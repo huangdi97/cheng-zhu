@@ -1,0 +1,70 @@
+import { existsSync } from 'node:fs'
+import { defineConfig, devices } from '@playwright/test'
+
+const LOOPBACK_NO_PROXY = ['127.0.0.1', 'localhost', '::1']
+const existingNoProxy = process.env.NO_PROXY || process.env.no_proxy || ''
+const nextNoProxy = Array.from(new Set([
+  ...existingNoProxy.split(',').map((item) => item.trim()).filter(Boolean),
+  ...LOOPBACK_NO_PROXY,
+])).join(',')
+process.env.NO_PROXY = nextNoProxy
+process.env.no_proxy = nextNoProxy
+
+const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4173)
+const BASE_URL = `http://127.0.0.1:${PORT}`
+// The CI workflow installs Playwright Chromium. On a Windows checkout the
+// bundled browser may not be installed yet, so use the already-installed
+// system Chrome for local E2E/snapshot work when available.
+const SYSTEM_CHROME = process.platform === 'win32'
+  ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  : ''
+const browserLaunchOptions = SYSTEM_CHROME && existsSync(SYSTEM_CHROME)
+  ? { executablePath: SYSTEM_CHROME }
+  : undefined
+
+export default defineConfig({
+  testDir: './e2e',
+  testMatch: /.*\.spec\.mjs$/,
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  reporter: process.env.CI
+    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
+    : 'list',
+  use: {
+    baseURL: BASE_URL,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    viewport: { width: 1440, height: 900 },
+    launchOptions: browserLaunchOptions,
+  },
+  // Snapshots live in e2e/__screenshots__/<file>/<name>-<platform>.png so
+  // Linux (CI) and macOS (local dev) baselines don't collide.
+  snapshotPathTemplate:
+    'e2e/__screenshots__/{testFilePath}/{arg}-{platform}{ext}',
+  expect: {
+    toHaveScreenshot: {
+      // ~0.5% allowed pixel diff handles font subpixel rendering noise.
+      maxDiffPixelRatio: 0.005,
+      threshold: 0.2,
+      animations: 'disabled',
+      // index.css 拉 Google Fonts，部分环境等待 document.fonts 较慢
+      timeout: 30_000,
+    },
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+  webServer: {
+    command: `npm run preview -- --host 127.0.0.1 --port ${PORT} --strictPort`,
+    url: BASE_URL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000,
+  },
+  outputDir: 'test-results',
+})

@@ -1,0 +1,16 @@
+{
+  "name": "cheng-zhu-desktop",
+  "version": "1.0.0",
+  "description": "成竹 Cheng Zhu - Electron 桌面端技术面试工作台",
+  "appDisplayName": "成竹",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^41.10.7"
+  }
+}

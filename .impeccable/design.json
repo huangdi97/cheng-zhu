@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-15T00:00:00+08:00",
+  "title": "Design System: 成竹 Cheng Zhu",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "rgb(0 92 197)",
+        "tonalRamp": [
+          "rgb(0 92 197 / 0.10)",
+          "rgb(0 92 197 / 0.25)",
+          "rgb(0 92 197)"
+        ]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Success Green",
+        "canonical": "rgb(16 124 16)",
+        "tonalRamp": [
+          "rgb(16 124 16 / 0.12)",
+          "rgb(16 124 16 / 0.25)",
+          "rgb(16 124 16)"
+        ]
+      },
+      "tertiary": {
+        "role": "tertiary",
+        "displayName": "Notice Amber",
+        "canonical": "rgb(184 134 11)",
+        "tonalRamp": [
+          "rgb(184 134 11 / 0.15)",
+          "rgb(184 134 11 / 0.45)",
+          "rgb(184 134 11)"
+        ]
+      },
+      "danger": {
+        "role": "danger",
+        "displayName": "Danger Red",
+        "canonical": "rgb(196 43 28)",
+        "tonalRamp": [
+          "rgb(196 43 28 / 0.12)",
+          "rgb(196 43 28 / 0.18)",
+          "rgb(196 43 28)"
+        ]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "App Background",
+        "canonical": "rgb(255 255 255)",
+        "tonalRamp": [
+          "rgb(255 255 255)",
+          "rgb(243 243 243)",
+          "rgb(237 237 237)"
+        ]
+      },
+      "neutral-surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "rgb(243 243 243)",
+        "tonalRamp": [
+          "rgb(255 255 255)",
+          "rgb(243 243 243)",
+          "rgb(237 237 237)"
+        ]
+      },
+      "neutral-border": {
+        "role": "neutral",
+        "displayName": "Subtle Border",
+        "canonical": "rgb(207 214 223)",
+        "tonalRamp": [
+          "rgb(207 214 223)",
+          "rgb(150 163 180)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "rgb(88 88 88)",
+        "tonalRamp": [
+          "rgb(88 88 88)",
+          "rgb(80 80 80)",
+          "rgb(30 30 30)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page and card titles only (20px/700)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Transcription, answers, descriptions (14px/400)."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Buttons, chips, labels, dense meta (12px/500)."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Numbers, tokens, timestamps, code (12px, tabular)."
+      }
+    },
+    "shadows": [
+      {
+        "name": "popover",
+        "value": "0 25px 50px -12px rgba(0,0,0,0.25)",
+        "purpose": "Floating layers: popovers, dropdowns, workbench."
+      },
+      {
+        "name": "glow-green",
+        "value": "0 0 10px -2px rgb(16 124 16 / 0.5)",
+        "purpose": "Active switch / recording glow."
+      },
+      {
+        "name": "glow-blue",
+        "value": "0 0 6px rgb(0 92 197 / 0.6)",
+        "purpose": "Active header dot / focus accent."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fade-up",
+        "value": "fade-up 0.3s ease-out both",
+        "purpose": "Popover and card entrance."
+      },
+      {
+        "name": "slide-left",
+        "value": "slide-in-left 0.25s ease-out both",
+        "purpose": "Left/right panel entrance (transcript, memo)."
+      },
+      {
+        "name": "recording-pulse",
+        "value": "pulse 1.6s ease-in-out infinite",
+        "purpose": "Recording indicator micro-pulse."
+      },
+      {
+        "name": "respect-reduced-motion",
+        "value": "none",
+        "purpose": "All animations disabled under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Single primary action per view.",
+      "html": "<button class=\"ds-btn-primary\">开始面试</button>",
+      "css": ".ds-btn-primary{background:rgb(0 92 197);color:#fff;font:500 12px/1.4 'Plus Jakarta Sans','Noto Sans SC',system-ui,sans-serif;padding:10px 20px;border:0;border-radius:8px;cursor:pointer;transition:filter .15s}.ds-btn-primary:hover{filter:brightness(1.1)}.ds-btn-primary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "32px header / row utility button with aria-label.",
+      "html": "<button class=\"ds-btn-icon\" aria-label=\"打开设置\">&#9881;</button>",
+      "css": ".ds-btn-icon{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;background:transparent;color:rgb(88 88 88);border:1px solid transparent;border-radius:12px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}.ds-btn-icon:hover{background:rgb(243 243 243);color:rgb(30 30 30);border-color:rgb(228 228 228)}.ds-btn-icon:focus-visible{outline:2px solid rgb(0 92 197 / .55);outline-offset:2px}"
+    },
+    {
+      "name": "Role Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Speaker / status labels (面试官, 你自己).",
+      "html": "<span class=\"ds-chip\">面试官</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:4px;font:500 10px/1.4 'Plus Jakarta Sans','Noto Sans SC',sans-serif;color:rgb(0 92 197);background:rgb(0 92 197 / .12);border:1px solid rgb(0 92 197 / .25);border-radius:9999px;padding:2px 6px}"
+    },
+    {
+      "name": "Switch",
+      "kind": "custom",
+      "refersTo": "switch",
+      "description": "On/off toggle; on = semantic green with glow.",
+      "html": "<button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\"><span class=\"ds-switch-knob\"></span></button>",
+      "css": ".ds-switch{width:36px;height:20px;border-radius:9999px;background:rgb(16 124 16);border:0;padding:0;position:relative;cursor:pointer;transition:background .2s;box-shadow:0 0 10px -2px rgb(16 124 16 / .5)}.ds-switch-knob{position:absolute;top:2px;left:18px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .2s}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Interview Workbench",
+    "overview": "本地优先的面试学习工具台。界面是操作型（Operate）的：高压、低注意力场景下，信息层级服务于「听题 → 转写 → 出答案」主链。世界由三层构成：语义化多主题（6 套主题共享同一套 --c-* 令牌）、玻璃拟态悬浮层、结果先行的并行可读平面。主题化机制是核心不变量：新组件必须只用语义令牌。",
+    "keyCharacteristics": [
+      "语义化多主题（6 套）",
+      "玻璃浮层 + 实色平面两级深度",
+      "角色化转录（面试官/你自己）",
+      "低音量实时动效（脉冲/电平条）",
+      "结果先行的双栏工作区"
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Accent Rule",
+        "body": "蓝=行动、绿=成功/录制、琥珀=注意/建议、红=错误/删除；同义分层用透明度，不新增色相。",
+        "section": "colors"
+      },
+      {
+        "name": "The Muted Floor Rule",
+        "body": "次要文本对比度不低于 text-muted（浅色 ~4.6:1）。",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Face Rule",
+        "body": "只用两族字体：Plus Jakarta Sans + Noto Sans SC 与 JetBrains Mono。",
+        "section": "typography"
+      },
+      {
+        "name": "The Two-Pane Interview Rule",
+        "body": "实时辅助主区固定 左转录 | 右答案 双栏，可选 288px 备忘常驻栏。",
+        "section": "layout"
+      },
+      {
+        "name": "The Glass Float Rule",
+        "body": "悬浮层用玻璃面浮起，实体面板用实色平面，两级深度不混淆。",
+        "section": "elevation"
+      },
+      {
+        "name": "The Focus Ring Rule",
+        "body": "键盘焦点统一 2px 语义色外环 + offset 2px。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "只用语义令牌，新组件先映射现有令牌",
+      "一个界面一个主按钮，蓝色唯一",
+      "纯图标按钮必带 aria-label",
+      "数字/耗时用等宽 + tabular-nums"
+    ],
+    "donts": [
+      "硬编码色值或新增状态色相",
+      "在实体面板上加投影冒充浮层",
+      "用 text-muted 更浅的对比度承载信息",
+      "引入第三族字体或新圆角体系",
+      "让弹层遮挡触发点"
+    ]
+  }
+}

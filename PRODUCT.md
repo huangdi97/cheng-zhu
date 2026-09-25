@@ -1,3 +1,8 @@
+<!-- CURRENT/HISTORICAL 状态说明 -->
+<!-- 本文件为 HISTORICAL（保留的既有设计稿，不再作为当前最高优先级设计）。 -->
+<!-- 当前最高优先级设计（Single Source of Truth）：docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md（canonical version: v1.0-R1 · date: 2026-09-25）。 -->
+<!-- 品牌已统一为：成竹 Chengzhu（不再使用 Cheng Zhu 作为正式英文品牌）。 -->
+
 # Product
 
 <!-- impeccable:product-schema 1 -->

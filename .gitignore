@@ -106,3 +106,6 @@ CODE_REVIEW.md
 .pytest-summary*/
 .pytest-workspace-tmp/
 .tmp-test/
+
+# PI-Desktop host session artifacts
+.pi/

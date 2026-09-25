@@ -1,8 +1,12 @@
-# 成竹 Cheng Zhu
+# 成竹 Chengzhu
 
-成竹（Cheng Zhu）是一套面向技术面试准备、实时练习与复盘的本地优先 AI 工作台。
+> **Resume-first, not Resume-bound.** Ready before you speak.
 
-实时听题，自动生成专业面试回答。你可以把它理解成一个开着就能用的面试辅助工具：你负责听题和临场反应，它负责转写、答题、截图审题，卡壳的时候还能把问答框挂在旁边。
+成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
+
+> 当前最高优先级设计（Single Source of Truth）：[docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md](docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md)（canonical version: v1.0-R1 · date: 2026-09-25）。历史文档（DESIGN.md / PRODUCT.md）已标注 HISTORICAL。
+
+实时听题，自动生成专业面试回答。它是一个开着就能用的面试辅助工具：你负责听题和临场反应，它负责转写、答题、截图审题，卡壳的时候还能把问答框挂在旁边。
 
 面向面试准备、模拟练习与复盘场景：支持系统音频 / 麦克风转写、截图审题、多模型切换、知识库引用；Electron 端提供 Boss Key、托盘和轻量悬浮窗，方便在本机学习与练习时快速查看回答建议。
 

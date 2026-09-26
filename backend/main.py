@@ -28,6 +28,7 @@ from api import common, assist, analytics, resume, jobs, review, prep
 from api import kb as kb_api
 from api import copilot as copilot_api
 from api import sessions as sessions_api
+from api import intelligence as intelligence_api
 
 setup_logging()
 _log = get_logger("app.main")
@@ -248,6 +249,7 @@ app.include_router(kb_api.router, prefix="/api")
 app.include_router(prep.router, prefix="/api")
 app.include_router(copilot_api.router, prefix="/api")
 app.include_router(sessions_api.router, prefix="/api")
+app.include_router(intelligence_api.intelligence_router, prefix="/api/intelligence")
 
 
 if os.path.isdir(FRONTEND_DIR):

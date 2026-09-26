@@ -32,6 +32,7 @@ FAST_BUDGET_TOKENS = 1400
 DEEP_BUDGET_TOKENS = 3200
 _FAST_SELECT_LIMIT = 6
 _DEEP_SELECT_LIMIT = 12
+_PROVIDER_FETCH_LIMIT = 24
 
 
 class ContextProvider(Protocol):
@@ -228,7 +229,7 @@ class ContextCompiler:
         candidates: list[ContextItem] = []
         for provider in self._providers:
             try:
-                candidates.extend(provider.collect(question_text, limit=limit))
+                candidates.extend(provider.collect(question_text, limit=_PROVIDER_FETCH_LIMIT))
             except Exception as exc:  # noqa: BLE001
                 # One failing provider must not lose the whole package.
                 _log.warning("context provider %s failed: %s", provider.source_type.value, exc)

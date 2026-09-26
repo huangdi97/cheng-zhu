@@ -150,11 +150,11 @@ class AppConfig(BaseModel):
     language: str = "Python"
     # 回答语言：中文 / English（控制答案输出语言，区别于上面的编程语言）
     answer_language: str = "中文"
-    # ?? JD?PrepSpace ??/????????????????????????? <jd_context>?
+    # JD / PrepSpace 的岗位描述文本；注入回答 prompt 的 <jd_context> 段
     jd_text: Optional[str] = None
-    # ??????????????? <notes>?????
+    # 面试笔记文本；注入回答 prompt 的 <notes> 段
     interview_notes: Optional[str] = None
-    # ???? JD?????????? JD ??????????
+    # 回答时对齐 JD：把当前问题与 JD 要求一起交给模型参考
     assist_answer_align_jd_enabled: bool = True
     # ??????????????????????????
     assist_inline_translation_enabled: bool = False
@@ -167,6 +167,24 @@ class AppConfig(BaseModel):
     resume_text: Optional[str] = None
     # 当前生效的简历对应的历史记录 id（写入 config.json；简历正文仍不入库）
     resume_active_history_id: Optional[int] = None
+    # ----------------- Intelligence Core (v1.0-R1) -----------------
+    # 分阶段 feature flags（canonical Stage Y）：新路径先 flag 接入，收口后默认开启。
+    # Stage A：Candidate Representation（简历 → 结构化候选人表示）
+    intelligence_candidate_v1: bool = True
+    # Stage G：Context Compiler（最小充分上下文包）
+    intelligence_context_compiler_v1: bool = True
+    # Stage H：Answer Planner（结构化回答计划）
+    intelligence_answer_planner_v1: bool = True
+    # Stage J：Live cue-first 双路径（Fast/Deep）
+    intelligence_live_cue_v1: bool = True
+    # Stage F：Interviewer State（概率性面试官状态；关闭时系统功能完全正常）
+    interviewer_state_enabled: bool = True
+    # Stage M：Personal Voice（个人表达风格；关闭时答案不受风格影响）
+    voice_profile_enabled: bool = False
+    # Stage P：AI policy mode（AI_FORBIDDEN / AI_LIMITED / AI_ALLOWED / AI_EXPECTED）
+    ai_policy_mode: str = "AI_ALLOWED"
+    # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）
+    raw_audio_retention_sessions: int = 0
 
     auto_detect: bool = True
     # off=仅转录；smart=高置信度自动答、模糊题二次判定；always=有效问句直接入队。

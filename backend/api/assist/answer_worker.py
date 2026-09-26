@@ -1112,6 +1112,39 @@ def process_question_parallel(
         relation_to_previous=("follow_up" if is_followup else relation_hint),
         high_churn_short_answer=high_churn_short_answer,
     )
+    # ----------------- Intelligence Core (v1.0-R1) -----------------
+    # Stage D/H/E: 21-type understanding + structured plan + incremental state.
+    # Strictly additive: existing grounding/followup/candidate-ASR safeguards
+    # above keep running; failures degrade to the legacy path.
+    intelligence_layer: dict = {}
+    if bool(getattr(cfg, "intelligence_answer_planner_v1", True)):
+        try:
+            from services.intelligence.realtime_bridge import build_intelligence_layer
+
+            intelligence_layer = build_intelligence_layer(
+                question_text,
+                previous_question=last_qa.question if last_qa else "",
+                relation_to_previous=("follow_up" if is_followup else relation_hint),
+                session_ref=session_ref,
+                grounding_status=experience_grounding.status,
+                interviewer_state_enabled=bool(getattr(cfg, "interviewer_state_enabled", False)),
+            )
+            intel_plan_prompt = str(intelligence_layer.get("plan_prompt") or "")
+            intel_state_context = str(intelligence_layer.get("state_context") or "")
+            if intel_state_context and not written_exam:
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": intel_state_context})
+                else:
+                    user_for_llm = f"{intel_state_context}\n{user_for_llm}"
+            if intel_plan_prompt:
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": intel_plan_prompt})
+                else:
+                    user_for_llm = f"{intel_plan_prompt}\n{user_for_llm}"
+        except Exception as exc:  # noqa: BLE001
+            deps.error_logger.warning("intelligence layer failed id=%s: %s", qa_id, exc)
+            intelligence_layer = {}
+
 
     system_prompt = build_system_prompt(
         manual_input=manual_input,
@@ -1373,6 +1406,23 @@ def process_question_parallel(
         (first_token_mono - gen_start) * 1000 if first_token_mono else gen_elapsed
     )
 
+    # Stage J/Q: TTFUG telemetry — first USEFUL guidance is the first answer
+    # token for the candidate; deep completion is recorded separately in commit.
+    if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+        try:
+            from services.intelligence.telemetry import record_guidance_event
+
+            record_guidance_event(
+                str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                "first_useful_guidance",
+                route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                provider=str(getattr(model_cfg, "name", "") or ""),
+                model=str(getattr(model_cfg, "model", "") or ""),
+                latency_ms=int(first_token_ms),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
     if deps.abort_check():
         deps.logger.info("ANSWER_CANCEL id=%s after=%.0fms", qa_id, gen_elapsed)
         _broadcast({"type": "answer_cancelled", "id": qa_id})
@@ -1392,6 +1442,39 @@ def process_question_parallel(
                 experience_grounding.status,
                 experience_grounding.subject,
             )
+        # Unified Truth Boundary post-check (Stage B): additional violation
+        # detection (internal leakage, unexpected metric, subject substitution)
+        # WITHOUT weakening the deterministic grounding above — violations the
+        # grounding already accepted are never re-flagged here.
+        if bool(getattr(cfg, "intelligence_answer_planner_v1", True)):
+            try:
+                from services.intelligence.truth_boundary import (
+                    TruthBoundary,
+                    check_generated_answer,
+                    classify_output_space,
+                    map_grounding_status,
+                )
+
+                truth_result = check_generated_answer(
+                    full_answer,
+                    boundary=TruthBoundary(
+                        grounding=experience_grounding,
+                        output_space=classify_output_space(experience_grounding),
+                        truth_status=map_grounding_status(experience_grounding.status),
+                    ),
+                    evidence_texts=[experience_grounding.evidence_excerpt] if experience_grounding.evidence_excerpt else [],
+                    question_text=question_text,
+                )
+                if truth_result.fallback_used and truth_result.final_text:
+                    full_answer = truth_result.final_text
+                    grounding_replaced = True
+                    deps.logger.warning(
+                        "TRUTH_BOUNDARY_REWRITE id=%s violations=%s",
+                        qa_id,
+                        [v.get("kind") for v in truth_result.violations],
+                    )
+            except Exception as exc:  # noqa: BLE001
+                deps.error_logger.warning("truth boundary check failed id=%s: %s", qa_id, exc)
         if full_answer:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": full_answer})
     else:
@@ -1498,8 +1581,41 @@ def process_question_parallel(
                     "model_name": display_model_name,
                     "first_token_ms": int(first_token_ms),
                     "total_ms": int(gen_elapsed),
+                    # GuidanceViewModel payload (Stage K): glance-first data;
+                    # components consume this instead of raw prompt responses.
+                    "guidance": {
+                        "core_ideas": list((intelligence_layer.get("plan") or {}).get("structure", []) or [])[:6],
+                        "evidence": (
+                            [experience_grounding.evidence_excerpt[:160]]
+                            if experience_grounding.evidence_excerpt
+                            else []
+                        ),
+                        "mode": str((intelligence_layer.get("plan") or {}).get("mode", "") or ""),
+                        "intent": list((intelligence_layer.get("plan") or {}).get("intent", []) or [])[:3],
+                        "resolved_question": str((intelligence_layer.get("understanding") or {}).get("resolved_question", "") or ""),
+                        "state_context": str(intelligence_layer.get("state_context") or ""),
+                    },
                 }
             )
+            # Stage Q: committed turn telemetry + route event (never breaks the
+            # realtime path); guidance is never written as a candidate fact.
+            if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+                try:
+                    from services.intelligence.realtime_bridge import record_committed_turn
+
+                    record_committed_turn(
+                        str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                        seq=seq,
+                        question_raw=question_text[:200],
+                        question_resolved=str((intelligence_layer.get("understanding") or {}).get("resolved_question", "") or "")[:200],
+                        question_type=str((intelligence_layer.get("understanding") or {}).get("question_type", "") or ""),
+                        route=str((intelligence_layer.get("plan") or {}).get("mode", "") or ""),
+                        guidance_text=full_answer[:200],
+                        latency_ms=int(gen_elapsed),
+                        answer_plan=intelligence_layer.get("plan") or {},
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
             deps.broadcast(
                 {
                     "type": "token_update",

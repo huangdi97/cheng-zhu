@@ -12,11 +12,18 @@ from __future__ import annotations
 
 from services.intelligence.followup_resolver import resolve_followup
 from services.intelligence.interview_state import apply_event, compact_state_context, get_state
+from services.intelligence.interviewer_state import (
+    InterviewerState,
+    planner_hint,
+    update_interviewer_state,
+)
 from services.intelligence.question_understanding import understand_question
 from services.intelligence.truth_boundary import map_grounding_status
 from services.intelligence.types import InterviewState
 
 DEFAULT_SESSION_ID = "default"
+
+_INTERVIEWER_STATES: dict[str, InterviewerState] = {}
 
 
 def _session_id_of(session_ref) -> str:
@@ -34,6 +41,7 @@ def build_intelligence_layer(
     session_ref=None,
     grounding_status: str = "",
     interviewer_state_enabled: bool = True,
+    planner_enabled: bool = True,
     open_threads: list[str] | None = None,
 ) -> dict:
     """Understand the question, update the interview state, and build the
@@ -88,6 +96,20 @@ def build_intelligence_layer(
     if planner_enabled:
         from services.intelligence.answer_planner import create_plan
 
+        interviewer = None
+        if interviewer_state_enabled:
+            interviewer = _INTERVIEWER_STATES.get(resolved_session_id) or InterviewerState(
+                session_id=resolved_session_id
+            )
+            # Probabilistic inference updated per turn; decays between turns
+            # are handled by the planner-facing decay() entry.
+            interviewer = update_interviewer_state(
+                interviewer,
+                question_type=understanding.question_type.value,
+                intent=understanding.intent,
+                topic=understanding.follow_up_target or understanding.resolved_question,
+            )
+            _INTERVIEWER_STATES[resolved_session_id] = interviewer
         plan = create_plan(
             understanding.question_type,
             resolved_question=resolved_question,
@@ -95,7 +117,7 @@ def build_intelligence_layer(
             expected_depth=understanding.expected_depth,
             truth_status=map_grounding_status(grounding_status).value,
             personal_fact_required=understanding.personal_fact_required,
-            interviewer_state=(state if interviewer_state_enabled else None),
+            interviewer_state=interviewer,
             open_world_allowed=understanding.open_world_allowed,
         )
         payload["plan"] = plan.payload()

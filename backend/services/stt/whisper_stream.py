@@ -1,4 +1,4 @@
-"""Local faster-whisper sliding-window streaming preview for Cheng Zhu.
+"""Local faster-whisper sliding-window streaming preview for Chengzhu.
 
 Feeds growing 16k mono float32 audio; a background decode thread periodically
 transcribes the current window (language fixed, beam_size=1,

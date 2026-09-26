@@ -126,7 +126,7 @@ def _preload_stt():
         _log.debug("Whisper fallback preload skipped: %s", e)
 
 
-app = FastAPI(title="成竹 Cheng Zhu", lifespan=lifespan)
+app = FastAPI(title="成竹 Chengzhu", lifespan=lifespan)
 
 # CORS: 默认只允许后端自身的 loopback origin。局域网扫码页面与桌面端均为同源访问,
 # 不需要跨源；如确需单独前端直连后端，可通过 IA_CORS_REGEX 显式放宽。

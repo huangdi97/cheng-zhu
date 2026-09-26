@@ -1,8 +1,8 @@
-# 成竹 Cheng Zhu — 项目归属与来源说明
+# 成竹 Chengzhu — 项目归属与来源说明
 
 ## 当前发布归属
 
-- 项目名称：成竹（Cheng Zhu）
+- 项目名称：成竹（Chengzhu）
 - 维护与发布者：`huangdi97`
 - 公共仓库：<https://github.com/huangdi97/cheng-zhu>
 - 当前产品路线、默认配置、界面文案、构建脚本和后续版本，均以本仓库为准。

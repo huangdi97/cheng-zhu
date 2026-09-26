@@ -157,12 +157,14 @@ def list_claims(candidate_id: str, limit: int = 500) -> list[dict[str, Any]]:
 
 
 def update_claim_status(claim_id: str, truth_status: str, confidence: Optional[float] = None) -> bool:
-    params: list[Any] = [truth_status]
+    # Params follow the SQL placeholder order: status, updated_at,
+    # [confidence], id — appending confidence before updated_at would swap
+    # the two values silently.
+    params: list[Any] = [truth_status, time.time()]
     query = "UPDATE claim SET truth_status = ?, updated_at = ?"
     if confidence is not None:
         query += ", confidence = ?"
         params.append(float(confidence))
-    params.append(time.time())
     query += " WHERE id = ?"
     params.append(claim_id)
     with _LOCK:

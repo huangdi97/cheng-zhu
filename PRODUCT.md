@@ -79,7 +79,7 @@ web
 
 ## Brand Commitments
 
-- 显示名：`成竹`（英文：`Cheng Zhu`，见 desktop/app-title.json）；README 标题：`成竹 Cheng Zhu`
+- 显示名：`成竹`（英文：`Chengzhu`，见 desktop/app-title.json）；README 标题：`成竹 Chengzhu`
 - 无外部品牌资产、logo、颜色、字体等绑定承诺（视觉世界由 DESIGN.md 记录时另行确认）
 - 口语化、结果先行的中文产品文案基调（现有 UI 与 README 一致）
 

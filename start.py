@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unified launcher for Cheng Zhu (成竹)."""
+"""Unified launcher for Chengzhu (成竹)."""
 
 import argparse
 import contextlib
@@ -343,7 +343,7 @@ def _port_in_use(port: int) -> bool:
 
 
 def _is_our_server_running(port: int) -> bool:
-    """Return True if the Cheng Zhu backend is already serving on port."""
+    """Return True if the Chengzhu backend is already serving on port."""
     if not _port_in_use(port):
         return False
     try:
@@ -542,7 +542,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 50)
-    print("  成竹 Cheng Zhu")
+    print("  成竹 Chengzhu")
     print("=" * 50)
     print()
 

@@ -1,4 +1,4 @@
-"""Tests for Cheng Zhu's local Whisper preview and Doubao feed format."""
+"""Tests for Chengzhu's local Whisper preview and Doubao feed format."""
 
 from __future__ import annotations
 

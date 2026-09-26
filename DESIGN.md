@@ -4,7 +4,7 @@
 <!-- 品牌已统一为：成竹 Chengzhu（不再使用 Cheng Zhu 作为正式英文品牌）。 -->
 
 ---
-name: 成竹 Cheng Zhu
+name: 成竹 Chengzhu
 description: 本地优先的面试学习工具台：实时转录 + AI 回答 + 准备/复盘闭环，语义化多主题的 Operate 界面
 colors:
   primary: "rgb(0 92 197)"
@@ -91,7 +91,7 @@ components:
     height: "20px"
 ---
 
-# 成竹 Cheng Zhu — Design System
+# 成竹 Chengzhu — Design System
 
 ## Overview
 

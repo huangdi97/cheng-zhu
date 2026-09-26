@@ -220,6 +220,16 @@ python -m pytest backend/tests -q
 `http://localhost:18080`。只有 `python start.py --mode network`、`IA_AUTH_ENABLE=1`
 或设置了 `IA_AUTH_TOKEN` 时，才会要求局域网请求携带 token。
 
+## 文档
+
+canonical（唯一当前最高优先级设计）：[docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md](docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md)；架构与专题文档：
+
+| 分类 | 文档 |
+| --- | --- |
+| 架构 | [Intelligence Core](docs/architecture/INTELLIGENCE_CORE.md) · [Candidate Representation](docs/architecture/CANDIDATE_REPRESENTATION.md) · [Truth Boundary](docs/architecture/TRUTH_BOUNDARY.md) · [Interview State](docs/architecture/INTERVIEW_STATE.md) · [Context Compiler](docs/architecture/CONTEXT_COMPILER.md) · [Answer Planner](docs/architecture/ANSWER_PLANNER.md) · [Memory](docs/architecture/MEMORY.md) · [Realtime Pipeline](docs/architecture/REALTIME_PIPELINE.md) |
+| 产品 | [Live UX](docs/product/LIVE_UX.md) · [Prepare / Mock / Review](docs/product/PREP_MOCK_REVIEW.md) |
+| 评测 | [Eval Protocol](docs/evals/EVAL_PROTOCOL.md) |
+| 隐私 | [Privacy 与 Policy](docs/privacy/PRIVACY_AND_POLICY.md) |
 ## README 素材更新
 
 ```bash

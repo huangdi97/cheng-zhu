@@ -272,7 +272,7 @@ def latest_job_id() -> str:
 
 def save_state_snapshot(session_id: str, version: int, state_json: str) -> None:
     _write(
-        "INSERT INTO interview_state_snapshot (id, session_id, version, state_json, created_at) VALUES (?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO interview_state_snapshot (id, session_id, version, state_json, created_at) VALUES (?, ?, ?, ?, ?)",
         (f"{session_id}-{version}", session_id, version, state_json, time.time()),
     )
 

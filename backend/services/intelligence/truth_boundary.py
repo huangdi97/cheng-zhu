@@ -36,13 +36,38 @@ _INTERNAL_LEAK = re.compile(
     re.IGNORECASE,
 )
 _POSITIVE_CLAIM = re.compile(
-    r"(?:我|我们)(?:确实|曾经|之前|实际|有|在.{0,16})?(?:做过|用过|使用过|负责过|参与过|实现过|落地过|部署过|开发过|设计过|搭建过)"
-    r"|(?:我|本人|我们)\s*(?:用|使用|负责|参与|实现|落地|部署|维护|开发|设计|搭建)",
+    r"(?:我|我们)(?:确实|曾经|之前|实际|当时|那时候|有|在.{0,16})?(?:做过|用过|使用过|负责过|参与过|实现过|落地过|部署过|开发过|设计过|搭建过)"
+    r"|(?:我|本人|我们)[\s当时那]{0,4}(?:用|使用|负责|参与|实现|落地|部署|维护|开发|设计|搭建)",
     re.IGNORECASE,
 )
 _NEGATION_PREFIX = re.compile(r"(?:没有|没|未|从未|不|尚未).{0,8}$", re.IGNORECASE)
 _HYPOTHETICAL_MARKERS = ("如果", "假如", "假设", "要是", "比如", "would", "if ")
 _SUBJECT_SUBSTITUTION_HINT = re.compile(r"(?:这块我主要是|换个话题|说到这个|其实我更熟悉)", re.IGNORECASE)
+
+
+def _claim_meaningful_terms(text: str) -> list[str]:
+    """Meaningful terms of a claimed text (ASCII tokens + CJK chunks)."""
+    lowered = (text or "").lower()
+    tokens = [token for token in re.findall(r"[a-z][a-z0-9+#.\-/]{1,}", lowered) if len(token) > 2]
+    for chunk in re.findall(r"[\\u4e00-\\u9fff]{2,}", lowered):
+        tokens.append(chunk)
+    return tokens[:10]
+
+
+_DOWNGRADE_SUBJECT = re.compile(
+    r"(?:我|我们|本人)(?:确实|曾经|之前|实际|当时|那时候|在[^，,]{0,12})?"
+    r"(?:用了|用了过|做过|用过|实现过|搭建过|部署过|负责过|使用过)",
+    re.IGNORECASE,
+)
+
+
+def _downgrade_to_boundary(text: str) -> str:
+    """Downgrade unsupported first-person experience claims to knowledge
+    phrasing (master doc B4: rewrite / downgrade / fallback)."""
+    downgraded = _DOWNGRADE_SUBJECT.sub("可以用", text or "")
+    if downgraded == (text or ""):
+        return f"（事实边界：我没有直接做过这件事，以下是通用说明。）{(text or '').strip()}"
+    return downgraded
 
 
 def claim_policy_text(status: TruthStatus | str) -> str:
@@ -158,16 +183,25 @@ def check_generated_answer(
                 if number not in evidence_blob and number not in question_text.lower():
                     violations.append({"kind": "unexpected_metric", "detail": f"证据外指标 {number}"})
                     break
-        if boundary.applicable and boundary.truth_status in {
+        # Unsupported personal claims are checked for EVERY non-supported
+        # output (not only experience-verification questions): "no evidence"
+        # must never become a first-person experience claim. The evidence
+        # anchor requires a composite match - every meaningful term of the
+        # claimed text must be covered by evidence, not just one token.
+        if boundary.truth_status in {
             TruthStatus.UNKNOWN,
             TruthStatus.INFERRED,
             TruthStatus.CONTRADICTED,
-        }:
+        } or not boundary.applicable:
             for match in _POSITIVE_CLAIM.finditer(text):
                 prefix = text[max(0, match.start() - 16):match.start()]
-                if not _NEGATION_PREFIX.search(prefix) and "如果" not in text[max(0, match.start() - 24):match.start()]:
-                    violations.append({"kind": "unsupported_personal_claim", "detail": "无证据第一人称经历声称"})
-                    break
+                if _NEGATION_PREFIX.search(prefix) or "如果" in text[max(0, match.start() - 24):match.start()]:
+                    continue
+                claim_terms = _claim_meaningful_terms(text)
+                if claim_terms and evidence_blob and all(term in evidence_blob for term in claim_terms):
+                    continue
+                violations.append({"kind": "unsupported_personal_claim", "detail": "无证据第一人称经历声称"})
+                break
 
     if violations:
         final_text, rewritten = enforce_truth(text, boundary)
@@ -181,13 +215,26 @@ def check_generated_answer(
                 actions=actions,
                 fallback_used=True,
             )
-        # Grounding judged the prose acceptable (e.g. honest negation);
-        # violations were conservative false positives.
+        if boundary.applicable:
+            # Grounding judged the prose acceptable (e.g. honest negation);
+            # violations were conservative false positives.
+            return TruthCheckResult(
+                original_text=text,
+                final_text=text,
+                passed=True,
+                violations=[],
+                actions=["grounding_kept_prose"],
+            )
+        # Not an experience-verification question, but the output contains an
+        # unsupported first-person experience claim: downgrade the language so
+        # "no evidence" never becomes a first-person fact (master doc B4).
+        bounded = _downgrade_to_boundary(text)
         return TruthCheckResult(
             original_text=text,
-            final_text=text,
-            passed=True,
-            violations=[],
-            actions=["grounding_kept_prose"],
+            final_text=bounded,
+            passed=False,
+            violations=violations,
+            actions=[*actions, "downgrade_to_boundary"],
+            fallback_used=True,
         )
     return TruthCheckResult(original_text=text, final_text=text, passed=True)

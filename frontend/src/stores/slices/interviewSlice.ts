@@ -137,6 +137,7 @@ export interface InterviewSliceActions {
     modelName?: string,
     firstTokenMs?: number,
     totalMs?: number,
+    guidance?: unknown,
   ) => void
   cancelAnswer: (id: string) => void
   errorAnswer: (id: string, message: string) => void
@@ -280,7 +281,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
     _scheduleChunkFlush(set)
   },
 
-  finalizeAnswer: (id, question, answer, thinkContent, modelName, firstTokenMs, totalMs) => {
+  finalizeAnswer: (id, question, answer, thinkContent, modelName, firstTokenMs, totalMs, guidance) => {
     _chunkBuffer.delete(id)
     set((s) => {
       const next = s.streamingIds.filter((x) => x !== id)
@@ -297,6 +298,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
                   modelLabel: modelName ?? qa.modelLabel,
                   firstTokenMs: firstTokenMs ?? qa.firstTokenMs,
                   totalMs: totalMs ?? qa.totalMs,
+                  guidance: guidance ?? qa.guidance,
                   status: 'done' as QAStatus,
                 }
               : qa,
@@ -313,6 +315,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
               modelLabel: modelName,
               firstTokenMs,
               totalMs,
+              guidance,
               status: 'done' as QAStatus,
             },
           ]

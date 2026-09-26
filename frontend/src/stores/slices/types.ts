@@ -167,6 +167,8 @@ export interface QAPair {
   modelLabel?: string
   firstTokenMs?: number
   totalMs?: number
+  /** WS answer_done 携带的原始 guidance 负载（unknown），渲染时经 buildGuidanceViewModel 解析 */
+  guidance?: unknown
   visionVerify?: { verdict: 'PASS' | 'FAIL' | 'UNKNOWN'; reason: string }
   status?: QAStatus
   errorMessage?: string

@@ -187,6 +187,7 @@ export function useInterviewWS(active = true) {
           msg.model_name as string,
           msg.first_token_ms as number | undefined,
           msg.total_ms as number | undefined,
+          msg.guidance,
         )
         if (useInterviewStore.getState().streamingIds.length === 0) {
           s.setQuestionParseStatus(null)

@@ -4,6 +4,8 @@ import { useInterviewStore, QAPair } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import KbReferenceBanner from '@/components/kb/KbReferenceBanner'
 import type { ColorSchemeId } from '@/lib/colorScheme'
+import { buildGuidanceViewModel, isGlanceReady } from '@/lib/guidanceViewModel'
+import GuidanceFirstScreen from './GuidanceFirstScreen'
 
 const SoundTest = lazy(() => import('./SoundTest'))
 const WrittenExamTest = lazy(() => import('./WrittenExamTest'))
@@ -191,6 +193,8 @@ type QACardProps = {
 const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, animate, animateDelayMs }: QACardProps) {
   const srcLabel = sourceLabel(qa.questionSource)
   const suggestion = useInterviewStore((s) => s.suggestionsById[qa.id])
+  const guidanceVm = buildGuidanceViewModel(qa.guidance)
+  const showGuidanceFirstScreen = isGlanceReady(guidanceVm)
   const baseClass = animate ? 'animate-fade-up' : ''
   const animStyle = animate ? { animationDelay: `${animateDelayMs}ms` } : undefined
 
@@ -253,7 +257,16 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
               )}
             </div>
             <KbReferenceBanner qaId={qa.id} />
-            {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
+            {showGuidanceFirstScreen ? (
+              <GuidanceFirstScreen
+                vm={guidanceVm}
+                answer={qa.answer}
+                colorScheme={colorScheme}
+                isStreaming={isStreaming}
+              />
+            ) : (
+              renderAnswerBody(qa, isStreaming, stream, colorScheme)
+            )}
           </div>
         </div>
       </div>
@@ -316,7 +329,16 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
             )}
           </div>
           <KbReferenceBanner qaId={qa.id} />
-          {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
+          {showGuidanceFirstScreen ? (
+            <GuidanceFirstScreen
+              vm={guidanceVm}
+              answer={qa.answer}
+              colorScheme={colorScheme}
+              isStreaming={isStreaming}
+            />
+          ) : (
+            renderAnswerBody(qa, isStreaming, stream, colorScheme)
+          )}
         </div>
       </div>
       {suggestion && !isStreaming && (

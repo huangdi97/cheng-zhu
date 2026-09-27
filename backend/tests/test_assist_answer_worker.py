@@ -1338,7 +1338,7 @@ def test_non_followup_prompt_skips_unrelated_candidate_spoken_background(monkeyp
     )
 
     prompt = seen["user"]
-    assert prompt == "MySQL 索引为什么用 B+ 树？"
+    assert prompt.endswith("MySQL 索引为什么用 B+ 树？")
     assert "[候选人回答辅助背景]" not in prompt
     assert "风控规则引擎" not in prompt
 

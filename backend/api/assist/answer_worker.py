@@ -1131,12 +1131,14 @@ def process_question_parallel(
             )
             intel_plan_prompt = str(intelligence_layer.get("plan_prompt") or "")
             intel_state_context = str(intelligence_layer.get("state_context") or "")
-            if intel_state_context and not written_exam:
+            if intel_state_context and not written_exam and not images:
                 if isinstance(user_for_llm, list):
                     user_for_llm.insert(0, {"type": "text", "text": intel_state_context})
                 else:
                     user_for_llm = f"{intel_state_context}\n{user_for_llm}"
-            if intel_plan_prompt:
+            # Written-exam keeps its fixed message contract (revision context +
+            # 题面 only); the plan prompt is for the live spoken path.
+            if intel_plan_prompt and not written_exam and not images:
                 if isinstance(user_for_llm, list):
                     user_for_llm.insert(0, {"type": "text", "text": intel_plan_prompt})
                 else:

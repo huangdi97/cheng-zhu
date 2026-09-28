@@ -111,7 +111,7 @@ describe('App bootstrap', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: '实时辅助' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: '上场' })).toBeInTheDocument()
     })
 
     expect(screen.queryByText('连接后端失败')).not.toBeInTheDocument()
@@ -338,7 +338,7 @@ describe('Window control buttons', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: '实时辅助' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: '上场' })).toBeInTheDocument()
     })
 
     expect(screen.queryByRole('button', { name: '最小化窗口' })).not.toBeInTheDocument()

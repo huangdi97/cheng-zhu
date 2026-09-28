@@ -40,7 +40,7 @@ test.describe('job tracker and review linkage', () => {
 
     await page.goto('/')
 
-    await expect(page.getByRole('tab', { name: '面试复盘' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: '复盘' })).toHaveAttribute('aria-selected', 'true')
     const linkedReviewRow = page.locator('article').filter({ hasText: '二面复盘' }).first()
     await expect(linkedReviewRow).toBeVisible()
     await linkedReviewRow.click()

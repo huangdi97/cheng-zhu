@@ -29,11 +29,11 @@ test.describe('app shell', () => {
   test('module tabs switch between assist / review / knowledge / resume / job-tracker', async ({ page }) => {
     await page.goto('/')
 
-    const assistTab = page.getByRole('tab', { name: '实时辅助' })
-    const reviewTab = page.getByRole('tab', { name: '面试复盘' })
+    const assistTab = page.getByRole('tab', { name: '上场' })
+    const reviewTab = page.getByRole('tab', { name: '复盘' })
     const knowledgeTab = page.getByRole('tab', { name: '能力分析' })
-    const resumeTab = page.getByRole('tab', { name: '简历优化' })
-    const jobTab = page.getByRole('tab', { name: /求职看板/ })
+    const resumeTab = page.getByRole('tab', { name: '我的成竹' })
+    const jobTab = page.getByRole('tab', { name: /岗位/ })
 
     await expect(assistTab).toHaveAttribute('aria-selected', 'true')
 

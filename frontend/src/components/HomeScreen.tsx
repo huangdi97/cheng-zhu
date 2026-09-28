@@ -34,7 +34,7 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'assist',
     icon: Radio,
-    title: '实时辅助',
+    title: '上场',
     desc: '对方声音实时转录 · AI 自动回答 · 滚动备忘',
     accent: 'text-container-on-secondary',
     tile: 'bg-container-secondary',
@@ -43,7 +43,7 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'prep',
     icon: BookOpenCheck,
-    title: '面试准备',
+    title: '演练',
     desc: '技能卡 · 真题预测 · 模拟面试',
     accent: 'text-container-on-primary',
     tile: 'bg-container-primary',
@@ -52,7 +52,7 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'review',
     icon: ClipboardList,
-    title: '面试复盘',
+    title: '复盘',
     desc: '逐轮亮点/风险 · 整体评价 · 导出 MD/JSON',
     accent: 'text-container-on-tertiary',
     tile: 'bg-container-tertiary',
@@ -70,7 +70,7 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'resume-opt',
     icon: FileText,
-    title: '简历优化',
+    title: '我的成竹',
     desc: '对照 JD 命中/缺失分析 · 逐条建议',
     accent: 'text-container-on-secondary',
     tile: 'bg-container-secondary',
@@ -79,7 +79,7 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'job-tracker',
     icon: Kanban,
-    title: '求职看板',
+    title: '岗位',
     desc: '投递进度 · Offer 对比 · 复盘串联',
     accent: 'text-container-on-tertiary',
     tile: 'bg-container-tertiary',
@@ -225,7 +225,7 @@ export default function HomeScreen() {
         </div>
 
         <p className="text-xs text-text-muted mt-8 leading-relaxed">
-          提示：面试前在「面试准备」里准备好岗位和技能卡；面试中用「实时辅助」抓对方问题，系统音频（★扬声器）→ 实时转录 → AI 自动回答；结束后去「面试复盘」生成分析。
+          提示：面试前在「演练」里准备好岗位和技能卡；面试中用「上场」抓对方问题，系统音频（★扬声器）→ 实时转录 → AI 自动回答；结束后去「复盘」生成分析。
         </p>
       </div>
 
@@ -234,7 +234,7 @@ export default function HomeScreen() {
         type="button"
         onClick={() => setAppMode('assist')}
         aria-label="开始面试"
-        title="进入实时辅助"
+        title="进入上场"
         className="fixed bottom-8 right-8 z-30 inline-flex items-center gap-2 rounded-full bg-accent-blue text-white pl-4 pr-5 py-3 text-sm font-semibold shadow-lg shadow-accent-blue/30 transition-all hover:brightness-110 active:scale-[0.98]"
       >
         <Mic className="w-4 h-4" aria-hidden />

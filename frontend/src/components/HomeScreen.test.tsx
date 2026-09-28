@@ -11,20 +11,20 @@ describe('HomeScreen', () => {
 
   it('shows the two entry cards', () => {
     render(<HomeScreen />)
-    expect(screen.getByText('面试准备')).toBeTruthy()
-    expect(screen.getByText('实时辅助')).toBeTruthy()
+    expect(screen.getByText('演练')).toBeTruthy()
+    expect(screen.getByText('上场')).toBeTruthy()
     expect(screen.getByText('先准备，再上场 —— 一个工作台，覆盖准备 → 实战 → 复盘全流程')).toBeTruthy()
   })
 
   it('clicking prep card switches to prep mode', () => {
     render(<HomeScreen />)
-    fireEvent.click(screen.getByText('面试准备'))
+    fireEvent.click(screen.getByText('演练'))
     expect(useUiPrefsStore.getState().appMode).toBe('prep')
   })
 
   it('clicking assist card switches to assist mode', () => {
     render(<HomeScreen />)
-    fireEvent.click(screen.getByText('实时辅助'))
+    fireEvent.click(screen.getByText('上场'))
     expect(useUiPrefsStore.getState().appMode).toBe('assist')
   })
 })

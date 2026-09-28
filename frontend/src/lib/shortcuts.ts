@@ -35,7 +35,7 @@ export const defaultShortcuts: Record<ShortcutAction, ShortcutConfig> = {
     key: 'CommandOrControl+.',
     defaultKey: 'CommandOrControl+.',
     label: '硬清空',
-    category: '实时辅助',
+    category: '上场',
     status: 'available',
   },
   askFromServerScreen: {
@@ -43,7 +43,7 @@ export const defaultShortcuts: Record<ShortcutAction, ShortcutConfig> = {
     key: 'CommandOrControl+/',
     defaultKey: 'CommandOrControl+/',
     label: '服务端截图审题',
-    category: '实时辅助',
+    category: '上场',
     status: 'available',
   },
   cancelAnswer: {
@@ -51,7 +51,7 @@ export const defaultShortcuts: Record<ShortcutAction, ShortcutConfig> = {
     key: 'CommandOrControl+Escape',
     defaultKey: 'CommandOrControl+Escape',
     label: '取消生成',
-    category: '实时辅助',
+    category: '上场',
     status: 'available',
   },
   addMultiServerScreenShot: {
@@ -59,7 +59,7 @@ export const defaultShortcuts: Record<ShortcutAction, ShortcutConfig> = {
     key: 'CommandOrControl+Shift+/',
     defaultKey: 'CommandOrControl+Shift+/',
     label: '多图截图判题',
-    category: '实时辅助',
+    category: '上场',
     status: 'available',
   },
   toggleInterviewOverlay: {
@@ -67,7 +67,7 @@ export const defaultShortcuts: Record<ShortcutAction, ShortcutConfig> = {
     key: 'CommandOrControl+O',
     defaultKey: 'CommandOrControl+O',
     label: '显示/隐藏悬浮窗',
-    category: '实时辅助',
+    category: '上场',
     status: 'available',
   },
   moveOverlayToMouse: {
@@ -75,7 +75,7 @@ export const defaultShortcuts: Record<ShortcutAction, ShortcutConfig> = {
     key: 'CommandOrControl+M',
     defaultKey: 'CommandOrControl+M',
     label: '移动悬浮窗到鼠标位置',
-    category: '实时辅助',
+    category: '上场',
     status: 'available',
   },
   focusPrevTab: {

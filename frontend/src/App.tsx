@@ -34,12 +34,12 @@ const HomeScreen = lazy(() => import('@/components/HomeScreen'))
 
 const APP_MODE_TABS = [
   ['home', '首页'],
-  ['assist', '实时辅助'],
-  ['review', '面试复盘'],
+  ['resume-opt', '我的成竹'],
+  ['job-tracker', '岗位'],
+  ['prep', '演练'],
+  ['assist', '上场'],
+  ['review', '复盘'],
   ['knowledge', '能力分析'],
-  ['resume-opt', '简历优化'],
-  ['job-tracker', '求职看板'],
-  ['prep', '面试准备'],
 ] as const
 
 const HEADER_ICON_BTN =
@@ -63,12 +63,12 @@ function WorkbenchMark({ className }: { className?: string }) {
 /* MD3 导航栏（Navigation Rail）：桌面端左侧功能切换 */
 const NAV_ITEMS: Array<[AppMode, string, typeof Home]> = [
   ['home', '首页', Home],
-  ['assist', '实时辅助', Radio],
-  ['review', '面试复盘', ClipboardList],
+  ['resume-opt', '我的成竹', FileText],
+  ['job-tracker', '岗位', Kanban],
+  ['prep', '演练', BookOpenCheck],
+  ['assist', '上场', Radio],
+  ['review', '复盘', ClipboardList],
   ['knowledge', '能力分析', BrainCircuit],
-  ['resume-opt', '简历优化', FileText],
-  ['job-tracker', '求职看板', Kanban],
-  ['prep', '面试准备', BookOpenCheck],
 ]
 
 function AppNavRail({ appMode, onSelect }: { appMode: AppMode; onSelect: (mode: AppMode) => void }) {

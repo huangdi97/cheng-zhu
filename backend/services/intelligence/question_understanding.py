@@ -203,7 +203,7 @@ def understand_question(
             target = threads[-1]
         follow_up_target = target
         if previous_question and target:
-            resolved = f"{previous_question.rstrip('？?？。')} —— 追问：{_clean_target(raw) or target}？"
+            resolved = f"{_QUESTION_SUFFIX.sub('', previous_question)} —— 追问：{_clean_target(raw) or target}？"
         elif target:
             resolved = f"关于{target}的追问：{raw}"
     elif state_topic and not _topic_overlap(raw, state_topic):

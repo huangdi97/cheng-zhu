@@ -15,6 +15,7 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from core.logger import get_logger
 from services.intelligence.types import CandidateRepresentation, Claim, Evidence, EvidenceSource, TruthStatus, new_id
@@ -163,7 +164,7 @@ def _parse_project_entry(line: str) -> dict[str, Any]:
     name_match = re.match(r"([^:：|｜]{1,30})[:：|｜]", line)
     name = name_match.group(1).strip() if name_match else (line if len(line) <= 30 else "")
     if period:
-        name = name.replace(period, "").strip(" ：：,，-—–")
+        name = re.sub(r"[ ：：,，—–-]", "", name.replace(period, ""))
     return {"name": name, "period": period, "text": line}
 
 def _parse_skill_tokens(line: str) -> list[str]:

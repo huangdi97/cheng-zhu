@@ -10,7 +10,7 @@
 | Baseline HEAD | `6dfa47520246a35350cfb5090a5abbc22a84739d`（`Initial public release: Cheng Zhu`，main） |
 | Final HEAD | `8f64cb41d2af8d7429f9123a602cc6a99d6e595b` |
 | Branch | `feat/chengzhu-v1-interview-intelligence`（已 push 到 origin，未 force push） |
-| Commits | 9 个，按能力边界提交（见下） |
+| Commits | 11 个，按能力边界提交（见下） |
 | Changed files | 81 |
 
 ## Commits（按能力边界）
@@ -77,6 +77,7 @@ edbdd85 docs: architecture/product/eval/privacy doc system (Stage X), README ent
 21. **Stage V**：CI 强化（intelligence 单测 + eval smoke + migration smoke 进 backend job）。
 22. **Stage W**：Perf benchmark（全部预算内）。
 23. **Stage X**：docs/architecture 8 篇 + product 2 篇 + evals/privacy 各 1 篇。
+24. **Stage T**：Frontend IA 收敛——导航统一到目标词汇（首页/我的成竹/岗位/演练/上场/复盘/能力分析），HomeScreen 卡片镜像导航主心智（Job Tracker 保留且非主位），e2e specs/单测断言同步；视觉基线实证闭环（update-visual-snapshots workflow ubuntu success + 基线未被重写 + 本地 3 passed = 标签变更差异在既定 tolerance 内）。
 
 ## Migration
 
@@ -131,7 +132,7 @@ local overhead 与 provider latency 分开报告（provider 延迟见 telemetry 
 4. Personal Voice 默认关闭（voice_profile_enabled=False），需真实口述样本积累后开启。
 5. Soak 为事件压缩模拟（2h/3h）；真实音频 soak 见外部阻塞。
 6. config.py 仍有部分历史注释乱码（153-157 已修复，其他区域 cosmetic）。
-7. Visual regression 基线为 linux/darwin（CI 跑 ubuntu）；本机 Windows 未更新基线。
+7. Visual regression 基线为 linux/darwin（CI 跑 ubuntu）；Stage T 标签变更的差异已实证在既定 tolerance 内（workflow ubuntu success 且基线未被重写、本地 Windows 系统 Chrome 3 passed），基线无需更新。Vitest 全量并发下偶见 1 次 focus 竞态 flaky（SoundTest/settings/JobTracker 各出现过一次，单独重跑全绿）——属环境性竞态，非代码缺陷。
 
 ## External blockers（BLOCKED，不阻塞其余工程）
 

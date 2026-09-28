@@ -10,7 +10,7 @@
 | Baseline HEAD | `6dfa47520246a35350cfb5090a5abbc22a84739d`（`Initial public release: Cheng Zhu`，main） |
 | Final HEAD | `8f64cb41d2af8d7429f9123a602cc6a99d6e595b` |
 | Branch | `feat/chengzhu-v1-interview-intelligence`（已 push 到 origin，未 force push） |
-| Commits | 11 个，按能力边界提交（见下） |
+| Commits | 12 个，按能力边界提交（见下） |
 | Changed files | 81 |
 
 ## Commits（按能力边界）
@@ -99,6 +99,18 @@ edbdd85 docs: architecture/product/eval/privacy doc system (Stage X), README ent
 | Playwright e2e（跳过 @visual） | **9 passed, 3 skipped**（skip 为 real-chain-smoke 需真实后端/模型） |
 
 新增测试：intelligence 6 个测试文件 110 项（question_understanding/truth_boundary/state/candidate_job/compiler_planner/migration）。
+
+### CI 实证（workflow_dispatch run 36410570270，2026-09-28，feat 分支）
+
+| Job | 结果 |
+| --- | --- |
+| backend（ruff + 单测 + intelligence/eval/migration smoke） | success |
+| frontend（tsc + Vitest + build） | success |
+| desktop（node --test） | success |
+| e2e-playwright（功能，跳过 @visual） | success |
+| **e2e-visual（视觉回归，ubuntu）** | **success**（Stage T 标签变更差异在既定 tolerance 内） |
+| e2e-smoke（真实后端 boot + API contracts） | success |
+| ci-gate | **success（全部 8 job 通过）** |
 
 ## Evals（backend/evals，2026-09-26 基线）
 

@@ -122,6 +122,23 @@ def build_intelligence_layer(
         )
         payload["plan"] = plan.payload()
         payload["plan_prompt"] = plan.plan_prompt
+    # Stage Q: unified telemetry events for this turn (deterministic layers).
+    try:
+        from services.intelligence.telemetry import record_guidance_event
+
+        record_guidance_event(resolved_session_id, "question_received", route=understanding.question_type.value)
+        if understanding.resolved_question != question_text:
+            record_guidance_event(resolved_session_id, "question_resolved", route=understanding.question_type.value)
+        record_guidance_event(resolved_session_id, "state_updated", route=understanding.question_type.value)
+        if planner_enabled and payload.get("plan"):
+            record_guidance_event(
+                resolved_session_id,
+                "plan_created",
+                route=str(payload["plan"].get("mode", "") or ""),
+            )
+    except Exception:  # noqa: BLE001
+        # Telemetry must never break the realtime path.
+        pass
     return payload
 
 
@@ -155,6 +172,19 @@ def record_committed_turn(
             route=route,
             guidance_text=guidance_text,
             truth_flags=truth_flags or [],
+            latency_ms=latency_ms,
+        )
+    except Exception:  # noqa: BLE001
+        # Telemetry must never break the realtime path.
+        pass
+    # Stage Q: deep_guidance_completed — the full answer is committed.
+    try:
+        from services.intelligence.telemetry import record_guidance_event as _rec_dgc
+
+        _rec_dgc(
+            session_id,
+            "deep_guidance_completed",
+            route=route or str((answer_plan or {}).get("mode", "") or ""),
             latency_ms=latency_ms,
         )
     except Exception:  # noqa: BLE001

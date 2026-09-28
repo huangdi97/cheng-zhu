@@ -1303,6 +1303,22 @@ def process_question_parallel(
     first_token_mono: Optional[float] = None
     chunk_buffer: list[str] = []
     batch_size = 5
+    # Stage Q: fast_guidance_started — the deterministic layers (plan/state/
+    # grounding) are already committed to the prompt; the LLM stream starts
+    # now. first_useful_guidance is recorded after the first token below.
+    if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+        try:
+            from services.intelligence.telemetry import record_guidance_event as _rec_fgs
+
+            _rec_fgs(
+                str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                "fast_guidance_started",
+                route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                provider=str(getattr(model_cfg, "name", "") or ""),
+                model=str(getattr(model_cfg, "model", "") or ""),
+            )
+        except Exception:  # noqa: BLE001
+            pass
     try:
         think_override = None
         if prompt_mode in (PROMPT_MODE_ASR_REALTIME, PROMPT_MODE_MANUAL_TEXT) and not bool(
@@ -1381,6 +1397,20 @@ def process_question_parallel(
             exc,
             exc_info=not isinstance(exc, LLMError),
         )
+        # Stage Q: provider_fallback telemetry event (generation failure).
+        if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+            try:
+                from services.intelligence.telemetry import record_guidance_event as _rec_pf
+
+                _rec_pf(
+                    str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                    "provider_fallback",
+                    route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                    provider=str(getattr(model_cfg, "name", "") or ""),
+                    model=str(getattr(model_cfg, "model", "") or ""),
+                )
+            except Exception:  # noqa: BLE001
+                pass
         if chunk_buffer:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": "".join(chunk_buffer)})
             chunk_buffer.clear()
@@ -1475,6 +1505,18 @@ def process_question_parallel(
                         qa_id,
                         [v.get("kind") for v in truth_result.violations],
                     )
+                    # Stage Q: truth_rewrite telemetry event.
+                    try:
+                        from services.intelligence.telemetry import record_guidance_event as _rec_tr
+
+                        _rec_tr(
+                            str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                            "truth_rewrite",
+                            route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                            truth_flags=[str(v.get("kind", "")) for v in truth_result.violations],
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
             except Exception as exc:  # noqa: BLE001
                 deps.error_logger.warning("truth boundary check failed id=%s: %s", qa_id, exc)
         if full_answer:

@@ -1147,6 +1147,72 @@ def process_question_parallel(
             deps.error_logger.warning("intelligence layer failed id=%s: %s", qa_id, exc)
             intelligence_layer = {}
 
+    # ----------------- Context Compiler (Stage G, canonical 14) -----------------
+    # Minimal sufficient context: providers contribute candidates, the compiler
+    # scores them and selects the smallest package. Strictly additive — the KB
+    # hits retrieved above are reused as a provider (no second retrieval), and
+    # failures degrade to the legacy prompt sections.
+    if bool(getattr(cfg, "intelligence_context_compiler_v1", True)) and not written_exam and not images:
+        try:
+            from services.intelligence.context_compiler import (
+                ContextCompiler,
+                EvidenceProvider,
+                JobProvider,
+                KBProvider,
+                ResumeProvider,
+                SessionMemoryProvider,
+                render_context_sections,
+            )
+
+            intel_state = intelligence_layer.get("state") or {}
+            job_requirements: list[str] = []
+            try:
+                from services.storage import intelligence as intel_storage
+
+                job_profile = intel_storage.get_job_profile(intel_storage.latest_job_id()) if intel_storage.latest_job_id() else None
+                if job_profile:
+                    job_requirements = [
+                        *(job_profile.get("must_have") or []),
+                        *(job_profile.get("technologies") or []),
+                    ][:8]
+            except Exception:  # noqa: BLE001
+                job_requirements = []
+            compiled = ContextCompiler(
+                [
+                    ResumeProvider(str(getattr(cfg, "resume_text", "") or "")),
+                    EvidenceProvider(),
+                    SessionMemoryProvider(
+                        memo_context=str(memo_context or ""),
+                        compact_state=str(intelligence_layer.get("state_context") or ""),
+                    ),
+                    JobProvider(job_requirements=job_requirements),
+                    KBProvider(kb_hits),
+                ]
+            ).compile(
+                question_text,
+                deep=answer_depth_profile in {"deep", "compact_deep"},
+                active_topic=str(intel_state.get("current_topic", "") or ""),
+                job_requirements=job_requirements,
+            )
+            compiled_sections = render_context_sections(compiled)
+            if compiled_sections:
+                section_block = "[编译上下文：最小充分包]\n" + "\n".join(compiled_sections)
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": section_block})
+                else:
+                    user_for_llm = f"{section_block}\n{user_for_llm}"
+            deps.logger.info(
+                "CONTEXT_COMPILED id=%s items=%d tokens=%d dropped=%d latency=%dms",
+                qa_id,
+                len(compiled.items),
+                compiled.total_token_estimate,
+                len(compiled.dropped),
+                compiled.latency_ms,
+            )
+        except Exception as exc:  # noqa: BLE001
+            deps.error_logger.warning("context compiler failed id=%s: %s", qa_id, exc)
+
+
 
     system_prompt = build_system_prompt(
         manual_input=manual_input,

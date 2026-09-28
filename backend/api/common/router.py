@@ -17,6 +17,7 @@ from core.config import (
     normalize_llm_max_tokens, normalize_llm_temperature,
 )
 from core.env import env_int
+from core.logger import get_logger
 from services.audio import AudioCapture
 from services.stt import get_stt_engine, set_whisper_language
 from api.common.config_payload import build_config_payload
@@ -38,6 +39,8 @@ from services.storage.resume_history import (
 )
 
 router = APIRouter()
+
+_rlog = get_logger(__name__)
 
 # 简历上传阈值从 services.storage.resume_history 引入 (单一来源 / DRY)。
 # Router 层做流式校验是为了在拿到 Content-Length 或读到超限时立即拒绝,
@@ -540,11 +543,39 @@ async def api_upload_resume(request: Request, file: UploadFile = File(...)):
     content = b"".join(chunks)
 
     try:
-        return await run_in_threadpool(add_upload, content, file.filename)
+        result = await run_in_threadpool(add_upload, content, file.filename)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     except Exception as e:
         raise HTTPException(500, str(e)) from e
+    if bool(get_config().intelligence_candidate_v1):
+        # Stage A: structured representation follows the upload (background).
+        _schedule_candidate_rebuild()
+    return result
+
+
+
+
+def _schedule_candidate_rebuild() -> None:
+    """Stage A: rebuild the Candidate Representation after resume activation.
+
+    Runs in a daemon thread so the upload/apply response never waits on it;
+    failures are logged and never surface to the caller.
+    """
+
+    def _worker() -> None:
+        try:
+            from services.intelligence.candidate_representation import rebuild_and_persist
+
+            cfg = get_config()
+            resume_text = str(getattr(cfg, "resume_text", "") or "")
+            if len(resume_text.strip()) >= 20:
+                history_id = getattr(cfg, "resume_active_history_id", None)
+                rebuild_and_persist(resume_text, resume_history_id=history_id)
+        except Exception as exc:  # noqa: BLE001
+            _rlog.warning("candidate rebuild after resume activation failed: %s", exc)
+
+    threading.Thread(target=_worker, name="candidate-rebuild", daemon=True).start()
 
 
 @router.delete("/resume")
@@ -586,11 +617,15 @@ async def api_resume_history_update(entry_id: int, body: ResumeHistoryUpdateBody
 async def api_resume_history_apply(entry_id: int):
     """在线程池执行，避免大 PDF 解析阻塞事件循环导致其它请求（含预览）卡死。"""
     try:
-        return await run_in_threadpool(apply_entry, entry_id)
+        result = await run_in_threadpool(apply_entry, entry_id)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+    if bool(get_config().intelligence_candidate_v1):
+        # Stage A: structured representation follows the activation (background).
+        _schedule_candidate_rebuild()
+    return result
 
 
 @router.delete("/resume/history/{entry_id}")

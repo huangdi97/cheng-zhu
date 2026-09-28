@@ -85,6 +85,19 @@ def _deps(
 @pytest.fixture(autouse=True)
 def reset_worker_state(monkeypatch: pytest.MonkeyPatch):
     reset_session()
+    # Intelligence state is module-level (interview state + interviewer
+    # state); without a reset it accumulates across tests and inflates the
+    # compiled state context.
+    from services.intelligence.interview_state import drop_session as _drop_intel_state
+    from services.intelligence.realtime_bridge import _INTERVIEWER_STATES
+
+    for state_key in list(_INTERVIEWER_STATES):
+        _INTERVIEWER_STATES.pop(state_key, None)
+    import core.session as _session_mod
+
+    for session_obj in list(_session_mod.sessions.values()) if hasattr(_session_mod, "sessions") else []:
+        _drop_intel_state(str(getattr(session_obj, "id", "") or ""))
+    _drop_intel_state("default")
     monkeypatch.setattr(answer_worker, "get_config", _cfg)
     monkeypatch.setattr(answer_worker, "build_system_prompt", lambda **_kwargs: "system")
     monkeypatch.setattr(

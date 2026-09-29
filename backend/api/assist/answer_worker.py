@@ -834,6 +834,21 @@ def process_question_parallel(
         deps.mark_seq_skipped(seq)
         return
 
+    # Stage P: AI policy gate — AI_FORBIDDEN disables realtime AI guidance
+    # server-side (never by hiding a UI button). Prepare/Mock/Review are
+    # unaffected because they never call this path.
+    try:
+        from services.intelligence.policy import live_guidance_allowed, policy_block_payload
+
+        if not live_guidance_allowed(cfg):
+            deps.logger.info("POLICY_BLOCK id=%s mode=%s", qa_id, getattr(cfg, "ai_policy_mode", ""))
+            _broadcast({**policy_block_payload(), "id": qa_id})
+            deps.mark_seq_skipped(seq)
+            return
+    except Exception:  # noqa: BLE001
+        # A policy-module failure must never block the realtime path.
+        pass
+
     written_exam = bool(getattr(cfg, "written_exam_mode", False))
     written_exam_think = bool(getattr(cfg, "written_exam_think", False))
     prompt_mode = prompt_mode_for_task(source, manual_input, written_exam=written_exam)

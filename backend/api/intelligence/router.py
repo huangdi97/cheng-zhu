@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -269,3 +270,39 @@ def reset_interview_state(body: SessionRequest):
 def restore_interview_state(body: SessionRequest):
     """Crash recovery: rebuild the in-memory state from the latest snapshot."""
     return restore_from_snapshot(body.session_id).payload()
+
+# ---------------------------------------------------------------------------
+# Privacy / portability (Stage P)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/export")
+def export_intelligence(
+    session_id: str = Query(default="", description="Optional interview session id"),
+):
+    """Export the candidate's intelligence data (claims, evidence, job,
+    state) as JSON for user-controlled portability.
+
+    PRIVACY:
+    - Only intelligence-layer data leaves the backend; raw resume text and
+      audio are never included.
+    - The export is intentionally read-only: no secret/provider keys.
+    """
+    candidate_id = intelligence_storage.active_candidate_id()
+    job_id = intelligence_storage.latest_job_id()
+    payload: dict[str, Any] = {
+        "candidate_id": candidate_id,
+        "exported_at": time.time(),
+        "claims": intelligence_storage.list_claims(candidate_id) if candidate_id else [],
+        "evidence": intelligence_storage.list_evidence(candidate_id) if candidate_id else [],
+        "job": intelligence_storage.get_job_profile(job_id) if job_id else None,
+        "memory_items": {
+            kind: intelligence_storage.list_memory_items(kind)
+            for kind in ("knowledge_weakness", "repeated_topic", "communication_profile", "user_confirmed_fact")
+        },
+    }
+    if session_id:
+        from services.intelligence.interview_state import get_state
+
+        payload["state"] = get_state(session_id).payload()
+    return payload

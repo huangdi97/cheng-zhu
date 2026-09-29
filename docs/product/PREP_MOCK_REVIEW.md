@@ -1,6 +1,6 @@
 # Prepare / Mock / Review（Stage L）
 
-> CURRENT · 对应 canonical 第 25、26、30、31 节。落点：`backend/services/prep_service.py`、`practice_service.py`、`backend/services/intelligence/job_representation.py`、`review_writeback.py`、`backend/api/prep/`、`backend/api/review/router.py`。
+> CURRENT · 对应 canonical 第 25、26、30、31 节。落点：`backend/services/prep_service.py`、`practice_service.py`、`backend/services/intelligence/job_representation.py`、`job_workspace.py`、`review_writeback.py`、`backend/api/prep/`、`backend/api/review/router.py`。
 
 ## 1. 定位
 
@@ -22,17 +22,28 @@
 | 启动包 | `build_launch_pack(space)` 聚合 JD/洞察/技能卡/问题 | `services/prep_service.py:175` |
 | 题目生成 | `generate_questions(role, jd_text, resume_text)` → Question Graph 初始节点 | `services/prep_service.py:284` |
 
-**Gap Map**：`gaps`（LLM 洞察）+ alignment `GAP/KNOWLEDGE_MATCH` 状态（确定性）共同构成；缺口是 Mock 动态追问的输入。
+### Job Workspace（`POST /api/intelligence/workspace`，确定性、无 LLM）
+
+`intelligence/job_workspace.py` 在 JD 结构化 + Alignment 之上组合四块，前端 `JobWorkspacePanel` 展示在准备空间详情页：
+
+| 区块 | 来源与规则 |
+| --- | --- |
+| Gap Map | alignment 的 `GAP`（must-have → 优先）/ `KNOWLEDGE_MATCH`（可用知识回答，但无证据不能说做过）/ `PARTIAL_MATCH`（补充）+ 复盘写回的 `knowledge_weakness`（≥2 次确认 → 优先）与 `repeated_topic`；按主题去重，无百分比 |
+| 简历攻击面 | 仅 `VERIFIED/SUPPORTED` 的 fact claim；与岗位对齐、带指标的经历排前，附风险提示与追问维度（`extract_experience_expansion`） |
+| Question Graph | 追问**树**（`parent_id`）：经历深挖链 + 每个 Gap 的「知识 → 事实边界 → 开放设计」链 |
+| Stories | 已存真实故事 + 缺失胜任力的找故事提示（只指向候选人自己的材料，**从不生成事件**） |
+
+`POST /api/intelligence/job/rebuild` 契约不变（不含 `workspace`）。
 
 ## 3. Mock：基于 gap 动态追问
 
 `backend/services/practice_service.py`：
 
 - `start_session(space_id, rounds=5)`：从 PrepSpace 的题目集开一场模拟（`_ensure_questions` 保证题目存在）。
-- `_pick_next`（`:79`）选题顺序：
-  1. `pending_followups` 优先——基于你上一题回答的**动态追问**（`type: follow_up`）；
-  2. 其余按薄弱点排序（`_order_by_weak_points`，`_weak_keywords(profile)` 来自知识薄弱点沉淀）。
-- `_feedback_payload(turn)`（`:139`）：每轮反馈带 `follow_up_questions`（来自 Experience Expansion 追问维度，非假事实）。
+- Gap 焦点（`_gap_focus` → `job_workspace.mock_gap_focus`）：用**本准备空间自己的 JD** × 候选人证据 + 复盘写回弱项算 Gap（不读全局"最近岗位"、不落库）；Intelligence 层失败时降级为普通练习。响应带 `gap_focus`，前端在"本场优先补弱项"中展示。
+- 题池顺序：先按薄弱点排序（`_order_by_weak_points`，关键词 = 复盘画像弱项 ∪ Gap 主题），再由 `_merge_gap_questions` 在第一题热身后穿插 Gap 题（`type: gap`，去重）。
+- `_pick_next` 选题：`pending_followups` 优先——基于你上一题回答的**动态追问**（`type: follow_up`）；其余按上述题池顺序。
+- `_feedback_payload(turn)`：每轮反馈带 `follow_up_questions`（来自逐题分析 `review_analysis.analyze_turn`）。
 - `_build_report(session)`（`:166`）：整场报告（`_avg_score` 汇总）。
 - 无真实故事的 BEHAVIORAL 题：不编事件，提供找故事的方向（canonical 第 26 节；planner BEHAVIORAL 模式同样约束）。
 

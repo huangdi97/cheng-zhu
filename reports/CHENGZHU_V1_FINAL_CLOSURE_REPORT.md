@@ -1,6 +1,6 @@
 # 成竹 Chengzhu v1.0 Final Closure Report
 
-**日期**：2026-09-26
+**日期**：2026-09-26（2026-09-29 更新：Stage L1/L2 收口）
 **Canonical**：v1.0-R1（`docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md`，2026-09-25）
 
 ## Baseline → Final
@@ -8,10 +8,9 @@
 | 项 | 值 |
 | --- | --- |
 | Baseline HEAD | `6dfa47520246a35350cfb5090a5abbc22a84739d`（`Initial public release: Cheng Zhu`，main） |
-| Final HEAD | `8f64cb41d2af8d7429f9123a602cc6a99d6e595b` |
+| Final code HEAD | `8db2912`（本报告更新随后单独提交） |
 | Branch | `feat/chengzhu-v1-interview-intelligence`（已 push 到 origin，未 force push） |
-| Commits | 12 个，按能力边界提交（见下） |
-| Changed files | 81 |
+| Commits | 按能力边界提交（见下） |
 
 ## Commits（按能力边界）
 
@@ -25,6 +24,13 @@
 4f39ad5 feat(live): GuidanceViewModel + glance-first first screen wired into AnswerPanel (Stage K)
 edbdd85 docs: architecture/product/eval/privacy doc system (Stage X), README entry
 8f64cb4 fix: written-exam/images keep fixed message contract; test asserts follow semantic contract
+f6a4d2b feat(live): Stage T frontend IA - nav to target vocabulary
+6d04093 feat(observability): complete unified telemetry events
+c64038c feat(integration): Context Compiler into production answer path (Stage G) + candidate rebuild on resume upload/apply (Stage A)
+24eb345 feat(privacy): Stage P AI policy gate (AI_FORBIDDEN blocks live guidance server-side; AI_LIMITED disables auto-answer), export endpoint
+3c09b24 fix(intelligence): stable memory_item ids across processes; job title line is not a requirement
+fd53ff6 feat(prepare): Job Workspace (Stage L1) + gap-driven Mock (Stage L2)
+8db2912 test(frontend): await JobTracker detail summary instead of racing the list render
 ```
 
 ## Architecture delivered（对应 canonical 第 7、34 节）
@@ -51,6 +57,7 @@ edbdd85 docs: architecture/product/eval/privacy doc system (Stage X), README ent
 | telemetry.py | Stage Q：guidance_event/turn 统一事件（敏感内容截断） | — |
 | realtime_bridge.py | 生产路径一键集成（understanding→plan→state→planner） | answer_worker.py 调用 |
 | review_writeback.py | Review → Intelligence 写回（weak_points/repeated_topic/communication） | review_async_analysis.py 调用 |
+| job_workspace.py | Stage L1/L2：Gap Map / 简历攻击面 / Question Graph（追问树）/ Stories 组合；Mock 的 gap 焦点 | `POST /api/intelligence/workspace`；practice_service 调用 |
 
 ## Features delivered
 
@@ -65,7 +72,12 @@ edbdd85 docs: architecture/product/eval/privacy doc system (Stage X), README ent
 9. **Stage I**：开放世界路由（七轮 fixture route 全对；Q4 不因简历没写拒答；Q6 不声称用过；Q7 可谈迁移）。
 10. **Stage J**：Fast/Deep 等价结构（deterministic 规则 <5ms 先行 + LLM 流式）；TTFUG telemetry。
 11. **Stage K**：GuidanceViewModel + GuidanceFirstScreen（cue-first 第一屏：当前问题/核心思路/我的证据/[展开]）；answer_done guidance payload。
-12. **Stage L**：Mock/Review → Controlled write-back 闭环（memory_policy 白名单）。
+12. **Stage L**：
+    - L1 Prepare → Job Workspace：`POST /api/intelligence/workspace` 返回岗位结构 + Alignment + Gap Map + 简历攻击面 + Question Graph（追问树）+ Stories（只提示去哪找真实故事，不生成事件）；准备空间详情页 `JobWorkspacePanel` 展示。
+    - L2 Mock：基于本准备空间 JD 的 Gap（+ 复盘写回弱项）穿插 Gap 题并参与弱项排序，不是随机题库；失败降级为普通练习。
+    - L3/L4 Review → Controlled write-back（memory_policy 白名单）。
+    - **G10 闭环实证**：`test_review_learning_reaches_next_workspace_and_mock`——两场复盘写回同一弱项后，下一次 Mock 的 gap 焦点与题目包含该弱项（优先级 high，理由含"出现 2 次"）。
+    - 修复：`memory_item` id 原用进程加盐的 `hash()`，跨次启动无法累计 confirmations（跨 session 学习失效）→ 改 sha1；JD 标题行曾被当作 must-have 需求产生虚假 Gap → 已跳过。
 13. **Stage M**：Personal Voice profile（真实口述、A/B 可关、不改事实边界）。
 14. **Stage N**：Coding/System Design planner 统一到 Intelligence Core（11 种 Response Modes 含完整结构）。
 15. **Stage O**：SQLite versioned migration（user_version + schema_migrations + backup）。
@@ -90,17 +102,23 @@ edbdd85 docs: architecture/product/eval/privacy doc system (Stage X), README ent
 
 | Suite | 结果 |
 | --- | --- |
-| backend `python -m pytest -q` | **792 passed, 4 skipped, 0 failed**（4 skip 为环境性：test_kb_loaders 缺 docx/pypdf 可选包） |
+| backend `python -m pytest -q` | **818 passed, 4 skipped, 0 failed**（2026-09-29；4 skip 为环境性：test_kb_loaders 缺 docx/pypdf 可选包） |
 | backend `ruff check .`（uvx 等价） | All checks passed |
 | backend `py_compile main.py pipeline.py answer_worker.py` | 通过 |
-| frontend `npm test`（Vitest） | **344 passed, 0 failed**（48 文件；全量下曾有 1 次 focus 竞态 flaky，复跑全绿） |
+| frontend `npm test`（Vitest） | **352 passed, 0 failed**（49 文件，2026-09-29） |
 | frontend `npm run build`（tsc -b + vite） | 通过 |
 | desktop `node --test *.test.js` | **13 passed, 0 failed** |
-| Playwright e2e（跳过 @visual） | **9 passed, 3 skipped**（skip 为 real-chain-smoke 需真实后端/模型） |
+| Playwright e2e（功能） | **11 passed, 3 skipped**（含新增 job-workspace.spec：桌面 + 390px 无横向溢出 + 键盘展开追问树；skip 为 real-chain-smoke 需真实后端/模型） |
+| Playwright @visual（本机 Windows） | 未验证：仓库只有 linux/darwin 基线，本机首次运行只会生成 win32 快照（已删除、未提交）；以 CI ubuntu `e2e-visual` 为准 |
 
-新增测试：intelligence 6 个测试文件 110 项（question_understanding/truth_boundary/state/candidate_job/compiler_planner/migration）。
+新增测试：intelligence 测试文件（question_understanding/truth_boundary/state/candidate_job/compiler_planner/migration/policy/job_workspace）；eval smoke 2026-09-29 复跑：route 1.0 / type 0.9 / unsupported block 1.0 / fact precision 1.0（无变化）。
 
-### CI 实证（workflow_dispatch run 36410570270，2026-09-28，feat 分支）
+### CI 实证（workflow_dispatch run 36575912875，2026-09-29，HEAD `8db2912`）
+
+全部 8 job success：changes / backend / frontend / desktop / e2e-playwright / **e2e-visual（ubuntu 视觉回归）** / e2e-smoke / ci-gate。
+前一次 run 36575235528（`fd53ff6`）frontend 失败于 JobTracker 既有竞态测试（列表先于详情渲染，同步查询 "补跟进时间"），已在 `8db2912` 改为 await 详情（断言不变）后全绿。
+
+### 历史 CI 实证（workflow_dispatch run 36410570270，2026-09-28，feat 分支）
 
 | Job | 结果 |
 | --- | --- |
@@ -168,7 +186,7 @@ local overhead 与 provider latency 分开报告（provider 延迟见 telemetry 
 1. pipeline.py / answer_worker.py 按职责拆分到 300 行内（ASR loop plumbing / prompt assembly 已有 Intelligence 层承接）。
 2. Voice Profile 深化（真实口述采集 → 统计 → A/B）。
 3. LLM-driven Interviewer State + company public context。
-4. 更强 Mock（基于 Gap Map 动态追问的 Question Graph）。
+4. 更强 Mock：Gap 题目前为确定性模板，v1.1 可让 LLM 面试官沿 Question Graph 多轮追问；Stories 的录入/确认 UI。
 5. dense embedding 检索（local embeddings，无云依赖）。
 6. 性能调优（Context Compiler P95、Fast path P95 持续优化）。
 

@@ -25,7 +25,9 @@ from services.llm.streaming import (
 
 _log = get_logger("copilot.strategy")
 
-_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "copilot_strategy")
+from services.storage.paths import data_dir as _storage_data_dir
+
+_DATA_DIR = os.path.join(_storage_data_dir(), "copilot_strategy")
 
 _active_trees: dict[str, Optional[dict]] = {}
 _active_space_ids: dict[str, Optional[int]] = {}

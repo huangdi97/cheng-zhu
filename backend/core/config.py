@@ -40,7 +40,14 @@ def normalize_llm_max_tokens(value: Any) -> int:
     return max(256, min(32768, int(parsed)))
 
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_FILE = os.environ.get("IA_CONFIG_PATH") or os.path.join(_BACKEND_DIR, "config.json")
+def _default_config_file() -> str:
+    # Packaged app: %APPDATA%\\Chengzhu\\config\\config.json (never the install dir).
+    from services.storage.paths import config_dir
+
+    return os.path.join(config_dir(), "config.json")
+
+
+CONFIG_FILE = os.environ.get("IA_CONFIG_PATH") or _default_config_file()
 CONFIG_EXAMPLE = os.path.join(_BACKEND_DIR, "config.example.json")
 
 

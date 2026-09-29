@@ -73,10 +73,20 @@ def classify_question_type_21(text: str, *, relation_to_previous: str = "") -> Q
         return QuestionType.META
     if _SELF_INTRO.search(value):
         return QuestionType.SELF_INTRODUCTION
-    if re.search(r"写(?:一段)?代码|写一个|写个|实现(?:一下)?算法|leetcode|算法题|复杂度|手写|编程题|\bcoding\b", value):
+    # OOD before system design: "用面向对象设计一个停车场" is object design.
+    if re.search(r"面向对象|ood\b|类图|类设计|object[- ]oriented|class diagram", value):
+        return QuestionType.OOD
+    if re.search(
+        r"写(?:一段)?代码|写一个(?:函数|方法|算法|程序)?|写个|实现(?:一下)?(?:算法|一个)|leetcode|算法题|复杂度|手写|编程题|\bcoding\b"
+        r"|\bimplement\b|write (?:a|an) (?:function|method|program)|time complexity|space complexity|what'?s the complexity|big[- ]o",
+        value,
+    ):
         return QuestionType.CODING
-    if re.search(r"系统设计|架构设计|容量规划|分库分表|设计一个|设计一套", value):
+    if re.search(r"系统设计|架构设计|容量规划|分库分表|设计一个|设计一套|system design|design (?:a|an) |how would you design|scal(?:e|able) to", value):
         return QuestionType.SYSTEM_DESIGN
+    # Product metrics before hypothetical: "如果要提升次日留存" is a product case.
+    if re.search(r"留存|转化率|日活|月活|\bdau\b|\bmau\b|\bgmv\b|北极星|用户增长|a/b\s*test|ab\s*实验|retention|conversion rate", value):
+        return QuestionType.PRODUCT
     if _HYPOTHETICAL_CLASSIFIER.search(value):
         return QuestionType.HYPOTHETICAL
     if re.search(r"面向对象|面向对象设计|ood|类设计|多态|继承", value):
@@ -93,13 +103,21 @@ def classify_question_type_21(text: str, *, relation_to_previous: str = "") -> Q
         return QuestionType.PRODUCT
     if re.search(r"商业模式|商业化|盈利|市场", value):
         return QuestionType.BUSINESS
-    if re.search(r"为什么选择我们|为什么想来|了解我们|对公司", value):
+    if re.search(r"为什么选择我们|为什么想来|为什么想加入|加入我们|了解我们|对公司|why (?:do you want to )?join|why (?:our|this) company|why us\b", value):
         return QuestionType.COMPANY
     if re.search(r"职业规划|五年|三年规划|career|发展计划", value):
         return QuestionType.CAREER
-    if re.search(r"团队|协作|冲突|推动|失败经历|压力|挑战|领导力|行为|star", value):
+    if re.search(
+        r"团队|协作|冲突|推动|失败经历|压力|挑战|领导力|行为|star|讲一次|说一次|举一个你|意见不一致|分歧|说服|最有成就感|最大的失败"
+        r"|tell me about a time|describe a time|a time when|conflict with",
+        value,
+    ):
         return QuestionType.BEHAVIORAL
-    if re.search(r"你的项目|项目里|项目背景|你负责|简历|实习|上一家|技术难点|介绍一下你的|your project|your rag|your work|your experience", value):
+    if re.search(
+        r"你的项目|项目里|项目背景|你负责|具体负责|你做的|你们做的|你参与的|你主导的|你搭的|你搭建的|你在.{0,16}(?:里|中|时).{0,8}(?:负责|做了|角色)"
+        r"|简历|实习|上一家|技术难点|介绍一下你的|讲讲你的|your project|your rag|your work|your experience|you built|you worked on|your role",
+        value,
+    ):
         return QuestionType.EXPERIENCE
     if re.search(r"怎么迁|如何迁|你会怎么(?:做|设计|迁)|迁移方案", value):
         return QuestionType.SYSTEM_DESIGN

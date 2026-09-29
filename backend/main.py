@@ -36,7 +36,8 @@ _log = get_logger("app.main")
 # H5: 扩大广播队列容量，避免 LLM 流式输出被截断
 _BQ_SIZE = env_int("IA_BROADCAST_QUEUE_SIZE", 2000, minimum=1)
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# Packaged app: Electron passes the bundled, prebuilt frontend dist.
+FRONTEND_DIR = os.environ.get("CHENGZHU_FRONTEND_DIST") or os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 
 def _is_path_within_dir(base_dir: str, candidate_path: str) -> bool:

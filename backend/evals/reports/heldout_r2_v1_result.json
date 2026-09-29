@@ -1,0 +1,232 @@
+{
+  "total": 28,
+  "exact_accuracy": 0.6786,
+  "semantic_accuracy": 0.6786,
+  "cases": [
+    {
+      "id": "h01",
+      "question": "TCP 三次握手为什么不是两次？",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h02",
+      "question": "Explain the difference between a process and a thread.",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h03",
+      "question": "B+ 树为什么适合做数据库索引？",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h04",
+      "question": "What is eventual consistency?",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h05",
+      "question": "Kafka 的 ISR 机制是怎么保证不丢消息的？",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h06",
+      "question": "写一个函数判断链表是否有环",
+      "expected": "CODING",
+      "actual": "CODING",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h07",
+      "question": "Implement an LRU cache, what's the complexity?",
+      "expected": "CODING",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h08",
+      "question": "设计一个短链接服务，需要支持每天一亿次访问",
+      "expected": "SYSTEM_DESIGN",
+      "actual": "SYSTEM_DESIGN",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h09",
+      "question": "Design a rate limiter for a public API.",
+      "expected": "SYSTEM_DESIGN",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h10",
+      "question": "如果订单量突然涨十倍，你的系统哪里会先扛不住？",
+      "expected": "HYPOTHETICAL",
+      "actual": "HYPOTHETICAL",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h11",
+      "question": "假设让你把对账系统迁到云上，你会怎么落地？",
+      "expected": "OPEN_DESIGN",
+      "actual": "OPEN_DESIGN",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h12",
+      "question": "讲讲你做的订单服务重构",
+      "expected": "EXPERIENCE",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h13",
+      "question": "你在支付对账系统里具体负责什么？",
+      "expected": "EXPERIENCE",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h14",
+      "question": "Tell me about the RAG knowledge base you built.",
+      "expected": "EXPERIENCE",
+      "actual": "EXPERIENCE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h15",
+      "question": "订单服务为什么选 PostgreSQL 而不是 MySQL？",
+      "expected": "EXPERIENCE_KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h16",
+      "question": "为什么不用 RabbitMQ？",
+      "expected": "EXPERIENCE_KNOWLEDGE",
+      "actual": "EXPERIENCE_KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h17",
+      "question": "你用过 Redis Cluster 吗？",
+      "expected": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+      "actual": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h18",
+      "question": "你在生产环境部署过 Flink 作业吗？",
+      "expected": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+      "actual": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h19",
+      "question": "Have you used Terraform in production?",
+      "expected": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+      "actual": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h20",
+      "question": "讲一次你和同事意见不一致的经历",
+      "expected": "BEHAVIORAL",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h21",
+      "question": "为什么想加入我们公司？",
+      "expected": "BEHAVIORAL",
+      "actual": "KNOWLEDGE",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h22",
+      "question": "你的期望薪资是多少？",
+      "expected": "NEGOTIATION",
+      "actual": "NEGOTIATION",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h23",
+      "question": "如果要提升 App 的次日留存，你会怎么分析？",
+      "expected": "PRODUCT_CASE",
+      "actual": "HYPOTHETICAL",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h24",
+      "question": "用面向对象设计一个停车场系统",
+      "expected": "OOD",
+      "actual": "SYSTEM_DESIGN",
+      "exact": false,
+      "semantic": false
+    },
+    {
+      "id": "h25",
+      "question": "那 Elasticsearch 的倒排索引是怎么工作的？",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h26",
+      "question": "这个最后是怎么上线验证的？",
+      "expected": "EXPERIENCE_KNOWLEDGE",
+      "actual": "EXPERIENCE_KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h27",
+      "question": "卡夫卡的消费者组 rebalance 是什么",
+      "expected": "KNOWLEDGE",
+      "actual": "KNOWLEDGE",
+      "exact": true,
+      "semantic": true
+    },
+    {
+      "id": "h28",
+      "question": "先做个自我介绍吧",
+      "expected": "EXPERIENCE",
+      "actual": "EXPERIENCE",
+      "exact": true,
+      "semantic": true
+    }
+  ],
+  "frozen_at": "2026-09-30 (before any classifier change)"
+}

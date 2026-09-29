@@ -34,6 +34,15 @@ export default function LivePackBar() {
 
   useEffect(() => { refresh() }, [refresh])
 
+  // The frozen pack's per-session Share Privacy overrides the default; an
+  // unfrozen session uses the settings default (OFF unless changed).
+  const defaultSharePrivacy = useInterviewStore((s) => s.config?.share_privacy_mode ?? 'OFF')
+  useEffect(() => {
+    if (!loaded) return
+    const mode = pack?.policies.share_privacy_policy ?? defaultSharePrivacy
+    void window.electronAPI?.setSharePrivacy?.(mode)
+  }, [loaded, pack?.policies.share_privacy_policy, defaultSharePrivacy])
+
   if (!loaded) return null
 
   if (!pack) {

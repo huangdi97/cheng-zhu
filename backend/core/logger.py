@@ -17,7 +17,11 @@ from logging.handlers import TimedRotatingFileHandler
 
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
-LOG_DIR = os.path.join(_PROJECT_ROOT, "log")
+if (os.environ.get("CHENGZHU_HOME") or "").strip():
+    # Packaged app: logs live under the user-data dir, never the install dir.
+    LOG_DIR = os.path.join(os.path.abspath(os.environ["CHENGZHU_HOME"].strip()), "logs")
+else:
+    LOG_DIR = os.path.join(_PROJECT_ROOT, "log")
 
 _LOG_FORMAT = "%(asctime)s | %(levelname)-5s | %(name)s | %(message)s"
 _LOG_DATE_FMT = "%Y-%m-%d %H:%M:%S"

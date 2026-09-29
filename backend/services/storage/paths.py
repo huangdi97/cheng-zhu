@@ -1,4 +1,16 @@
-"""运行时数据目录：统一放在 backend/data/，并从旧版 backend/*.db 自动迁移一次。"""
+"""运行时数据目录。
+
+开发模式：数据在 backend/data/，并从旧版 backend/*.db 自动迁移一次。
+安装包模式（R2 Stage AH）：Electron 把 app.getPath('userData') 通过环境变量
+``CHENGZHU_HOME`` 传给后端 sidecar，所有用户数据都写到该目录，绝不写安装目录：
+
+    %APPDATA%\\Chengzhu\\
+      data\\    SQLite、知识库、策略树
+      config\\  config.json
+      logs\\    运行日志
+      cache\\   模型等可再生缓存
+      exports\\ 导出文件
+"""
 
 from __future__ import annotations
 
@@ -9,13 +21,45 @@ _BACKEND_ROOT = os.path.abspath(os.path.join(_STORAGE_PKG, "..", ".."))
 
 
 def backend_root() -> str:
+    """Directory of the backend code (read-only in an installed build)."""
     return _BACKEND_ROOT
 
 
+def app_home() -> str:
+    """Root for user-writable state: CHENGZHU_HOME when packaged, else backend/."""
+    home = (os.environ.get("CHENGZHU_HOME") or "").strip()
+    return os.path.abspath(home) if home else _BACKEND_ROOT
+
+
+def is_packaged_home() -> bool:
+    return bool((os.environ.get("CHENGZHU_HOME") or "").strip())
+
+
+def _ensure(path: str) -> str:
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def data_dir() -> str:
-    d = os.path.join(_BACKEND_ROOT, "data")
-    os.makedirs(d, exist_ok=True)
-    return d
+    return _ensure(os.path.join(app_home(), "data"))
+
+
+def config_dir() -> str:
+    return _ensure(os.path.join(app_home(), "config")) if is_packaged_home() else _BACKEND_ROOT
+
+
+def logs_dir() -> str:
+    if is_packaged_home():
+        return _ensure(os.path.join(app_home(), "logs"))
+    return os.path.join(os.path.dirname(_BACKEND_ROOT), "log")
+
+
+def cache_dir() -> str:
+    return _ensure(os.path.join(app_home(), "cache"))
+
+
+def exports_dir() -> str:
+    return _ensure(os.path.join(app_home(), "exports"))
 
 
 def sqlite_path(filename: str) -> str:
@@ -26,7 +70,7 @@ def sqlite_path(filename: str) -> str:
     d = data_dir()
     new_p = os.path.join(d, filename)
     old_p = os.path.join(_BACKEND_ROOT, filename)
-    if not os.path.isfile(new_p) and os.path.isfile(old_p):
+    if not is_packaged_home() and not os.path.isfile(new_p) and os.path.isfile(old_p):
         try:
             os.replace(old_p, new_p)
             for ext in ("-wal", "-shm"):

@@ -136,6 +136,7 @@ def create_plan(
     ai_policy: str = "AI_ALLOWED",
     raw_question: str = "",
     state_carries_intent: bool = False,
+    profile_text: str = "",
 ) -> AnswerPlan:
     """Build the structured plan for one question (no prose)."""
     act, content, req = derive_axes(
@@ -145,6 +146,7 @@ def create_plan(
         personal_fact_required=personal_fact_required,
         open_world_allowed=open_world_allowed,
         raw_question=raw_question,
+        profile_text=profile_text,
     )
     prov = provenance if provenance is not None else _LEGACY_TO_PROVENANCE.get(str(truth_status or "").upper(), ProvenanceStatus.NO_EVIDENCE)
     assertion = decide_assertion_policy(prov, user_assertion, session_status, req, ai_policy=ai_policy)

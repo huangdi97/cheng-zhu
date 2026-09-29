@@ -166,7 +166,7 @@ def provenance_from_grounding(
 _YESNO = re.compile(
     r"(?:用|做|搭|部署|上线|负责|实现|接触|维护)(?:过|了).{0,40}(?:吗|没有)[？?]?\s*$"
     r"|有没有.{0,40}(?:经验|经历|用过|做过)|是否.{0,40}(?:用过|做过|经验)"
-    r"|(?:did you|have you) (?:use|used|build|built|run|ran|deploy|deployed)",
+    r"|\b(?:did you|have you) (?:use|used|build|built|run|ran|deploy|deployed)\b",
     re.IGNORECASE,
 )
 _TECH_PHRASE = re.compile(r"[A-Za-z][A-Za-z0-9+#.\-]*(?:\s+[A-Z][A-Za-z0-9+#.\-]*)*")
@@ -179,8 +179,13 @@ def claim_coverage(question: str, profile_text: str) -> ProvenanceStatus | None:
     Returns None when the question names no checkable phrase."""
     if not _YESNO.search(question or ""):
         return None
-    phrases = [p.strip() for p in _TECH_PHRASE.findall(question or "") if len(p.strip()) > 1]
-    phrases = [p for p in phrases if p.lower() not in _EN_STOP]
+    phrases = []
+    for raw in _TECH_PHRASE.findall(question or ""):
+        # "use Kafka" -> "Kafka": drop question/verb words inside a phrase.
+        words = [w for w in raw.split() if w.lower().strip("?.,") not in _EN_STOP]
+        phrase = " ".join(words).strip(" ?.,")
+        if len(phrase) > 1:
+            phrases.append(phrase)
     if not phrases:
         return None
     profile = (profile_text or "").lower()
@@ -294,6 +299,23 @@ _RATIONALE = re.compile(r"为什么|为何|怎么考虑|取舍|权衡|why", re.I
 _DEICTIC = re.compile(r"这个|那个|这块|这里|刚才|上面|你们|你的|当时|这么|^为什么|^然后|^接着|^具体", re.IGNORECASE)
 
 
+_CHOICE_RATIONALE = re.compile(r"为什么(?:选|用|采用|选择|不用|没用|要用)|怎么考虑|为何选|why did you (?:choose|pick|use)|why not use", re.IGNORECASE)
+_PROFILE_PHRASE = re.compile(r"[A-Za-z][A-Za-z0-9+#.\-]{2,}|[\u4e00-\u9fff]{3,8}")
+
+
+def _anchored_to_profile(text: str, profile_text: str) -> bool:
+    """A choice-rationale question that names something from the candidate's
+    own profile ("订单服务为什么选 PostgreSQL") asks about their decision."""
+    if not _CHOICE_RATIONALE.search(text or ""):
+        return False
+    profile = (profile_text or "").lower()
+    for phrase in _PROFILE_PHRASE.findall(text or ""):
+        chunk = phrase.lower()
+        if len(chunk) >= 3 and chunk in profile and chunk not in {"为什么", "怎么考虑"}:
+            return True
+    return False
+
+
 def _follow_up_content(raw: str) -> ContentType:
     """A follow-up keeps the thread's project frame only when it points back
     at it ("这个怎么验证", "为什么不用 X"); a follow-up that names a new
@@ -316,6 +338,7 @@ def derive_axes(
     personal_fact_required: bool = False,
     open_world_allowed: bool = True,
     raw_question: str = "",
+    profile_text: str = "",
 ) -> tuple[DialogueAct, ContentType, TruthRequirement]:
     """Split one question into (dialogue act, content type, truth requirement).
 
@@ -345,6 +368,8 @@ def derive_axes(
         content = _follow_up_content(raw)
     elif content == ContentType.EXPERIENCE and _RATIONALE.search(value):
         # "Tell me about your X, why this design" = experience + rationale.
+        content = ContentType.PROJECT_DEEP_DIVE
+    if content == ContentType.KNOWLEDGE and profile_text and _anchored_to_profile(value, profile_text):
         content = ContentType.PROJECT_DEEP_DIVE
     if content == ContentType.KNOWLEDGE and _DATA_ML.search(value):
         content = ContentType.DATA_ML

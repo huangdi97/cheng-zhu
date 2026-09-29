@@ -157,6 +157,7 @@ def build_intelligence_layer(
             is_follow_up=understanding.is_follow_up,
             raw_question=question_text,
             state_carries_intent=bool(understanding.intent),
+            profile_text=pack.profile_text if pack is not None else "",
             **plan_axes,
         )
         payload["plan"] = plan.payload()

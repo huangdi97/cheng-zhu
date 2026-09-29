@@ -50,7 +50,8 @@ def capture_primary_region_data_url(region: str = "left_half", max_long_edge: in
     - 与主进程分离 session，降低终端/IDE 因本进程图形调用被抢焦点的概率
     """
     worker = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_screen_capture_worker.py")
-    if not os.path.isfile(worker):
+    frozen = bool(getattr(sys, "frozen", False))
+    if not frozen and not os.path.isfile(worker):
         raise ScreenCaptureError("截屏子进程脚本缺失")
     valid = ("full", "left_half", "right_half", "top_half", "bottom_half")
     if isinstance(region, dict):
@@ -73,7 +74,13 @@ def capture_primary_region_data_url(region: str = "left_half", max_long_edge: in
         max_long_edge = 1600
 
     kwargs: dict = {
-        "args": [sys.executable, worker, region_arg, str(max_long_edge)],
+        # Packaged sidecar: there is no python.exe; the same executable runs
+        # the worker in a fresh process via a dedicated flag.
+        "args": (
+            [sys.executable, "--screen-capture-worker", region_arg, str(max_long_edge)]
+            if frozen
+            else [sys.executable, worker, region_arg, str(max_long_edge)]
+        ),
         "capture_output": True,
         "timeout": 20,
         "stdin": subprocess.DEVNULL,

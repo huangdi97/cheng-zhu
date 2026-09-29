@@ -111,6 +111,10 @@ def build_job_representation(
     nice_to_have: list[str] = []
     in_nice_section = False
     for line in lines:
+        # A bare title line ("高级后端开发工程师") matches the 开发 verb; it is
+        # the job's name, not a requirement the candidate could be missing.
+        if line in (title_found, company_found):
+            continue
         if re.search(r"加分|优先|plus|nice[- ]?to[- ]?have", line, re.IGNORECASE):
             # “加分：xxx” may carry items on the header line itself.
             if re.search(r"[:：]", line):

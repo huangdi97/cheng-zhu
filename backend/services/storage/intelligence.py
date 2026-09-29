@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import sqlite3
@@ -346,6 +347,13 @@ def list_guidance_events(session_id: str, limit: int = 200) -> list[dict[str, An
 # Controlled long-term memory write-back
 # ---------------------------------------------------------------------------
 
+def _memory_item_id(kind: str, text: str) -> str:
+    # hashlib (not builtin hash, which is salted per process): the same
+    # learning signal must upsert across app restarts so confirmations count.
+    digest = hashlib.sha1(f"{kind}|{text}".encode("utf-8")).hexdigest()[:12]
+    return f"{kind}-{digest}"
+
+
 def upsert_memory_item(kind: str, text: str, *, candidate_id: str = "", session_id: str = "") -> None:
     """Only policy-approved kinds may call this (see intelligence/memory_policy)."""
     now = time.time()
@@ -353,7 +361,7 @@ def upsert_memory_item(kind: str, text: str, *, candidate_id: str = "", session_
         "INSERT INTO memory_item (id, candidate_id, session_id, kind, text, confirmations, metadata_json, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, 1, '{}', ?, ?) "
         "ON CONFLICT(id) DO UPDATE SET text=excluded.text, confirmations=confirmations+1, updated_at=excluded.updated_at",
-        (f"{kind}-{abs(hash(text)) % 10**12}", candidate_id, session_id, kind, text, now, now),
+        (_memory_item_id(kind, text), candidate_id, session_id, kind, text, now, now),
     )
 
 
@@ -367,6 +375,14 @@ def list_memory_items(kind: str, limit: int = 100) -> list[dict[str, Any]]:
 
 def delete_memory_item(item_id: str) -> None:
     _write("DELETE FROM memory_item WHERE id = ?", (item_id,))
+
+
+def list_stories(candidate_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    rows = _read(
+        "SELECT * FROM story WHERE candidate_id = ? ORDER BY updated_at DESC LIMIT ?",
+        (candidate_id, limit),
+    )
+    return [dict(row) for row in rows]
 
 
 def save_voice_profile(candidate_id: str, profile_json: str, sample_count: int, enabled: bool) -> None:

@@ -563,7 +563,9 @@ describe('JobTracker', () => {
     render(<JobTracker />)
     await waitFor(() => expect(screen.getAllByText('Acme').length).toBeGreaterThan(0))
 
-    expect(screen.getByText('补跟进时间')).toBeInTheDocument()
+    // The list row renders before the auto-selected detail summary; await the
+    // summary itself instead of assuming both land in the same render.
+    expect(await screen.findByText('补跟进时间')).toBeInTheDocument()
     expect(screen.getAllByText(/2 场 · 7\.1/).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '补时间' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /查看 Acme 的 2 场关联复盘/ }))

@@ -124,9 +124,15 @@ describe('PrepSpace', () => {
     })
     render(<PrepSpace />)
     fireEvent.click(await screen.findByText('后端准备空间'))
-    fireEvent.click(await screen.findByRole('button', { name: '用于本场面试' }))
+    fireEvent.click(await screen.findByRole('button', { name: '冻结并用于本场' }))
 
-    await waitFor(() => expect(apiMock.prepActivateLaunchPack).toHaveBeenCalledWith(1))
+    // R2: freezing carries the three independent per-session policies; the
+    // defaults are AI allowed, human assistance practice-only, share privacy off.
+    await waitFor(() => expect(apiMock.prepActivateLaunchPack).toHaveBeenCalledWith(1, {
+      ai_policy: 'AI_ALLOWED',
+      human_assistance_policy: 'HUMAN_PRACTICE_ONLY',
+      share_privacy_policy: 'OFF',
+    }))
     expect(await screen.findByText('本场上场包已启用')).toBeInTheDocument()
     expect(screen.getByText(/为什么选择 Kafka/)).toBeInTheDocument()
   })

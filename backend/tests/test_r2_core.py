@@ -543,6 +543,76 @@ def test_migration_v2_backfills_axes_from_legacy_status(tmp_path):
     assert rows["c3"] == ("DIRECT_EVIDENCE", "USER_CONFIRMED")
     assert rows["c4"] == ("CONFLICTING_EVIDENCE", "UNREVIEWED")
     assert rows["c5"] == ("NO_EVIDENCE", "USER_CONFIRMED")  # confirmed but no source: not evidence
-    assert mig.ensure_schema(db) == 2  # idempotent
+    assert mig.ensure_schema(db) == mig.LATEST_SCHEMA_VERSION  # idempotent
     tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"interview_pack", "session_claim"} <= tables
+
+
+# ---------------------------------------------------------------------------
+# G11 Candidate: user verdicts survive a resume rebuild; stories; voice
+# ---------------------------------------------------------------------------
+
+def test_resume_rebuild_keeps_user_verdicts_and_review_confirmed_facts(tmp_intel_db):
+    from services.intelligence.candidate_representation import rebuild_and_persist
+
+    first = rebuild_and_persist("WenNian 项目\n负责检索链路，使用 Redis 管理 session state")
+    rows = intel_storage.list_claims(first.candidate_id)
+    target = next(r for r in rows if "Redis" in r["text"])
+    intel_storage.update_claim_axes(target["id"], user_assertion_status="USER_DENIED")
+    # a Review-confirmed session statement (not from the resume)
+    intel_storage.save_claims(first.candidate_id, [{"id": "claim-x", "text": "我们后来用了 Redis Cluster", "source": "session_statement", "truth_status": "UNKNOWN"}])
+    intel_storage.update_claim_axes("claim-x", provenance_status="NO_EVIDENCE", user_assertion_status="USER_CONFIRMED")
+
+    second = rebuild_and_persist("WenNian 项目\n负责检索链路，使用 Redis 管理 session state\n新增：Kafka 削峰")
+    assert second.candidate_id != first.candidate_id
+    new_rows = intel_storage.list_claims(second.candidate_id)
+    redis = next(r for r in new_rows if "Redis 管理" in r["text"])
+    assert redis["user_assertion_status"] == "USER_DENIED"
+    cluster = next(r for r in new_rows if r["id"] == "claim-x")
+    assert cluster["user_assertion_status"] == "USER_CONFIRMED" and cluster["provenance_status"] == "NO_EVIDENCE"
+
+
+def test_denied_claim_never_enters_pack(tmp_intel_db):
+    intel_storage.save_candidate_profile("cand", profile_text=RESUME)
+    intel_storage.save_claims("cand", [{"id": "c-deny", "text": "我主导了全公司架构", "source": "resume"}])
+    intel_storage.update_claim_axes("c-deny", user_assertion_status="USER_DENIED")
+    payload = interview_pack.build_pack_payload(session_id="s", cfg=SimpleNamespace(resume_text="", ai_policy_mode=""), candidate_id="cand")
+    assert all(c["id"] != "c-deny" for c in payload["claims"])
+
+
+def test_stories_are_user_owned_and_frozen_into_pack(tmp_intel_db):
+    intel_storage.save_story("story-1", "cand-old", {"title": "灰度回滚", "situation": "上线故障", "action": "回滚", "result": "10 分钟恢复"})
+    payload = interview_pack.build_pack_payload(session_id="s", cfg=SimpleNamespace(resume_text="", ai_policy_mode=""), candidate_id="cand-new")
+    assert payload["stories"][0]["title"] == "灰度回滚"
+
+
+def test_voice_prompt_line():
+    from api.intelligence.r2_router import voice_prompt_line
+
+    line = voice_prompt_line({"conclusion_first": True, "target_seconds": 45, "shape": "bullet", "term_style": "keep_english_terms", "banned_phrases": ["赋能", "抓手"]})
+    assert line.startswith("[我的表达]") and "先给结论" in line and "45 秒" in line and "赋能" in line
+    assert voice_prompt_line({}) == ""
+
+
+def test_turn_trace_saved_for_review(monkeypatch, tmp_intel_db):
+    from api.assist import answer_worker
+    from core.session import reset_session
+    from tests.test_assist_answer_worker import _cfg, _deps
+
+    reset_session()
+    cfg = _cfg()
+    cfg.resume_text = RESUME
+    monkeypatch.setattr(answer_worker, "get_config", lambda: cfg)
+    monkeypatch.setattr(answer_worker, "chat_stream_single_model", lambda *_a, **_k: iter([("text", "RAG 适合频繁更新的知识。")]))
+    broadcasts: list[dict] = []
+    answer_worker.process_question_parallel(
+        ("RAG 和微调怎么选", None, False, "asr", {"origin": "asr", "asr_turn_id": 1}),
+        seq=0, model_idx=0, sess_v=0, deps=_deps(broadcasts=broadcasts),
+    )
+    qa_id = next(e for e in broadcasts if e["type"] == "answer_done")["id"]
+    trace = intel_storage.get_turn_traces([qa_id])[qa_id]
+    assert trace["question_raw"] == "RAG 和微调怎么选"
+    assert trace["fast_cue"]["direction"]
+    assert "ttfug_internal_ms" in trace["latency"]
+    assert trace["axes"]["content_type"] == "KNOWLEDGE"
+    assert all("api_key" not in str(v) for v in trace.values())

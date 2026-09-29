@@ -15,6 +15,7 @@ test.describe('job tracker and review linkage', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
 
+    await page.getByRole('tab', { name: '投递看板' }).click()
     await expect(page.getByRole('heading', { name: '求职进度', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '查看 MiniMax 详情' }).click()
 
@@ -40,7 +41,7 @@ test.describe('job tracker and review linkage', () => {
 
     await page.goto('/')
 
-    await expect(page.getByRole('tab', { name: '复盘' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: '复盘', exact: true })).toHaveAttribute('aria-selected', 'true')
     const linkedReviewRow = page.locator('article').filter({ hasText: '二面复盘' }).first()
     await expect(linkedReviewRow).toBeVisible()
     await linkedReviewRow.click()

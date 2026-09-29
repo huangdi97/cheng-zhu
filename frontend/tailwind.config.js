@@ -37,6 +37,13 @@ export default {
         outline: {
           subtle: 'rgb(var(--c-outline-variant) / <alpha-value>)',
         },
+        status: {
+          direct: 'rgb(var(--c-status-direct) / <alpha-value>)',
+          supported: 'rgb(var(--c-status-supported) / <alpha-value>)',
+          inferred: 'rgb(var(--c-status-inferred) / <alpha-value>)',
+          unknown: 'rgb(var(--c-status-unknown) / <alpha-value>)',
+          risk: 'rgb(var(--c-status-risk) / <alpha-value>)',
+        },
       },
     },
   },

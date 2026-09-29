@@ -129,6 +129,12 @@ class ConfigUpdate(BaseModel):
     # Review (面试复盘)
     review_enabled: Optional[bool] = None
     review_model_index: Optional[int] = None
+    # R2 per-session policy defaults (each frozen into the InterviewPack)
+    ai_policy_mode: Optional[str] = None
+    human_assistance_policy: Optional[str] = None
+    share_privacy_mode: Optional[str] = None
+    speech_adoption_analytics_live: Optional[bool] = None
+    fast_cue_model_index: Optional[int] = None
 
 
 _MODEL_API_KEY_KEEP = "__IA_KEEP_EXISTING_API_KEY__"
@@ -284,6 +290,18 @@ async def api_update_config(body: ConfigUpdate):
     from core.config import ModelConfig
 
     d = body.model_dump(exclude_none=True)
+    # R2: policy fields accept only their enum values (server-side, not UI).
+    _allowed_policies = {
+        "ai_policy_mode": {"AI_FORBIDDEN", "AI_LIMITED", "AI_ALLOWED", "AI_EXPECTED"},
+        "human_assistance_policy": {"HUMAN_FORBIDDEN", "HUMAN_PRACTICE_ONLY", "HUMAN_ALLOWED"},
+        "share_privacy_mode": {"OFF", "PRIVATE_OVERLAY"},
+    }
+    for _key, _allowed in _allowed_policies.items():
+        if _key in d:
+            _value = str(d[_key]).strip().upper()
+            if _value not in _allowed:
+                raise HTTPException(status_code=422, detail=f"{_key} 必须是 {'/'.join(sorted(_allowed))} 之一")
+            d[_key] = _value
     try:
         if "assist_auto_answer_mode" in d:
             mode = str(d["assist_auto_answer_mode"] or "").strip().lower()

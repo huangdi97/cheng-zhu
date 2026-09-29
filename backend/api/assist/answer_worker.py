@@ -810,6 +810,62 @@ def _pack_notes(pack, cfg) -> str:
     return str(getattr(cfg, "interview_notes", "") or "")
 
 
+def _voice_line(pack) -> str:
+    try:
+        from api.intelligence.r2_router import voice_prompt_line
+
+        return voice_prompt_line(dict((pack.voice_profile or {}).get("explicit_preferences") or {}))
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _save_turn_trace(
+    *,
+    qa_id: str,
+    session_id: str,
+    pack,
+    question_text: str,
+    intelligence_layer: dict,
+    fast_cue_payload: dict,
+    compiled_items: list,
+    compile_stats: dict,
+    latency_metrics: dict,
+    provider: str,
+    model: str,
+    stream_guard,
+) -> None:
+    """Review 2.0 trace: what the candidate saw for this turn. Never contains
+    provider keys or the full resume; context is recorded by fragment id."""
+    try:
+        from services.storage import intelligence as intel_storage
+
+        plan = intelligence_layer.get("plan") or {}
+        understanding = intelligence_layer.get("understanding") or {}
+        intel_storage.save_turn_trace(
+            qa_id,
+            session_id,
+            str(getattr(pack, "id", "") or ""),
+            {
+                "question_raw": question_text[:500],
+                "resolved_question": str(understanding.get("resolved_question", "") or "")[:500],
+                "response_mode": str(plan.get("mode", "") or ""),
+                "axes": {k: (plan.get("metadata") or {}).get(k) for k in ("dialogue_act", "content_type", "truth_requirement", "provenance", "assertion_policy")},
+                "fast_cue": {k: fast_cue_payload.get(k) for k in ("direction", "cues", "cautions", "level")} if fast_cue_payload else {},
+                "context": [
+                    {"fragment_id": (item.metadata or {}).get("fragment_id", item.id), "source_type": item.source_type.value, "provenance": (item.metadata or {}).get("provenance", "")}
+                    for item in compiled_items
+                ],
+                "context_stats": compile_stats,
+                "latency": latency_metrics,
+                "provider": provider,
+                "model": model,
+                "stream_guard_rewrites": int(getattr(stream_guard, "rewrites", 0) or 0),
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _lat_mark(qa_id: str, point: str, mono: Optional[float] = None) -> None:
     try:
         from services.intelligence import latency_clock
@@ -1348,6 +1404,9 @@ def process_question_parallel(
                 blocks.append("[编译上下文：最小充分包]\n" + "\n".join(compiled_sections))
             if session_claim_block:
                 blocks.append(session_claim_block)
+            voice_line = _voice_line(live_pack)
+            if voice_line:
+                blocks.append(voice_line)
             if blocks:
                 section_block = "\n".join(blocks)
                 if isinstance(user_for_llm, list):
@@ -1952,6 +2011,20 @@ def process_question_parallel(
                     )
                 except Exception:  # noqa: BLE001
                     pass
+            _save_turn_trace(
+                qa_id=qa_id,
+                session_id=live_session_id,
+                pack=live_pack,
+                question_text=question_text,
+                intelligence_layer=intelligence_layer,
+                fast_cue_payload=fast_cue_payload,
+                compiled_items=compiled_items,
+                compile_stats={**compile_stats, "compiler_fallback": compiler_fallback},
+                latency_metrics=latency_metrics,
+                provider=str(display_model_name or answer_engine_name or ""),
+                model=str(getattr(model_cfg, "model", "") or ""),
+                stream_guard=stream_guard,
+            )
             deps.broadcast(
                 {
                     "type": "token_update",

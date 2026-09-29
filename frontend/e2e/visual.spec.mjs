@@ -34,6 +34,7 @@ test.describe('@visual main pages', () => {
 
   test('knowledge page', async ({ page }) => {
     await page.goto('/')
+    await page.getByRole('tab', { name: '复盘', exact: true }).click()
     await page.getByRole('tab', { name: '能力分析' }).click()
     await expect(page.getByText('薄弱点排名')).toBeVisible({ timeout: 8000 })
     await page.waitForTimeout(500)

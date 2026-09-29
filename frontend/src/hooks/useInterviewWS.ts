@@ -169,6 +169,19 @@ export function useInterviewWS(active = true) {
             ?? (msg.question_cluster ? [msg.question_cluster as any] : undefined),
         })
         break
+      case 'guidance_fast':
+        if (msg.exam_preflight_id) return
+        s.setFastCue(msg.id as string, msg)
+        break
+      case 'session_claim_warning':
+        s.pushSessionClaimWarning({
+          id: String(msg.id ?? ''),
+          qaId: String(msg.qa_id ?? ''),
+          text: String(msg.text ?? ''),
+          message: String(msg.message ?? ''),
+          actions: Array.isArray(msg.actions) ? (msg.actions as Array<{ id: string; label: string }>) : [],
+        })
+        break
       case 'answer_think_chunk':
         if (msg.exam_preflight_id) return
         s.appendThinkChunk(msg.id as string, msg.chunk as string)
@@ -188,6 +201,7 @@ export function useInterviewWS(active = true) {
           msg.first_token_ms as number | undefined,
           msg.total_ms as number | undefined,
           msg.guidance,
+          (msg.latency ?? undefined) as Record<string, number | null> | undefined,
         )
         if (useInterviewStore.getState().streamingIds.length === 0) {
           s.setQuestionParseStatus(null)

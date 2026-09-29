@@ -1,95 +1,72 @@
-import { lazy, Suspense, useState } from 'react'
-import { ChevronDown, Lightbulb, Loader2, Quote, Search } from 'lucide-react'
-import type { ColorSchemeId } from '@/lib/colorScheme'
-import type { GuidanceViewModel } from '@/lib/guidanceViewModel'
+import { AlertTriangle, BookOpen, Globe, UserCheck, Users } from 'lucide-react'
+import { CUE_SOURCE_LABELS, type CueSource, type FastCueViewModel } from '@/lib/guidanceViewModel'
 
-const AnswerMarkdownContent = lazy(() => import('./AnswerMarkdownContent'))
+// R2 Live Main 首屏：当前问题下的 Fast Cue（先于 Deep Answer 到达）。
+// 每条 cue 都显示来源（图标 + 文字，不只靠颜色）；风险单独一栏。
+// Deep Answer 由调用方在下方渲染，本组件不再解析 answer 文本。
 
-interface GuidanceFirstScreenProps {
-  vm: GuidanceViewModel
-  answer: string
-  colorScheme: ColorSchemeId
-  isStreaming?: boolean
+const SOURCE_ICON: Record<CueSource, typeof BookOpen> = {
+  PERSONAL_EVIDENCE: UserCheck,
+  KB_KNOWLEDGE: BookOpen,
+  WORLD_KNOWLEDGE: Globe,
+  HUMAN_COACH: Users,
 }
 
-function SectionTitle({ icon: Icon, label, tone }: { icon: typeof Quote; label: string; tone: string }) {
+// 语义状态色（WCAG AA，见 index.css 的 --status-* token）。
+const SOURCE_TONE: Record<CueSource, string> = {
+  PERSONAL_EVIDENCE: 'text-status-direct',
+  KB_KNOWLEDGE: 'text-status-supported',
+  WORLD_KNOWLEDGE: 'text-status-unknown',
+  HUMAN_COACH: 'text-status-inferred',
+}
+
+export function CueSourceBadge({ source }: { source: CueSource }) {
+  const Icon = SOURCE_ICON[source]
   return (
-    <div className={`flex items-center gap-1.5 text-[10px] font-semibold mb-1.5 ${tone}`}>
-      <Icon className="w-3 h-3" />
-      {label}
-    </div>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${SOURCE_TONE[source]}`}>
+      <Icon className="w-3 h-3" aria-hidden />
+      {CUE_SOURCE_LABELS[source]}
+    </span>
   )
 }
 
-function BulletList({ items, dotTone }: { items: string[]; dotTone: string }) {
-  return (
-    <ul className="space-y-1">
-      {items.map((item, idx) => (
-        <li key={idx} className="flex items-start gap-1.5 text-xs text-text-secondary leading-relaxed">
-          <span className={`mt-[7px] h-1 w-1 flex-shrink-0 rounded-full ${dotTone}`} aria-hidden />
-          <span className="min-w-0 break-words">{item}</span>
-        </li>
-      ))}
-    </ul>
-  )
+interface FastCuePanelProps {
+  cue: FastCueViewModel
 }
 
-// glance-first 首屏：答案就绪后先展示「当前问题 + 核心思路 + 我的证据」，
-// 完整答案默认折叠，由 [展开] 按钮按需渲染，避免长答案淹没首屏。
-export default function GuidanceFirstScreen({ vm, answer, colorScheme, isStreaming = false }: GuidanceFirstScreenProps) {
-  const [expanded, setExpanded] = useState(false)
-  const hasFullAnswer = answer.trim().length > 0
-  const showResolved = vm.resolvedQuestion.length > 0 && vm.resolvedQuestion !== vm.question
-
+export default function GuidanceFirstScreen({ cue }: FastCuePanelProps) {
   return (
-    <div className="rounded-xl border border-accent-blue/20 bg-accent-blue/5 p-3 space-y-3">
-      <div className="min-w-0">
-        <SectionTitle icon={Quote} label="当前问题" tone="text-accent-blue" />
-        <p className="text-sm text-text-primary leading-relaxed font-medium break-words">{vm.question}</p>
-        {showResolved && (
-          <p className="mt-1 text-[11px] text-text-muted leading-relaxed break-words">审题：{vm.resolvedQuestion}</p>
-        )}
-      </div>
-
-      {vm.coreIdeas.length > 0 && (
-        <div className="min-w-0">
-          <SectionTitle icon={Lightbulb} label="核心思路" tone="text-accent-amber" />
-          <BulletList items={vm.coreIdeas} dotTone="bg-accent-amber" />
-        </div>
+    <section aria-label="Fast Cue" data-testid="fast-cue" className="rounded-xl border border-accent-blue/20 bg-accent-blue/5 p-3 mb-2 space-y-2">
+      {cue.direction && (
+        <p className="text-[11px] font-semibold text-text-secondary">{cue.direction}</p>
       )}
-
-      {vm.evidence.length > 0 && (
-        <div className="min-w-0">
-          <SectionTitle icon={Search} label="我的证据" tone="text-accent-green" />
-          <BulletList items={vm.evidence} dotTone="bg-accent-green" />
-        </div>
+      {cue.cues.length > 0 && (
+        <ul className="space-y-1.5">
+          {cue.cues.map((item, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-[13px] text-text-primary leading-relaxed">
+              <span className="mt-[8px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-blue" aria-hidden />
+              <span className="min-w-0 flex-1 break-words">{item.text}</span>
+              <CueSourceBadge source={item.source} />
+            </li>
+          ))}
+        </ul>
       )}
-
-      {(hasFullAnswer || isStreaming) && (
-        <div className="border-t border-accent-blue/15 pt-2.5">
-          {expanded && hasFullAnswer && (
-            <div className="mb-1.5 max-h-[280px] overflow-y-auto rounded-lg bg-bg-tertiary/20 p-2.5">
-              <Suspense fallback={<div className="text-xs text-text-muted">渲染答案中…</div>}>
-                <AnswerMarkdownContent answer={answer} colorScheme={colorScheme} stream={false} />
-              </Suspense>
-            </div>
-          )}
-          {expanded && !hasFullAnswer && (
-            <div className="flex items-center gap-2 text-text-muted text-xs py-1">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              生成中…
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-[11px] font-medium text-accent-blue hover:underline"
-          >
-            {expanded ? '收起' : '展开'}
-            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
+      {cue.jobFocus && <p className="text-[11px] text-text-muted">岗位关注：{cue.jobFocus}</p>}
+      {cue.cautions.length > 0 && (
+        <ul className="space-y-1" aria-label="风险">
+          {cue.cautions.map((item, idx) => (
+            <li key={idx} className="flex items-start gap-1.5 text-[11px] font-medium text-status-risk">
+              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" aria-hidden />
+              <span className="break-words">{item}</span>
+            </li>
+          ))}
+        </ul>
       )}
-    </div>
+      {(cue.ttfugUserMs != null || cue.ttfugInternalMs != null) && (
+        <p className="text-[10px] font-mono text-text-muted tabular-nums">
+          {cue.ttfugUserMs != null ? `提示 ${cue.ttfugUserMs}ms（自说完）` : `提示 ${cue.ttfugInternalMs}ms（自问题确定）`}
+        </p>
+      )}
+    </section>
   )
 }

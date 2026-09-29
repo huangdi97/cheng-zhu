@@ -67,7 +67,7 @@ const WORKSPACE = {
 async function openWorkspace(context, page) {
   await installMocks(context, {
     messages: COMMON_WS_BOOTSTRAP,
-    localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'prep' },
+    localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'job-tracker' },
     apiOverrides: {
       'GET /api/prep/spaces': { items: [SPACE] },
       'GET /api/prep/spaces/7': SPACE,

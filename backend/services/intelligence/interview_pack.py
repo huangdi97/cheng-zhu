@@ -255,6 +255,7 @@ def build_pack_payload(
     screen_context_policy: str = "",
     ai_policy: str = "",
     answer_preferences: Optional[dict[str, Any]] = None,
+    profile_text_override: str = "",
 ) -> dict[str, Any]:
     """Collect the actual content to freeze. Called at Prepare/Preflight time,
     where reading "latest" profiles is legitimate (the user is choosing)."""
@@ -266,12 +267,17 @@ def build_pack_payload(
         cfg = get_config()
     candidate_id = candidate_id or storage.active_candidate_id()
     candidate_row = storage.get_candidate_profile(candidate_id) if candidate_id else None
-    profile_text = str((candidate_row or {}).get("profile_text") or getattr(cfg, "resume_text", "") or "")
+    profile_text = str(
+        profile_text_override
+        or (candidate_row or {}).get("profile_text")
+        or getattr(cfg, "resume_text", "")
+        or ""
+    )
     job = storage.get_job_profile(job_id) if job_id else None
-    voice = storage.get_voice_profile(candidate_id) if candidate_id else None
+    voice = storage.get_voice_profile("local") or (storage.get_voice_profile(candidate_id) if candidate_id else None)
     stories = [
         {key: row.get(key, "") for key in ("id", "title", "situation", "challenge", "action", "result", "reflection")}
-        for row in (storage.list_stories(candidate_id) if candidate_id else [])
+        for row in storage.list_all_stories()
     ]
     memory = {
         kind: [str(item.get("text", "")) for item in storage.list_memory_items(kind, limit=20)]

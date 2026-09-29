@@ -16,6 +16,8 @@ import WorkbenchPopover from '@/components/WorkbenchPopover'
 import AnswerPanel from '@/components/AnswerPanel'
 import ControlBar from '@/components/ControlBar'
 import CopilotHintPanel from '@/components/CopilotHintPanel'
+import LivePackBar from '@/components/live/LivePackBar'
+import SessionClaimWarnings from '@/components/live/SessionClaimWarnings'
 import QuestionBoundaryPanel from '@/components/QuestionBoundaryPanel'
 import ScreenshotModePanel from '@/components/ScreenshotModePanel'
 import SettingsDrawer from '@/components/SettingsDrawer'
@@ -25,21 +27,21 @@ import KnowledgeDrawer from '@/components/kb/KnowledgeDrawer'
 import { AppToastStack } from '@/components/app/AppToastStack'
 import { InitErrorScreen } from '@/components/app/InitErrorScreen'
 import { ModelPriorityDropdown } from '@/components/app/ModelPriorityDropdown'
-const ReviewMode = lazy(() => import('@/components/ReviewMode'))
-const KnowledgeMap = lazy(() => import('@/components/KnowledgeMap'))
-const ResumeOptimizer = lazy(() => import('@/components/ResumeOptimizer'))
-const JobTracker = lazy(() => import('@/components/JobTracker'))
-const PrepSpace = lazy(() => import('@/components/PrepSpace'))
+const MyChengzhu = lazy(() => import('@/components/my/MyChengzhu'))
+const JobHub = lazy(() => import('@/components/hubs/Hubs').then((m) => ({ default: m.JobHub })))
+const RehearseHub = lazy(() => import('@/components/hubs/Hubs').then((m) => ({ default: m.RehearseHub })))
+const ReviewHub = lazy(() => import('@/components/hubs/Hubs').then((m) => ({ default: m.ReviewHub })))
 const HomeScreen = lazy(() => import('@/components/HomeScreen'))
 
+// R2 Stage O: 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置.
+// 设置 opens the settings drawer; 准备 lives inside each Job Goal.
 const APP_MODE_TABS = [
   ['home', '首页'],
   ['resume-opt', '我的成竹'],
-  ['job-tracker', '岗位'],
+  ['job-tracker', '求职'],
   ['prep', '演练'],
   ['assist', '上场'],
   ['review', '复盘'],
-  ['knowledge', '能力分析'],
 ] as const
 
 const HEADER_ICON_BTN =
@@ -64,20 +66,19 @@ function WorkbenchMark({ className }: { className?: string }) {
 const NAV_ITEMS: Array<[AppMode, string, typeof Home]> = [
   ['home', '首页', Home],
   ['resume-opt', '我的成竹', FileText],
-  ['job-tracker', '岗位', Kanban],
+  ['job-tracker', '求职', Kanban],
   ['prep', '演练', BookOpenCheck],
   ['assist', '上场', Radio],
   ['review', '复盘', ClipboardList],
-  ['knowledge', '能力分析', BrainCircuit],
 ]
 
-function AppNavRail({ appMode, onSelect }: { appMode: AppMode; onSelect: (mode: AppMode) => void }) {
+function AppNavRail({ appMode, onSelect, onSettings }: { appMode: AppMode; onSelect: (mode: AppMode) => void; onSettings: () => void }) {
   return (
     <nav
-      role="tablist"
-      aria-label="功能模块"
+      aria-label="主导航"
       className="hidden md:flex flex-col items-center gap-1 w-[76px] flex-shrink-0 border-r border-bg-tertiary/70 bg-bg-secondary/40 py-3 px-1.5 overflow-y-auto scrollbar-none"
     >
+      <div role="tablist" aria-label="功能模块" aria-orientation="vertical" className="flex flex-col items-center gap-1 w-full">
       {NAV_ITEMS.map(([mode, label, Icon]) => (
         <button
           key={mode}
@@ -96,6 +97,16 @@ function AppNavRail({ appMode, onSelect }: { appMode: AppMode; onSelect: (mode: 
           <span className="text-[10px] leading-none">{label}</span>
         </button>
       ))}
+      </div>
+      <button
+        type="button"
+        onClick={onSettings}
+        title="设置"
+        className="mt-auto flex flex-col items-center justify-center gap-1.5 w-full py-2.5 rounded-2xl text-text-muted hover:bg-bg-hover/60 hover:text-text-primary"
+      >
+        <Settings className="w-5 h-5" aria-hidden />
+        <span className="text-[10px] leading-none">设置</span>
+      </button>
     </nav>
   )
 }
@@ -537,7 +548,7 @@ export default function App() {
       </header>
 
       <div className="flex flex-1 min-h-0">
-        <AppNavRail appMode={appMode} onSelect={setAppMode} />
+        <AppNavRail appMode={appMode} onSelect={setAppMode} onSettings={toggleSettings} />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
 
       {/* ── Assist Mode ── */}
@@ -571,8 +582,10 @@ export default function App() {
               截图模式
             </button>
           </div>
+          <LivePackBar />
           {assistMode === 'voice' ? (
             <>
+          <SessionClaimWarnings />
           {/* Mobile tab switcher */}
           <div className="flex md:hidden border-b border-bg-tertiary flex-shrink-0" role="tablist" aria-label="实时辅助面板">
             <button role="tab" aria-selected={mobileTab === 'transcript'} onClick={() => setMobileTab('transcript')}
@@ -691,38 +704,31 @@ export default function App() {
       </>
       )}
 
-      {/* ── Review Mode ── */}
-      {appMode === 'review' && (
+      {/* ── 复盘（场次复盘 + 能力分析） ── */}
+      {(appMode === 'review' || appMode === 'knowledge') && (
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载面试复盘中…</div>}>
-          <ReviewMode />
+          <ReviewHub />
         </Suspense>
       )}
 
-      {/* ── Knowledge Map ── */}
-      {appMode === 'knowledge' && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载能力分析中…</div>}>
-          <KnowledgeMap />
-        </Suspense>
-      )}
-
-      {/* ── Resume Optimizer ── */}
+      {/* ── 我的成竹 ── */}
       {appMode === 'resume-opt' && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载简历优化中…</div>}>
-          <ResumeOptimizer />
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载我的成竹中…</div>}>
+          <MyChengzhu />
         </Suspense>
       )}
 
-      {/* ── Job tracker ── */}
+      {/* ── 求职（岗位目标 + 投递看板） ── */}
       {appMode === 'job-tracker' && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载求职看板中…</div>}>
-          <JobTracker />
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载求职中…</div>}>
+          <JobHub />
         </Suspense>
       )}
 
-      {/* Prep space */}
+      {/* ── 演练 ── */}
       {appMode === 'prep' && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载面试准备中…</div>}>
-          <PrepSpace />
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载演练中…</div>}>
+          <RehearseHub />
         </Suspense>
       )}
 

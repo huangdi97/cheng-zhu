@@ -73,3 +73,84 @@ export function buildGuidanceViewModel(payload: unknown): GuidanceViewModel {
 export function isGlanceReady(vm: GuidanceViewModel): boolean {
   return vm.question.trim().length > 0 || vm.coreIdeas.length > 0
 }
+
+// ---------------------------------------------------------------------------
+// R2 Fast Cue：guidance_fast 负载 → 首屏 cue 视图模型。Main UI 与 Overlay 共用。
+// INVARIANT: cue 是内容（"RAG 更适合频繁更新的知识"），来源必须是四类之一；
+// 解析永不抛错，未知来源一律降级为 WORLD_KNOWLEDGE（绝不冒充个人证据）。
+// ---------------------------------------------------------------------------
+
+export type CueSource = 'PERSONAL_EVIDENCE' | 'KB_KNOWLEDGE' | 'WORLD_KNOWLEDGE' | 'HUMAN_COACH'
+
+export interface CueItem {
+  text: string
+  source: CueSource
+  provenance: string
+}
+
+export interface FastCueViewModel {
+  direction: string
+  cues: CueItem[]
+  cautions: string[]
+  jobFocus: string
+  responseMode: string
+  level: string
+  ttfugUserMs: number | null
+  ttfugInternalMs: number | null
+}
+
+export const CUE_SOURCE_LABELS: Record<CueSource, string> = {
+  PERSONAL_EVIDENCE: '个人来源',
+  KB_KNOWLEDGE: '资料',
+  WORLD_KNOWLEDGE: '通用知识',
+  HUMAN_COACH: '教练建议',
+}
+
+const CUE_CAP = 5
+const KNOWN_SOURCES = new Set<CueSource>(['PERSONAL_EVIDENCE', 'KB_KNOWLEDGE', 'WORLD_KNOWLEDGE', 'HUMAN_COACH'])
+
+export function buildFastCueViewModel(payload: unknown): FastCueViewModel | null {
+  if (!isRecord(payload)) return null
+  const rawCues = Array.isArray(payload.cues) ? payload.cues : []
+  const cues: CueItem[] = []
+  for (const raw of rawCues) {
+    if (!isRecord(raw) || typeof raw.text !== 'string' || !raw.text.trim()) continue
+    const source = (typeof raw.source === 'string' && KNOWN_SOURCES.has(raw.source as CueSource)
+      ? raw.source
+      : 'WORLD_KNOWLEDGE') as CueSource
+    cues.push({ text: raw.text, source, provenance: typeof raw.provenance === 'string' ? raw.provenance : '' })
+    if (cues.length >= CUE_CAP) break
+  }
+  const direction = typeof payload.direction === 'string' ? payload.direction : ''
+  if (!cues.length && !direction) return null
+  return {
+    direction,
+    cues,
+    cautions: toCappedStringList(payload.cautions, 3),
+    jobFocus: typeof payload.job_focus === 'string' ? payload.job_focus : '',
+    responseMode: typeof payload.response_mode === 'string' ? payload.response_mode : '',
+    level: typeof payload.level === 'string' ? payload.level : 'L0',
+    ttfugUserMs: toFiniteNumber(payload.ttfug_user_ms),
+    ttfugInternalMs: toFiniteNumber(payload.ttfug_internal_ms),
+  }
+}
+
+export interface LiveGuidance {
+  vm: GuidanceViewModel
+  cue: FastCueViewModel | null
+}
+
+/** QA 条目 → 首屏数据。qa.guidance 是 answer_done.guidance（内层对象），qa.fastCue 是 guidance_fast。 */
+export function buildLiveGuidance(qa: { question?: string; answer?: string; guidance?: unknown; fastCue?: unknown; firstTokenMs?: number; totalMs?: number } | null | undefined): LiveGuidance {
+  if (!qa) return { vm: EMPTY_GUIDANCE_VIEW_MODEL, cue: null }
+  const vm = buildGuidanceViewModel({
+    question: qa.question ?? '',
+    answer: qa.answer ?? '',
+    guidance: qa.guidance,
+    first_token_ms: qa.firstTokenMs,
+    total_ms: qa.totalMs,
+  })
+  const guidance = isRecord(qa.guidance) ? qa.guidance : {}
+  const cue = buildFastCueViewModel(qa.fastCue ?? guidance.fast_cue)
+  return { vm, cue }
+}

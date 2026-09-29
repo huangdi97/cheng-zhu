@@ -18,7 +18,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.intelligence_migrations")
 
-LATEST_SCHEMA_VERSION = 2
+LATEST_SCHEMA_VERSION = 3
 
 # Step 1: initial Intelligence Core schema (master doc section 32).
 _V1_TABLES: tuple[str, ...] = (
@@ -311,9 +311,26 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_session_claim_session ON session_claim(session_id)")
 
 
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """R2 Review 2.0: one trace row per answered turn (what the candidate saw)."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS turn_trace (
+            qa_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            pack_id TEXT NOT NULL DEFAULT '',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            created_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_turn_trace_session ON turn_trace(session_id, created_at)")
+
+
 _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "initial intelligence core schema"),
     2: (_migrate_v2, "r2 provenance axes, interview pack, session claims"),
+    3: (_migrate_v3, "r2 turn trace for review 2.0"),
 }
 
 

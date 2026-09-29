@@ -273,15 +273,66 @@ def rebuild_and_persist(
     try:
         # Lazy import inside the function: avoids storage-layer import cycles.
         from services.storage import intelligence as intelligence_storage
+        previous_candidate_id = intelligence_storage.active_candidate_id()
         intelligence_storage.save_candidate_profile(
             rep.candidate_id, display_name="", resume_history_id=resume_history_id,
             profile_text=rep.profile_text[:_PROFILE_TEXT_LIMIT],
         )
         intelligence_storage.save_claims(rep.candidate_id, [_claim_storage_dict(c) for c in rep.claims])
         intelligence_storage.save_evidence_batch(rep.candidate_id, [asdict(e) for e in evidences], links)
+        if previous_candidate_id and previous_candidate_id != rep.candidate_id:
+            carry_over_user_verdicts(previous_candidate_id, rep.candidate_id)
     except Exception as exc:  # persistence must not break in-memory build
         _log.warning("candidate representation persistence failed: %s", exc)
     return rep
+
+def _norm_claim(text: str) -> str:
+    return re.sub(r"\s+", "", str(text or "")).lower()
+
+
+def carry_over_user_verdicts(old_candidate_id: str, new_candidate_id: str) -> int:
+    """R2: a resume rebuild must not erase what the user decided.
+
+    - A claim the user confirmed / denied keeps that verdict when the same
+      statement is rebuilt from the new resume (provenance comes from the new
+      sources; the user axis is carried).
+    - Claims that did not come from the resume (Review-confirmed session
+      statements, user-added facts) are copied to the new candidate as-is.
+    Returns the number of claims carried.
+    """
+    from services.storage import intelligence as storage
+
+    new_rows = {_norm_claim(r["text"]): r for r in storage.list_claims(new_candidate_id, limit=5000)}
+    carried = 0
+    for old in storage.list_claims(old_candidate_id, limit=5000):
+        verdict = str(old.get("user_assertion_status") or "UNREVIEWED")
+        non_resume = str(old.get("source") or "") in {"session_statement", "user_added"}
+        if verdict == "UNREVIEWED" and not non_resume:
+            continue
+        match = new_rows.get(_norm_claim(old["text"]))
+        if match is not None:
+            storage.update_claim_axes(match["id"], user_assertion_status=verdict)
+            carried += 1
+            continue
+        if not non_resume:
+            continue
+        storage.save_claims(new_candidate_id, [{
+            "id": old["id"],
+            "type": old.get("type", "fact"),
+            "text": old["text"],
+            "source": old.get("source", ""),
+            "truth_status": old.get("truth_status", "UNKNOWN"),
+            "confidence": float(old.get("confidence") or 0.3),
+            "metadata": json.loads(old.get("metadata_json") or "{}"),
+        }])
+        storage.update_claim_axes(
+            old["id"],
+            provenance_status=str(old.get("provenance_status") or "NO_EVIDENCE"),
+            user_assertion_status=verdict,
+        )
+        carried += 1
+    return carried
+
 
 def _claim_storage_dict(claim: Claim) -> dict[str, Any]:
     """save_claims expects metadata as a dict; the dataclass keeps JSON text."""

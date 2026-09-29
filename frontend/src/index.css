@@ -65,10 +65,10 @@ code, pre, .font-mono {
   --c-text-primary: 15 23 42;
   --c-text-secondary: 71 85 105;
   --c-text-muted: 94 108 132;
-  --c-accent-blue: 37 99 235;
-  --c-accent-green: 22 163 74;
-  --c-accent-red: 220 38 38;
-  --c-accent-amber: 202 138 4;
+  --c-accent-blue: 29 78 216;    /* #1D4ED8 */
+  --c-accent-green: 22 101 52;   /* #166534: AA on white and on its 10-20% tints */
+  --c-accent-red: 185 28 28;     /* #B91C1C */
+  --c-accent-amber: 146 64 14;   /* #92400E */
   --c-grad-from: 37 99 235;
   --c-grad-to: 99 91 230;
   --c-primary-container: 219 234 254;
@@ -278,9 +278,9 @@ code, pre, .font-mono {
   --c-text-secondary: 92 88 96;
   --c-text-muted: 100 96 106;
   --c-accent-blue: 43 92 169;
-  --c-accent-green: 58 123 89;
+  --c-accent-green: 46 105 75;
   --c-accent-red: 158 63 77;
-  --c-accent-amber: 183 129 52;
+  --c-accent-amber: 140 94 30;
   --c-grad-from: 43 92 169;
   --c-grad-to: 109 78 163;
   --c-primary-container: 214 228 244;
@@ -371,6 +371,39 @@ code, pre, .font-mono {
   --c-lyric-shell-bg: 7 54 66;
   --c-lyric-shell-border: 181 137 0;
 }
+
+/* ========== R2 语义状态色（WCAG AA：正文对比度 >= 4.5:1，含 Surface/SurfaceAlt）==========
+   有直接证据 / 有支持材料 / 推断 / 暂无证据 / 风险。状态一律“图标 + 文字”，不只靠颜色。
+   对比度由 src/lib/statusContrast.test.ts 在 CI 中逐主题校验。 */
+:root,
+[data-theme='vscode-light-plus'],
+[data-theme='editorial-glass'] {
+  --c-status-direct: 37 106 75;     /* #256A4B */
+  --c-status-supported: 49 117 102; /* #317566 */
+  --c-status-inferred: 134 85 31;   /* #86551F */
+  --c-status-unknown: 99 106 102;   /* #636A66 */
+  --c-status-risk: 173 69 69;       /* #AD4545 */
+}
+
+[data-theme='vscode-dark-plus'],
+[data-theme='vscode-dark-hc'],
+[data-theme='nord'],
+[data-theme='solarized-dark'] {
+  --c-status-direct: 111 207 159;   /* #6FCF9F */
+  --c-status-supported: 108 195 179;/* #6CC3B3 */
+  --c-status-inferred: 224 169 106; /* #E0A96A */
+  --c-status-unknown: 176 183 179;  /* #B0B7B3 */
+  --c-status-risk: 242 143 143;     /* #F28F8F */
+}
+
+[data-theme='nord'] {
+  --c-status-direct: 177 229 203; /* #B1E5CB */
+  --c-status-supported: 184 226 219; /* #B8E2DB */
+  --c-status-inferred: 240 214 183; /* #F0D6B7 */
+  --c-status-unknown: 214 218 215; /* #D6DAD7 */
+  --c-status-risk: 250 208 208; /* #FAD0D0 */
+}
+
 
 /* 文本选中：保证各主题下对比度足够，不依赖字体（仅改颜色） */
 ::selection {
@@ -1187,6 +1220,17 @@ code, pre, .font-mono {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* R2 Overlay Cue Mode */
+.ov-cue { display: flex; flex-direction: column; gap: 0.35em; }
+.ov-cue-question { font-weight: 600; opacity: 0.85; }
+.ov-cue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2em; }
+.ov-cue-sources { font-size: 0.78em; opacity: 0.75; }
+.ov-cue-risk { font-size: 0.85em; font-weight: 600; color: rgb(var(--c-ov-fail)); }
+.ov-cue-toggle {
+  align-self: flex-start; margin-top: 0.2em; font-size: 0.78em; padding: 0.1em 0.6em;
+  border-radius: 999px; border: 1px solid rgb(var(--c-ov-border) / 0.6); background: transparent; color: inherit; cursor: pointer;
 }
 
 .ov-answer-stack {

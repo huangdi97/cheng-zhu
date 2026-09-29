@@ -147,6 +147,114 @@ def fact_usage(claim_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Stories (user-authored, never AI-invented) and voice preferences
+# ---------------------------------------------------------------------------
+
+
+class StoryRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    situation: str = Field(default="", max_length=4000)
+    challenge: str = Field(default="", max_length=4000)
+    action: str = Field(default="", max_length=4000)
+    result: str = Field(default="", max_length=4000)
+    reflection: str = Field(default="", max_length=4000)
+    tags: list[str] = Field(default_factory=list)
+
+
+@router.get("/stories")
+def list_stories():
+    return storage.list_all_stories()
+
+
+@router.post("/stories")
+def create_story(body: StoryRequest):
+    import uuid
+
+    story_id = f"story-{uuid.uuid4().hex[:12]}"
+    storage.save_story(story_id, storage.active_candidate_id() or "local", body.model_dump(), body.tags)
+    return {"id": story_id}
+
+
+@router.put("/stories/{story_id}")
+def update_story(story_id: str, body: StoryRequest):
+    storage.save_story(story_id, storage.active_candidate_id() or "local", body.model_dump(), body.tags)
+    return {"id": story_id}
+
+
+@router.delete("/stories/{story_id}")
+def delete_story(story_id: str):
+    return {"id": story_id, "deleted": storage.delete_story(story_id)}
+
+
+class VoicePreferences(BaseModel):
+    conclusion_first: bool = True
+    target_seconds: int = Field(default=60, ge=15, le=300)
+    language: str = Field(default="zh-CN", max_length=20)
+    term_style: str = Field(default="keep_english_terms", max_length=40)
+    shape: str = Field(default="bullet", max_length=20)  # bullet / narrative
+    banned_phrases: list[str] = Field(default_factory=list)
+
+
+_VOICE_OWNER = "local"
+
+
+@router.get("/voice-preferences")
+def get_voice_preferences():
+    row = storage.get_voice_profile(_VOICE_OWNER)
+    prefs = (row or {}).get("profile", {}).get("explicit_preferences") if row else None
+    return VoicePreferences(**(prefs or {})).model_dump()
+
+
+@router.put("/voice-preferences")
+def put_voice_preferences(body: VoicePreferences):
+    storage.save_voice_profile(
+        _VOICE_OWNER,
+        json.dumps({"explicit_preferences": body.model_dump()}, ensure_ascii=False),
+        sample_count=0,
+        enabled=True,
+    )
+    return body.model_dump()
+
+
+def voice_prompt_line(prefs: dict[str, Any]) -> str:
+    """One style line for the answer prompt (enters the pack)."""
+    if not prefs:
+        return ""
+    parts = []
+    if prefs.get("conclusion_first", True):
+        parts.append("先给结论")
+    if prefs.get("target_seconds"):
+        parts.append(f"口述约 {int(prefs['target_seconds'])} 秒")
+    parts.append("要点式" if prefs.get("shape") == "bullet" else "叙述式")
+    if prefs.get("term_style") == "keep_english_terms":
+        parts.append("技术术语保留英文")
+    banned = [str(p) for p in prefs.get("banned_phrases") or [] if str(p).strip()]
+    if banned:
+        parts.append("禁用：" + "、".join(banned[:8]))
+    return "[我的表达] " + "；".join(parts)
+
+
+@router.get("/skill-cards")
+def list_skill_cards():
+    from services.storage import prep_space
+
+    out = []
+    for lite in prep_space.list_spaces():
+        space = prep_space.get_space(int(lite["id"])) or {}
+        for card in space.get("skill_cards") or []:
+            out.append({
+                "id": card["id"],
+                "space_id": space.get("id"),
+                "space_title": space.get("title", ""),
+                "project_name": card.get("project_name", ""),
+                "status": card.get("status", ""),
+                "user_reviewed": bool((card.get("card") or {}).get("user_reviewed")),
+                "card": card.get("card") or {},
+            })
+    return out
+
+
+# ---------------------------------------------------------------------------
 # InterviewPack
 # ---------------------------------------------------------------------------
 
@@ -273,6 +381,37 @@ def review_session_claim(claim_id: str, body: ReviewDecisionRequest):
     if result is None:
         raise HTTPException(status_code=404, detail="session claim or decision not found")
     return result
+
+
+@router.get("/review/{review_session_id}/r2")
+def review_r2(review_session_id: int):
+    """Review 2.0 for one review session: per-turn trace (raw / resolved
+    question, Fast Cue, sources, context selection, latency, provider) and the
+    session claims raised during it, joined on qa_id."""
+    from services.storage import review as review_storage
+
+    detail = review_storage.get_session_detail(review_session_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="review session not found")
+    qa_ids = [str(t.get("qa_id", "")) for t in detail.get("turns", []) if t.get("qa_id")]
+    traces = storage.get_turn_traces(qa_ids)
+    claims = storage.list_session_claims_by_qa(qa_ids)
+    return {
+        "review_session_id": review_session_id,
+        "turns": [
+            {
+                "qa_id": t.get("qa_id"),
+                "question": t.get("question_text", ""),
+                "candidate_actual_speech": t.get("candidate_answer_text") or "",
+                "trace": traces.get(str(t.get("qa_id", "")), {}),
+            }
+            for t in detail.get("turns", [])
+        ],
+        "session_claims": [
+            {**row, "session_label": SESSION_LABELS.get(row["session_status"], ""), "provenance_label": PROVENANCE_LABELS.get(row["provenance_status"], "")}
+            for row in claims
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------

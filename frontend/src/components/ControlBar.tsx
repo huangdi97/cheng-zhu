@@ -784,7 +784,7 @@ export default function ControlBar() {
           <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:max-w-[38rem]">
             <div className="flex min-w-0 flex-col gap-1 lg:max-w-[19rem]">
               <span className="text-[10px] font-medium text-text-muted leading-none">会议音频 · 听面试官</span>
-              <p className="text-[10px] text-text-muted/80 leading-snug truncate">电脑会议选 ★系统音频；电话会议选麦克风（手机开免提放电脑旁）</p>
+              <p className="text-[10px] text-text-muted leading-snug truncate">电脑会议选 ★系统音频；电话会议选麦克风（手机开免提放电脑旁）</p>
               <AudioDevicePicker
                 devices={devices}
                 selectedDevice={selectedDevice}
@@ -811,7 +811,7 @@ export default function ControlBar() {
                   {candidateSttLoading && <Loader2 className="w-3 h-3 animate-spin inline ml-1 text-accent-blue" />}
                   {!candidateSttLoading && candidateSttLoaded && <span className="text-accent-green ml-1">✓</span>}
                 </span>
-                <p className="text-[10px] text-text-muted/80 leading-snug truncate">用你的麦克风记录口述，便于复盘与追问</p>
+                <p className="text-[10px] text-text-muted leading-snug truncate">用你的麦克风记录口述，便于复盘与追问</p>
                 <AudioDevicePicker
                   devices={candidateMicDevices}
                   selectedDevice={selectedCandidateMic}
@@ -834,7 +834,7 @@ export default function ControlBar() {
             ) : (
               <div className="flex min-w-0 flex-col gap-1 lg:max-w-[19rem]">
                 <span className="text-[10px] font-medium text-text-muted leading-none">我的麦克风 · 记录我的回答</span>
-                <p className="text-[10px] text-text-muted/80 leading-snug truncate">在设置中开启「我的回答记录」后可用麦克风记录口述</p>
+                <p className="text-[10px] text-text-muted leading-snug truncate">在设置中开启「我的回答记录」后可用麦克风记录口述</p>
                 <div
                   role="status"
                   aria-label="我的回答记录状态"

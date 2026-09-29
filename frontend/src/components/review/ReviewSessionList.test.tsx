@@ -206,10 +206,13 @@ describe('ReviewSessionList', () => {
 
     expect(onViewDetail).toHaveBeenCalledWith(39)
 
+    // Keyboard / AT path: the title is a real button (the row itself is not
+    // role=button, so nested controls stay valid — axe nested-interactive).
     onViewDetail.mockClear()
-    fireEvent.keyDown(row as HTMLElement, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '打开 米哈游二面 复盘详情' }))
 
     expect(onViewDetail).toHaveBeenCalledWith(39)
+    expect(onViewDetail).toHaveBeenCalledTimes(1)
   })
 
   it('shows linked application stages and supports focus filtering', async () => {

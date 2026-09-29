@@ -131,7 +131,7 @@ def save_claims(candidate_id: str, claims: list[dict[str, Any]]) -> int:
                 conn.execute(
                     "INSERT INTO claim (id, candidate_id, type, text, source, truth_status, confidence, metadata_json, created_at, updated_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-                    "ON CONFLICT(id) DO UPDATE SET text=excluded.text, truth_status=excluded.truth_status, "
+                    "ON CONFLICT(id) DO UPDATE SET candidate_id=excluded.candidate_id, text=excluded.text, truth_status=excluded.truth_status, "
                     "confidence=excluded.confidence, metadata_json=excluded.metadata_json, updated_at=excluded.updated_at",
                     (
                         claim["id"],
@@ -386,6 +386,40 @@ def delete_memory_item(item_id: str) -> None:
     _write("DELETE FROM memory_item WHERE id = ?", (item_id,))
 
 
+_STORY_FIELDS = ("title", "situation", "challenge", "action", "result", "reflection")
+
+
+def save_story(story_id: str, candidate_id: str, fields: dict[str, Any], tags: Optional[list[str]] = None) -> None:
+    """User-authored Story (S/C/A/R/Reflection). Never AI-invented."""
+    now = time.time()
+    values = [str(fields.get(key, "") or "") for key in _STORY_FIELDS]
+    _write(
+        "INSERT INTO story (id, candidate_id, title, situation, challenge, action, result, reflection, tags_json, truth_status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUPPORTED', ?, ?) "
+        "ON CONFLICT(id) DO UPDATE SET title=excluded.title, situation=excluded.situation, challenge=excluded.challenge, "
+        "action=excluded.action, result=excluded.result, reflection=excluded.reflection, tags_json=excluded.tags_json, updated_at=excluded.updated_at",
+        (story_id, candidate_id, *values, json.dumps(tags or [], ensure_ascii=False), now, now),
+    )
+
+
+def delete_story(story_id: str) -> bool:
+    with _LOCK:
+        conn = _conn()
+        try:
+            cur = conn.execute("DELETE FROM story WHERE id = ?", (story_id,))
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+
+def list_all_stories(limit: int = 200) -> list[dict[str, Any]]:
+    """Local single-user product: stories belong to the user, not to one
+    resume rebuild, so they survive a new candidate_id."""
+    rows = _read("SELECT * FROM story ORDER BY updated_at DESC LIMIT ?", (limit,))
+    return [dict(row) for row in rows]
+
+
 def list_stories(candidate_id: str, limit: int = 50) -> list[dict[str, Any]]:
     rows = _read(
         "SELECT * FROM story WHERE candidate_id = ? ORDER BY updated_at DESC LIMIT ?",
@@ -560,6 +594,41 @@ def list_session_claims(session_id: str) -> list[dict[str, Any]]:
 def get_session_claim(claim_id: str) -> Optional[dict[str, Any]]:
     rows = _read("SELECT * FROM session_claim WHERE id = ?", (claim_id,))
     return dict(rows[0]) if rows else None
+
+
+# ---------------------------------------------------------------------------
+# Turn trace (Review 2.0)
+# ---------------------------------------------------------------------------
+
+def save_turn_trace(qa_id: str, session_id: str, pack_id: str, payload: dict[str, Any]) -> None:
+    _write(
+        "INSERT OR REPLACE INTO turn_trace (qa_id, session_id, pack_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)",
+        (qa_id, session_id, pack_id, json.dumps(payload, ensure_ascii=False, default=str), time.time()),
+    )
+
+
+def get_turn_traces(qa_ids: list[str]) -> dict[str, dict[str, Any]]:
+    ids = [str(q) for q in qa_ids if q]
+    if not ids:
+        return {}
+    placeholders = ",".join("?" for _ in ids)
+    rows = _read(f"SELECT * FROM turn_trace WHERE qa_id IN ({placeholders})", tuple(ids))
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        try:
+            out[row["qa_id"]] = {**json.loads(row["payload_json"] or "{}"), "session_id": row["session_id"], "pack_id": row["pack_id"]}
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return out
+
+
+def list_session_claims_by_qa(qa_ids: list[str]) -> list[dict[str, Any]]:
+    ids = [str(q) for q in qa_ids if q]
+    if not ids:
+        return []
+    placeholders = ",".join("?" for _ in ids)
+    rows = _read(f"SELECT * FROM session_claim WHERE qa_id IN ({placeholders}) ORDER BY created_at ASC", tuple(ids))
+    return [dict(row) for row in rows]
 
 
 init_db()

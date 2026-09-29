@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGuidanceViewModel, EMPTY_GUIDANCE_VIEW_MODEL, isGlanceReady } from './guidanceViewModel'
+import { buildFastCueViewModel, buildGuidanceViewModel, buildLiveGuidance, EMPTY_GUIDANCE_VIEW_MODEL, isGlanceReady } from './guidanceViewModel'
 
 // 与后端 answer_done 事件负载同构：question/answer + 延迟指标 + guidance 子对象。
 const FULL_ANSWER_DONE_PAYLOAD = {
@@ -138,5 +138,37 @@ describe('isGlanceReady', () => {
 
   it('is true with only core ideas and no question', () => {
     expect(isGlanceReady({ ...EMPTY_GUIDANCE_VIEW_MODEL, coreIdeas: ['核心思路'] })).toBe(true)
+  })
+})
+
+describe('R2 fast cue view model', () => {
+  it('parses guidance_fast into cues with source taxonomy', () => {
+    const cue = buildFastCueViewModel({
+      direction: '先说边界，再讲理解与落地做法',
+      cues: [
+        { text: '先说边界：材料里没有「Redis Cluster」的直接经历', source: 'PERSONAL_EVIDENCE', provenance: 'NO_EVIDENCE' },
+        { text: 'RAG 更适合频繁更新的知识', source: 'KB_KNOWLEDGE' },
+        { text: '伪造来源', source: 'SOMETHING_ELSE' },
+      ],
+      cautions: ['没有来源支持，不要说成“我做过/我负责”'],
+      ttfug_user_ms: 900,
+      ttfug_internal_ms: 420,
+    })
+    expect(cue?.cues.map((c) => c.source)).toEqual(['PERSONAL_EVIDENCE', 'KB_KNOWLEDGE', 'WORLD_KNOWLEDGE'])
+    expect(cue?.ttfugUserMs).toBe(900)
+    expect(cue?.cautions).toHaveLength(1)
+  })
+
+  it('returns null for empty or malformed payloads', () => {
+    expect(buildFastCueViewModel(null)).toBeNull()
+    expect(buildFastCueViewModel({ cues: 'x' })).toBeNull()
+  })
+
+  it('buildLiveGuidance reads qa.fastCue first, then guidance.fast_cue', () => {
+    const fromEvent = buildLiveGuidance({ question: 'q', fastCue: { direction: 'd', cues: [{ text: 'a', source: 'KB_KNOWLEDGE' }] } })
+    expect(fromEvent.cue?.cues[0].text).toBe('a')
+    const fromDone = buildLiveGuidance({ question: 'q', guidance: { fast_cue: { direction: 'd2', cues: [] } } })
+    expect(fromDone.cue?.direction).toBe('d2')
+    expect(buildLiveGuidance(null).cue).toBeNull()
   })
 })

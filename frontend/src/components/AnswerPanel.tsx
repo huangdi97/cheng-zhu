@@ -4,7 +4,7 @@ import { useInterviewStore, QAPair } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import KbReferenceBanner from '@/components/kb/KbReferenceBanner'
 import type { ColorSchemeId } from '@/lib/colorScheme'
-import { buildGuidanceViewModel, isGlanceReady } from '@/lib/guidanceViewModel'
+import { buildLiveGuidance } from '@/lib/guidanceViewModel'
 import GuidanceFirstScreen from './GuidanceFirstScreen'
 
 const SoundTest = lazy(() => import('./SoundTest'))
@@ -193,8 +193,9 @@ type QACardProps = {
 const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, animate, animateDelayMs }: QACardProps) {
   const srcLabel = sourceLabel(qa.questionSource)
   const suggestion = useInterviewStore((s) => s.suggestionsById[qa.id])
-  const guidanceVm = buildGuidanceViewModel(qa.guidance)
-  const showGuidanceFirstScreen = isGlanceReady(guidanceVm)
+  // R2 cue-first: the Fast Cue (guidance_fast) renders above the deep answer
+  // as soon as it arrives; the deep answer keeps streaming below it.
+  const { cue } = buildLiveGuidance(qa)
   const baseClass = animate ? 'animate-fade-up' : ''
   const animStyle = animate ? { animationDelay: `${animateDelayMs}ms` } : undefined
 
@@ -257,16 +258,8 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
               )}
             </div>
             <KbReferenceBanner qaId={qa.id} />
-            {showGuidanceFirstScreen ? (
-              <GuidanceFirstScreen
-                vm={guidanceVm}
-                answer={qa.answer}
-                colorScheme={colorScheme}
-                isStreaming={isStreaming}
-              />
-            ) : (
-              renderAnswerBody(qa, isStreaming, stream, colorScheme)
-            )}
+            {cue && <GuidanceFirstScreen cue={cue} />}
+            {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
           </div>
         </div>
       </div>
@@ -329,16 +322,8 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
             )}
           </div>
           <KbReferenceBanner qaId={qa.id} />
-          {showGuidanceFirstScreen ? (
-            <GuidanceFirstScreen
-              vm={guidanceVm}
-              answer={qa.answer}
-              colorScheme={colorScheme}
-              isStreaming={isStreaming}
-            />
-          ) : (
-            renderAnswerBody(qa, isStreaming, stream, colorScheme)
-          )}
+          {cue && <GuidanceFirstScreen cue={cue} />}
+          {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
         </div>
       </div>
       {suggestion && !isStreaming && (

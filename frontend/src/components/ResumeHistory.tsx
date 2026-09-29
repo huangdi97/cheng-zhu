@@ -210,6 +210,7 @@ function ResumeHistoryListBody({
     return <p className="text-[11px] text-text-muted text-center py-4">{emptyHint}</p>
   }
   return (
+    <>
     <ul className="space-y-1">
       {items.map((rec) => (
         <li
@@ -276,8 +277,9 @@ function ResumeHistoryListBody({
           </div>
         </li>
       ))}
-      <p className="text-[10px] text-text-muted pt-1 px-0.5">最多 {max} 条；越靠下为最近上传或选用。</p>
     </ul>
+    <p className="text-[10px] text-text-muted pt-1 px-0.5">最多 {max} 条；越靠下为最近上传或选用。</p>
+    </>
   )
 }
 

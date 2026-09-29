@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { readFileSync } from 'fs'
+
+const APP_VERSION = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')).version as string
 
 function manualChunks(id: string) {
   if (!id.includes('node_modules')) return
@@ -44,6 +47,9 @@ function manualChunks(id: string) {
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   resolve: {
     alias: [
       { find: '@', replacement: path.resolve(__dirname, './src') },

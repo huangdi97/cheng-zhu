@@ -9,6 +9,7 @@ import {
   warnInterviewOverlaySyncIssue,
 } from '@/lib/interviewOverlay'
 import { getShortcutDisplay } from '@/lib/shortcuts'
+import { buildLiveGuidance, CUE_SOURCE_LABELS, type FastCueViewModel } from '@/lib/guidanceViewModel'
 import { useInterviewStore } from '@/stores/configStore'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
@@ -68,6 +69,9 @@ export default function InterviewOverlay() {
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [reviewQaId, setReviewQaId] = useState<string | null>(null)
   const [liveFocusQaId, setLiveFocusQaId] = useState<string | null>(null)
+  // R2 Cue Mode: the non-focus overlay shows the Fast Cue first; the full
+  // answer is one click ([展开]) away, per question.
+  const [expandedQaIds, setExpandedQaIds] = useState<Record<string, boolean>>({})
   const busyActionRef = useRef<string | null>(null)
   const pinnedFocusTabsByQaIdRef = useRef<Record<string, boolean>>({})
 
@@ -379,6 +383,13 @@ export default function InterviewOverlay() {
     { key: 'hide' as const, label: '隐藏面板', shortcut: shortcuts.toggleInterviewOverlay?.key },
   ]
 
+  const overlayCue = displayedQa ? buildLiveGuidance(displayedQa).cue : null
+  const cueExpanded = Boolean(displayedQa && expandedQaIds[displayedQa.id])
+  const toggleCueExpanded = () => {
+    if (!displayedQa) return
+    const qaId = displayedQa.id
+    setExpandedQaIds((current) => ({ ...current, [qaId]: !current[qaId] }))
+  }
   const renderedAnswer = hasContent ? (
     <div className="ov-answer-stack">
       {displayedQa && qaPairs.length > 1 && (
@@ -387,8 +398,21 @@ export default function InterviewOverlay() {
         </div>
       )}
       {activeVisionVerify && <OverlayVisionVerify verify={activeVisionVerify} />}
-      <OverlayMarkdown content={overlayAnswerSlice.text} />
-      {isStreaming && <span className="ov-caret" />}
+      {overlayCue && !cueExpanded ? (
+        <OverlayCue
+          question={qaPairs.length > 1 ? '' : displayedQa?.question ?? ''}
+          cue={overlayCue}
+          onExpand={toggleCueExpanded}
+        />
+      ) : (
+        <>
+          <OverlayMarkdown content={overlayAnswerSlice.text} />
+          {isStreaming && <span className="ov-caret" />}
+          {overlayCue && (
+            <button type="button" className="ov-cue-toggle" onClick={toggleCueExpanded}>收起</button>
+          )}
+        </>
+      )}
     </div>
   ) : (
     <span className="ov-standby-hint" style={{ fontSize: `${answerFontSize}px` }}>
@@ -503,6 +527,27 @@ export default function InterviewOverlay() {
           {renderedAnswer}
         </div>
       </div>
+    </div>
+  )
+}
+
+function OverlayCue({ question, cue, onExpand }: { question: string; cue: FastCueViewModel; onExpand: () => void }) {
+  const sources = Array.from(new Set(cue.cues.map((item) => CUE_SOURCE_LABELS[item.source])))
+  return (
+    <div className="ov-cue" data-testid="overlay-cue">
+      {question && <div className="ov-cue-question">{question}</div>}
+      <ul className="ov-cue-list">
+        {cue.cues.map((item, idx) => (
+          <li key={idx}>
+            <span aria-hidden>•</span> {item.text}
+          </li>
+        ))}
+      </ul>
+      {sources.length > 0 && <div className="ov-cue-sources">来源：{sources.join(' / ')}</div>}
+      {cue.cautions.map((item, idx) => (
+        <div key={idx} className="ov-cue-risk">! {item}</div>
+      ))}
+      <button type="button" className="ov-cue-toggle" onClick={onExpand}>展开</button>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 {
   "name": "cheng-zhu-desktop",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "成竹 Chengzhu - Electron 桌面端技术面试工作台",
   "appDisplayName": "成竹",
   "engines": {

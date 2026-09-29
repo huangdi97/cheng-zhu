@@ -13,7 +13,7 @@
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-284B63" alt="License" />
+  <img src="https://img.shields.io/badge/license-MIT-284B63" alt="License" />
   <img src="https://img.shields.io/badge/python-3.10+-2A9D8F" alt="Python" />
   <img src="https://img.shields.io/badge/node-22.12%2B-E76F51" alt="Node" />
   <img src="https://img.shields.io/badge/react-18-264653" alt="React" />
@@ -280,7 +280,7 @@ cheng-zhu/
 
 ## 开源协议与免责
 
-- **协议**：[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
+- **协议**：[MIT](LICENSE)（自 v1.2.0 起；第三方依赖与资源保留各自许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)）
 - **免责**：项目仅供学习研究，请勿用于学术不端、违规考试或其他不合规场景；使用后果自行承担。
 
 ## 反馈与贡献

@@ -183,6 +183,19 @@ class AppConfig(BaseModel):
     voice_profile_enabled: bool = False
     # Stage P：AI policy mode（AI_FORBIDDEN / AI_LIMITED / AI_ALLOWED / AI_EXPECTED）
     ai_policy_mode: str = "AI_ALLOWED"
+    # R2 Stage R：人工协助策略，独立于 AI policy（AI_ALLOWED 不推出 HUMAN_ALLOWED）
+    # HUMAN_FORBIDDEN / HUMAN_PRACTICE_ONLY / HUMAN_ALLOWED
+    human_assistance_policy: str = "HUMAN_PRACTICE_ONLY"
+    # R2 Stage T：共享隐私（OFF / PRIVATE_OVERLAY），默认 OFF；不是“不可检测”保证
+    share_privacy_mode: str = "OFF"
+    # R2 Stage Y：正式 Live 的 cue 采纳 / 语速分析默认关闭，需用户显式开启（本地）
+    speech_adoption_analytics_live: bool = False
+    # R2 Stage G：Context Compiler 成功时成为唯一上下文来源（关闭 = legacy 注入）
+    intelligence_compiler_authoritative: bool = True
+    # R2 Stage K：独立 guidance_fast 事件（L0 确定性 cue，先于 Deep Answer）
+    intelligence_fast_cue_v2: bool = True
+    # R2 Stage K：L1 fast cue 使用的模型序号（-1 = 仅 L0 确定性 cue）
+    fast_cue_model_index: int = -1
     # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）
     raw_audio_retention_sessions: int = 0
 

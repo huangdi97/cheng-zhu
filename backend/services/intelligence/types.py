@@ -105,6 +105,8 @@ class ResponseMode(str, Enum):
     SYSTEM_DESIGN = "SYSTEM_DESIGN"
     CASE = "CASE"
     NEGOTIATION = "NEGOTIATION"
+    OOD = "OOD"
+    PRODUCT_CASE = "PRODUCT_CASE"
 
 
 class DepthProfile(str, Enum):

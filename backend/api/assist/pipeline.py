@@ -388,6 +388,19 @@ def _maybe_build_interviewer_segment(
     started_mono = max(0.0, min(float(segment_started_mono), ended_mono))
     if ended_mono - started_mono + 1e-6 < audio_sec:
         started_mono = max(0.0, ended_mono - audio_sec)
+    # R2 Stage I: E = estimated interviewer speech end. A silence flush fires
+    # silence_duration after the last voiced frame, so subtract it; the VAD
+    # wait is then visible in QBD instead of being hidden.
+    try:
+        from services.intelligence import latency_clock
+
+        trailing = float(getattr(cfg, "silence_duration", 1.2) or 1.2) if flush_reason == "silence" else 0.0
+        latency_clock.mark_speech_end(
+            str(getattr(session, "session_id", "") or "default"),
+            max(started_mono, ended_mono - trailing),
+        )
+    except Exception:  # noqa: BLE001
+        pass
     segment = InterviewerSegment(
         audio=speech_audio,
         sample_rate=AudioCapture.SAMPLE_RATE,
@@ -1495,6 +1508,8 @@ def _interview_worker():
         try:
             if (text or "").strip():
                 _note_interviewer_speech_activity(time.monotonic())
+                if len((text or "").strip()) >= 4:
+                    _on_meaningful_partial(session, text)
             broadcast({"type": "interviewer_transcription_partial", "text": text})
         except Exception:
             pass
@@ -1896,6 +1911,34 @@ def preload_candidate_asr_if_enabled() -> None:
     _preload_candidate_whisper_async(provider, model, language)
 
 
+def _on_meaningful_partial(session, text: str) -> None:
+    """Q0 + predictive prefetch from the first meaningful partial (R2 12.3).
+    Never commits state, claims or answers."""
+    sid = str(getattr(session, "session_id", "") or "default")
+    try:
+        from services.intelligence import latency_clock, predictive
+
+        latency_clock.mark_first_partial(sid)
+        predictive.on_partial(sid, text)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _record_session_claims(session, text: str, qa_id: str) -> None:
+    """R2 Stage E: record first-person statements from the candidate's actual
+    speech; unsourced ones raise a private consistency warning."""
+    try:
+        from services.intelligence.interview_pack import resolve_live_pack
+        from services.intelligence.session_claims import record_candidate_speech
+
+        sid = str(getattr(session, "session_id", "") or "default")
+        pack = resolve_live_pack(sid, get_config())
+        for warning in record_candidate_speech(sid, pack, text, qa_id=qa_id or ""):
+            broadcast(warning)
+    except Exception as exc:  # noqa: BLE001
+        _elog.warning("session claim record failed: %s", exc)
+
+
 def _publish_candidate_transcription(
     session,
     text: str,
@@ -1933,6 +1976,8 @@ def _publish_candidate_transcription(
             candidate_answer = session.get_candidate_answer_for_qa(segment.qa_id, max_chars=2400)
         if candidate_answer:
             _submit_candidate_knowledge_update(segment.qa_id, candidate_answer)
+    if segment.is_final:
+        _record_session_claims(session, cleaned, segment.qa_id)
     _ilog.info(
         "CANDIDATE_ASR_PUBLISH segment=%s qa_id=%s final=%s provider=%s chars=%d",
         segment.segment_id,

@@ -107,7 +107,11 @@ def get_candidate_profile(candidate_id: str) -> Optional[dict[str, Any]]:
 
 
 def active_candidate_id() -> str:
-    """Single-candidate local product: the active profile is the latest one."""
+    """Single-candidate local product: the active profile is the latest one.
+
+    Used when BUILDING an InterviewPack (prepare time). The Live path must
+    read the frozen pack instead and never call this.
+    """
     rows = _read("SELECT id FROM candidate_profile ORDER BY updated_at DESC LIMIT 1")
     return str(rows[0]["id"]) if rows else ""
 
@@ -265,6 +269,11 @@ def get_job_profile(job_id: str) -> Optional[dict[str, Any]]:
 
 
 def latest_job_id() -> str:
+    """Most recently analyzed job. Prepare-side convenience only.
+
+    INVARIANT: never call from the Live answer path — a job analyzed after a
+    pack was frozen must not leak into that session (R2 Stage F).
+    """
     rows = _read("SELECT id FROM job_profile ORDER BY updated_at DESC LIMIT 1")
     return str(rows[0]["id"]) if rows else ""
 
@@ -406,6 +415,151 @@ def get_voice_profile(candidate_id: str) -> Optional[dict[str, Any]]:
     except (json.JSONDecodeError, TypeError):
         row["profile"] = {}
     return row
+
+
+# ---------------------------------------------------------------------------
+# R2 claim axes (provenance / user assertion are independent columns)
+# ---------------------------------------------------------------------------
+
+def update_claim_axes(
+    claim_id: str,
+    *,
+    provenance_status: Optional[str] = None,
+    user_assertion_status: Optional[str] = None,
+    structured: Optional[dict[str, Any]] = None,
+    source_ids: Optional[list[str]] = None,
+) -> bool:
+    sets: list[str] = ["updated_at = ?"]
+    params: list[Any] = [time.time()]
+    if provenance_status is not None:
+        sets.append("provenance_status = ?")
+        params.append(provenance_status)
+    if user_assertion_status is not None:
+        sets.append("user_assertion_status = ?")
+        params.append(user_assertion_status)
+    if structured is not None:
+        sets.append("structured_json = ?")
+        params.append(json.dumps(structured, ensure_ascii=False))
+    if source_ids is not None:
+        sets.append("source_ids_json = ?")
+        params.append(json.dumps(source_ids, ensure_ascii=False))
+    params.append(claim_id)
+    with _LOCK:
+        conn = _conn()
+        try:
+            cur = conn.execute(f"UPDATE claim SET {', '.join(sets)} WHERE id = ?", tuple(params))
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+
+def claim_evidence_ids(claim_id: str) -> list[str]:
+    rows = _read("SELECT evidence_id FROM claim_evidence WHERE claim_id = ?", (claim_id,))
+    return [str(row["evidence_id"]) for row in rows]
+
+
+def delete_claim(claim_id: str) -> bool:
+    with _LOCK:
+        conn = _conn()
+        try:
+            conn.execute("DELETE FROM claim_evidence WHERE claim_id = ?", (claim_id,))
+            cur = conn.execute("DELETE FROM claim WHERE id = ?", (claim_id,))
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+
+# ---------------------------------------------------------------------------
+# InterviewPack (immutable rows; a revision is a new row)
+# ---------------------------------------------------------------------------
+
+def insert_interview_pack(fields: dict[str, Any]) -> None:
+    _write(
+        "INSERT INTO interview_pack (id, pack_group_id, session_id, revision, parent_id, job_id, pack_json, content_hash, reason, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            fields["id"],
+            fields["pack_group_id"],
+            fields["session_id"],
+            int(fields.get("revision", 1)),
+            fields.get("parent_id", ""),
+            fields.get("job_id", ""),
+            fields["pack_json"],
+            fields["content_hash"],
+            fields.get("reason", ""),
+            float(fields.get("created_at") or time.time()),
+        ),
+    )
+
+
+def _pack_row(row: sqlite3.Row) -> dict[str, Any]:
+    data = dict(row)
+    try:
+        data["pack"] = json.loads(data.pop("pack_json"))
+    except (json.JSONDecodeError, TypeError):
+        data["pack"] = {}
+    return data
+
+
+def latest_interview_pack(session_id: str) -> Optional[dict[str, Any]]:
+    rows = _read(
+        "SELECT * FROM interview_pack WHERE session_id = ? ORDER BY revision DESC, created_at DESC LIMIT 1",
+        (session_id,),
+    )
+    return _pack_row(rows[0]) if rows else None
+
+
+def get_interview_pack(pack_id: str) -> Optional[dict[str, Any]]:
+    rows = _read("SELECT * FROM interview_pack WHERE id = ?", (pack_id,))
+    return _pack_row(rows[0]) if rows else None
+
+
+def list_interview_pack_revisions(session_id: str) -> list[dict[str, Any]]:
+    rows = _read(
+        "SELECT id, pack_group_id, session_id, revision, parent_id, job_id, content_hash, reason, created_at "
+        "FROM interview_pack WHERE session_id = ? ORDER BY revision ASC",
+        (session_id,),
+    )
+    return [dict(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Session claims (said aloud this session; never long-term facts by themselves)
+# ---------------------------------------------------------------------------
+
+def upsert_session_claim(fields: dict[str, Any]) -> None:
+    now = time.time()
+    _write(
+        "INSERT INTO session_claim (id, session_id, pack_id, text, normalized, session_status, provenance_status, review_state, qa_id, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(id) DO UPDATE SET text=excluded.text, session_status=excluded.session_status, "
+        "provenance_status=excluded.provenance_status, review_state=excluded.review_state, updated_at=excluded.updated_at",
+        (
+            fields["id"],
+            fields["session_id"],
+            fields.get("pack_id", ""),
+            fields["text"],
+            fields["normalized"],
+            fields.get("session_status", "SESSION_STATED"),
+            fields.get("provenance_status", "NO_EVIDENCE"),
+            fields.get("review_state", "PENDING"),
+            fields.get("qa_id", ""),
+            now,
+            now,
+        ),
+    )
+
+
+def list_session_claims(session_id: str) -> list[dict[str, Any]]:
+    rows = _read("SELECT * FROM session_claim WHERE session_id = ? ORDER BY created_at ASC", (session_id,))
+    return [dict(row) for row in rows]
+
+
+def get_session_claim(claim_id: str) -> Optional[dict[str, Any]]:
+    rows = _read("SELECT * FROM session_claim WHERE id = ?", (claim_id,))
+    return dict(rows[0]) if rows else None
 
 
 init_db()

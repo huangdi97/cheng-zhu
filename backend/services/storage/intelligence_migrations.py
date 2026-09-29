@@ -18,7 +18,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.intelligence_migrations")
 
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 2
 
 # Step 1: initial Intelligence Core schema (master doc section 32).
 _V1_TABLES: tuple[str, ...] = (
@@ -240,8 +240,80 @@ _V1_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_memory_kind ON memory_item(kind)",
 )
 
+def _column_names(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    """R2: three-axis claim semantics, frozen InterviewPack, session claims.
+
+    Backfill maps the legacy single-axis truth_status:
+      SUPPORTED (resume action line)   -> DIRECT_EVIDENCE
+      INFERRED  (熟悉/了解 self-rating)  -> SUPPORTING_EVIDENCE
+      VERIFIED  (user clicked confirm) -> USER_CONFIRMED + DIRECT/NO by evidence link
+      CONTRADICTED -> CONFLICTING_EVIDENCE, UNKNOWN -> NO_EVIDENCE
+    The old column is kept (read-only) so a downgrade still opens the file.
+    """
+    existing = _column_names(conn, "claim")
+    additions = {
+        "provenance_status": "TEXT NOT NULL DEFAULT 'NO_EVIDENCE'",
+        "user_assertion_status": "TEXT NOT NULL DEFAULT 'UNREVIEWED'",
+        "structured_json": "TEXT NOT NULL DEFAULT '{}'",
+        "source_ids_json": "TEXT NOT NULL DEFAULT '[]'",
+    }
+    for column, ddl in additions.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE claim ADD COLUMN {column} {ddl}")
+    conn.execute(
+        "UPDATE claim SET provenance_status = CASE truth_status "
+        "WHEN 'SUPPORTED' THEN 'DIRECT_EVIDENCE' "
+        "WHEN 'INFERRED' THEN 'SUPPORTING_EVIDENCE' "
+        "WHEN 'CONTRADICTED' THEN 'CONFLICTING_EVIDENCE' "
+        "WHEN 'VERIFIED' THEN CASE WHEN EXISTS (SELECT 1 FROM claim_evidence ce WHERE ce.claim_id = claim.id) "
+        "THEN 'DIRECT_EVIDENCE' ELSE 'NO_EVIDENCE' END "
+        "ELSE 'NO_EVIDENCE' END"
+    )
+    conn.execute("UPDATE claim SET user_assertion_status = 'USER_CONFIRMED' WHERE truth_status = 'VERIFIED'")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS interview_pack (
+            id TEXT PRIMARY KEY,
+            pack_group_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 1,
+            parent_id TEXT NOT NULL DEFAULT '',
+            job_id TEXT NOT NULL DEFAULT '',
+            pack_json TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pack_session ON interview_pack(session_id, revision)")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS session_claim (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            pack_id TEXT NOT NULL DEFAULT '',
+            text TEXT NOT NULL,
+            normalized TEXT NOT NULL,
+            session_status TEXT NOT NULL DEFAULT 'SESSION_STATED',
+            provenance_status TEXT NOT NULL DEFAULT 'NO_EVIDENCE',
+            review_state TEXT NOT NULL DEFAULT 'PENDING',
+            qa_id TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_session_claim_session ON session_claim(session_id)")
+
+
 _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "initial intelligence core schema"),
+    2: (_migrate_v2, "r2 provenance axes, interview pack, session claims"),
 }
 
 

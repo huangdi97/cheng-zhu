@@ -20,24 +20,37 @@ from evals.fixtures.interview_fixtures import (
 _log = get_logger("evals.route_runner")
 
 
-def _route_matches(expected: str, actual_mode: str, *, boundary_applicable: bool) -> bool:
-    """Tolerant route matching: the fixture's expected name maps to the
-    planner mode with the documented aliases."""
-    expected_n = (expected or "").strip().upper().replace(" ", "_")
-    actual_n = (actual_mode or "").strip().upper()
-    if expected_n == "EXPERIENCE_BOUNDARY":
-        return boundary_applicable or actual_n == "EXPERIENCE_BOUNDARY_KNOWLEDGE"
-    if expected_n == "EXPERIENCE+KNOWLEDGE" or expected_n == "EXPERIENCE_KNOWLEDGE":
-        return actual_n in {"EXPERIENCE_KNOWLEDGE", "EXPERIENCE"}
-    if expected_n == "KNOWLEDGE+CURRENT_CONTEXT" or expected_n == "KNOWLEDGE+CURRENT_ARCHITECTURE":
-        return actual_n in {"KNOWLEDGE", "EXPERIENCE_KNOWLEDGE"}
-    if expected_n == "OPEN_DESIGN":
-        return actual_n in {"OPEN_DESIGN", "SYSTEM_DESIGN", "HYPOTHETICAL"}
-    if expected_n == "EXPERIENCE+TRADEOFF":
-        return actual_n in {"EXPERIENCE_KNOWLEDGE", "EXPERIENCE"}
-    if expected_n == "KNOWLEDGE":
-        return actual_n in {"KNOWLEDGE", "EXPERIENCE_KNOWLEDGE"}
-    return actual_n == expected_n
+# Name-only aliases: fixture spellings for the SAME mode. These are not
+# semantic leniency — "OPEN_DESIGN" never strictly matches "SYSTEM_DESIGN".
+_NAME_ALIASES = {
+    "EXPERIENCE_BOUNDARY": "EXPERIENCE_BOUNDARY_KNOWLEDGE",
+    "EXPERIENCE+KNOWLEDGE": "EXPERIENCE_KNOWLEDGE",
+    "EXPERIENCE+TRADEOFF": "EXPERIENCE_KNOWLEDGE",
+    "KNOWLEDGE+CURRENT_CONTEXT": "KNOWLEDGE",
+    "KNOWLEDGE+CURRENT_ARCHITECTURE": "KNOWLEDGE",
+    "CASE": "PRODUCT_CASE",
+}
+
+
+def _canonical(name: str) -> str:
+    value = (name or "").strip().upper().replace(" ", "_")
+    return _NAME_ALIASES.get(value, value)
+
+
+def _route_matches_strict(expected: str, actual_mode: str) -> bool:
+    return _canonical(expected) == _canonical(actual_mode)
+
+
+def _route_matches_semantic(expected: str, actual_mode: str) -> bool:
+    from services.intelligence.semantics import SEMANTIC_COMPATIBLE
+
+    exp, act = _canonical(expected), _canonical(actual_mode)
+    return act == exp or act in SEMANTIC_COMPATIBLE.get(exp, set())
+
+
+def _route_matches(expected: str, actual_mode: str, *, boundary_applicable: bool = False) -> bool:
+    """Back-compat name: strict match only (R2 Stage H removed leniency)."""
+    return _route_matches_strict(expected, actual_mode)
 
 
 def _reconstruct_state(session_id: str, dialogue_history: list[dict]):
@@ -58,6 +71,7 @@ def run_route_eval(fixtures: list[dict] | None = None) -> dict:
     from services.intelligence.answer_planner import create_plan
     from services.intelligence.question_understanding import understand_question
     from services.intelligence.truth_boundary import analyze_truth_boundary
+    from services.intelligence.semantics import provenance_from_grounding
     from services.intelligence.types import DepthProfile
 
     cases: list[dict] = []
@@ -84,12 +98,17 @@ def run_route_eval(fixtures: list[dict] | None = None) -> dict:
             truth_status=boundary.truth_status.value,
             personal_fact_required=understanding.personal_fact_required,
             open_world_allowed=understanding.open_world_allowed,
+            provenance=provenance_from_grounding(
+                boundary.grounding.status,
+                has_profile=bool(resume_text.strip()),
+                question=question,
+                profile_text=resume_text,
+            ),
+            raw_question=question,
+            is_follow_up=understanding.is_follow_up,
         )
-        matched = _route_matches(
-            str(fixture.get("expected_route", "")),
-            plan.mode.value,
-            boundary_applicable=boundary.applicable,
-        )
+        matched = _route_matches_strict(str(fixture.get("expected_route", "")), plan.mode.value)
+        semantic = _route_matches_semantic(str(fixture.get("expected_route", "")), plan.mode.value)
         type_matched = understanding.question_type.value == str(fixture.get("expected_question_type", "")).upper()
         cases.append(
             {
@@ -100,10 +119,12 @@ def run_route_eval(fixtures: list[dict] | None = None) -> dict:
                 "question_type": understanding.question_type.value,
                 "type_matched": type_matched,
                 "matched": matched,
+                "semantic_matched": semantic,
             }
         )
 
     route_accuracy = sum(1 for case in cases if case["matched"]) / max(1, len(cases))
+    semantic_accuracy = sum(1 for case in cases if case["semantic_matched"]) / max(1, len(cases))
     type_accuracy = sum(1 for case in cases if case["type_matched"]) / max(1, len(cases))
     per_category: dict[str, dict] = {}
     for case in cases:
@@ -116,6 +137,8 @@ def run_route_eval(fixtures: list[dict] | None = None) -> dict:
     fact_precision = _run_fact_precision_probe()
     return {
         "route_accuracy": round(route_accuracy, 4),
+        "route_accuracy_exact": round(route_accuracy, 4),
+        "route_accuracy_semantic": round(semantic_accuracy, 4),
         "type_accuracy": round(type_accuracy, 4),
         "per_category": per_category,
         "unsupported_claim_rate": unsupported["blocked_rate"],
@@ -177,7 +200,8 @@ def write_report(result: dict, path: str) -> None:
             "",
             "| Metric | Value |",
             "| --- | --- |",
-            f"| route_accuracy | {result['route_accuracy']} |",
+            f"| route_accuracy (exact) | {result['route_accuracy_exact']} |",
+            f"| route_accuracy (semantic compatible) | {result['route_accuracy_semantic']} |",
             f"| type_accuracy | {result.get('type_accuracy', '')} |",
             f"| unsupported_claim_rate (blocked) | {result['unsupported_claim_rate']} |",
             f"| fact_precision | {result['fact_precision']} |",

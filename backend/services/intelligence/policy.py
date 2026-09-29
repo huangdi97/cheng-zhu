@@ -34,6 +34,37 @@ def live_guidance_allowed(cfg) -> bool:
     return resolve_policy_mode(getattr(cfg, "ai_policy_mode", "")) != AIPolicyMode.AI_FORBIDDEN
 
 
+def live_guidance_allowed_for_pack(pack, cfg) -> bool:
+    """R2: a frozen InterviewPack carries the session's AI policy and is
+    authoritative; an unfrozen session falls back to the config value."""
+    if pack is not None and getattr(pack, "frozen", False):
+        return resolve_policy_mode(getattr(pack, "ai_policy", "")) != AIPolicyMode.AI_FORBIDDEN
+    return live_guidance_allowed(cfg)
+
+
+HUMAN_POLICIES = ("HUMAN_FORBIDDEN", "HUMAN_PRACTICE_ONLY", "HUMAN_ALLOWED")
+
+
+def resolve_human_policy(raw: str | None) -> str:
+    """Unknown values fall back to the conservative default."""
+    value = str(raw or "").strip().upper()
+    return value if value in HUMAN_POLICIES else "HUMAN_PRACTICE_ONLY"
+
+
+def human_coach_allowed(human_policy: str | None, *, session_kind: str) -> bool:
+    """Human assistance is a separate axis from AI policy.
+
+    session_kind: "practice" (Mock / Rehearse / coaching) or "live".
+    AI_ALLOWED never implies HUMAN_ALLOWED; only the human policy decides.
+    """
+    policy = resolve_human_policy(human_policy)
+    if policy == "HUMAN_FORBIDDEN":
+        return False
+    if policy == "HUMAN_PRACTICE_ONLY":
+        return session_kind == "practice"
+    return True
+
+
 def auto_answer_allowed(cfg) -> bool:
     """Whether auto-answer (without explicit ask) may run; AI_LIMITED and
     AI_FORBIDDEN disable the smart auto-path."""

@@ -29,7 +29,40 @@ _INTERVIEWER_STATES: dict[str, InterviewerState] = {}
 def _session_id_of(session_ref) -> str:
     if session_ref is None:
         return DEFAULT_SESSION_ID
-    return str(getattr(session_ref, "id", "") or "").strip() or DEFAULT_SESSION_ID
+    # core.session.Session exposes ``session_id``; ``id`` kept for fakes.
+    value = getattr(session_ref, "session_id", "") or getattr(session_ref, "id", "")
+    return str(value or "").strip() or DEFAULT_SESSION_ID
+
+
+def _pack_axes(pack, session_id: str, question_text: str, grounding_status: str) -> dict:
+    """R2 axes for the planner, from the frozen pack + this session's claims.
+
+    Without a pack (tests / legacy callers) the planner keeps its legacy
+    truth_status mapping.
+    """
+    if pack is None:
+        return {}
+    from services.intelligence.semantics import provenance_from_grounding
+
+    axes: dict = {
+        "provenance": provenance_from_grounding(
+            grounding_status,
+            has_profile=bool(pack.profile_text.strip()),
+            question=question_text,
+            profile_text=" ".join([pack.profile_text, *[str(c.get("text", "")) for c in pack.claims]]),
+        ),
+        "ai_policy": pack.ai_policy,
+    }
+    matched = pack.claim_axes_for(question_text)
+    if matched:
+        axes["user_assertion"] = str(matched.get("user_assertion_status", "UNREVIEWED"))
+    try:
+        from services.intelligence.session_claims import session_status_for
+
+        axes["session_status"] = session_status_for(session_id, question_text)
+    except Exception:  # noqa: BLE001
+        pass
+    return axes
 
 
 def build_intelligence_layer(
@@ -43,6 +76,7 @@ def build_intelligence_layer(
     interviewer_state_enabled: bool = True,
     planner_enabled: bool = True,
     open_threads: list[str] | None = None,
+    pack=None,
 ) -> dict:
     """Understand the question, update the interview state, and build the
     structured plan for the current turn.
@@ -110,6 +144,7 @@ def build_intelligence_layer(
                 topic=understanding.follow_up_target or understanding.resolved_question,
             )
             _INTERVIEWER_STATES[resolved_session_id] = interviewer
+        plan_axes = _pack_axes(pack, resolved_session_id, question_text, grounding_status)
         plan = create_plan(
             understanding.question_type,
             resolved_question=resolved_question,
@@ -119,6 +154,10 @@ def build_intelligence_layer(
             personal_fact_required=understanding.personal_fact_required,
             interviewer_state=interviewer,
             open_world_allowed=understanding.open_world_allowed,
+            is_follow_up=understanding.is_follow_up,
+            raw_question=question_text,
+            state_carries_intent=bool(understanding.intent),
+            **plan_axes,
         )
         payload["plan"] = plan.payload()
         payload["plan_prompt"] = plan.plan_prompt

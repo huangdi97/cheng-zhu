@@ -783,6 +783,133 @@ def _schedule_answer_suggestion(qa_id: str, question: str, answer: str, model_cf
         pass
 
 
+def _live_session_id() -> str:
+    try:
+        from core.session import session_id as _sid
+
+        return str(_sid() or "default")
+    except Exception:  # noqa: BLE001
+        return "default"
+
+
+def _resolve_live_pack(session_id: str, cfg):
+    from services.intelligence.interview_pack import ephemeral_pack, resolve_live_pack
+
+    try:
+        return resolve_live_pack(session_id, cfg)
+    except Exception:  # noqa: BLE001
+        return ephemeral_pack(session_id, cfg)
+
+
+def _pack_notes(pack, cfg) -> str:
+    """Interview notes are frozen into the pack; an unfrozen session uses the
+    current config value (there is no other session to confuse it with)."""
+    prefs = pack.answer_preferences if pack.frozen else {}
+    if "notes" in prefs:
+        return str(prefs.get("notes") or "")
+    return str(getattr(cfg, "interview_notes", "") or "")
+
+
+def _lat_mark(qa_id: str, point: str, mono: Optional[float] = None) -> None:
+    try:
+        from services.intelligence import latency_clock
+
+        latency_clock.mark(qa_id, point, mono)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _lat_finish(qa_id: str) -> dict:
+    try:
+        from services.intelligence import latency_clock
+
+        return latency_clock.finish_turn(qa_id)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _apply_guard_rewrites(text: str, guard) -> str:
+    for event in getattr(guard, "events", []):
+        if event.kind == "rewrite" and event.sentence and event.sentence in text:
+            text = text.replace(event.sentence, event.released, 1)
+    return text
+
+
+def _emit_fast_cue(
+    *,
+    qa_id: str,
+    question_text: str,
+    intelligence_layer: dict,
+    compiled_items: list,
+    kb_hits: list,
+    live_pack,
+    session_claim_block: str,
+    cfg,
+    broadcast,
+    logger,
+) -> dict:
+    """R2 Stage K: emit guidance_fast (L0) before the deep stream starts."""
+    try:
+        from services.intelligence import fast_cue, latency_clock
+
+        plan = intelligence_layer.get("plan") or {}
+        understanding = intelligence_layer.get("understanding") or {}
+        body = fast_cue.build_l0(
+            question_raw=question_text,
+            resolved_question=str(understanding.get("resolved_question", "") or question_text),
+            plan_meta=dict(plan.get("metadata") or {}),
+            response_mode=str(plan.get("mode", "") or "KNOWLEDGE"),
+            compiled_items=compiled_items,
+            kb_hits=[hit for hit in (kb_hits or []) if live_pack.kb_path_allowed(str(getattr(hit, "path", "") or ""))],
+            job_requirements=live_pack.job_requirements,
+            session_constraints=session_claim_block,
+        )
+        latency_clock.mark(qa_id, "G0")
+        payload = fast_cue.finalize(body, qa_id=qa_id, timing=latency_clock.metrics(qa_id))
+        broadcast(payload)
+        _schedule_fast_cue_l1(qa_id, payload, live_pack, cfg, broadcast)
+        return payload
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("fast cue failed id=%s: %s", qa_id, exc)
+        return {}
+
+
+def _schedule_fast_cue_l1(qa_id: str, l0_payload: dict, live_pack, cfg, broadcast) -> None:
+    """Optional L1: a small fast model rewrites the cue; L0 stays on failure."""
+    idx = int(getattr(cfg, "fast_cue_model_index", -1) or -1)
+    models = list(getattr(cfg, "models", []) or [])
+    if idx < 0 or idx >= len(models):
+        return
+
+    def _worker() -> None:
+        try:
+            from services.intelligence import fast_cue
+            from services.llm.streaming import get_client_for_model
+
+            model_cfg = models[idx]
+            client = get_client_for_model(model_cfg)
+            resp = client.chat.completions.create(
+                model=model_cfg.model,
+                messages=[{"role": "system", "content": fast_cue.L1_SYSTEM}, *fast_cue.l1_messages(l0_payload.get("resolved_question") or l0_payload.get("question_raw", ""), l0_payload)],
+                max_tokens=100,
+                temperature=0.2,
+                stream=False,
+                timeout=4,
+            )
+            text = (resp.choices[0].message.content or "").strip() if resp.choices else ""
+            corpus = " ".join([live_pack.profile_text, *[str(c.get("text", "")) for c in live_pack.claims]])
+            cues = fast_cue.parse_l1(text, l0_payload, corpus)
+            if cues:
+                broadcast({**l0_payload, "cues": cues, "level": "L1"})
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        threading.Thread(target=_worker, name="fast-cue-l1", daemon=True).start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def process_question_parallel(
     task: TaskPayload,
     seq: int,
@@ -834,13 +961,24 @@ def process_question_parallel(
         deps.mark_seq_skipped(seq)
         return
 
+    # R2 Stage F: the frozen InterviewPack is the ONLY source of candidate /
+    # job context on the Live path (never latest_job_id / latest resume).
+    live_session_id = _live_session_id()
+    live_pack = _resolve_live_pack(live_session_id, cfg)
+    try:
+        from services.intelligence import latency_clock as _lat
+
+        _lat.start_turn(live_session_id, qa_id, source=str(source or ""))
+    except Exception:  # noqa: BLE001
+        pass
+
     # Stage P: AI policy gate — AI_FORBIDDEN disables realtime AI guidance
     # server-side (never by hiding a UI button). Prepare/Mock/Review are
     # unaffected because they never call this path.
     try:
-        from services.intelligence.policy import live_guidance_allowed, policy_block_payload
+        from services.intelligence.policy import live_guidance_allowed_for_pack, policy_block_payload
 
-        if not live_guidance_allowed(cfg):
+        if not live_guidance_allowed_for_pack(live_pack, cfg):
             deps.logger.info("POLICY_BLOCK id=%s mode=%s", qa_id, getattr(cfg, "ai_policy_mode", ""))
             _broadcast({**policy_block_payload(), "id": qa_id})
             deps.mark_seq_skipped(seq)
@@ -864,16 +1002,14 @@ def process_question_parallel(
     relation_hint = str(question_cluster.get("relation_to_previous") or "").strip()
     parser_followup = relation_hint in {"follow_up", "followup", "continuation"}
 
+    pack_notes = _pack_notes(live_pack, cfg)
     experience_grounding = analyze_experience_grounding(
         question_text,
-        resume_text=str(getattr(cfg, "resume_text", "") or ""),
-        interview_notes=str(getattr(cfg, "interview_notes", "") or ""),
+        resume_text=live_pack.profile_text,
+        interview_notes=pack_notes,
     ) if not written_exam else analyze_experience_grounding("")
     grounding_uses_model = experience_grounding.applicable and experience_grounding.status != "supported"
-    profile_context_available = bool(
-        str(getattr(cfg, "resume_text", "") or "").strip()
-        or str(getattr(cfg, "interview_notes", "") or "").strip()
-    )
+    profile_context_available = bool(live_pack.profile_text.strip() or pack_notes.strip())
     answer_engine_name = (
         "候选人事实约束"
         if experience_grounding.status == "supported"
@@ -899,12 +1035,25 @@ def process_question_parallel(
                 else int(getattr(cfg, "kb_deadline_ms", 150) or 150)
             )
             t0 = time.monotonic()
-            kb_hits = _kb_retrieve(
-                question_text,
-                k=int(getattr(cfg, "kb_top_k", 4) or 4),
-                deadline_ms=deadline_ms,
-                mode=prompt_mode,
-            )
+            prefetched = None
+            if prompt_mode == PROMPT_MODE_ASR_REALTIME:
+                try:
+                    from services.intelligence import predictive
+
+                    prefetched = predictive.take(live_session_id, question_text)
+                except Exception:  # noqa: BLE001
+                    prefetched = None
+            if prefetched is not None:
+                # Predictive Start: KB warmed from the partial and the stable
+                # question still matches the hypothesis.
+                kb_hits = list(prefetched.get("hits") or [])
+            else:
+                kb_hits = _kb_retrieve(
+                    question_text,
+                    k=int(getattr(cfg, "kb_top_k", 4) or 4),
+                    deadline_ms=deadline_ms,
+                    mode=prompt_mode,
+                )
             kb_latency_ms = int((time.monotonic() - t0) * 1000)
         except Exception as exc:
             deps.error_logger.warning("kb retrieve in answer worker failed: %s", exc)
@@ -1132,6 +1281,9 @@ def process_question_parallel(
     # Strictly additive: existing grounding/followup/candidate-ASR safeguards
     # above keep running; failures degrade to the legacy path.
     intelligence_layer: dict = {}
+    compiler_authoritative_enabled = bool(getattr(cfg, "intelligence_context_compiler_v1", True)) and bool(
+        getattr(cfg, "intelligence_compiler_authoritative", True)
+    )
     if bool(getattr(cfg, "intelligence_answer_planner_v1", True)):
         try:
             from services.intelligence.realtime_bridge import build_intelligence_layer
@@ -1141,12 +1293,15 @@ def process_question_parallel(
                 previous_question=last_qa.question if last_qa else "",
                 relation_to_previous=("follow_up" if is_followup else relation_hint),
                 session_ref=session_ref,
+                session_id=live_session_id,
                 grounding_status=experience_grounding.status,
                 interviewer_state_enabled=bool(getattr(cfg, "interviewer_state_enabled", False)),
+                pack=live_pack,
             )
             intel_plan_prompt = str(intelligence_layer.get("plan_prompt") or "")
             intel_state_context = str(intelligence_layer.get("state_context") or "")
-            if intel_state_context and not written_exam and not images:
+            compiler_will_own_state = compiler_authoritative_enabled and not written_exam and not images
+            if intel_state_context and not written_exam and not images and not compiler_will_own_state:
                 if isinstance(user_for_llm, list):
                     user_for_llm.insert(0, {"type": "text", "text": intel_state_context})
                 else:
@@ -1162,72 +1317,73 @@ def process_question_parallel(
             deps.error_logger.warning("intelligence layer failed id=%s: %s", qa_id, exc)
             intelligence_layer = {}
 
-    # ----------------- Context Compiler (Stage G, canonical 14) -----------------
-    # Minimal sufficient context: providers contribute candidates, the compiler
-    # scores them and selects the smallest package. Strictly additive — the KB
-    # hits retrieved above are reused as a provider (no second retrieval), and
-    # failures degrade to the legacy prompt sections.
+    # ----------------- Context Compiler (R2 Stage G: the one authority) -----------------
+    # Providers read the frozen InterviewPack; the compiled package replaces
+    # (not adds to) the legacy resume / KB / memo / JD prompt sections.
+    compiler_ok = False
+    compiler_fallback = False
+    compiled_items: list = []
+    compile_stats: dict = {}
+    session_claim_block = ""
     if bool(getattr(cfg, "intelligence_context_compiler_v1", True)) and not written_exam and not images:
         try:
-            from services.intelligence.context_compiler import (
-                ContextCompiler,
-                EvidenceProvider,
-                JobProvider,
-                KBProvider,
-                ResumeProvider,
-                SessionMemoryProvider,
-                render_context_sections,
-            )
+            from services.intelligence.context_compiler import compile_live_context
+            from services.intelligence.session_claims import prompt_constraints
 
             intel_state = intelligence_layer.get("state") or {}
-            job_requirements: list[str] = []
-            try:
-                from services.storage import intelligence as intel_storage
-
-                job_profile = intel_storage.get_job_profile(intel_storage.latest_job_id()) if intel_storage.latest_job_id() else None
-                if job_profile:
-                    job_requirements = [
-                        *(job_profile.get("must_have") or []),
-                        *(job_profile.get("technologies") or []),
-                    ][:8]
-            except Exception:  # noqa: BLE001
-                job_requirements = []
-            compiled = ContextCompiler(
-                [
-                    ResumeProvider(str(getattr(cfg, "resume_text", "") or "")),
-                    EvidenceProvider(),
-                    SessionMemoryProvider(
-                        memo_context=str(memo_context or ""),
-                        compact_state=str(intelligence_layer.get("state_context") or ""),
-                    ),
-                    JobProvider(job_requirements=job_requirements),
-                    KBProvider(kb_hits),
-                ]
-            ).compile(
+            compiled, compiled_sections = compile_live_context(
+                live_pack,
                 question_text,
+                memo_context=str(memo_context or ""),
+                compact_state=str(intelligence_layer.get("state_context") or ""),
+                kb_hits=kb_hits,
                 deep=answer_depth_profile in {"deep", "compact_deep"},
                 active_topic=str(intel_state.get("current_topic", "") or ""),
-                job_requirements=job_requirements,
+                session_id=live_session_id,
             )
-            compiled_sections = render_context_sections(compiled)
+            compiled_items = list(compiled.items)
+            session_claim_block = prompt_constraints(live_session_id)
+            blocks = []
             if compiled_sections:
-                section_block = "[编译上下文：最小充分包]\n" + "\n".join(compiled_sections)
+                blocks.append("[编译上下文：最小充分包]\n" + "\n".join(compiled_sections))
+            if session_claim_block:
+                blocks.append(session_claim_block)
+            if blocks:
+                section_block = "\n".join(blocks)
                 if isinstance(user_for_llm, list):
                     user_for_llm.insert(0, {"type": "text", "text": section_block})
                 else:
                     user_for_llm = f"{section_block}\n{user_for_llm}"
+            compiler_ok = compiler_authoritative_enabled
+            compile_stats = {
+                "items": len(compiled.items),
+                "tokens": compiled.total_token_estimate,
+                "duplicates_dropped": sum(1 for d in compiled.dropped if d.get("reason") == "duplicate_fragment"),
+                "latency_ms": compiled.latency_ms,
+                "pack_id": live_pack.id,
+                "pack_frozen": live_pack.frozen,
+            }
             deps.logger.info(
-                "CONTEXT_COMPILED id=%s items=%d tokens=%d dropped=%d latency=%dms",
+                "CONTEXT_COMPILED id=%s pack=%s frozen=%s items=%d tokens=%d dup_dropped=%d latency=%dms",
                 qa_id,
+                live_pack.id or "-",
+                live_pack.frozen,
                 len(compiled.items),
                 compiled.total_token_estimate,
-                len(compiled.dropped),
+                compile_stats["duplicates_dropped"],
                 compiled.latency_ms,
             )
         except Exception as exc:  # noqa: BLE001
-            deps.error_logger.warning("context compiler failed id=%s: %s", qa_id, exc)
-
-
+            compiler_fallback = True
+            deps.error_logger.warning("context compiler failed id=%s (compiler_fallback=true): %s", qa_id, exc)
+            # Explicit failure only: restore the state context the compiler
+            # would have carried, then let the legacy prompt sections run.
+            fallback_state = str(intelligence_layer.get("state_context") or "")
+            if fallback_state and compiler_authoritative_enabled:
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": fallback_state})
+                else:
+                    user_for_llm = f"{fallback_state}\n{user_for_llm}"
 
     system_prompt = build_system_prompt(
         manual_input=manual_input,
@@ -1253,6 +1409,9 @@ def process_question_parallel(
         question_type=question_type,
         answer_depth_profile=answer_depth_profile,
         relation_to_previous=("follow_up" if is_followup else relation_hint),
+        context_authoritative=compiler_ok,
+        pack_notes=pack_notes,
+        position_override=str(live_pack.job.get("title", "") or ""),
     )
 
     messages_for_llm = base_messages + [{"role": "user", "content": user_for_llm}]
@@ -1323,6 +1482,21 @@ def process_question_parallel(
             "fact_grounding": experience_grounding.public_payload(),
         }
     )
+    fast_cue_payload: dict = {}
+    if bool(getattr(cfg, "intelligence_fast_cue_v2", True)) and not written_exam and not images:
+        fast_cue_payload = _emit_fast_cue(
+            qa_id=qa_id,
+            question_text=question_text,
+            intelligence_layer=intelligence_layer,
+            compiled_items=compiled_items,
+            kb_hits=kb_hits,
+            live_pack=live_pack,
+            session_claim_block=session_claim_block,
+            cfg=cfg,
+            broadcast=_broadcast,
+            logger=deps.error_logger,
+        )
+
     # 面试官问题内联翻译（可选，默认关）：并行翻一句，不阻塞回答。
     if (
         bool(getattr(cfg, "assist_inline_translation_enabled", False))
@@ -1367,6 +1541,22 @@ def process_question_parallel(
     # checked the complete response; otherwise a hallucinated first sentence
     # could already have been shown to the candidate.
     strict_grounding_buffer = grounding_uses_model
+    stream_guard = None
+    if bool(getattr(cfg, "intelligence_fast_cue_v2", True)) and not written_exam and not images:
+        try:
+            from services.intelligence.stream_guard import StreamTruthGuard
+
+            stream_guard = StreamTruthGuard(
+                assertion_policy=str(((intelligence_layer.get("plan") or {}).get("metadata") or {}).get("assertion_policy", "REQUIRE_BOUNDARY")),
+                boundary_subject=str(experience_grounding.subject or "") if grounding_uses_model else "",
+                evidence_texts=[live_pack.profile_text, pack_notes, *[str(c.get("text", "")) for c in live_pack.claims], *[str(e.get("text", "")) for e in live_pack.evidence_refs]],
+            )
+            # Sentence-level guard replaces whole-answer buffering: risky
+            # first-person spans are held per sentence, the rest streams.
+            strict_grounding_buffer = False
+        except Exception as exc:  # noqa: BLE001
+            deps.error_logger.warning("stream guard init failed id=%s: %s", qa_id, exc)
+            stream_guard = None
     full_think = ""
     token_prompt_delta = 0
     token_completion_delta = 0
@@ -1457,10 +1647,13 @@ def process_question_parallel(
             else:
                 if first_token_mono is None and chunk_text:
                     first_token_mono = time.monotonic()
+                    _lat_mark(qa_id, "A0", first_token_mono)
                 raw_full_answer += chunk_text
                 if strict_grounding_buffer:
                     continue
                 clean_chunk = stream_sanitizer.push(chunk_text)
+                if stream_guard is not None and clean_chunk:
+                    clean_chunk = stream_guard.feed(clean_chunk)
                 if clean_chunk:
                     chunk_buffer.append(clean_chunk)
                     if len(chunk_buffer) >= batch_size:
@@ -1515,6 +1708,8 @@ def process_question_parallel(
         return
 
     gen_elapsed = (time.monotonic() - gen_start) * 1000
+    _lat_mark(qa_id, "D0")
+    latency_metrics = _lat_finish(qa_id)
     first_token_ms = (
         (first_token_mono - gen_start) * 1000 if first_token_mono else gen_elapsed
     )
@@ -1542,7 +1737,13 @@ def process_question_parallel(
         deps.mark_seq_skipped(seq)
         return
 
-    if strict_grounding_buffer:
+    guarded_post_audit = stream_guard is not None and grounding_uses_model
+    if strict_grounding_buffer or guarded_post_audit:
+        if guarded_post_audit:
+            tail = stream_sanitizer.finish()
+            tail = (stream_guard.feed(tail) if tail else "") + stream_guard.flush()
+            if tail:
+                _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": tail})
         full_answer = postprocess_answer_for_mode(raw_full_answer, prompt_mode)
         full_answer, grounding_replaced = enforce_experience_answer(
             full_answer,
@@ -1600,13 +1801,19 @@ def process_question_parallel(
                         pass
             except Exception as exc:  # noqa: BLE001
                 deps.error_logger.warning("truth boundary check failed id=%s: %s", qa_id, exc)
-        if full_answer:
+        if full_answer and not guarded_post_audit:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": full_answer})
     else:
         tail = stream_sanitizer.finish()
+        if stream_guard is not None:
+            tail = (stream_guard.feed(tail) if tail else "") + stream_guard.flush()
         if tail:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": tail})
         full_answer = postprocess_answer_for_mode(raw_full_answer, prompt_mode)
+        if stream_guard is not None and stream_guard.rewrites:
+            # The final text must match what the guard showed: apply the
+            # same sentence rewrites to the committed answer.
+            full_answer = _apply_guard_rewrites(full_answer, stream_guard)
     if not full_answer.strip():
         deps.error_logger.warning(
             "ANSWER_EMPTY id=%s model=%s source=%s think_len=%d raw_len=%d",
@@ -1719,7 +1926,11 @@ def process_question_parallel(
                         "intent": list((intelligence_layer.get("plan") or {}).get("intent", []) or [])[:3],
                         "resolved_question": str((intelligence_layer.get("understanding") or {}).get("resolved_question", "") or ""),
                         "state_context": str(intelligence_layer.get("state_context") or ""),
+                        "fast_cue": fast_cue_payload,
+                        "context": {**compile_stats, "compiler_fallback": compiler_fallback},
+                        "stream_guard_rewrites": int(stream_guard.rewrites) if stream_guard is not None else 0,
                     },
+                    "latency": latency_metrics,
                 }
             )
             # Stage Q: committed turn telemetry + route event (never breaks the

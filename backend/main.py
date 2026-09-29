@@ -250,6 +250,7 @@ app.include_router(prep.router, prefix="/api")
 app.include_router(copilot_api.router, prefix="/api")
 app.include_router(sessions_api.router, prefix="/api")
 app.include_router(intelligence_api.intelligence_router, prefix="/api/intelligence")
+app.include_router(intelligence_api.intelligence_r2_router, prefix="/api/intelligence")
 
 
 if os.path.isdir(FRONTEND_DIR):

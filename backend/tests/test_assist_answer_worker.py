@@ -126,16 +126,20 @@ def test_process_question_parallel_streams_and_commits_answer(monkeypatch: pytes
     )
 
     event_types = [event["type"] for event in broadcasts]
+    # R2 Stage K: the Fast Cue arrives right after answer_start, before any
+    # deep token.
     assert event_types == [
         "answer_start",
+        "guidance_fast",
         "answer_think_chunk",
         "answer_chunk",
         "answer_done",
         "token_update",
     ]
     assert broadcasts[0]["model_name"] == "模型一"
-    assert broadcasts[3]["answer"] == "用 AOF 和 RDB 组合。"
-    assert broadcasts[3]["think"] == "先判断场景"
+    assert broadcasts[1]["id"] == broadcasts[0]["id"]
+    assert broadcasts[4]["answer"] == "用 AOF 和 RDB 组合。"
+    assert broadcasts[4]["think"] == "先判断场景"
     assert knowledge == [("Redis 怎么持久化？", "用 AOF 和 RDB 组合。", broadcasts[0]["id"], "")]
 
     session = get_session()
@@ -530,7 +534,7 @@ def test_process_question_parallel_marks_seq_skipped_when_aborted(
     )
 
     event_types = [event["type"] for event in broadcasts]
-    assert event_types == ["answer_start", "answer_cancelled"]
+    assert event_types == ["answer_start", "guidance_fast", "answer_cancelled"]
     assert skipped == [5]
     assert get_session().qa_pairs == []
 

@@ -364,7 +364,7 @@ def test_running_asr_worker_can_still_be_cancelled_when_interrupt_enabled(
     _DeferredThread.started[0].run()
 
     event_types = [event["type"] for event in broadcasts]
-    assert event_types == ["answer_start", "answer_cancelled"]
+    assert event_types == ["answer_start", "guidance_fast", "answer_cancelled"]
     assert get_session().qa_pairs == []
 
 

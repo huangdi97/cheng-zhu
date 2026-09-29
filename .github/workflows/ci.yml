@@ -82,7 +82,7 @@ jobs:
 
       - name: Intelligence unit tests + eval + migration smoke
         run: |
-          python -m pytest tests/test_intelligence_question_understanding.py tests/test_intelligence_truth_boundary.py tests/test_intelligence_state.py tests/test_intelligence_candidate_job.py tests/test_intelligence_compiler_planner.py tests/test_intelligence_migration.py -q --tb=short
+          python -m pytest tests/test_intelligence_question_understanding.py tests/test_intelligence_truth_boundary.py tests/test_intelligence_state.py tests/test_intelligence_candidate_job.py tests/test_intelligence_compiler_planner.py tests/test_intelligence_migration.py tests/test_intelligence_job_workspace.py -q --tb=short
           python -c "import sys; sys.path.insert(0, '.'); from evals.runners.route_runner import run_route_eval; r = run_route_eval(); assert r['route_accuracy'] >= 0.8, 'route_accuracy below threshold'; assert r['unsupported_claim_rate'] >= 0.8, 'unsupported claim block rate below threshold'; print('eval smoke OK:', r['route_accuracy'], r['unsupported_claim_rate'])"
 
   # ── Frontend ─────────────────────────────────────────────

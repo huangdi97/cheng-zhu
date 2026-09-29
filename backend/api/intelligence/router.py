@@ -31,6 +31,13 @@ from services.intelligence.job_representation import (
     compute_alignment,
     save_job,
 )
+from services.intelligence.job_workspace import (
+    active_claims,
+    alignment_resume_text,
+    compose_workspace,
+    learning_signals,
+    stored_stories,
+)
 from services.intelligence.types import TruthStatus
 from services.storage import intelligence as intelligence_storage
 
@@ -88,31 +95,6 @@ def _with_parsed_metadata(row: dict[str, Any]) -> dict[str, Any]:
     except json.JSONDecodeError:
         payload["metadata"] = {}
     return payload
-
-
-def _active_claim_texts() -> tuple[list[str], list[str]]:
-    """Active candidate's claim texts + ids, used as alignment evidence links."""
-    candidate_id = intelligence_storage.active_candidate_id()
-    if not candidate_id:
-        return [], []
-    rows = intelligence_storage.list_claims(candidate_id)
-    return (
-        [str(row.get("text", "")) for row in rows],
-        [str(row.get("id", "")) for row in rows],
-    )
-
-
-def _alignment_resume_text(resume_text: str) -> str:
-    """compute_alignment matches requirement terms against resume text; when
-    the caller omits it, fall back to the stored active profile so alignment
-    still reflects the candidate instead of reporting only gaps."""
-    if (resume_text or "").strip():
-        return resume_text
-    candidate_id = intelligence_storage.active_candidate_id()
-    if not candidate_id:
-        return ""
-    profile = intelligence_storage.get_candidate_profile(candidate_id) or {}
-    return str(profile.get("profile_text") or "")
 
 
 # ---------------------------------------------------------------------------
@@ -229,20 +211,36 @@ def get_latest_job():
 @router.post("/job/rebuild")
 def rebuild_job(body: RebuildJobRequest):
     """Structure a JD, compute explainable alignment, persist, and return it."""
+    payload, _alignment, _claims = _rebuild_job_payload(body)
+    return payload
+
+
+def _rebuild_job_payload(body: RebuildJobRequest) -> tuple[dict[str, Any], list[dict], list[dict]]:
     job = build_job_representation(
         body.jd_text, company=body.company, title=body.title, role=body.role
     )
-    claim_texts, claim_ids = _active_claim_texts()
+    claims = active_claims()
     alignment = compute_alignment(
         job,
-        _alignment_resume_text(body.resume_text),
-        claim_texts=claim_texts,
-        claim_ids=claim_ids,
+        alignment_resume_text(body.resume_text),
+        claim_texts=[str(row.get("text", "")) for row in claims],
+        claim_ids=[str(row.get("id", "")) for row in claims],
     )
     final_id = save_job(job, alignment=alignment)
     # save_job stored the alignment into the payload; expose it verbatim.
     payload = job.payload()
     payload["job_id"] = final_id
+    return payload, alignment, claims
+
+
+@router.post("/workspace")
+def rebuild_workspace(body: RebuildJobRequest):
+    """Stage L1 Job Workspace: structured job + alignment, plus Gap Map,
+    Attack Surface, Question Graph and Stories (all deterministic)."""
+    payload, alignment, claims = _rebuild_job_payload(body)
+    payload["workspace"] = compose_workspace(
+        payload, alignment, claims, stored_stories(), learning_signals()
+    )
     return payload
 
 

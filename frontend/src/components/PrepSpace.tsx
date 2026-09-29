@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, Sparkles, RefreshCw, ArrowLeft, Target, ListChecks, FolderKanban, Loader2, AlertTriangle, BriefcaseBusiness, ShieldCheck } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import JobWorkspacePanel from './JobWorkspacePanel'
 import PracticePanel from './PracticePanel'
 import SkillBuilderPanel from './SkillBuilderPanel'
 import { api, LaunchPack, PrepSpace as PrepSpaceType, PrepSpaceLite, ResumeHistoryItem } from '@/lib/api'
@@ -407,6 +408,8 @@ export default function PrepSpace() {
                   <p className="text-sm text-text-muted">尚未生成。点击右上角"生成 / 重新生成"。</p>
                 )}
               </div>
+
+              <JobWorkspacePanel jdText={space.jd_text || ''} resumeText={space.resume_text || ''} />
 
               <div className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-5">
                 <div className="flex items-center justify-between mb-3">

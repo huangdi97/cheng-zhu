@@ -76,6 +76,36 @@ def _order_by_weak_points(
     return sorted(questions, key=lambda q: -_score(q))
 
 
+def _gap_focus(space: dict[str, Any]) -> dict[str, Any]:
+    """Stage L2：从本准备空间 JD × 候选人证据 + 复盘写回的弱项得到 Gap 焦点。
+    Intelligence 层任何失败都降级为空，不影响练习。"""
+    try:
+        from services.intelligence.job_workspace import mock_gap_focus
+
+        return mock_gap_focus(space.get("jd_text") or "", space.get("resume_text") or "")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("practice gap focus unavailable: %s", exc)
+        return {"terms": [], "questions": []}
+
+
+def _merge_gap_questions(
+    gap_questions: list[dict[str, Any]],
+    pool: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Gap 题穿插在弱项排序后的真题池前部：先一题真题热身，再逐个命中 Gap。"""
+    existing = {str(q.get("question") or "").strip() for q in pool}
+    fresh = [q for q in gap_questions if str(q.get("question") or "").strip() not in existing]
+    if not fresh:
+        return pool
+    merged: list[dict[str, Any]] = pool[:1]
+    rest = pool[1:]
+    for gap_q in fresh:
+        merged.append(gap_q)
+        if rest:
+            merged.append(rest.pop(0))
+    return merged + rest
+
+
 def _pick_next(session: dict[str, Any]) -> Optional[dict[str, Any]]:
     """优先使用上一题分析里生成的「可能追问」实现真实追问，否则用预测真题池。"""
     if session["pending_followups"]:
@@ -104,8 +134,11 @@ def start_session(space_id: int, rounds: int = 5) -> dict[str, Any]:
     pid = _new_id()
     # 长期画像闭环：读最近复盘弱项，优先命中薄弱点的题
     profile = review_storage.recent_profile(limit=6)
-    weak_terms = _weak_keywords(profile)
-    ordered_pool = _order_by_weak_points(questions, weak_terms)
+    gap_focus = _gap_focus(space)
+    weak_terms = list(dict.fromkeys([*_weak_keywords(profile), *gap_focus["terms"]]))[:10]
+    ordered_pool = _merge_gap_questions(
+        gap_focus["questions"], _order_by_weak_points(questions, weak_terms)
+    )
     session: dict[str, Any] = {
         "id": pid,
         "space_id": space_id,
@@ -128,6 +161,7 @@ def start_session(space_id: int, rounds: int = 5) -> dict[str, Any]:
         "rounds": rounds,
         "weak_points": profile.get("weaknesses", [])[:5],
         "weak_terms": weak_terms,
+        "gap_focus": gap_focus["terms"],
     }
 
 

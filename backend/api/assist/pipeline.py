@@ -1596,6 +1596,7 @@ def _interview_worker():
     runtime.turn_tracker = turn_tracker
     speculative_on = _speculative_final_enabled(cfg)
     spec_min_silence = float(getattr(cfg, "assist_speculative_min_silence_sec", 0.30) or 0.30)
+    preview_stop_silence = float(getattr(cfg, "assist_preview_stop_silence_sec", 0.08) or 0.08)
     spec_state: dict[str, Optional[int]] = {"key": None}
     if bool(getattr(cfg, "assist_adaptive_eot", True)):
         vad.end_of_turn_probe = lambda silence: turn_tracker.probe(silence, vad.voiced_end_samples)
@@ -1877,11 +1878,14 @@ def _interview_worker():
                                     speculative=True,
                                     spec_key=vad.voiced_end_samples,
                                 ))
-                        # whisper 兜底仍按段增量喂（豆包走上面的连续流）；尾部静音里不再
-                        # 喂预览流：speculative final 已覆盖，预览解码只会抢 CPU。
+                        # whisper 兜底仍按段增量喂（豆包走上面的连续流）。说话人一停
+                        # （~80 ms 静音）就不再喂预览流：此时开始的预览解码会占住 CPU，
+                        # 让 0.3 s 后的 speculative final 排队一整次解码（实测 p95 尾部主因）。
+                        preview_quiet = speculative_on and float(getattr(vad, "trailing_silence_sec", 0.0) or 0.0) >= preview_stop_silence
                         if (
                             not dstream_is_doubao
                             and not in_tail
+                            and not preview_quiet
                             and getattr(vad, "has_pending_audio", False)
                             and not _pause_event.is_set()
                         ):

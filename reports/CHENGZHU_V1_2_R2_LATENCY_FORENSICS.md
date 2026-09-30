@@ -1,7 +1,7 @@
 # Chengzhu v1.2-R2 — Latency Forensics & Closure
 
 Date: 2026-09-30 · Scope: Stages A–H of the release-closure goal.
-Raw data: `reports/perf/latency_bench_ci.json` (clean runner) + `latency_bench_ci_runner.json`.
+Raw data: `reports/perf/latency_ci/` (3 clean-runner runs + pooled summary).
 Harness: `scripts/bench_latency.py` · corpus: `backend/evals/latency_corpus/` (`scripts/latency_corpus.py`) · tables: `scripts/render_latency_report.py` · CI: `.github/workflows/latency-bench.yml`.
 
 ## 1. What changed in the measurement (and why the old number was optimistic)
@@ -16,12 +16,13 @@ The previous report (`CHENGZHU_V1_2_R2_PERFORMANCE.md`, TTFUG_user p50 3.62 s) m
 
 The new harness uses the product components end to end (see §3), all time points on one monotonic simulated clock, and **ground-truth** speech end E from the clean synthesized speech.
 
-## 2. Two product bugs the controlled corpus found
+## 2. Product bugs found during the closure (all fixed)
 
-1. **English questions were rejected in the default `smart` mode** — every English question without a Chinese cue word was classified as "这段内容不像完整问题" and never answered (`test_asr_english_questions.py`).
-2. **Chinese questions with 哪里/哪个/多少/会不会/是不是… ending in "。"** (Whisper often drops "？") were rejected the same way.
-
-Both were in the shipping f04f217 build and are independent of latency.
+1. **English questions were rejected in the default `smart` mode** — every English question without a Chinese cue word was classified "这段内容不像完整问题" and never answered (`test_asr_english_questions.py`). In the shipping f04f217 build.
+2. **Chinese questions with 哪里/哪个/多少/会不会/是不是… ending in "。"** (Whisper often drops "？") were rejected the same way. In f04f217.
+3. **Sticky language could drop a question**: with `zh` pinned, an English question decoded to an empty string → re-decode with detection when a pinned decode hears nothing / only weakly.
+4. **…or echo the Whisper initial prompt** ("请优先识别技术术语英文原词…") with good confidence → prompt echo is treated as a language mismatch (v1.2.2).
+5. **v1.2.0 exited at first launch on non-Chinese Windows locales** ("成竹后端已退出 (code 3)", `UnicodeEncodeError` on a cp1252 stdout — the frozen sidecar ignores `PYTHONIOENCODING`). Found by the download-back verification on a fresh en-US VM; fixed in v1.2.1; the packaged smoke now does a fresh first run on the en-US runner.
 
 ## 3. Pipeline after the closure (Stages C–E)
 
@@ -51,114 +52,111 @@ Predictive start (Stage D): the existing read-only prefetch (`services/intellige
 
 ## 4. Results
 
-Primary measurement: clean GitHub `windows-latest` runner (AMD EPYC, 4 vCPU, CPU 15–20 % before each mode; run `36689804321` on commit `edc47e5`). 33 corpus fixtures (+1 silence clip); the final Local profile ran 3 repeats (n = 99).
+Final code = the v1.2.2 live path (commit `15e6407`). Three independent clean GitHub `windows-latest`
+runs (4 vCPU each, product defaults, 34-clip corpus; the final Local profile ran 3 repeats per run, so
+n = 297). Runs land on two CPU types; the slower one dominates the p95. Raw data:
+`reports/perf/latency_ci/run-*.json`, pooled summary `reports/perf/latency_ci/pooled.json`.
 
-Generated 2026-09-30 08:43:59 · faster-whisper base int8 CPU (product STTEngine) · 4 CPU threads
+### Pooled over 3 runs
 
-### Headline (TTFUG_user = first useful cue on screen − ground-truth speech end)
+| Mode | n | TTFUG_user p50 | p95 | per-run p95 | QBD p50 | TTFA p50 | premature end | premature cue | replaced | question ok | cue before deep |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline (v1.x path) | 99 | 7.25 s | 8.27 s | 8.43 s / 8.17 s / 7.63 s | 5.90 s | 1.88 s | 0.000 | 0.000 | 0.000 | 0.758 | 1.00 |
+| r2_prev (f04f217, as rendered) | 99 | 5.61 s | 6.89 s | 6.89 s / 7.31 s / 5.69 s | 4.26 s | 1.88 s | 0.000 | 0.000 | 0.000 | 0.737 | 1.00 |
+| **final · Local CPU profile** | 297 | 1.58 s | 3.00 s | 2.96 s / 3.12 s / 2.50 s | 2.44 s | 1.88 s | 0.000 | 0.020 | 0.000 | 0.788 | 1.00 |
+| **final · Streaming profile (SIMULATED)** | 99 | 0.56 s | 2.08 s | 2.06 s / 2.06 s / 2.00 s | 1.98 s | 1.88 s | 0.000 | 0.000 | 0.000 | 0.758 | 1.00 |
 
-| Mode | n | TTFUG_user p50 | p95 | QBD p50 | p95 | TTFUG_internal p50 | question ok | no question | cue before deep |
-|---|---|---|---|---|---|---|---|---|---|
-| baseline (v1.x path) | 32 | 7.05 s | 7.55 s | 5.70 s | 6.20 s | 1.35 s | 0.750 | 1 | 1.00 |
-| r2_prev (f04f217, old frontend) | 32 | 5.27 s | 5.93 s | 3.92 s | 4.58 s | 1.35 s | 0.750 | 1 | 1.00 |
-| **final · Local CPU profile** | 99 | 1.30 s | 2.54 s | 2.22 s | 2.98 s | -0.82 s | 0.788 | 0 | 1.00 |
-| **final · Streaming profile (SIMULATED provider)** | 33 | 0.56 s | 2.00 s | 1.98 s | 2.12 s | -1.42 s | 0.758 | 0 | 1.00 |
+| Run | runner CPU | calibration decode (ms) | Local p50 / p95 | Streaming p50 / p95 |
+|---|---|---|---|---|
+| 36709255474 | AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD (4 vCPU) | [1687, 1911, 1689] | 1.74 s / 2.96 s | 0.56 s / 2.06 s |
+| 36709258083 | AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD (4 vCPU) | [1698, 1681, 1663] | 1.74 s / 3.12 s | 0.56 s / 2.06 s |
+| 36709263343 | AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD (4 vCPU) | [1248, 1278, 1553] | 1.26 s / 2.50 s | 0.56 s / 2.00 s |
 
-### Safety rates
+**Correction.** An earlier draft of this report (and the v1.2.0 / v1.2.1 release notes) quoted a single run
+(`36689804321`: Local 1.30 s / 2.54 s) that happened to land on the faster runner CPU. Re-running the same
+code on more runners gave Local p95 2.90–3.08 s. The numbers above are pooled; single runs are not quoted.
 
-| Mode | premature end | premature cue | question replaced | provisional cues (same / corrected / replaced) | cards rendered >1× | false trigger on silence |
-|---|---|---|---|---|---|---|
-| baseline (v1.x path) | 0.000 | 0.000 | 0.000 | 0 (0 / 0 / 0) | 0 | 0 |
-| r2_prev (f04f217, old frontend) | 0.000 | 0.000 | 0.000 | 0 (0 / 0 / 0) | 0 | 0 |
-| **final · Local CPU profile** | 0.000 | 0.000 | 0.010 | 99 (83 / 9 / 1) | 10 | 0 |
-| **final · Streaming profile (SIMULATED provider)** | 0.000 | 0.000 | 0.000 | 33 (21 / 10 / 0) | 10 | 0 |
-
-### Forensic time points (median ms after ground-truth speech end E)
+### Forensic time points of one final run (`36709255474`, slower runner CPU; median ms after ground-truth speech end E)
 
 | Point | baseline (v1.x path) | r2_prev (f04f217, old frontend) | **final · Local CPU profile** | **final · Streaming profile (SIMULATED provider)** |
 |---|---|---|---|---|
-| partial_first | -1740 (n=32) | -1756 (n=32) | -1920 (n=99) | -2310 (n=33) |
-| partial_stable | — | — | 1080 (n=47) | 540 (n=27) |
-| speech_end_estimate | -20 (n=32) | -20 (n=32) | -20 (n=99) | -20 (n=33) |
-| vad_end | 1180 (n=32) | 1180 (n=32) | 1180 (n=99) | 560 (n=33) |
-| asr_final | 3150 (n=32) | 3011 (n=32) | 1404 (n=99) | 1160 (n=33) |
-| question_candidate | 5160 (n=32) | 3380 (n=32) | 1760 (n=99) | 1520 (n=33) |
-| question_confirmed | 5700 (n=32) | 3920 (n=32) | 2220 (n=99) | 1980 (n=33) |
-| guidance_fast_created | — | 3920 (n=32) | 1200 (n=99) | 560 (n=33) |
-| guidance_fast_broadcast | — | 3922 (n=32) | 1302 (n=99) | 562 (n=33) |
-| guidance_fast_rendered | 7053 (n=32) | 5270 (n=32) | 1302 (n=99) | 562 (n=33) |
-| deep_first_token | 7580 (n=32) | 5800 (n=32) | 4100 (n=99) | 3860 (n=33) |
-| deep_done | 7720 (n=32) | 5940 (n=32) | 4240 (n=99) | 4000 (n=33) |
+| partial_first | -1686 (n=32) | -1701 (n=31) | -1530 (n=99) | -2210 (n=33) |
+| partial_stable | — | — | 1120 (n=4) | 540 (n=27) |
+| speech_end_estimate | -20 (n=33) | -20 (n=33) | -20 (n=99) | -20 (n=33) |
+| vad_end | 1180 (n=33) | 1180 (n=33) | 1180 (n=99) | 560 (n=33) |
+| asr_final | 3684 (n=33) | 3701 (n=33) | 1780 (n=99) | 1160 (n=33) |
+| question_candidate | 5700 (n=33) | 4060 (n=33) | 2160 (n=99) | 1520 (n=33) |
+| question_confirmed | 6200 (n=33) | 4520 (n=33) | 2620 (n=99) | 1980 (n=33) |
+| guidance_fast_created | — | 4520 (n=33) | 1740 (n=99) | 560 (n=33) |
+| guidance_fast_broadcast | — | 4522 (n=33) | 1742 (n=99) | 562 (n=33) |
+| guidance_fast_rendered | 7553 (n=33) | 5870 (n=33) | 1742 (n=99) | 562 (n=33) |
+| deep_first_token | 8080 (n=33) | 6400 (n=33) | 4500 (n=99) | 3860 (n=33) |
+| deep_done | 8220 (n=33) | 6540 (n=33) | 4640 (n=99) | 4000 (n=33) |
 
 ### Machine load during each mode (calibration = one fixed zh-short decode; ~0.8 s when the CPU is quiet)
 
 | Mode | repeat | CPU before | calib. before | CPU after | calib. after |
 |---|---|---|---|---|---|
-| baseline | 0 | 17.1% | 1265 ms | 14.8% | 748 ms |
-| r2_prev | 0 | 18.3% | 1272 ms | 17.2% | 747 ms |
-| local | 0 | 16.8% | 1335 ms | 15.9% | 763 ms |
-| local | 1 | 19.9% | 1338 ms | 17.4% | 742 ms |
-| local | 2 | 18.1% | 1277 ms | 15.2% | 743 ms |
-| streaming_sim | 0 | 18.6% | 1306 ms | 16.2% | 1275 ms |
+| baseline | 0 | 15.2% | 1665 ms | 13.7% | 989 ms |
+| r2_prev | 0 | 16.4% | 1683 ms | 13.3% | 976 ms |
+| local | 0 | 17.9% | 1687 ms | 39.8% | 1337 ms |
+| local | 1 | 43.2% | 1911 ms | 14.1% | 977 ms |
+| local | 2 | 17.4% | 1689 ms | 13.3% | 965 ms |
+| streaming_sim | 0 | 16.4% | 1678 ms | 14.3% | 1696 ms |
 
 ### Errors (no question submitted)
 
-- baseline: en-long
-- r2_prev: en-long
+- baseline: none
+- r2_prev: none
 - local: none
 - streaming_sim: none
-
-`en-long` in baseline / r2_prev: the old path's cue arrived after the harness tail on this 11 s question (not a crash); every mode recognizes it once the cue path is fast enough.
 
 
 ### Latency gates
 
-| Gate | Target | Local CPU profile (measured) | Streaming profile (simulated) |
+| Gate | Target | Local CPU profile (measured, pooled) | Streaming profile (simulated, pooled) |
 |---|---|---|---|
-| **Gate A** | TTFUG_user p50 ≤ 2.0 s, p95 ≤ 3.0 s | **MET** — 1.30 s / 2.54 s | **MET** — 0.56 s / 2.00 s |
+| **Gate A** | TTFUG_user p50 ≤ 2.0 s, p95 ≤ 3.0 s | p50 **1.58 s** met; p95 **3.00 s — at the boundary** (per run 2.50 / 2.96 / 3.12 s) | **MET** — 0.56 s / 2.08 s |
 | premature_end_rate ≤ 3 % | | 0.000 | 0.000 |
-| premature_cue_rate ≤ 3 % | | 0.000 | 0.000 |
-| question_replacement_rate ≤ 5 % | | 0.010 | 0.000 |
-| **Gate B** | TTFUG_user p50 ≤ 1.2 s, p95 ≤ 2.0 s | **not met** (1.30 s / 2.54 s) | **MET** (0.56 s / 2.00 s, p95 at the limit) |
+| premature_cue_rate ≤ 3 % | | 0.020 | 0.000 |
+| question_replacement_rate ≤ 5 % | | 0.000 | 0.000 |
+| **Gate B** | TTFUG_user p50 ≤ 1.2 s, p95 ≤ 2.0 s | not met | p50 met; p95 **2.08 s — not met** |
 
-`LATENCY_GATE_A = MET` (both profiles). Gate B is split by profile as Stage G requires: the Streaming
-profile meets it in simulation; the Local CPU profile (Whisper `base` on 4 CPU cores) does not, and the
-release notes say so. Before the closure the same harness measured the shipped f04f217 path at
-5.27 s / 5.93 s (as rendered) and the v1.x path at 7.05 s / 7.55 s.
+`LATENCY_GATE_A = MET` for the Streaming profile (simulated provider). For the Local CPU profile the
+median meets Gate A with margin and the 95th percentile sits exactly on the 3.0 s limit on a 4-vCPU
+cloud CPU (met on 2 of 3 runs): **BORDERLINE**, not claimed as met. As Stage G requires, the profiles are
+reported separately and the release notes state the local figure as measured. Before the closure the
+same harness measured the shipped f04f217 path at 5.61 s / 6.89 s (as rendered) and the v1.x path at
+7.25 s / 8.27 s.
 
-No cue is shown for half a question: premature end / premature cue are 0 in both profiles; a
-provisional cue is re-rendered at most once, on the same card (`corrected`), in 9–10 % of turns;
-one local turn in 99 was `replaced`.
-
+Safety holds in both profiles: no premature end, premature cue ≤ 2 %, no question replaced, the cue
+is before the deep answer in every turn, no false trigger on the silence clip, no question lost.
 
 ## 5. Where the remaining time goes
 
-Local CPU profile (median after E, from the forensic table):
+Local CPU profile, run `36709255474` (slower runner CPU), medians after E:
 
-| Stage | Time |
+| Stage | Time after E |
 |---|---|
-| wait for 0.30 s of trailing silence (speculative trigger) | 0.30 s |
-| speculative final decode (product engine, beam 3, sticky language) + any in-flight preview decode it waits for | ≈ 1.0 s |
-| provisional cue compute + render | ≈ 3 ms |
-| **first useful cue on screen** | **1.30 s** |
-| authoritative final available (reused decode) | 1.40 s |
-| question confirmed (merge + group windows) | 2.22 s — confirms the cue already on screen |
-| deep answer first token (fake provider, after the 1.2 s late-constraint grace) | 4.10 s |
+| speculative final starts after 0.30 s of trailing silence (+ any preview decode still running) | ≥ 0.30 s |
+| speculative final decode done (product engine, beam 3, sticky language) = authoritative text | 1.78 s |
+| provisional cue computed and on screen (≈ 3 ms compute) | **1.74 s** |
+| question confirmed by the merge + group windows (confirms the cue already on screen) | 2.62 s |
+| deep answer first token (fake provider, after the 1.2 s late-constraint grace) | 4.50 s |
 
-The remaining local cost is the CPU Whisper decode itself. Reaching Gate B locally needs faster
-recognition — a GPU, a smaller/distilled model, or a true streaming ASR — not more waiting-time
-tuning. The p95 tail is long questions (en-long: 7 s of audio) and one wasted speculative decode on a
-comma pause (zh-coding).
+The remaining local cost is the CPU Whisper decode itself (≈ 1.0–1.5 s on these CPUs, up to 2.7 s for
+a 7 s question). The p95 tail is long questions (en-long, zh-long) and noisy clips (echo, keyboard)
+whose trailing noise delays the end of speech. Reaching Gate B locally — or a p95 with margin under
+3.0 s on a 4-core CPU — needs faster recognition (GPU, a smaller/distilled model or a true streaming
+ASR), not more waiting-time tuning. Decoding without timestamps was measured (40 % faster) and rejected:
+it changed recognized text (en-behavioral came back as prompt text).
 
-Streaming profile: the provider endpoint (end_window 320 ms + 250 ms modeled lag) confirms the turn
-at 0.56 s; the provisional cue renders immediately; the provider final (modeled 600 ms) confirms it
-at the same card.
+Streaming profile: the provider endpoint (end_window 320 ms + 250 ms modeled lag) confirms the turn at
+0.56 s and the provisional cue renders immediately; the p95 (≈ 2.1 s) is turns where the partial did
+not yet read as a complete question, which then wait for the provider final + windows.
 
-Developer machine (not the headline): with a Docker VM and other applications running, the same
-fixed calibration decode took 0.8–5.4 s instead of ~0.75 s; Local-profile latency scales with that
-factor. Earlier runs on that machine (before the harness matched the product VAD preroll) are not
-reported.
-
+Developer machine (not the headline): with a Docker VM and other applications running, the fixed
+calibration decode took 0.8–5.4 s instead of ~0.75 s; Local-profile latency scales with that factor.
 
 ## 6. Cue quality regression (Stage H)
 
@@ -167,7 +165,7 @@ reported.
 | Eval 2.0 `python -m evals.r2_eval --check` | mandatory **20/20**; dev route exact 1.0; seven-turn 1.0; unsupported claim blocked 1.0; held-out v2 exact **0.833** (unchanged from before the closure) |
 | Question text correct (corpus, keyword match) | same in every mode (misses are Whisper-base recognition errors: 单线成, 漫茶巡, 分裤分表, "tree offs") — the latency work does not change what is recognized |
 | Premature partial question / corrected final | `test_end_of_turn.py::test_premature_partial_is_reconciled_on_the_same_card`, `…two_part_turn…`, `…comma_pause…`; provisional relations in the corpus runs above |
-| Truth boundary / follow-up / topic reset / Job A/B / Session Claim | backend suite (990 tests) green, including the existing fixtures for each |
+| Truth boundary / follow-up / topic reset / Job A/B / Session Claim | backend suite (994 tests) green, including the existing fixtures for each |
 
 ## 7. Honest limits
 

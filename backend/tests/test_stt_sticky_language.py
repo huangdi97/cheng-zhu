@@ -105,3 +105,25 @@ def test_wrong_pin_never_loses_the_question():
     assert "Tell me about a time" in text
     assert engine._model.calls == ["zh", None]
     assert engine.sticky_language is None
+
+
+class _PromptEchoModel(_FakeModel):
+    """Under the wrong pin, hallucinates the initial prompt with good confidence."""
+
+    def transcribe(self, audio, **kwargs):
+        forced = kwargs.get("language")
+        self.calls.append(forced)
+        if forced == "zh":
+            seg = SimpleNamespace(text="请优先语英文原词请优先语英文原词", no_speech_prob=0.0, avg_logprob=-0.2)
+            return iter([seg]), SimpleNamespace(language="zh", language_probability=1.0)
+        seg = SimpleNamespace(text="Walk me through how you would design a URL shortener", no_speech_prob=0.0, avg_logprob=-0.3)
+        return iter([seg]), SimpleNamespace(language="en", language_probability=0.99)
+
+
+def test_prompt_echo_under_a_wrong_pin_is_re_detected():
+    engine = STTEngine("base", "auto")
+    engine._model = _PromptEchoModel([])
+    engine._sticky_lang = "zh"
+    text = engine.transcribe(AUDIO)
+    assert "URL shortener" in text and "请优先" not in text
+    assert engine._model.calls == ["zh", None]

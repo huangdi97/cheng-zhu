@@ -187,7 +187,7 @@ await shot('about-version', 'settings → 关于: version / license / source', a
   const search = win.getByLabel('搜索设置项')
   if (await search.isDisabled()) await win.getByRole('button', { name: '常用' }).first().click()
   await search.fill('关于')
-  const v = win.getByText(/1\.2\.0/).first()
+  const v = win.getByText(/^\s*\d+\.\d+\.\d+\s*$/).first()
   await v.scrollIntoViewIfNeeded()
   await v.waitFor({ timeout: 10000 })
 })

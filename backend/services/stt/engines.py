@@ -491,6 +491,7 @@ class STTEngine:
         return self._sticky_lang
 
     STICKY_MIN_AVG_LOGPROB = -0.9
+    PROMPT_ECHO_MARKERS = ("请优先", "英文原词", "技术面试语音", "口音不标准")
 
     def _sticky_mismatch(self, used_sticky: bool, segments, texts: list[str]) -> bool:
         """A decode under the pinned language that heard nothing, or heard it
@@ -500,9 +501,13 @@ class STTEngine:
             return False
         logprobs = [float(getattr(seg, "avg_logprob", 0.0) or 0.0) for seg in segments if (seg.text or "").strip()]
         weak = bool(logprobs) and (sum(logprobs) / len(logprobs)) < self.STICKY_MIN_AVG_LOGPROB
-        if texts and not weak:
+        # Under a wrong pin Whisper can also hallucinate its own initial
+        # prompt ("请优先识别技术术语英文原词…") with a good log-probability.
+        joined = " ".join(texts)
+        echo = any(marker in joined for marker in self.PROMPT_ECHO_MARKERS)
+        if texts and not weak and not echo:
             return False
-        _log.info("Whisper sticky language %s looks wrong (empty=%s weak=%s); re-detecting", self._sticky_lang, not texts, weak)
+        _log.info("Whisper sticky language %s looks wrong (empty=%s weak=%s echo=%s); re-detecting", self._sticky_lang, not texts, weak, echo)
         self._sticky_lang = None
         self._lang_votes.clear()
         self._sticky_uses = 0

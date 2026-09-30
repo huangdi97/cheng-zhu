@@ -1,0 +1,151 @@
+{
+  "runs": [
+    {
+      "run": "36709255474",
+      "commit": "15e6407",
+      "cpu": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+      "threads": 4,
+      "calibration_ms": [
+        1687,
+        1911,
+        1689
+      ],
+      "baseline": {
+        "p50": 7553,
+        "p95": 8433
+      },
+      "r2_prev": {
+        "p50": 5870,
+        "p95": 6890
+      },
+      "local": {
+        "p50": 1742,
+        "p95": 2962
+      },
+      "streaming_sim": {
+        "p50": 562,
+        "p95": 2062
+      }
+    },
+    {
+      "run": "36709258083",
+      "commit": "15e6407",
+      "cpu": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+      "threads": 4,
+      "calibration_ms": [
+        1698,
+        1681,
+        1663
+      ],
+      "baseline": {
+        "p50": 7513,
+        "p95": 8173
+      },
+      "r2_prev": {
+        "p50": 5890,
+        "p95": 7310
+      },
+      "local": {
+        "p50": 1743,
+        "p95": 3123
+      },
+      "streaming_sim": {
+        "p50": 562,
+        "p95": 2062
+      }
+    },
+    {
+      "run": "36709263343",
+      "commit": "15e6407",
+      "cpu": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+      "threads": 4,
+      "calibration_ms": [
+        1248,
+        1278,
+        1553
+      ],
+      "baseline": {
+        "p50": 6713,
+        "p95": 7633
+      },
+      "r2_prev": {
+        "p50": 5050,
+        "p95": 5690
+      },
+      "local": {
+        "p50": 1262,
+        "p95": 2501
+      },
+      "streaming_sim": {
+        "p50": 562,
+        "p95": 2002
+      }
+    }
+  ],
+  "pooled": {
+    "baseline": {
+      "n": 99,
+      "ttfug_user_p50": 7253,
+      "ttfug_user_p95": 8273,
+      "qbd_p50": 5900,
+      "qbd_p95": 6920,
+      "ttfa_p50": 1880,
+      "ttd_p50": 2020,
+      "ttfug_internal_p50": 1353,
+      "premature_end_rate": 0.0,
+      "premature_cue_rate": 0.0,
+      "question_replacement_rate": 0.0,
+      "question_ok_rate": 0.758,
+      "cue_before_deep_rate": 1.0,
+      "no_question": 0
+    },
+    "r2_prev": {
+      "n": 99,
+      "ttfug_user_p50": 5610,
+      "ttfug_user_p95": 6890,
+      "qbd_p50": 4260,
+      "qbd_p95": 5540,
+      "ttfa_p50": 1880,
+      "ttd_p50": 2020,
+      "ttfug_internal_p50": 1350,
+      "premature_end_rate": 0.0,
+      "premature_cue_rate": 0.0,
+      "question_replacement_rate": 0.0,
+      "question_ok_rate": 0.737,
+      "cue_before_deep_rate": 1.0,
+      "no_question": 0
+    },
+    "local": {
+      "n": 297,
+      "ttfug_user_p50": 1582,
+      "ttfug_user_p95": 3002,
+      "qbd_p50": 2440,
+      "qbd_p95": 3700,
+      "ttfa_p50": 1880,
+      "ttd_p50": 2020,
+      "ttfug_internal_p50": -818,
+      "premature_end_rate": 0.0,
+      "premature_cue_rate": 0.02,
+      "question_replacement_rate": 0.0,
+      "question_ok_rate": 0.788,
+      "cue_before_deep_rate": 1.0,
+      "no_question": 0
+    },
+    "streaming_sim": {
+      "n": 99,
+      "ttfug_user_p50": 562,
+      "ttfug_user_p95": 2082,
+      "qbd_p50": 1980,
+      "qbd_p95": 2440,
+      "ttfa_p50": 1880,
+      "ttd_p50": 2020,
+      "ttfug_internal_p50": -1418,
+      "premature_end_rate": 0.0,
+      "premature_cue_rate": 0.0,
+      "question_replacement_rate": 0.0,
+      "question_ok_rate": 0.758,
+      "cue_before_deep_rate": 1.0,
+      "no_question": 0
+    }
+  }
+}

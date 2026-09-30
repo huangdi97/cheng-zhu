@@ -217,6 +217,8 @@ class AppConfig(BaseModel):
     assist_eot_min_silence_sec: float = 0.55
     # 预判最终转写（本地 Whisper）在尾部静音达到该秒数时启动；只是提前解码，不结束本段
     assist_speculative_min_silence_sec: float = 0.30
+    # 本地 Whisper 预览：说话人停下该秒数后不再送新音频给预览解码（把 CPU 留给最终转写）
+    assist_preview_stop_silence_sec: float = 0.08
     # 本地 Whisper：尾部静音达到上面阈值即对已说内容做一次「预判最终转写」，
     # 同一段音频被 VAD 结束时直接复用（远程 STT 不启用，避免重复计费）
     assist_speculative_final: bool = True

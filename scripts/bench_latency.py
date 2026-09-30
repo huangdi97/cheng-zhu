@@ -302,6 +302,7 @@ def run_case(case: dict, mode: str, batch_engine, cfg_base, sim_cache: dict) -> 
                     pass
                 elif (
                     not in_tail
+                    and not (speculative_on and vad.trailing_silence_sec >= cfg.assist_preview_stop_silence_sec)
                     and stream["inflight"] is None
                     and t >= stream["next_at"]
                     and fed >= int(0.6 * SR)

@@ -1,5 +1,12 @@
 # 修复日志
 
+## 2026-09-30 - v1.2.1：修复非中文系统首次启动失败
+
+- 修复：系统区域为英文等非中文时，安装版首次启动报「成竹后端已退出 (code 3)」（打包后端忽略 PYTHONIOENCODING，stdout 为 cp1252，打印中文即崩溃）；后端启动时强制 UTF-8 输出
+- 发布流水线的打包冒烟新增「全新首次运行（无配置）」检查，在英文区域的 Windows runner 上执行
+- SHA256SUMS.txt 改为 LF 换行，Linux / macOS 可直接 `sha256sum -c`
+- 下载回验：`release-verify` 工作流在全新 Windows VM 上按发布 URL 下载、校验并安装验证
+
 ## 2026-09-30 - v1.2.0（R2）：可安装的 Interview Intelligence
 
 ### 产品

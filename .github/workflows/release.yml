@@ -92,12 +92,14 @@ jobs:
           Copy-Item dist/desktop/Chengzhu-Portable-x64.zip dist/release/
           Copy-Item LICENSE dist/release/LICENSE.txt
           Copy-Item THIRD_PARTY_NOTICES.md dist/release/
-          Copy-Item docs/RELEASE_NOTES_v1.2.0.md dist/release/
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          Copy-Item "docs/RELEASE_NOTES_v$version.md" dist/release/
           $lines = foreach ($f in @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip')) {
             $h = (Get-FileHash "dist/release/$f" -Algorithm SHA256).Hash.ToLower()
             "$h  $f"
           }
-          $lines | Set-Content -Encoding ascii dist/release/SHA256SUMS.txt
+          # LF line endings so `sha256sum -c SHA256SUMS.txt` works on Linux / macOS too
+          [IO.File]::WriteAllText("$PWD/dist/release/SHA256SUMS.txt", (($lines -join "`n") + "`n"), [Text.Encoding]::ASCII)
           Get-Content dist/release/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
@@ -113,14 +115,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           $tag = "${{ github.ref_name }}"
-          if (-not $tag.StartsWith('v')) { $tag = 'v1.2.0' }
+          if (-not $tag.StartsWith('v')) { $tag = "v$version" }
+          if ($tag -ne "v$version") { throw "tag $tag does not match app version $version" }
           gh release create $tag `
             dist/release/Chengzhu-Setup-x64.exe `
             dist/release/Chengzhu-Portable-x64.zip `
             dist/release/SHA256SUMS.txt `
             dist/release/LICENSE.txt `
             dist/release/THIRD_PARTY_NOTICES.md `
-            dist/release/RELEASE_NOTES_v1.2.0.md `
+            "dist/release/RELEASE_NOTES_v$version.md" `
             --title "成竹 Chengzhu $tag" `
-            --notes-file dist/release/RELEASE_NOTES_v1.2.0.md
+            --notes-file "dist/release/RELEASE_NOTES_v$version.md"

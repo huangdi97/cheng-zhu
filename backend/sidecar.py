@@ -21,7 +21,7 @@ import argparse
 import os
 import sys
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 
 
 def _run_screen_capture_worker(argv: list[str]) -> int:
@@ -39,7 +39,19 @@ def _run_screen_capture_worker(argv: list[str]) -> int:
     return 0
 
 
+def _force_utf8_stdio() -> None:
+    """The frozen sidecar ignores PYTHONIOENCODING, so on a non-Chinese
+    Windows locale (cp1252) stdout/stderr pipes could not encode the first
+    Chinese print and the backend exited at first launch (v1.2.0)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "--screen-capture-worker":
         return _run_screen_capture_worker(argv[1:])

@@ -1,0 +1,76 @@
+name: release-verify
+
+# Download-back verification on a fresh GitHub Windows VM: download the
+# published release assets by URL (not the build folder), verify SHA256, then
+# run scripts/sandbox/verify-clean-install.ps1 with Python and Node removed
+# from PATH. The hosted image has Python/Node installed on disk; the check
+# proves the app never calls them. The Windows Sandbox run is the clean-OS
+# counterpart (scripts/sandbox/run-clean-install.ps1).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to verify"
+        required: true
+        default: "v1.2.1"
+  pull_request:
+    paths:
+      - ".github/workflows/release-verify.yml"
+      - "scripts/sandbox/**"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.event.inputs.tag || 'v1.2.1' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/sandbox
+
+      - name: Release published yet?
+        id: exists
+        shell: pwsh
+        run: |
+          try {
+            Invoke-WebRequest -Method Head "https://github.com/${{ github.repository }}/releases/download/$env:TAG/SHA256SUMS.txt" | Out-Null
+            "published=true" >> $env:GITHUB_OUTPUT
+          } catch {
+            "published=false" >> $env:GITHUB_OUTPUT
+            Write-Host "::notice::$env:TAG is not published yet; nothing to verify"
+          }
+
+      - name: Download release assets by URL
+        if: steps.exists.outputs.published == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force C:\cz\in, C:\cz\out | Out-Null
+          $base = "https://github.com/${{ github.repository }}/releases/download/$env:TAG"
+          foreach ($f in 'Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip','SHA256SUMS.txt','LICENSE.txt','THIRD_PARTY_NOTICES.md',"RELEASE_NOTES_$env:TAG.md") {
+            Invoke-WebRequest "$base/$f" -OutFile "C:\cz\in\$f"
+            "$f $((Get-Item "C:\cz\in\$f").Length) bytes"
+          }
+          Copy-Item scripts/sandbox/verify-clean-install.ps1, scripts/sandbox/resume.txt, scripts/sandbox/jd.txt C:\cz\in\
+
+      - name: Verify with Python and Node removed from PATH
+        if: steps.exists.outputs.published == 'true'
+        shell: powershell
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object { $_ -and $_ -notmatch 'python|node|npm|hostedtoolcache|Program Files\\nodejs' }) -join ';'
+          Remove-Item Env:PYTHONPATH, Env:PYTHONHOME, Env:NODE_PATH -ErrorAction SilentlyContinue
+          powershell -NoProfile -ExecutionPolicy Bypass -File C:\cz\in\verify-clean-install.ps1
+          Get-Content C:\cz\out\results.json
+          $r = Get-Content C:\cz\out\results.json -Raw | ConvertFrom-Json
+          if (-not $r.passed) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.exists.outputs.published == 'true'
+        with:
+          name: release-verify-windows
+          path: C:\cz\out
+          retention-days: 30

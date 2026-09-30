@@ -277,6 +277,16 @@ class AssistAsrStateMachine:
             return
         since_last = now_mono - self.merge_mono_last
         burst_age = (now_mono - self.merge_mono_first) if self.merge_mono_first is not None else 0.0
+        if bool(getattr(cfg, "assist_eot_fast_flush", True)):
+            from services.intelligence.eot import looks_like_complete_question
+
+            # R2: when the merged text already reads as a finished question,
+            # only a short quiet period is needed. Speech activity (a newer
+            # streaming partial) still moves merge_mono_last forward, so a
+            # speaker who keeps talking is never cut off.
+            if looks_like_complete_question(" ".join(self.merge_parts)):
+                eot_gap = float(getattr(cfg, "assist_eot_merge_gap_sec", 0.35) or 0.35)
+                gap = min(gap, max(0.1, eot_gap))
         if since_last >= gap or burst_age >= max_wait:
             self.flush_merge_buffer_now(cfg, session)
 
@@ -304,11 +314,6 @@ class AssistAsrStateMachine:
             self.merge_mono_first = now_mono
         self.merge_parts.append(pub)
         self.merge_mono_last = now_mono
-        if not force_flush_tail and bool(getattr(cfg, "assist_eot_fast_flush", True)):
-            from services.intelligence.eot import looks_like_complete_question
-
-            # R2: a finished question does not need to wait the merge gap.
-            force_flush_tail = looks_like_complete_question(" ".join(self.merge_parts))
         if force_flush_tail:
             self.flush_merge_buffer_now(cfg, session)
         else:

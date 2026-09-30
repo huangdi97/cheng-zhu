@@ -671,16 +671,33 @@ def test_complete_question_skips_merge_gap_and_emits_early_cue():
     sm = _asr_machine(submitted, early, clock)
     session = Session(session_id="t")
     sm.append_transcription_fragment(cfg, session, "Redis 的持久化机制有哪些？", clock["t"], False)
-    # merge gap (2.0 s) is skipped: the transcription is already published
-    assert session.transcription_history[-1].startswith("Redis")
     while not submitted and clock["t"] < 14:
         clock["t"] += 0.02
+        sm.try_flush_merge_buffer(cfg, session, clock["t"])
         sm.try_flush_question_group(cfg, session, clock["t"])
     t_submit, task = submitted[0]
-    assert t_submit - 10.0 < 1.3  # group confirm only, no 2 s merge gap
+    # short end-of-turn gap (0.35 s) + group confirm, not the 2.0 s merge gap
+    assert t_submit - 10.0 < 1.7
     assert early and early[0][2] == task[4]["qa_id"] and task[4]["early_cue_emitted"] is True
     # The deep answer still honors the late-constraint grace.
     assert task[4]["dispatch_after_mono"] > t_submit
+
+
+def test_end_of_turn_gap_still_waits_for_ongoing_speech():
+    from core.config import AppConfig
+    from core.session import Session
+
+    cfg = AppConfig().model_copy(update={"assist_auto_answer_mode": "always"})
+    submitted, early, clock = [], [], {"t": 1.0}
+    sm = _asr_machine(submitted, early, clock)
+    session = Session(session_id="t")
+    sm.append_transcription_fragment(cfg, session, "为什么选择 Redis", 1.0, False)
+    sm.note_speech_activity(1.3)  # streaming partial: the interviewer keeps talking
+    sm.try_flush_merge_buffer(cfg, session, 1.5)
+    assert not session.transcription_history
+    sm.append_transcription_fragment(cfg, session, "而不是 Memcached？", 2.0, False)
+    sm.try_flush_merge_buffer(cfg, session, 2.4)
+    assert session.transcription_history and "Memcached" in session.transcription_history[-1]
 
 
 def test_baseline_flags_keep_old_timing():

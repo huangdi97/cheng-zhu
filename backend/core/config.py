@@ -207,6 +207,8 @@ class AppConfig(BaseModel):
     onboarding_completed: bool = False
     # R2 Stage I：文本已是完整问句时立即结束合并等待（不再等满 merge gap）
     assist_eot_fast_flush: bool = True
+    # 完整问句的合并等待（秒）；新的实时转写（仍在说话）会继续顺延
+    assist_eot_merge_gap_sec: float = 0.35
     # R2 Stage I/K：问题分组确认后立即发 L0 Fast Cue，不等 late-constraint grace
     intelligence_early_cue: bool = True
     # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）

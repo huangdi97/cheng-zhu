@@ -22,4 +22,15 @@ def test_readme_and_packages_declare_mit():
 def test_third_party_notices_present():
     notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
     assert "not** relicensed" in notices
-    assert "PyMuPDF" in notices
+    assert "`pypdfium2`" in notices
+
+
+def test_no_agpl_pdf_renderer_shipped():
+    """PyMuPDF (AGPL-3.0) was replaced by pypdfium2 before the MIT release."""
+    requirements = (ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").lower()
+    assert "pymupdf" not in requirements.replace("替代 agpl 的 pymupdf", "")
+    spec = (ROOT / "packaging" / "chengzhu-backend.spec").read_text(encoding="utf-8")
+    assert '"fitz"' not in spec and '"pymupdf"' not in spec
+    notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    backend_table = notices.split("## Backend")[1].split("## Copyleft")[0]
+    assert "AGPL" not in backend_table and "pymupdf" not in backend_table.lower()

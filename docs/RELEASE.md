@@ -7,7 +7,7 @@
 | `Chengzhu-Setup-x64.exe` | Per-user NSIS installer (choose directory; no admin needed) |
 | `Chengzhu-Portable-x64.zip` | Unzip and run `Chengzhu.exe` |
 | `SHA256SUMS.txt` | Checksums of both |
-| `LICENSE.txt`, `THIRD_PARTY_NOTICES.md` | MIT + third-party licenses (PyMuPDF is AGPL-3.0) |
+| `LICENSE.txt`, `THIRD_PARTY_NOTICES.md` | MIT + third-party licenses (no copyleft components; PDF rendering is pypdfium2, BSD-3/Apache-2.0) |
 
 Neither artifact needs Python, Node, npm or pip on the target machine.
 

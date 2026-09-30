@@ -101,7 +101,7 @@ def _normalize(lic: str) -> str:
 
 
 def _is_permissive(lic: str) -> bool:
-    parts = re.split(r"\s+(?:OR|AND)\s+|/|\(", _normalize(lic))
+    parts = re.split(r"\s+(?:OR|AND)\s+|/|\(|,", _normalize(lic))
     return any(PERMISSIVE.match(part.strip().strip("()")) for part in parts)
 
 
@@ -117,8 +117,9 @@ def render() -> tuple[str, list[str]]:
         "## Provenance note",
         "",
         "Earlier releases (up to v1.1, Git history before the v1.2 MIT change) were published under CC BY-NC 4.0.",
-        "NOTICE.md records that some early base code may descend from an earlier `interview-assistant` code line.",
-        "All commits in this repository are authored by `huangdi97`; the maintainer relicensed the current tree to MIT in v1.2.",
+        "Early base code descends from the maintainer's own earlier `interview-assistant` code line; the maintainer",
+        "confirmed on 2026-09-30 that it was also written by `huangdi97` and that no third-party-owned code remains",
+        "(`reports/LEGACY_CODE_PROVENANCE_AUDIT.md`). All commits are authored by `huangdi97`, who relicensed the tree to MIT in v1.2.",
         "If you are the author of upstream code and believe it is included here under different terms, please open an issue.",
         "",
         "## Bundled assets",
@@ -156,10 +157,10 @@ def render() -> tuple[str, list[str]]:
     out += [
         "## Copyleft components shipped in the Windows build",
         "",
-        "- **PyMuPDF** is dual-licensed AGPL-3.0 / Artifex commercial. Chengzhu bundles it under AGPL-3.0 for",
-        "  PDF resume rendering. Because Chengzhu's complete source is public (MIT, which is AGPL-compatible),",
-        "  the combined installer is distributed with a pointer to that source and PyMuPDF's source",
-        "  (<https://github.com/pymupdf/PyMuPDF>). Redistributors of the binary must keep that source offer.",
+        "- none. PDF page rendering uses **pypdfium2** (PDFium; BSD-3-Clause / Apache-2.0) since v1.2.0;",
+        "  PyMuPDF (AGPL-3.0) was removed before the first MIT release (`reports/PYMUPDF_LICENSE_DECISION.md`).",
+        "  The pypdfium2 wheel carries PDFium's bundled third-party licenses (FreeType, ICU, libjpeg-turbo,",
+        "  libpng, OpenJPEG, lcms, zlib, abseil …) in its `dist-info/licenses` directory, which the installer keeps.",
         "",
     ]
     out += ["## Needs manual review", ""]
@@ -176,6 +177,14 @@ def main() -> int:
         # section + header to keep the check deterministic in CI.
         if current.split("## Backend")[0] != text.split("## Backend")[0]:
             print("THIRD_PARTY_NOTICES.md is out of date; run scripts/generate_third_party_notices.py")
+            return 1
+        # Release gate: a shipped dependency outside the allow-list (AGPL,
+        # GPL, non-commercial, unknown) fails the check instead of only
+        # being listed.
+        if flagged:
+            print("Shipped dependencies need license review:")
+            for item in flagged:
+                print("  FLAG", item)
             return 1
         return 0
     OUT.write_text(text, encoding="utf-8")

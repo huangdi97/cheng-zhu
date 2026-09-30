@@ -39,7 +39,7 @@ PYTHON_RUNTIME_IMPORTS = {
     "requests": "requests",
     "websocket-client": "websocket",
     "aiohttp": "aiohttp",
-    "pymupdf": "fitz",
+    "pypdfium2": "pypdfium2",
     "sounddevice": "sounddevice",
     "numpy": "numpy",
     "faster-whisper": "faster_whisper",

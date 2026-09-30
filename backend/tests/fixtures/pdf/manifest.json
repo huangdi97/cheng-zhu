@@ -1,0 +1,92 @@
+{
+  "normal.pdf": {
+    "pages": 1,
+    "expect": {
+      "1": [
+        "Backend Engineer",
+        "3000 QPS"
+      ]
+    }
+  },
+  "multipage.pdf": {
+    "pages": 3,
+    "expect": {
+      "1": [
+        "PAGE-1"
+      ],
+      "2": [
+        "PAGE-2"
+      ],
+      "3": [
+        "PAGE-3"
+      ]
+    }
+  },
+  "chinese.pdf": {
+    "pages": 1,
+    "expect": {
+      "1": [
+        "后端开发工程师",
+        "订单系统重构",
+        "缓存一致性"
+      ]
+    }
+  },
+  "english.pdf": {
+    "pages": 1,
+    "expect": {
+      "1": [
+        "rate limiter",
+        "Kafka streams"
+      ]
+    }
+  },
+  "mixed.pdf": {
+    "pages": 1,
+    "expect": {
+      "1": [
+        "RAG pipeline",
+        "exactly once",
+        "检索增强"
+      ]
+    }
+  },
+  "table.pdf": {
+    "pages": 1,
+    "expect": {
+      "1": [
+        "技能",
+        "Python",
+        "精通"
+      ]
+    }
+  },
+  "empty_page.pdf": {
+    "pages": 3,
+    "expect": {
+      "1": [
+        "FIRST-PAGE"
+      ],
+      "3": [
+        "THIRD-PAGE"
+      ]
+    },
+    "empty_pages": [
+      2
+    ]
+  },
+  "scanned.pdf": {
+    "pages": 1,
+    "expect": {},
+    "empty_pages": [
+      1
+    ],
+    "scanned": true
+  },
+  "damaged.pdf": {
+    "damaged": true
+  },
+  "encrypted.pdf": {
+    "encrypted": true
+  }
+}

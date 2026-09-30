@@ -19,25 +19,20 @@ _CAPTION_PROMPT = (
 def render_pdf_page_to_png(
     pdf_path: Path, page_idx: int, out_path: Path, zoom: float = 2.0
 ) -> bool:
-    """用 pymupdf 把 pdf_path 的第 page_idx 页（1-based）渲染为 PNG。失败返回 False。"""
+    """把 pdf_path 的第 page_idx 页（1-based）渲染为 PNG（pypdfium2）。失败返回 False。"""
     try:
-        import fitz  # pymupdf
+        from services.pdf_render import PdfRenderError, render_page_png
     except Exception as e:  # pragma: no cover
-        _log.info("pymupdf 未安装，跳过 Vision 渲染: %s", e)
+        _log.info("PDF 渲染模块不可用，跳过 Vision 渲染: %s", e)
         return False
     try:
-        doc = fitz.open(str(pdf_path))
-        try:
-            page = doc.load_page(page_idx - 1)
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            pix.save(str(out_path))
-            return True
-        finally:
-            doc.close()
+        render_page_png(pdf_path, page_idx, out_path, zoom=zoom)
+        return True
+    except PdfRenderError as e:
+        _log.warning("PDF 渲染失败 %s page %d: %s", pdf_path, page_idx, e)
+        return False
     except Exception as e:
-        _log.warning("pymupdf 渲染失败 %s page %d: %s", pdf_path, page_idx, e)
+        _log.warning("PDF 渲染失败 %s page %d: %s", pdf_path, page_idx, e)
         return False
 
 

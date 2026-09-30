@@ -3,7 +3,7 @@
 ## 2026-09-30 - v1.2.0（R2）：可安装的 Interview Intelligence
 
 ### 产品
-- 许可证改为 MIT；生成 THIRD_PARTY_NOTICES（PyMuPDF 为 AGPL-3.0，已注明）
+- 许可证改为 MIT；生成 THIRD_PARTY_NOTICES；PDF 页渲染由 PyMuPDF（AGPL-3.0）换为 pypdfium2（BSD-3-Clause / Apache-2.0），安装包不含 copyleft 组件
 - 事实三轴：来源状态 / 用户确认 / 本场口述，界面不再用“验证=真”
 - Interview Pack 冻结真实内容；上场只读本场 Pack，不再读取“最近分析的岗位”
 - Context Compiler 成为唯一上下文来源，同一片段只出现一次

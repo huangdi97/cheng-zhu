@@ -23,7 +23,7 @@ def test_runtime_import_map_handles_distribution_name_differences():
 
     assert imports["python-multipart"] == "multipart"
     assert imports["websocket-client"] == "websocket"
-    assert imports["pymupdf"] == "fitz"
+    assert imports["pypdfium2"] == "pypdfium2"
     assert imports["Pillow"] == "PIL"
     assert imports["python-docx"] == "docx"
 

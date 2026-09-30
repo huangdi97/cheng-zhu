@@ -1,0 +1,134 @@
+{
+  "captured_at": "2026-09-30T03:09:05.756Z",
+  "space_id": 1,
+  "entries": [
+    {
+      "name": "_runtime",
+      "note": "origin=http://127.0.0.1:18081 userData=C:\\Users\\Kaiser\\AppData\\Local\\Temp\\chengzhu-evidence-jqq7lA exe=E:\\AI\\面试助手\\dist\\desktop\\win-unpacked\\Chengzhu.exe"
+    },
+    {
+      "name": "onboarding",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\onboarding.png",
+      "note": "fresh config → first-run guide step 1"
+    },
+    {
+      "name": "onboarding-local-data",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\onboarding-local-data.png",
+      "note": "step 2 shows the real %APPDATA% data dir"
+    },
+    {
+      "name": "home",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\home.png",
+      "note": "home: 继续准备 / 开始演练 / 上场 into the current Job Goal"
+    },
+    {
+      "name": "my-chengzhu-resume",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\my-chengzhu-resume.png",
+      "note": "我的成竹 → 简历 (default tab)"
+    },
+    {
+      "name": "my-chengzhu-overview",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\my-chengzhu-overview.png",
+      "note": "我的成竹 → 概览"
+    },
+    {
+      "name": "facts",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\facts.png",
+      "note": "facts from the resume rebuild: provenance and user confirmation as separate chips"
+    },
+    {
+      "name": "story",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\story.png",
+      "note": "Story Builder + a seeded user-authored story"
+    },
+    {
+      "name": "voice",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\voice.png",
+      "note": "我的表达 preferences"
+    },
+    {
+      "name": "job-goal",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\job-goal.png",
+      "note": "Job Goal detail (JD / alignment / 准备)"
+    },
+    {
+      "name": "prepare-pack-frozen",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\prepare-pack-frozen.png",
+      "note": "InterviewPack frozen with per-session policies (fake provider for strategy generation)"
+    },
+    {
+      "name": "rehearse",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\rehearse.png",
+      "note": "演练 hub + practice coach panel"
+    },
+    {
+      "name": "coach-practice",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\coach-practice.png",
+      "note": "practice coach link generated (token shown once, fragment only)"
+    },
+    {
+      "name": "preflight-pack-bar",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\preflight-pack-bar.png",
+      "note": "Live: frozen pack bar with AI / human / share-privacy policies"
+    },
+    {
+      "name": "live-fast-cue",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\live-fast-cue.png",
+      "note": "Live: Fast Cue visible (guidance_fast) while the deep answer streams"
+    },
+    {
+      "name": "live-deep",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\live-deep.png",
+      "note": "Live: deep answer completed below the cue"
+    },
+    {
+      "name": "live-boundary-cue",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\live-boundary-cue.png",
+      "note": "Live: boundary cue for an unsourced personal claim"
+    },
+    {
+      "name": "review",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\review.png",
+      "note": "复盘 → 场次复盘"
+    },
+    {
+      "name": "review-ability",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\review-ability.png",
+      "note": "复盘 → 能力分析"
+    },
+    {
+      "name": "settings-share-privacy-off",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\settings-share-privacy-off.png",
+      "note": "Settings: share privacy default OFF, human assistance practice-only, about MIT"
+    },
+    {
+      "name": "settings-share-privacy-on",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\settings-share-privacy-on.png",
+      "note": "Settings: share privacy PRIVATE_OVERLAY → main process state {\"mode\":\"OFF\",\"protected\":false,\"note\":\"用于减少成竹中的私人资料意外出现在受支持的屏幕共享或录制路径中。不同系统和捕获方式行为不同，这不是安全或“不可检测”保证。\"}"
+    },
+    {
+      "name": "error",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\error.png",
+      "note": "provider unreachable → user-facing error in the answer card"
+    },
+    {
+      "name": "dark-facts",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\dark-facts.png",
+      "note": "dark theme: facts & sources (AA status colors)"
+    },
+    {
+      "name": "dark-home",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\dark-home.png",
+      "note": "dark theme: home"
+    },
+    {
+      "name": "mobile-390-home",
+      "file": "artifacts\\release-evidence\\v1.2-r2\\mobile-390-home.png",
+      "note": "390px wide window"
+    },
+    {
+      "name": "_390_overflow",
+      "note": "horizontal overflow at 390px: false"
+    }
+  ]
+}

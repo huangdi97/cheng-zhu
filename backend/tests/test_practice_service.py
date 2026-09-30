@@ -30,6 +30,7 @@ def env(monkeypatch):
 
     monkeypatch.setattr(practice_service.prep_storage, "get_space", lambda sid: _space())
     monkeypatch.setattr(practice_service.prep_storage, "update_questions", lambda *a, **k: None)
+    monkeypatch.setattr(practice_service, "_gap_focus", lambda space: {"terms": [], "questions": []})
 
     def fake_analyze(question, answer, reference_answer="", apply_asr_correction=True, review_source="assist"):
         return {
@@ -77,6 +78,7 @@ def test_start_session_returns_first_question(env):
 
 def test_start_session_generates_questions_when_missing(monkeypatch):
     monkeypatch.setattr(practice_service.prep_storage, "get_space", lambda sid: _space(questions=[]))
+    monkeypatch.setattr(practice_service, "_gap_focus", lambda space: {"terms": [], "questions": []})
     generated = [{"question": "g1", "type": "technical", "why": "w"}]
     monkeypatch.setattr(
         practice_service.prep_service, "generate_questions",
@@ -136,3 +138,39 @@ def test_submit_after_finish_rejected(env):
     practice_service.submit_answer(r["practice_id"], "答")
     with pytest.raises(ValueError):
         practice_service.submit_answer(r["practice_id"], "再答")
+
+GAP_QUESTION = {"question": "谈谈你对「Kafka」的理解？", "type": "gap", "why": "岗位要求，但没有证据"}
+
+
+def test_gap_questions_interleave_after_warmup():
+    pool = [{"question": f"q{i}"} for i in range(1, 4)]
+    merged = practice_service._merge_gap_questions([GAP_QUESTION], pool)
+    assert [q["question"] for q in merged] == ["q1", GAP_QUESTION["question"], "q2", "q3"]
+
+
+def test_gap_questions_skip_duplicates_of_pool():
+    pool = [{"question": GAP_QUESTION["question"]}, {"question": "q2"}]
+    assert practice_service._merge_gap_questions([GAP_QUESTION], pool) == pool
+
+
+def test_start_session_is_gap_driven(env, monkeypatch):
+    monkeypatch.setattr(
+        practice_service, "_gap_focus",
+        lambda space: {"terms": ["Kafka"], "questions": [GAP_QUESTION]},
+    )
+    r = practice_service.start_session(1, rounds=5)
+    assert r["gap_focus"] == ["Kafka"]
+    assert "Kafka" in r["weak_terms"]
+    pid = r["practice_id"]
+    pool = practice_service._SESSIONS[pid]["question_pool"]
+    assert pool[1]["type"] == "gap"
+
+
+def test_gap_focus_failure_degrades_to_plain_practice(monkeypatch):
+    import services.intelligence.job_workspace as job_workspace
+
+    def boom(*_a, **_k):
+        raise RuntimeError("intelligence db unavailable")
+
+    monkeypatch.setattr(job_workspace, "mock_gap_focus", boom)
+    assert practice_service._gap_focus(_space()) == {"terms": [], "questions": []}

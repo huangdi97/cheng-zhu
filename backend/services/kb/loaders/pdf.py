@@ -71,6 +71,15 @@ class PdfLoader:
         if not _PYPDF_OK:
             raise RuntimeError("pypdf 未安装：请 `pip install pypdf`")
         reader = PdfReader(str(file_path))
+        if reader.is_encrypted:
+            # Owner-password-only PDFs open with an empty user password;
+            # anything else is unsupported and reported, not half-indexed.
+            try:
+                opened = bool(reader.decrypt(""))
+            except Exception:  # noqa: BLE001
+                opened = False
+            if not opened:
+                raise ValueError("PDF 已加密，暂不支持；请导出未加密的 PDF 后再导入")
         title = _pdf_title(reader, rel_path)
         sections: list[RawSection] = []
         for idx, page in enumerate(reader.pages, start=1):

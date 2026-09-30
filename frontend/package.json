@@ -1,7 +1,8 @@
 {
   "name": "cheng-zhu-frontend",
   "private": true,
-  "version": "1.0.0",
+  "license": "MIT",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -33,6 +34,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",

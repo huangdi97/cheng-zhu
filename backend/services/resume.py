@@ -6,21 +6,10 @@ import tempfile
 
 
 def _pdf_to_images_base64(file_path: str, dpi: int = 150) -> list[str]:
-    """用 PyMuPDF 将 PDF 每页转为 PNG 的 base64，无系统依赖。"""
-    try:
-        import fitz
-    except ImportError:
-        raise ValueError("解析图片版 PDF 需要安装 PyMuPDF：pip install pymupdf") from None
-    out = []
-    doc = fitz.open(file_path)
-    try:
-        for page in doc:
-            pix = page.get_pixmap(dpi=dpi)
-            png_bytes = pix.tobytes("png")
-            out.append(base64.b64encode(png_bytes).decode("ascii"))
-    finally:
-        doc.close()
-    return out
+    """将 PDF 每页渲染为 PNG 的 base64（pypdfium2，无系统依赖）。"""
+    from services.pdf_render import iter_pages_png
+
+    return [base64.b64encode(png).decode("ascii") for png in iter_pages_png(file_path, dpi=dpi)]
 
 
 def parse_pdf(file_path: str) -> str:

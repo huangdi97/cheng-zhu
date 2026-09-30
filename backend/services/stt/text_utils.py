@@ -387,12 +387,25 @@ _QUESTION_CUE = re.compile(
     r"(什么|怎么|如何|为什么|为何|区别|原理|作用|流程|实现|设计|优化|排查|处理|"
     r"介绍(?:一下|下)?|说(?:一下|下)?|讲(?:一下|下)?|聊(?:一下|下)?|解释(?:一下|下)?|"
     r"分析(?:一下|下)?|怎么做|怎么办|有哪些|是否|能不能|可不可以|对比(?:一下|下)?|"
-    r"展开讲讲|详细说说|举个例子|继续讲|接着说)",
+    r"展开讲讲|详细说说|举个例子|继续讲|接着说|"
+    # Interrogatives Whisper often ends with "。" instead of "？"
+    r"哪里|哪个|哪些|哪种|哪一|多少|几个|几种|是不是|有没有|会不会|要不要|能否)",
     re.IGNORECASE,
 )
 _DIRECTIVE_QUESTION_CUE = re.compile(
     r"(?:请|你|麻烦|帮我|能否|能不能|可不可以).{0,24}"
     r"(?:介绍|说|讲|聊|解释|分析|设计|实现|排查|优化|比较|总结|展开)(?:一下|下)?",
+    re.IGNORECASE,
+)
+# English interview questions: an interrogative / directive opening or an
+# embedded "how would you ..." clause. Without this, smart auto-answer mode
+# rejected every English question that had no Chinese cue word.
+_EN_QUESTION_CUE = re.compile(
+    r"(?:^(?:so |and |okay |ok |now |then |alright )?"
+    r"(?:what|why|how|when|where|which|who|whose|can you|could you|would you|will you|"
+    r"do you|did you|does|is there|are there|have you|has your|tell me|explain|describe|"
+    r"walk me|talk (?:me )?(?:about|through)|give me|compare|implement|write)\b"
+    r"|\b(?:how|what|why) (?:would|do|did|does|is|are|can|could|should) (?:you|your|we|it|this|that)\b)",
     re.IGNORECASE,
 )
 _INCOMPLETE_TAIL = re.compile(
@@ -527,7 +540,7 @@ def classify_asr_question_candidate(
     need = max(2, int(min_significant_chars))
     has_question_mark = "?" in text or "？" in text
     has_question_cue = bool(_QUESTION_CUE.search(normalized))
-    has_directive_cue = bool(_DIRECTIVE_QUESTION_CUE.search(normalized))
+    has_directive_cue = bool(_DIRECTIVE_QUESTION_CUE.search(normalized)) or bool(_EN_QUESTION_CUE.search(normalized))
     has_tail_question = bool(re.search(r"(?:吗|么|呢)$", normalized))
     incomplete_tail = bool(_INCOMPLETE_TAIL.search(normalized))
     low_value_fragment = bool(_LOW_VALUE_FRAGMENT.fullmatch(normalized))

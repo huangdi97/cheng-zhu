@@ -115,6 +115,12 @@ def build_config_payload(cfg) -> dict:
             1.0, min(60.0, float(getattr(cfg, "multi_screen_capture_idle_sec", 10.0) or 10.0))
         ),
         "written_exam_mode": bool(getattr(cfg, "written_exam_mode", False)),
+        "ai_policy_mode": str(getattr(cfg, "ai_policy_mode", "AI_ALLOWED") or "AI_ALLOWED"),
+        "human_assistance_policy": str(getattr(cfg, "human_assistance_policy", "HUMAN_PRACTICE_ONLY") or "HUMAN_PRACTICE_ONLY"),
+        "share_privacy_mode": str(getattr(cfg, "share_privacy_mode", "OFF") or "OFF"),
+        "speech_adoption_analytics_live": bool(getattr(cfg, "speech_adoption_analytics_live", False)),
+        "fast_cue_model_index": int(getattr(cfg, "fast_cue_model_index", -1)),
+        "onboarding_completed": bool(getattr(cfg, "onboarding_completed", False)),
         "written_exam_think": bool(getattr(cfg, "written_exam_think", False)),
         "kb_enabled": bool(getattr(cfg, "kb_enabled", False)),
         "kb_top_k": int(getattr(cfg, "kb_top_k", 4) or 4),

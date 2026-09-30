@@ -154,6 +154,17 @@ def _analyze_session_worker(session_id: int):
 
             logger.info("Generated summary for session_id=%d", session_id)
 
+            # Stage L4: controlled write-back — only policy-approved kinds
+            # (knowledge weakness / repeated topic / communication profile)
+            # pass through memory_policy; LLM inference never becomes a
+            # candidate fact.
+            try:
+                from services.intelligence.review_writeback import write_back_after_review
+
+                write_back_after_review(session_id, summary_result, analyzed_turns)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Intelligence write-back failed: session_id=%s, error=%s", session_id, exc)
+
         except Exception as e:
             logger.error(
                 "Failed to generate summary: session_id=%d, error=%s",

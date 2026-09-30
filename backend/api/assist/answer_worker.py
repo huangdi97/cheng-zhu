@@ -783,6 +783,262 @@ def _schedule_answer_suggestion(qa_id: str, question: str, answer: str, model_cf
         pass
 
 
+def emit_early_cue(question_text: str, qa_id: str, meta: dict, *, broadcast) -> dict:
+    """R2 Stage I/K: deterministic L0 cue right after the question group is
+    confirmed, before the late-constraint grace delays the deep answer.
+    Read-only: no interview-state event is committed here (the answer
+    worker does that), only understanding + frozen-pack compile + L0."""
+    from services.intelligence import fast_cue, latency_clock
+    from services.intelligence.answer_planner import create_plan
+    from services.intelligence.context_compiler import compile_live_context
+    from services.intelligence.question_understanding import understand_question
+    from services.intelligence.semantics import provenance_from_grounding
+    from services.answer_grounding import analyze_experience_grounding
+
+    cfg = get_config()
+    sid = _live_session_id()
+    latency_clock.start_turn(
+        sid,
+        qa_id,
+        source=str(meta.get("source", "") or "asr"),
+        provisional=bool(meta.get("provisional")),
+    )
+    pack = _resolve_live_pack(sid, cfg)
+    understanding = understand_question(question_text)
+    grounding = analyze_experience_grounding(question_text, resume_text=pack.profile_text, interview_notes=_pack_notes(pack, cfg))
+    plan = create_plan(
+        understanding.question_type,
+        resolved_question=understanding.resolved_question,
+        intent=understanding.intent,
+        expected_depth=understanding.expected_depth,
+        personal_fact_required=understanding.personal_fact_required,
+        open_world_allowed=understanding.open_world_allowed,
+        provenance=provenance_from_grounding(grounding.status, has_profile=bool(pack.profile_text.strip()), question=question_text, profile_text=pack.profile_text),
+        raw_question=question_text,
+        profile_text=pack.profile_text,
+        ai_policy=pack.ai_policy,
+    )
+    from services.intelligence.policy import live_guidance_allowed_for_pack
+
+    if not live_guidance_allowed_for_pack(pack, cfg):
+        return {}
+    compiled, _sections = compile_live_context(pack, question_text, deep=False)
+    body = fast_cue.build_l0(
+        question_raw=question_text,
+        resolved_question=understanding.resolved_question,
+        plan_meta=dict(plan.metadata or {}),
+        response_mode=plan.mode.value,
+        compiled_items=compiled.items,
+        job_requirements=pack.job_requirements,
+    )
+    latency_clock.mark(qa_id, "G0")
+    payload = fast_cue.finalize(body, qa_id=qa_id, timing=latency_clock.metrics(qa_id))
+    payload["early"] = True
+    # The cue can render its own card before answer_start (the deep answer
+    # waits for the late-constraint grace), so it carries the question.
+    payload["question"] = str(meta.get("display_question") or question_text)
+    payload["provisional"] = bool(meta.get("provisional"))
+    if meta.get("reconciled"):
+        payload["reconciled"] = str(meta["reconciled"])
+    broadcast(payload)
+    try:
+        from api.coach.router import remember_fast_cue
+
+        remember_fast_cue(payload)
+    except Exception:  # noqa: BLE001
+        pass
+    return payload
+
+
+def _live_session_id() -> str:
+    try:
+        from core.session import session_id as _sid
+
+        return str(_sid() or "default")
+    except Exception:  # noqa: BLE001
+        return "default"
+
+
+def _resolve_live_pack(session_id: str, cfg):
+    from services.intelligence.interview_pack import ephemeral_pack, resolve_live_pack
+
+    try:
+        return resolve_live_pack(session_id, cfg)
+    except Exception:  # noqa: BLE001
+        return ephemeral_pack(session_id, cfg)
+
+
+def _pack_notes(pack, cfg) -> str:
+    """Interview notes are frozen into the pack; an unfrozen session uses the
+    current config value (there is no other session to confuse it with)."""
+    prefs = pack.answer_preferences if pack.frozen else {}
+    if "notes" in prefs:
+        return str(prefs.get("notes") or "")
+    return str(getattr(cfg, "interview_notes", "") or "")
+
+
+def _voice_line(pack) -> str:
+    try:
+        from api.intelligence.r2_router import voice_prompt_line
+
+        return voice_prompt_line(dict((pack.voice_profile or {}).get("explicit_preferences") or {}))
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _save_turn_trace(
+    *,
+    qa_id: str,
+    session_id: str,
+    pack,
+    question_text: str,
+    intelligence_layer: dict,
+    fast_cue_payload: dict,
+    compiled_items: list,
+    compile_stats: dict,
+    latency_metrics: dict,
+    provider: str,
+    model: str,
+    stream_guard,
+) -> None:
+    """Review 2.0 trace: what the candidate saw for this turn. Never contains
+    provider keys or the full resume; context is recorded by fragment id."""
+    try:
+        from services.storage import intelligence as intel_storage
+
+        plan = intelligence_layer.get("plan") or {}
+        understanding = intelligence_layer.get("understanding") or {}
+        intel_storage.save_turn_trace(
+            qa_id,
+            session_id,
+            str(getattr(pack, "id", "") or ""),
+            {
+                "question_raw": question_text[:500],
+                "resolved_question": str(understanding.get("resolved_question", "") or "")[:500],
+                "response_mode": str(plan.get("mode", "") or ""),
+                "axes": {k: (plan.get("metadata") or {}).get(k) for k in ("dialogue_act", "content_type", "truth_requirement", "provenance", "assertion_policy")},
+                "fast_cue": {k: fast_cue_payload.get(k) for k in ("direction", "cues", "cautions", "level")} if fast_cue_payload else {},
+                "context": [
+                    {"fragment_id": (item.metadata or {}).get("fragment_id", item.id), "source_type": item.source_type.value, "provenance": (item.metadata or {}).get("provenance", "")}
+                    for item in compiled_items
+                ],
+                "context_stats": compile_stats,
+                "latency": latency_metrics,
+                "provider": provider,
+                "model": model,
+                "stream_guard_rewrites": int(getattr(stream_guard, "rewrites", 0) or 0),
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _lat_mark(qa_id: str, point: str, mono: Optional[float] = None) -> None:
+    try:
+        from services.intelligence import latency_clock
+
+        latency_clock.mark(qa_id, point, mono)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _lat_finish(qa_id: str) -> dict:
+    try:
+        from services.intelligence import latency_clock
+
+        return latency_clock.finish_turn(qa_id)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _apply_guard_rewrites(text: str, guard) -> str:
+    for event in getattr(guard, "events", []):
+        if event.kind == "rewrite" and event.sentence and event.sentence in text:
+            text = text.replace(event.sentence, event.released, 1)
+    return text
+
+
+def _emit_fast_cue(
+    *,
+    qa_id: str,
+    question_text: str,
+    intelligence_layer: dict,
+    compiled_items: list,
+    kb_hits: list,
+    live_pack,
+    session_claim_block: str,
+    cfg,
+    broadcast,
+    logger,
+) -> dict:
+    """R2 Stage K: emit guidance_fast (L0) before the deep stream starts."""
+    try:
+        from services.intelligence import fast_cue, latency_clock
+
+        plan = intelligence_layer.get("plan") or {}
+        understanding = intelligence_layer.get("understanding") or {}
+        body = fast_cue.build_l0(
+            question_raw=question_text,
+            resolved_question=str(understanding.get("resolved_question", "") or question_text),
+            plan_meta=dict(plan.get("metadata") or {}),
+            response_mode=str(plan.get("mode", "") or "KNOWLEDGE"),
+            compiled_items=compiled_items,
+            kb_hits=[hit for hit in (kb_hits or []) if live_pack.kb_path_allowed(str(getattr(hit, "path", "") or ""))],
+            job_requirements=live_pack.job_requirements,
+            session_constraints=session_claim_block,
+        )
+        latency_clock.mark(qa_id, "G0")
+        payload = fast_cue.finalize(body, qa_id=qa_id, timing=latency_clock.metrics(qa_id))
+        broadcast(payload)
+        try:
+            from api.coach.router import remember_fast_cue
+
+            remember_fast_cue(payload)
+        except Exception:  # noqa: BLE001
+            pass
+        _schedule_fast_cue_l1(qa_id, payload, live_pack, cfg, broadcast)
+        return payload
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("fast cue failed id=%s: %s", qa_id, exc)
+        return {}
+
+
+def _schedule_fast_cue_l1(qa_id: str, l0_payload: dict, live_pack, cfg, broadcast) -> None:
+    """Optional L1: a small fast model rewrites the cue; L0 stays on failure."""
+    idx = int(getattr(cfg, "fast_cue_model_index", -1) or -1)
+    models = list(getattr(cfg, "models", []) or [])
+    if idx < 0 or idx >= len(models):
+        return
+
+    def _worker() -> None:
+        try:
+            from services.intelligence import fast_cue
+            from services.llm.streaming import get_client_for_model
+
+            model_cfg = models[idx]
+            client = get_client_for_model(model_cfg)
+            resp = client.chat.completions.create(
+                model=model_cfg.model,
+                messages=[{"role": "system", "content": fast_cue.L1_SYSTEM}, *fast_cue.l1_messages(l0_payload.get("resolved_question") or l0_payload.get("question_raw", ""), l0_payload)],
+                max_tokens=100,
+                temperature=0.2,
+                stream=False,
+                timeout=4,
+            )
+            text = (resp.choices[0].message.content or "").strip() if resp.choices else ""
+            corpus = " ".join([live_pack.profile_text, *[str(c.get("text", "")) for c in live_pack.claims]])
+            cues = fast_cue.parse_l1(text, l0_payload, corpus)
+            if cues:
+                broadcast({**l0_payload, "cues": cues, "level": "L1"})
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        threading.Thread(target=_worker, name="fast-cue-l1", daemon=True).start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def process_question_parallel(
     task: TaskPayload,
     seq: int,
@@ -792,7 +1048,8 @@ def process_question_parallel(
 ):
     question_text, image, manual_input, source, meta = task
     exam_preflight_id = str(meta.get("exam_preflight_id") or "") if meta.get("exam_preflight") else ""
-    qa_id = f"qa-{seq}-{int(time.time() * 1000)}"
+    qa_id = str(meta.get("qa_id") or "") or f"qa-{seq}-{int(time.time() * 1000)}"
+    early_cue_emitted = bool(meta.get("early_cue_emitted"))
 
     def _broadcast(data: dict) -> None:
         if exam_preflight_id:
@@ -834,6 +1091,43 @@ def process_question_parallel(
         deps.mark_seq_skipped(seq)
         return
 
+    # R2 Stage F: the frozen InterviewPack is the ONLY source of candidate /
+    # job context on the Live path (never latest_job_id / latest resume).
+    live_session_id = _live_session_id()
+    live_pack = _resolve_live_pack(live_session_id, cfg)
+    if not early_cue_emitted or meta.get("provisional_relation"):
+        # With an early cue the turn clock already started at Q1 (group
+        # confirmed) and G0 is recorded; restarting it would hide the grace.
+        # A provisional cue started it at the partial: the authoritative
+        # confirmation only moves Q1 (start_turn never resets E / G0).
+        try:
+            from services.intelligence import latency_clock as _lat
+
+            confirmed = meta.get("question_confirmed_mono")
+            _lat.start_turn(
+                live_session_id,
+                qa_id,
+                q1=float(confirmed) if confirmed is not None else None,
+                source=str(source or ""),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Stage P: AI policy gate — AI_FORBIDDEN disables realtime AI guidance
+    # server-side (never by hiding a UI button). Prepare/Mock/Review are
+    # unaffected because they never call this path.
+    try:
+        from services.intelligence.policy import live_guidance_allowed_for_pack, policy_block_payload
+
+        if not live_guidance_allowed_for_pack(live_pack, cfg):
+            deps.logger.info("POLICY_BLOCK id=%s mode=%s", qa_id, getattr(cfg, "ai_policy_mode", ""))
+            _broadcast({**policy_block_payload(), "id": qa_id})
+            deps.mark_seq_skipped(seq)
+            return
+    except Exception:  # noqa: BLE001
+        # A policy-module failure must never block the realtime path.
+        pass
+
     written_exam = bool(getattr(cfg, "written_exam_mode", False))
     written_exam_think = bool(getattr(cfg, "written_exam_think", False))
     prompt_mode = prompt_mode_for_task(source, manual_input, written_exam=written_exam)
@@ -849,16 +1143,14 @@ def process_question_parallel(
     relation_hint = str(question_cluster.get("relation_to_previous") or "").strip()
     parser_followup = relation_hint in {"follow_up", "followup", "continuation"}
 
+    pack_notes = _pack_notes(live_pack, cfg)
     experience_grounding = analyze_experience_grounding(
         question_text,
-        resume_text=str(getattr(cfg, "resume_text", "") or ""),
-        interview_notes=str(getattr(cfg, "interview_notes", "") or ""),
+        resume_text=live_pack.profile_text,
+        interview_notes=pack_notes,
     ) if not written_exam else analyze_experience_grounding("")
     grounding_uses_model = experience_grounding.applicable and experience_grounding.status != "supported"
-    profile_context_available = bool(
-        str(getattr(cfg, "resume_text", "") or "").strip()
-        or str(getattr(cfg, "interview_notes", "") or "").strip()
-    )
+    profile_context_available = bool(live_pack.profile_text.strip() or pack_notes.strip())
     answer_engine_name = (
         "候选人事实约束"
         if experience_grounding.status == "supported"
@@ -884,12 +1176,25 @@ def process_question_parallel(
                 else int(getattr(cfg, "kb_deadline_ms", 150) or 150)
             )
             t0 = time.monotonic()
-            kb_hits = _kb_retrieve(
-                question_text,
-                k=int(getattr(cfg, "kb_top_k", 4) or 4),
-                deadline_ms=deadline_ms,
-                mode=prompt_mode,
-            )
+            prefetched = None
+            if prompt_mode == PROMPT_MODE_ASR_REALTIME:
+                try:
+                    from services.intelligence import predictive
+
+                    prefetched = predictive.take(live_session_id, question_text)
+                except Exception:  # noqa: BLE001
+                    prefetched = None
+            if prefetched is not None:
+                # Predictive Start: KB warmed from the partial and the stable
+                # question still matches the hypothesis.
+                kb_hits = list(prefetched.get("hits") or [])
+            else:
+                kb_hits = _kb_retrieve(
+                    question_text,
+                    k=int(getattr(cfg, "kb_top_k", 4) or 4),
+                    deadline_ms=deadline_ms,
+                    mode=prompt_mode,
+                )
             kb_latency_ms = int((time.monotonic() - t0) * 1000)
         except Exception as exc:
             deps.error_logger.warning("kb retrieve in answer worker failed: %s", exc)
@@ -1112,6 +1417,117 @@ def process_question_parallel(
         relation_to_previous=("follow_up" if is_followup else relation_hint),
         high_churn_short_answer=high_churn_short_answer,
     )
+    # ----------------- Intelligence Core (v1.0-R1) -----------------
+    # Stage D/H/E: 21-type understanding + structured plan + incremental state.
+    # Strictly additive: existing grounding/followup/candidate-ASR safeguards
+    # above keep running; failures degrade to the legacy path.
+    intelligence_layer: dict = {}
+    compiler_authoritative_enabled = bool(getattr(cfg, "intelligence_context_compiler_v1", True)) and bool(
+        getattr(cfg, "intelligence_compiler_authoritative", True)
+    )
+    if bool(getattr(cfg, "intelligence_answer_planner_v1", True)):
+        try:
+            from services.intelligence.realtime_bridge import build_intelligence_layer
+
+            intelligence_layer = build_intelligence_layer(
+                question_text,
+                previous_question=last_qa.question if last_qa else "",
+                relation_to_previous=("follow_up" if is_followup else relation_hint),
+                session_ref=session_ref,
+                session_id=live_session_id,
+                grounding_status=experience_grounding.status,
+                interviewer_state_enabled=bool(getattr(cfg, "interviewer_state_enabled", False)),
+                pack=live_pack,
+            )
+            intel_plan_prompt = str(intelligence_layer.get("plan_prompt") or "")
+            intel_state_context = str(intelligence_layer.get("state_context") or "")
+            compiler_will_own_state = compiler_authoritative_enabled and not written_exam and not images
+            if intel_state_context and not written_exam and not images and not compiler_will_own_state:
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": intel_state_context})
+                else:
+                    user_for_llm = f"{intel_state_context}\n{user_for_llm}"
+            # Written-exam keeps its fixed message contract (revision context +
+            # 题面 only); the plan prompt is for the live spoken path.
+            if intel_plan_prompt and not written_exam and not images:
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": intel_plan_prompt})
+                else:
+                    user_for_llm = f"{intel_plan_prompt}\n{user_for_llm}"
+        except Exception as exc:  # noqa: BLE001
+            deps.error_logger.warning("intelligence layer failed id=%s: %s", qa_id, exc)
+            intelligence_layer = {}
+
+    # ----------------- Context Compiler (R2 Stage G: the one authority) -----------------
+    # Providers read the frozen InterviewPack; the compiled package replaces
+    # (not adds to) the legacy resume / KB / memo / JD prompt sections.
+    compiler_ok = False
+    compiler_fallback = False
+    compiled_items: list = []
+    compile_stats: dict = {}
+    session_claim_block = ""
+    if bool(getattr(cfg, "intelligence_context_compiler_v1", True)) and not written_exam and not images:
+        try:
+            from services.intelligence.context_compiler import compile_live_context
+            from services.intelligence.session_claims import prompt_constraints
+
+            intel_state = intelligence_layer.get("state") or {}
+            compiled, compiled_sections = compile_live_context(
+                live_pack,
+                question_text,
+                memo_context=str(memo_context or ""),
+                compact_state=str(intelligence_layer.get("state_context") or ""),
+                kb_hits=kb_hits,
+                deep=answer_depth_profile in {"deep", "compact_deep"},
+                active_topic=str(intel_state.get("current_topic", "") or ""),
+                session_id=live_session_id,
+            )
+            compiled_items = list(compiled.items)
+            session_claim_block = prompt_constraints(live_session_id)
+            blocks = []
+            if compiled_sections:
+                blocks.append("[编译上下文：最小充分包]\n" + "\n".join(compiled_sections))
+            if session_claim_block:
+                blocks.append(session_claim_block)
+            voice_line = _voice_line(live_pack)
+            if voice_line:
+                blocks.append(voice_line)
+            if blocks:
+                section_block = "\n".join(blocks)
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": section_block})
+                else:
+                    user_for_llm = f"{section_block}\n{user_for_llm}"
+            compiler_ok = compiler_authoritative_enabled
+            compile_stats = {
+                "items": len(compiled.items),
+                "tokens": compiled.total_token_estimate,
+                "duplicates_dropped": sum(1 for d in compiled.dropped if d.get("reason") == "duplicate_fragment"),
+                "latency_ms": compiled.latency_ms,
+                "pack_id": live_pack.id,
+                "pack_frozen": live_pack.frozen,
+            }
+            deps.logger.info(
+                "CONTEXT_COMPILED id=%s pack=%s frozen=%s items=%d tokens=%d dup_dropped=%d latency=%dms",
+                qa_id,
+                live_pack.id or "-",
+                live_pack.frozen,
+                len(compiled.items),
+                compiled.total_token_estimate,
+                compile_stats["duplicates_dropped"],
+                compiled.latency_ms,
+            )
+        except Exception as exc:  # noqa: BLE001
+            compiler_fallback = True
+            deps.error_logger.warning("context compiler failed id=%s (compiler_fallback=true): %s", qa_id, exc)
+            # Explicit failure only: restore the state context the compiler
+            # would have carried, then let the legacy prompt sections run.
+            fallback_state = str(intelligence_layer.get("state_context") or "")
+            if fallback_state and compiler_authoritative_enabled:
+                if isinstance(user_for_llm, list):
+                    user_for_llm.insert(0, {"type": "text", "text": fallback_state})
+                else:
+                    user_for_llm = f"{fallback_state}\n{user_for_llm}"
 
     system_prompt = build_system_prompt(
         manual_input=manual_input,
@@ -1137,6 +1553,9 @@ def process_question_parallel(
         question_type=question_type,
         answer_depth_profile=answer_depth_profile,
         relation_to_previous=("follow_up" if is_followup else relation_hint),
+        context_authoritative=compiler_ok,
+        pack_notes=pack_notes,
+        position_override=str(live_pack.job.get("title", "") or ""),
     )
 
     messages_for_llm = base_messages + [{"role": "user", "content": user_for_llm}]
@@ -1207,6 +1626,23 @@ def process_question_parallel(
             "fact_grounding": experience_grounding.public_payload(),
         }
     )
+    fast_cue_payload: dict = {}
+    if bool(getattr(cfg, "intelligence_fast_cue_v2", True)) and not written_exam and not images:
+        # Re-emitted even after an early cue: the resolved question may have
+        # gained a late constraint; G0 keeps the first (earliest) timestamp.
+        fast_cue_payload = _emit_fast_cue(
+            qa_id=qa_id,
+            question_text=question_text,
+            intelligence_layer=intelligence_layer,
+            compiled_items=compiled_items,
+            kb_hits=kb_hits,
+            live_pack=live_pack,
+            session_claim_block=session_claim_block,
+            cfg=cfg,
+            broadcast=_broadcast,
+            logger=deps.error_logger,
+        )
+
     # 面试官问题内联翻译（可选，默认关）：并行翻一句，不阻塞回答。
     if (
         bool(getattr(cfg, "assist_inline_translation_enabled", False))
@@ -1251,6 +1687,22 @@ def process_question_parallel(
     # checked the complete response; otherwise a hallucinated first sentence
     # could already have been shown to the candidate.
     strict_grounding_buffer = grounding_uses_model
+    stream_guard = None
+    if bool(getattr(cfg, "intelligence_fast_cue_v2", True)) and not written_exam and not images:
+        try:
+            from services.intelligence.stream_guard import StreamTruthGuard
+
+            stream_guard = StreamTruthGuard(
+                assertion_policy=str(((intelligence_layer.get("plan") or {}).get("metadata") or {}).get("assertion_policy", "REQUIRE_BOUNDARY")),
+                boundary_subject=str(experience_grounding.subject or "") if grounding_uses_model else "",
+                evidence_texts=[live_pack.profile_text, pack_notes, *[str(c.get("text", "")) for c in live_pack.claims], *[str(e.get("text", "")) for e in live_pack.evidence_refs]],
+            )
+            # Sentence-level guard replaces whole-answer buffering: risky
+            # first-person spans are held per sentence, the rest streams.
+            strict_grounding_buffer = False
+        except Exception as exc:  # noqa: BLE001
+            deps.error_logger.warning("stream guard init failed id=%s: %s", qa_id, exc)
+            stream_guard = None
     full_think = ""
     token_prompt_delta = 0
     token_completion_delta = 0
@@ -1268,6 +1720,22 @@ def process_question_parallel(
     first_token_mono: Optional[float] = None
     chunk_buffer: list[str] = []
     batch_size = 5
+    # Stage Q: fast_guidance_started — the deterministic layers (plan/state/
+    # grounding) are already committed to the prompt; the LLM stream starts
+    # now. first_useful_guidance is recorded after the first token below.
+    if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+        try:
+            from services.intelligence.telemetry import record_guidance_event as _rec_fgs
+
+            _rec_fgs(
+                str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                "fast_guidance_started",
+                route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                provider=str(getattr(model_cfg, "name", "") or ""),
+                model=str(getattr(model_cfg, "model", "") or ""),
+            )
+        except Exception:  # noqa: BLE001
+            pass
     try:
         think_override = None
         if prompt_mode in (PROMPT_MODE_ASR_REALTIME, PROMPT_MODE_MANUAL_TEXT) and not bool(
@@ -1325,10 +1793,13 @@ def process_question_parallel(
             else:
                 if first_token_mono is None and chunk_text:
                     first_token_mono = time.monotonic()
+                    _lat_mark(qa_id, "A0", first_token_mono)
                 raw_full_answer += chunk_text
                 if strict_grounding_buffer:
                     continue
                 clean_chunk = stream_sanitizer.push(chunk_text)
+                if stream_guard is not None and clean_chunk:
+                    clean_chunk = stream_guard.feed(clean_chunk)
                 if clean_chunk:
                     chunk_buffer.append(clean_chunk)
                     if len(chunk_buffer) >= batch_size:
@@ -1346,6 +1817,20 @@ def process_question_parallel(
             exc,
             exc_info=not isinstance(exc, LLMError),
         )
+        # Stage Q: provider_fallback telemetry event (generation failure).
+        if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+            try:
+                from services.intelligence.telemetry import record_guidance_event as _rec_pf
+
+                _rec_pf(
+                    str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                    "provider_fallback",
+                    route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                    provider=str(getattr(model_cfg, "name", "") or ""),
+                    model=str(getattr(model_cfg, "model", "") or ""),
+                )
+            except Exception:  # noqa: BLE001
+                pass
         if chunk_buffer:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": "".join(chunk_buffer)})
             chunk_buffer.clear()
@@ -1369,9 +1854,28 @@ def process_question_parallel(
         return
 
     gen_elapsed = (time.monotonic() - gen_start) * 1000
+    _lat_mark(qa_id, "D0")
+    latency_metrics = _lat_finish(qa_id)
     first_token_ms = (
         (first_token_mono - gen_start) * 1000 if first_token_mono else gen_elapsed
     )
+
+    # Stage J/Q: TTFUG telemetry — first USEFUL guidance is the first answer
+    # token for the candidate; deep completion is recorded separately in commit.
+    if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+        try:
+            from services.intelligence.telemetry import record_guidance_event
+
+            record_guidance_event(
+                str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                "first_useful_guidance",
+                route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                provider=str(getattr(model_cfg, "name", "") or ""),
+                model=str(getattr(model_cfg, "model", "") or ""),
+                latency_ms=int(first_token_ms),
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     if deps.abort_check():
         deps.logger.info("ANSWER_CANCEL id=%s after=%.0fms", qa_id, gen_elapsed)
@@ -1379,7 +1883,13 @@ def process_question_parallel(
         deps.mark_seq_skipped(seq)
         return
 
-    if strict_grounding_buffer:
+    guarded_post_audit = stream_guard is not None and grounding_uses_model
+    if strict_grounding_buffer or guarded_post_audit:
+        if guarded_post_audit:
+            tail = stream_sanitizer.finish()
+            tail = (stream_guard.feed(tail) if tail else "") + stream_guard.flush()
+            if tail:
+                _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": tail})
         full_answer = postprocess_answer_for_mode(raw_full_answer, prompt_mode)
         full_answer, grounding_replaced = enforce_experience_answer(
             full_answer,
@@ -1392,13 +1902,64 @@ def process_question_parallel(
                 experience_grounding.status,
                 experience_grounding.subject,
             )
-        if full_answer:
+        # Unified Truth Boundary post-check (Stage B): additional violation
+        # detection (internal leakage, unexpected metric, subject substitution)
+        # WITHOUT weakening the deterministic grounding above — violations the
+        # grounding already accepted are never re-flagged here.
+        if bool(getattr(cfg, "intelligence_answer_planner_v1", True)):
+            try:
+                from services.intelligence.truth_boundary import (
+                    TruthBoundary,
+                    check_generated_answer,
+                    classify_output_space,
+                    map_grounding_status,
+                )
+
+                truth_result = check_generated_answer(
+                    full_answer,
+                    boundary=TruthBoundary(
+                        grounding=experience_grounding,
+                        output_space=classify_output_space(experience_grounding),
+                        truth_status=map_grounding_status(experience_grounding.status),
+                    ),
+                    evidence_texts=[experience_grounding.evidence_excerpt] if experience_grounding.evidence_excerpt else [],
+                    question_text=question_text,
+                )
+                if truth_result.fallback_used and truth_result.final_text:
+                    full_answer = truth_result.final_text
+                    grounding_replaced = True
+                    deps.logger.warning(
+                        "TRUTH_BOUNDARY_REWRITE id=%s violations=%s",
+                        qa_id,
+                        [v.get("kind") for v in truth_result.violations],
+                    )
+                    # Stage Q: truth_rewrite telemetry event.
+                    try:
+                        from services.intelligence.telemetry import record_guidance_event as _rec_tr
+
+                        _rec_tr(
+                            str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                            "truth_rewrite",
+                            route=str((intelligence_layer.get("plan") or {}).get("mode", "") or prompt_mode),
+                            truth_flags=[str(v.get("kind", "")) for v in truth_result.violations],
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+            except Exception as exc:  # noqa: BLE001
+                deps.error_logger.warning("truth boundary check failed id=%s: %s", qa_id, exc)
+        if full_answer and not guarded_post_audit:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": full_answer})
     else:
         tail = stream_sanitizer.finish()
+        if stream_guard is not None:
+            tail = (stream_guard.feed(tail) if tail else "") + stream_guard.flush()
         if tail:
             _broadcast({"type": "answer_chunk", "id": qa_id, "chunk": tail})
         full_answer = postprocess_answer_for_mode(raw_full_answer, prompt_mode)
+        if stream_guard is not None and stream_guard.rewrites:
+            # The final text must match what the guard showed: apply the
+            # same sentence rewrites to the committed answer.
+            full_answer = _apply_guard_rewrites(full_answer, stream_guard)
     if not full_answer.strip():
         deps.error_logger.warning(
             "ANSWER_EMPTY id=%s model=%s source=%s think_len=%d raw_len=%d",
@@ -1498,7 +2059,58 @@ def process_question_parallel(
                     "model_name": display_model_name,
                     "first_token_ms": int(first_token_ms),
                     "total_ms": int(gen_elapsed),
+                    # GuidanceViewModel payload (Stage K): glance-first data;
+                    # components consume this instead of raw prompt responses.
+                    "guidance": {
+                        "core_ideas": list((intelligence_layer.get("plan") or {}).get("structure", []) or [])[:6],
+                        "evidence": (
+                            [experience_grounding.evidence_excerpt[:160]]
+                            if experience_grounding.evidence_excerpt
+                            else []
+                        ),
+                        "mode": str((intelligence_layer.get("plan") or {}).get("mode", "") or ""),
+                        "intent": list((intelligence_layer.get("plan") or {}).get("intent", []) or [])[:3],
+                        "resolved_question": str((intelligence_layer.get("understanding") or {}).get("resolved_question", "") or ""),
+                        "state_context": str(intelligence_layer.get("state_context") or ""),
+                        "fast_cue": fast_cue_payload,
+                        "context": {**compile_stats, "compiler_fallback": compiler_fallback},
+                        "stream_guard_rewrites": int(stream_guard.rewrites) if stream_guard is not None else 0,
+                    },
+                    "latency": latency_metrics,
                 }
+            )
+            # Stage Q: committed turn telemetry + route event (never breaks the
+            # realtime path); guidance is never written as a candidate fact.
+            if bool(getattr(cfg, "intelligence_live_cue_v1", True)):
+                try:
+                    from services.intelligence.realtime_bridge import record_committed_turn
+
+                    record_committed_turn(
+                        str((intelligence_layer.get("state") or {}).get("session_id", "") or "default"),
+                        seq=seq,
+                        question_raw=question_text[:200],
+                        question_resolved=str((intelligence_layer.get("understanding") or {}).get("resolved_question", "") or "")[:200],
+                        question_type=str((intelligence_layer.get("understanding") or {}).get("question_type", "") or ""),
+                        route=str((intelligence_layer.get("plan") or {}).get("mode", "") or ""),
+                        guidance_text=full_answer[:200],
+                        latency_ms=int(gen_elapsed),
+                        answer_plan=intelligence_layer.get("plan") or {},
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+            _save_turn_trace(
+                qa_id=qa_id,
+                session_id=live_session_id,
+                pack=live_pack,
+                question_text=question_text,
+                intelligence_layer=intelligence_layer,
+                fast_cue_payload=fast_cue_payload,
+                compiled_items=compiled_items,
+                compile_stats={**compile_stats, "compiler_fallback": compiler_fallback},
+                latency_metrics=latency_metrics,
+                provider=str(display_model_name or answer_engine_name or ""),
+                model=str(getattr(model_cfg, "model", "") or ""),
+                stream_guard=stream_guard,
             )
             deps.broadcast(
                 {

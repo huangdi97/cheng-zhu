@@ -1,3 +1,8 @@
+<!-- CURRENT/HISTORICAL 状态说明 -->
+<!-- 本文件为 HISTORICAL（保留的既有设计稿，不再作为当前最高优先级设计）。 -->
+<!-- 当前最高优先级设计（Single Source of Truth）：docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md（canonical version: v1.2-R2 · date: 2026-09-30）；v1.0-R1 仅作历史来源。 -->
+<!-- 品牌已统一为：成竹 Chengzhu（不再使用 Cheng Zhu 作为正式英文品牌）。 -->
+
 # Product
 
 <!-- impeccable:product-schema 1 -->
@@ -74,7 +79,7 @@ web
 
 ## Brand Commitments
 
-- 显示名：`成竹`（英文：`Cheng Zhu`，见 desktop/app-title.json）；README 标题：`成竹 Cheng Zhu`
+- 显示名：`成竹`（英文：`Chengzhu`，见 desktop/app-title.json）；README 标题：`成竹 Chengzhu`
 - 无外部品牌资产、logo、颜色、字体等绑定承诺（视觉世界由 DESIGN.md 记录时另行确认）
 - 口语化、结果先行的中文产品文案基调（现有 UI 与 README 一致）
 

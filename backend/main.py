@@ -28,6 +28,7 @@ from api import common, assist, analytics, resume, jobs, review, prep
 from api import kb as kb_api
 from api import copilot as copilot_api
 from api import sessions as sessions_api
+from api import intelligence as intelligence_api
 
 setup_logging()
 _log = get_logger("app.main")
@@ -35,7 +36,8 @@ _log = get_logger("app.main")
 # H5: 扩大广播队列容量，避免 LLM 流式输出被截断
 _BQ_SIZE = env_int("IA_BROADCAST_QUEUE_SIZE", 2000, minimum=1)
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# Packaged app: Electron passes the bundled, prebuilt frontend dist.
+FRONTEND_DIR = os.environ.get("CHENGZHU_FRONTEND_DIST") or os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 
 def _is_path_within_dir(base_dir: str, candidate_path: str) -> bool:
@@ -125,7 +127,7 @@ def _preload_stt():
         _log.debug("Whisper fallback preload skipped: %s", e)
 
 
-app = FastAPI(title="成竹 Cheng Zhu", lifespan=lifespan)
+app = FastAPI(title="成竹 Chengzhu", lifespan=lifespan)
 
 # CORS: 默认只允许后端自身的 loopback origin。局域网扫码页面与桌面端均为同源访问,
 # 不需要跨源；如确需单独前端直连后端，可通过 IA_CORS_REGEX 显式放宽。
@@ -248,6 +250,14 @@ app.include_router(kb_api.router, prefix="/api")
 app.include_router(prep.router, prefix="/api")
 app.include_router(copilot_api.router, prefix="/api")
 app.include_router(sessions_api.router, prefix="/api")
+app.include_router(intelligence_api.intelligence_router, prefix="/api/intelligence")
+app.include_router(intelligence_api.intelligence_r2_router, prefix="/api/intelligence")
+# R2 Human Coach: candidate routes under /api (loopback-authenticated like the
+# rest); the helper page + token-guarded helper endpoints under /coach.
+from api import coach as coach_api  # noqa: E402
+
+app.include_router(coach_api.candidate_router, prefix="/api")
+app.include_router(coach_api.helper_router)
 
 
 if os.path.isdir(FRONTEND_DIR):

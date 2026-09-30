@@ -689,27 +689,40 @@ def build_system_prompt(
     question_type: str = "",
     answer_depth_profile: Optional[str] = None,
     relation_to_previous: str = "",
+    context_authoritative: bool = False,
+    pack_notes: Optional[str] = None,
+    position_override: Optional[str] = None,
 ) -> str:
+    """Build the system prompt.
+
+    ``context_authoritative=True`` (R2 Stage G): the Context Compiler already
+    produced the candidate / job / KB / memo context from the frozen
+    InterviewPack. The system prompt then carries only rules and style; it
+    must not re-inject resume, KB hits, memo or the global JD, otherwise the
+    same fragment reaches the model twice.
+    """
     cfg = get_config()
     if mode is None:
         mode = PROMPT_MODE_MANUAL_TEXT if manual_input else PROMPT_MODE_ASR_REALTIME
     include_resume_section = False if mode == PROMPT_MODE_WRITTEN_EXAM else (
         bool(include_resume) if include_resume is not None else True
     )
-    resume_section = _resume_reference_section(cfg.resume_text) if include_resume_section else ""
-    kb_section = _kb_reference_section(
+    authoritative = bool(context_authoritative) and mode != PROMPT_MODE_WRITTEN_EXAM
+    resume_section = _resume_reference_section(cfg.resume_text) if include_resume_section and not authoritative else ""
+    kb_section = "" if authoritative else _kb_reference_section(
         kb_hits or [],
         excerpt_chars=int(getattr(cfg, "kb_prompt_excerpt_chars", 300) or 300),
     )
     is_exam = mode == PROMPT_MODE_WRITTEN_EXAM
-    jd_section = "" if is_exam else _jd_reference_section(
+    jd_section = "" if is_exam or authoritative else _jd_reference_section(
         getattr(cfg, "jd_text", None),
         bool(getattr(cfg, "assist_answer_align_jd_enabled", False)),
     )
     notes_section = "" if is_exam else _notes_reference_section(
-        getattr(cfg, "interview_notes", None)
+        pack_notes if authoritative and pack_notes is not None else getattr(cfg, "interview_notes", None)
     )
-    memo_section = "" if is_exam else _memo_reference_section(memo_context)
+    memo_section = "" if is_exam or authoritative else _memo_reference_section(memo_context)
+    position = (position_override or "").strip() or cfg.position
     depth_section = ""
     if not is_exam and answer_depth_profile:
         depth_section = build_answer_depth_contract(
@@ -725,10 +738,10 @@ def build_system_prompt(
         prefix = _written_exam_prefix(kb_section)
         body = _written_exam_prompt_body(cfg.language, lang_lower, region)
     elif mode == PROMPT_MODE_SERVER_SCREEN:
-        prefix = _base_prompt_prefix(cfg.position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language)
+        prefix = _base_prompt_prefix(position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language)
         body = _server_screen_prompt_body(cfg.language, lang_lower, region)
     elif mode == PROMPT_MODE_MANUAL_TEXT:
-        prefix = _base_prompt_prefix(cfg.position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language)
+        prefix = _base_prompt_prefix(position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language)
         body = _manual_text_prompt_body(cfg.language, lang_lower)
     else:
         concise_realtime = bool(
@@ -739,7 +752,7 @@ def build_system_prompt(
             "compact_deep",
         }
         prefix = _base_prompt_prefix(
-            cfg.position,
+            position,
             cfg.language,
             resume_section,
             kb_section,

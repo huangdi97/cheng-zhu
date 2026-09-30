@@ -1,3 +1,5 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore'
+import { isLightColorScheme } from '@/lib/colorScheme'
 import type { LucideIcon } from 'lucide-react'
 import {
   Send,
@@ -467,31 +469,31 @@ const STAGE_PILL_MAP: Record<string, PillColors> = {
   },
   written_rejected: {
     dark: 'bg-red-500/15 text-red-200 border-red-500/25',
-    light: 'bg-red-50 text-red-600 border-red-200',
+    light: 'bg-red-50 text-red-700 border-red-200',
   },
   interview1_rejected: {
     dark: 'bg-red-500/15 text-red-200 border-red-500/25',
-    light: 'bg-red-50 text-red-600 border-red-200',
+    light: 'bg-red-50 text-red-700 border-red-200',
   },
   interview2_rejected: {
     dark: 'bg-red-500/15 text-red-200 border-red-500/25',
-    light: 'bg-red-50 text-red-600 border-red-200',
+    light: 'bg-red-50 text-red-700 border-red-200',
   },
   interview3_rejected: {
     dark: 'bg-red-500/15 text-red-200 border-red-500/25',
-    light: 'bg-red-50 text-red-600 border-red-200',
+    light: 'bg-red-50 text-red-700 border-red-200',
   },
   hr_rejected: {
     dark: 'bg-red-500/15 text-red-200 border-red-500/25',
-    light: 'bg-red-50 text-red-600 border-red-200',
+    light: 'bg-red-50 text-red-700 border-red-200',
   },
   rejected: {
     dark: 'bg-red-500/15 text-red-200 border-red-500/25',
-    light: 'bg-red-50 text-red-600 border-red-200',
+    light: 'bg-red-50 text-red-700 border-red-200',
   },
   withdrawn: {
     dark: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/25',
-    light: 'bg-zinc-100 text-zinc-500 border-zinc-200',
+    light: 'bg-zinc-100 text-zinc-700 border-zinc-200',
   },
 }
 
@@ -501,10 +503,12 @@ export function stagePillClass(stage: string, isLight = false): string {
   return isLight ? entry.light : entry.dark
 }
 
-export function StageBadge({ stage, isLight = false }: { stage: string; isLight?: boolean }) {
+export function StageBadge({ stage, isLight }: { stage: string; isLight?: boolean }) {
+  const colorScheme = useUiPrefsStore((st) => st.colorScheme)
+  const light = isLight ?? isLightColorScheme(colorScheme)
   return (
     <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${stagePillClass(stage, isLight)}`}
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${stagePillClass(stage, light)}`}
     >
       {STAGE_LABELS[stage] ?? stage}
     </span>

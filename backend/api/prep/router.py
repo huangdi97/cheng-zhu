@@ -141,8 +141,58 @@ async def api_generate_space(space_id: int):
     return prep_space.get_space(space_id)
 
 
+class LaunchPackRequest(BaseModel):
+    ai_policy: str = ""
+    human_assistance_policy: str = ""
+    share_privacy_policy: str = ""
+    screen_context_policy: str = ""
+
+
+class SkillCardReviewRequest(BaseModel):
+    reviewed: bool = True
+
+
+@router.post("/prep/skill-cards/{card_id}/review")
+async def api_review_skill_card(card_id: int, body: SkillCardReviewRequest):
+    if not prep_space.set_skill_card_reviewed(card_id, body.reviewed):
+        raise HTTPException(404, "技能卡不存在")
+    return {"id": card_id, "user_reviewed": body.reviewed}
+
+
+def _freeze_space_pack(space: dict, body: Optional[LaunchPackRequest]) -> dict:
+    """R2 Stage F: freeze this Job Goal into an InterviewPack for the current
+    session. Live then reads only this pack (never the latest analyzed job)."""
+    from core.config import get_config
+    from core.session import session_id as current_session_id
+    from services.intelligence import interview_pack
+    from services.intelligence.job_representation import build_job_representation, save_job
+
+    job = build_job_representation(
+        str(space.get("jd_text") or ""),
+        company=str(space.get("company") or ""),
+        title=str(space.get("title") or ""),
+        role=str(space.get("role") or ""),
+    )
+    job_id = save_job(job, job_id=f"job-space-{space['id']}")
+    cfg = get_config()
+    policies = body or LaunchPackRequest()
+    payload = interview_pack.build_pack_payload(
+        session_id=current_session_id(),
+        cfg=cfg,
+        job_id=job_id,
+        prep_space_id=int(space["id"]),
+        ai_policy=policies.ai_policy,
+        human_assistance_policy=policies.human_assistance_policy,
+        share_privacy_policy=policies.share_privacy_policy,
+        screen_context_policy=policies.screen_context_policy,
+        answer_preferences={"notes": str(getattr(cfg, "interview_notes", "") or "")},
+        profile_text_override=str(space.get("resume_text") or ""),
+    )
+    return interview_pack.freeze_pack(payload, reason="launch_pack").summary()
+
+
 @router.post("/prep/spaces/{space_id}/launch-pack")
-async def api_activate_launch_pack(space_id: int):
+async def api_activate_launch_pack(space_id: int, body: Optional[LaunchPackRequest] = None):
     """Activate one prep space for the current live interview session."""
     space = prep_space.get_space(space_id)
     if not space:
@@ -157,26 +207,44 @@ async def api_activate_launch_pack(space_id: int):
         "resume_text": str(space.get("resume_text") or "") or None,
         "assist_answer_align_jd_enabled": True,
     })
+    # R2: freezing the InterviewPack is the essential step and takes well
+    # under a second; it must not wait behind the optional strategy-tree LLM
+    # call (up to 90 s). Freeze first, generate the strategy in the background.
+    try:
+        interview_pack_summary = await run_in_threadpool(_freeze_space_pack, space, body)
+    except Exception as exc:  # noqa: BLE001
+        _rlog.warning("interview pack freeze failed space=%s: %s", space_id, exc)
+        interview_pack_summary = None
+    live_session_id = get_session().session_id
     tree = copilot_strategy.load_tree(space_id)
-    generated = False
-    if tree is None and prep_service.prep_configured():
-        tree = await run_in_threadpool(
-            copilot_strategy.generate_strategy_tree,
-            str(space.get("role") or ""),
-            str(space.get("jd_text") or ""),
-            str(space.get("resume_text") or ""),
-            list(space.get("questions") or []),
-        )
-        if tree:
-            copilot_strategy.save_tree(tree, space_id)
-            generated = True
+    generating = False
     if tree is not None:
-        copilot_strategy.activate_tree(space_id, get_session().session_id)
+        copilot_strategy.activate_tree(space_id, live_session_id)
+    elif prep_service.prep_configured():
+        generating = True
+
+        def _generate_in_background() -> None:
+            try:
+                generated_tree = copilot_strategy.generate_strategy_tree(
+                    str(space.get("role") or ""),
+                    str(space.get("jd_text") or ""),
+                    str(space.get("resume_text") or ""),
+                    list(space.get("questions") or []),
+                )
+                if generated_tree:
+                    copilot_strategy.save_tree(generated_tree, space_id)
+                    copilot_strategy.activate_tree(space_id, live_session_id)
+            except Exception as exc:  # noqa: BLE001
+                _rlog.warning("strategy tree generation failed space=%s: %s", space_id, exc)
+
+        threading.Thread(target=_generate_in_background, name="strategy-tree", daemon=True).start()
     return {
         "ok": True,
         "strategy_ready": tree is not None,
-        "strategy_generated": generated,
+        "strategy_generated": False,
+        "strategy_generating": generating,
         "pack": prep_service.build_launch_pack(space),
+        "interview_pack": interview_pack_summary,
     }
 
 class StartPracticeRequest(BaseModel):

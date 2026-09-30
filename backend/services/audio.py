@@ -733,8 +733,17 @@ class VADBuffer:
                  silence_duration: float = 2.5, min_speech_duration: float = 0.5,
                  max_speech_duration: Optional[float] = None,
                  preroll_duration: float = 0.0,
-                 rollover_duration: float = 0.0):
+                 rollover_duration: float = 0.0,
+                 end_of_turn_probe: Optional[Callable[[float], bool]] = None,
+                 end_of_turn_min_silence: float = 0.25,
+                 on_speech_resumed: Optional[Callable[[float], None]] = None):
         self.sample_rate = sample_rate
+        # Adaptive end of turn: while trailing silence is shorter than
+        # silence_duration, the probe may end the segment early (reason
+        # "eot"). silence_duration stays the hard timeout.
+        self.end_of_turn_probe = end_of_turn_probe
+        self.end_of_turn_min_silence = max(0.05, float(end_of_turn_min_silence or 0.25))
+        self.on_speech_resumed = on_speech_resumed
         self.silence_threshold = silence_threshold
         self.silence_duration = silence_duration
         self.min_speech_duration = min_speech_duration
@@ -756,6 +765,8 @@ class VADBuffer:
         self._preroll_max_samples = int(round(self.sample_rate * self.preroll_duration))
         self._rollover_max_samples = int(round(self.sample_rate * self.rollover_duration))
         self._last_flush_reason: Optional[str] = None
+        # Trailing silence inside the last silence/eot flush (speech end = flush - this).
+        self.last_flush_trailing_sec = 0.0
         self._last_segment_started_at: Optional[float] = None
         self._last_segment_ended_at: Optional[float] = None
 
@@ -819,6 +830,11 @@ class VADBuffer:
                 else:
                     self._speech_start = now
                     self._last_segment_started_at = now
+            if self._trailing_silence_samples and self.on_speech_resumed is not None:
+                try:
+                    self.on_speech_resumed(self._trailing_silence_samples / self.sample_rate)
+                except Exception:  # noqa: BLE001
+                    pass
             self._silence_start = None
             self._trailing_silence_samples = 0
             self._buffer.append(audio)
@@ -850,11 +866,23 @@ class VADBuffer:
                 if self.silence_duration <= 0
                 else silence_elapsed_sec >= self.silence_duration
             )
+            flush_reason = "silence"
+            if (
+                not should_flush
+                and self.end_of_turn_probe is not None
+                and silence_elapsed_sec >= self.end_of_turn_min_silence
+            ):
+                try:
+                    should_flush = bool(self.end_of_turn_probe(silence_elapsed_sec))
+                except Exception:  # noqa: BLE001
+                    should_flush = False
+                flush_reason = "eot"
             if should_flush:
                 speech_duration = self._speech_audio_samples / self.sample_rate
                 if speech_duration >= self.min_speech_duration and self._buffer:
                     result = np.concatenate(self._buffer)
-                    self._last_flush_reason = "silence"
+                    self._last_flush_reason = flush_reason
+                    self.last_flush_trailing_sec = silence_elapsed_sec
                     self._last_segment_ended_at = now
                     self._reset()
                     return result
@@ -886,6 +914,15 @@ class VADBuffer:
     @property
     def is_speaking(self) -> bool:
         return self._speech_started and self._silence_start is None
+
+    @property
+    def trailing_silence_sec(self) -> float:
+        return self._trailing_silence_samples / self.sample_rate
+
+    @property
+    def voiced_end_samples(self) -> int:
+        """Samples in the pending buffer up to the last voiced frame."""
+        return max(0, self._speech_audio_samples - self._trailing_silence_samples)
 
     @property
     def has_pending_audio(self) -> bool:

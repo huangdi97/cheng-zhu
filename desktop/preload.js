@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resetShortcuts: () => ipcRenderer.invoke('reset-shortcuts'),
   toggleAlwaysOnTop: () => ipcRenderer.invoke('toggle-always-on-top'),
   toggleContentProtection: () => ipcRenderer.invoke('toggle-content-protection'),
+  // R2 Share Privacy: OFF (default) | PRIVATE_OVERLAY. Not an "undetectable" guarantee.
+  setSharePrivacy: (mode) => ipcRenderer.invoke('set-share-privacy', mode),
+  getSharePrivacy: () => ipcRenderer.invoke('get-share-privacy'),
   getWindowState: () => ipcRenderer.invoke('get-window-state'),
   captureRegion: () => ipcRenderer.invoke('capture-region-start'),
   syncOverlayWindow: (payload) => ipcRenderer.invoke('sync-overlay-window', payload),

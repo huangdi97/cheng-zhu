@@ -1,8 +1,8 @@
-# 成竹 Cheng Zhu — 项目归属与来源说明
+# 成竹 Chengzhu — 项目归属与来源说明
 
 ## 当前发布归属
 
-- 项目名称：成竹（Cheng Zhu）
+- 项目名称：成竹（Chengzhu）
 - 维护与发布者：`huangdi97`
 - 公共仓库：<https://github.com/huangdi97/cheng-zhu>
 - 当前产品路线、默认配置、界面文案、构建脚本和后续版本，均以本仓库为准。
@@ -11,7 +11,7 @@
 
 ## 代码与素材来源
 
-本项目是在既有面试辅助代码基础上持续重构、扩展和重新设计形成的。部分早期基础代码、依赖约定或设计素材可能来自此前的 `interview-assistant` 代码线；相关许可和署名义务仍由根目录 [LICENSE](LICENSE) 约束。成竹新增的实时问题切分、回答深度、简历 grounding、复盘链路、界面和发布配置由本项目维护。
+本项目是在维护者本人此前的面试辅助代码（`interview-assistant` 代码线）基础上持续重构、扩展和重新设计形成的。维护者已于 2026-09-30 确认：该早期代码线同样由 `huangdi97` 本人编写，仓库中不含第三方所有的代码（见 `reports/LEGACY_CODE_PROVENANCE_AUDIT.md`）。本仓库全部提交均由 `huangdi97` 完成；自 v1.2.0 起，维护者将当前代码树改为 [MIT License](LICENSE) 发布。v1.2.0 之前的 Git 历史版本当时以 CC BY-NC 4.0 发布，历史提交中的旧许可证仅作为历史记录保留。第三方依赖、模型与资源保留各自许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。成竹新增的实时问题切分、回答深度、简历 grounding、复盘链路、界面和发布配置由本项目维护。
 
-如果你再分发或改编本项目，请保留本说明和许可证，并明确标注你做过的修改。不要把成竹的产品名称、图标或发布者信息用于暗示官方背书。
+如果你再分发本项目，请按 MIT 要求保留版权与许可声明；再分发 Windows 安装包时还需保留 THIRD_PARTY_NOTICES.md 中列出的第三方许可。自 v1.2.0 起安装包不再包含任何 copyleft 组件（PDF 渲染由 AGPL 的 PyMuPDF 换为 BSD/Apache 许可的 pypdfium2）。不要把成竹的产品名称、图标或发布者信息用于暗示官方背书。
 

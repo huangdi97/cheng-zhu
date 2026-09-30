@@ -1,15 +1,19 @@
-# 成竹 Cheng Zhu
+# 成竹 Chengzhu
 
-成竹（Cheng Zhu）是一套面向技术面试准备、实时练习与复盘的本地优先 AI 工作台。
+> **Resume-first, not Resume-bound.** Ready before you speak.
 
-实时听题，自动生成专业面试回答。你可以把它理解成一个开着就能用的面试辅助工具：你负责听题和临场反应，它负责转写、答题、截图审题，卡壳的时候还能把问答框挂在旁边。
+成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
+
+> 当前最高优先级设计（Single Source of Truth）：[docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md](docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md)（canonical version: v1.0-R1 · date: 2026-09-25）。历史文档（DESIGN.md / PRODUCT.md）已标注 HISTORICAL。
+
+实时听题，自动生成专业面试回答。它是一个开着就能用的面试辅助工具：你负责听题和临场反应，它负责转写、答题、截图审题，卡壳的时候还能把问答框挂在旁边。
 
 面向面试准备、模拟练习与复盘场景：支持系统音频 / 麦克风转写、截图审题、多模型切换、知识库引用；Electron 端提供 Boss Key、托盘和轻量悬浮窗，方便在本机学习与练习时快速查看回答建议。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-284B63" alt="License" />
+  <img src="https://img.shields.io/badge/license-MIT-284B63" alt="License" />
   <img src="https://img.shields.io/badge/python-3.10+-2A9D8F" alt="Python" />
   <img src="https://img.shields.io/badge/node-22.12%2B-E76F51" alt="Node" />
   <img src="https://img.shields.io/badge/react-18-264653" alt="React" />
@@ -151,7 +155,18 @@ sequenceDiagram
 
 ## 快速开始
 
-### 1. 准备环境
+### 下载安装（推荐，Windows 10/11 x64）
+
+到 [GitHub Releases](https://github.com/huangdi97/cheng-zhu/releases) 下载：
+
+- `Chengzhu-Setup-x64.exe`：安装版（按用户安装，无需管理员）
+- `Chengzhu-Portable-x64.zip`：解压即用
+
+不需要安装 Python、Node.js 或 pip。首次打开会有引导：本地数据位置 → 模型（填自己的 API Key）→ 语音识别 → 麦克风 / 系统音频测试 → 共享隐私默认值（默认关闭）→ 导入简历 → 第一个目标岗位。所有数据保存在 `%APPDATA%\Chengzhu`。安装包暂未代码签名，首次运行时 Windows SmartScreen 可能提示，选择「仍要运行」即可；请核对 Release 中的 `SHA256SUMS.txt`。
+
+### 从源码运行
+
+#### 1. 准备环境
 
 - Python `3.10+`
 - Node.js `22.12+`（桌面模式所需；纯浏览器模式在已有构建产物时可不启动 Node）
@@ -216,6 +231,16 @@ python -m pytest backend/tests -q
 `http://localhost:18080`。只有 `python start.py --mode network`、`IA_AUTH_ENABLE=1`
 或设置了 `IA_AUTH_TOKEN` 时，才会要求局域网请求携带 token。
 
+## 文档
+
+canonical（当前最高优先级设计）：[docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：
+
+| 分类 | 文档 |
+| --- | --- |
+| 架构 | [Intelligence Core](docs/architecture/INTELLIGENCE_CORE.md) · [Candidate Representation](docs/architecture/CANDIDATE_REPRESENTATION.md) · [Truth Boundary](docs/architecture/TRUTH_BOUNDARY.md) · [Interview State](docs/architecture/INTERVIEW_STATE.md) · [Context Compiler](docs/architecture/CONTEXT_COMPILER.md) · [Answer Planner](docs/architecture/ANSWER_PLANNER.md) · [Memory](docs/architecture/MEMORY.md) · [Realtime Pipeline](docs/architecture/REALTIME_PIPELINE.md) |
+| 产品 | [Live UX](docs/product/LIVE_UX.md) · [Prepare / Mock / Review](docs/product/PREP_MOCK_REVIEW.md) |
+| 评测 | [Eval Protocol](docs/evals/EVAL_PROTOCOL.md) |
+| 隐私 | [Privacy 与 Policy](docs/privacy/PRIVACY_AND_POLICY.md) |
 ## README 素材更新
 
 ```bash
@@ -266,7 +291,7 @@ cheng-zhu/
 
 ## 开源协议与免责
 
-- **协议**：[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
+- **协议**：[MIT](LICENSE)（自 v1.2.0 起；第三方依赖与资源保留各自许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)）
 - **免责**：项目仅供学习研究，请勿用于学术不端、违规考试或其他不合规场景；使用后果自行承担。
 
 ## 反馈与贡献

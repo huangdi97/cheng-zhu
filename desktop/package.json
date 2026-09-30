@@ -1,16 +1,91 @@
 {
   "name": "cheng-zhu-desktop",
-  "version": "1.0.0",
-  "description": "成竹 Cheng Zhu - Electron 桌面端技术面试工作台",
+  "version": "1.2.0",
+  "license": "MIT",
+  "description": "成竹 Chengzhu - Electron 桌面端技术面试工作台",
   "appDisplayName": "成竹",
   "engines": {
     "node": ">=22.12.0"
   },
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist:win": "electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
-    "electron": "^41.10.7"
+    "electron": "^41.10.7",
+    "electron-builder": "^25.1.8"
+  },
+  "productName": "Chengzhu",
+  "author": "huangdi97",
+  "homepage": "https://github.com/huangdi97/cheng-zhu",
+  "build": {
+    "appId": "com.huangdi97.chengzhu",
+    "productName": "Chengzhu",
+    "copyright": "Copyright (c) 2026 huangdi97 — MIT License",
+    "directories": {
+      "output": "../dist/desktop",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "regionPreload.js",
+      "shortcuts.js",
+      "windowOptions.js",
+      "multiScreenBatch.js",
+      "sharePrivacy.js",
+      "backendLauncher.js",
+      "app-title.json",
+      "icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../build/sidecar/chengzhu-backend",
+        "to": "backend"
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "frontend-dist"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "../THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.png",
+      "signAndEditExecutable": false,
+      "artifactName": "Chengzhu-Portable-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "license": "../LICENSE",
+      "artifactName": "Chengzhu-Setup-x64.${ext}",
+      "shortcutName": "成竹 Chengzhu",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

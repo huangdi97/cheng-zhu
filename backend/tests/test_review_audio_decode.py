@@ -36,3 +36,19 @@ def test_decode_wav_to_pcm16k():
 def test_decode_rejects_empty_and_garbage():
     assert _decode_audio_to_pcm16k(b"") is None
     assert _decode_audio_to_pcm16k(b"not audio data at all") is None
+
+
+def test_decode_wav_without_pyav(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def no_av(name, *args, **kwargs):
+        if name == "av":
+            raise ImportError("no PyAV")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_av)
+    pcm = _decode_audio_to_pcm16k(_make_wav_bytes())
+    assert pcm is not None and pcm.dtype == np.int16 and len(pcm) >= 16000
+    assert _decode_audio_to_pcm16k(b"not audio data at all") is None

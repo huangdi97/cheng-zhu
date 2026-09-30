@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { RootState } from './rootState'
-import type { QAPair, QAStatus } from './types'
+import type { CoachCue, QAPair, QAStatus, SessionClaimWarning } from './types'
 
 const CHUNK_THROTTLE_MS = 50
 const MAX_TRANSCRIPTIONS = 200
@@ -101,6 +101,8 @@ export interface InterviewSliceState {
   suggestionsById: Record<string, { text: string; question: string }>
   sessions: Array<{ id: string; label: string; created_at: number; qa_count: number; transcription_count: number; is_active: boolean; is_recording: boolean; is_paused: boolean }>
   activeSessionId: string
+  sessionClaimWarnings: SessionClaimWarning[]
+  coachCues: CoachCue[]
 }
 
 export interface InterviewSliceActions {
@@ -137,7 +139,15 @@ export interface InterviewSliceActions {
     modelName?: string,
     firstTokenMs?: number,
     totalMs?: number,
+    guidance?: unknown,
+    latency?: Record<string, number | null>,
   ) => void
+  setFastCue: (id: string, payload: unknown) => void
+  retractFastCue: (id: string) => void
+  pushSessionClaimWarning: (warning: SessionClaimWarning) => void
+  dismissSessionClaimWarning: (id: string) => void
+  pushCoachCue: (cue: CoachCue) => void
+  dismissCoachCue: (id: string) => void
   cancelAnswer: (id: string) => void
   errorAnswer: (id: string, message: string) => void
   setVisionVerify: (id: string, verdict: 'PASS' | 'FAIL' | 'UNKNOWN', reason: string) => void
@@ -150,6 +160,19 @@ export interface InterviewSliceActions {
 }
 
 export type InterviewSlice = InterviewSliceState & InterviewSliceActions
+
+const _pendingFastCue = new Map<string, unknown>()
+
+function _cueQuestion(payload: unknown): string {
+  const value = (payload as { question?: unknown } | null)?.question
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function _takePendingFastCue(id: string): unknown {
+  const payload = _pendingFastCue.get(id)
+  _pendingFastCue.delete(id)
+  return payload
+}
 
 export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlice> = (set) => ({
   isRecording: false,
@@ -173,6 +196,8 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
   suggestionsById: {},
   sessions: [],
   activeSessionId: '',
+  sessionClaimWarnings: [],
+  coachCues: [],
 
   setRecording: (v) => set({ isRecording: v }),
   setPaused: (v) => set({ isPaused: v }),
@@ -260,6 +285,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
             questionCluster: meta?.questionCluster,
             clusterIndex: meta?.clusterIndex,
             clusterCount: meta?.clusterCount,
+            fastCue: _takePendingFastCue(id),
             status: 'streaming' as QAStatus,
           },
         ],
@@ -280,7 +306,66 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
     _scheduleChunkFlush(set)
   },
 
-  finalizeAnswer: (id, question, answer, thinkContent, modelName, firstTokenMs, totalMs) => {
+  setFastCue: (id, payload) =>
+    set((s) => {
+      const cueQuestion = _cueQuestion(payload)
+      if (!s.qaPairs.some((qa) => qa.id === id)) {
+        if (cueQuestion) {
+          // v1.2-R2: the Fast Cue renders on arrival. The deep answer's
+          // answer_start comes after the late-constraint grace and fills
+          // this same card; it must not gate the first cue on screen.
+          return {
+            qaPairs: [
+              ...s.qaPairs,
+              {
+                id,
+                question: cueQuestion,
+                answer: '',
+                thinkContent: '',
+                isThinking: false,
+                timestamp: Date.now() / 1000,
+                fastCue: payload,
+                status: 'streaming' as QAStatus,
+              },
+            ],
+          }
+        }
+        // Older payloads without the question: keep the cue until
+        // startAnswer creates the card instead of dropping it.
+        _pendingFastCue.set(id, payload)
+        return {}
+      }
+      return {
+        qaPairs: s.qaPairs.map((qa) => (qa.id === id
+          ? { ...qa, fastCue: payload, question: cueQuestion && !qa.answer ? cueQuestion : qa.question }
+          : qa)),
+      }
+    }),
+
+  retractFastCue: (id) =>
+    set((s) => {
+      _pendingFastCue.delete(id)
+      // Only a cue-only card (no deep answer started) is removed.
+      if (s.streamingIds.includes(id)) return {}
+      const target = s.qaPairs.find((qa) => qa.id === id)
+      if (!target || target.answer) return {}
+      return { qaPairs: s.qaPairs.filter((qa) => qa.id !== id) }
+    }),
+
+  pushSessionClaimWarning: (warning) =>
+    set((s) => (s.sessionClaimWarnings.some((w) => w.id === warning.id)
+      ? s
+      : { sessionClaimWarnings: [...s.sessionClaimWarnings, warning].slice(-5) })),
+
+  pushCoachCue: (cue) =>
+    set((s) => ({ coachCues: [...s.coachCues.filter((c) => c.id !== cue.id), cue].slice(-10) })),
+
+  dismissCoachCue: (id) => set((s) => ({ coachCues: s.coachCues.filter((c) => c.id !== id) })),
+
+  dismissSessionClaimWarning: (id) =>
+    set((s) => ({ sessionClaimWarnings: s.sessionClaimWarnings.filter((w) => w.id !== id) })),
+
+  finalizeAnswer: (id, question, answer, thinkContent, modelName, firstTokenMs, totalMs, guidance, latency) => {
     _chunkBuffer.delete(id)
     set((s) => {
       const next = s.streamingIds.filter((x) => x !== id)
@@ -297,6 +382,8 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
                   modelLabel: modelName ?? qa.modelLabel,
                   firstTokenMs: firstTokenMs ?? qa.firstTokenMs,
                   totalMs: totalMs ?? qa.totalMs,
+                  guidance: guidance ?? qa.guidance,
+                  latency: latency ?? qa.latency,
                   status: 'done' as QAStatus,
                 }
               : qa,
@@ -313,6 +400,8 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
               modelLabel: modelName,
               firstTokenMs,
               totalMs,
+              guidance,
+              latency,
               status: 'done' as QAStatus,
             },
           ]
@@ -426,6 +515,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
 
   clearSession: () => {
     _chunkBuffer.clear()
+    _pendingFastCue.clear()
     _candidateSegmentIds = []
     if (_chunkFlushTimer !== null) {
       clearTimeout(_chunkFlushTimer)
@@ -447,6 +537,8 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
       translationsByQuestion: {},
       suggestionsById: {},
       questionParseStatus: null,
+      sessionClaimWarnings: [],
+      coachCues: [],
     })
   },
 

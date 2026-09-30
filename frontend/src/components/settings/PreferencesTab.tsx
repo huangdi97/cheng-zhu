@@ -24,6 +24,7 @@ import NetworkQRCode from './NetworkQRCode'
 import QuickPromptsEditor from './QuickPromptsEditor'
 import Switch from '@/components/Switch'
 import GlobalShortcutsEditor from './GlobalShortcutsEditor'
+import PolicyPrivacySection from './PolicyPrivacySection'
 
 function Collapsible({ title, searchTitle, icon, defaultOpen = false, keywords, children }: {
   title: React.ReactNode
@@ -218,6 +219,8 @@ export default function PreferencesTab() {
           </button>
         </div>
       </Section>
+
+      <PolicyPrivacySection />
 
       <Section title="回答体验" icon={<LayoutGrid className="w-3.5 h-3.5" />} keywords="布局 卡片 流式 简短 layout card stream">
         <div className="grid grid-cols-2 gap-2">

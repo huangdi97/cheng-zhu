@@ -12,39 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Detect what changed ─────────────────────────────────────
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      desktop: ${{ steps.filter.outputs.desktop }}
-      e2e: ${{ steps.filter.outputs.e2e }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-              - '.github/workflows/ci.yml'
-            frontend:
-              - 'frontend/**'
-              - '.github/workflows/ci.yml'
-            desktop:
-              - 'desktop/**'
-              - '.github/workflows/ci.yml'
-            e2e:
-              - 'backend/**'
-              - 'frontend/**'
-              - 'scripts/**'
-              - '.github/workflows/ci.yml'
-
   # ── Backend ──────────────────────────────────────────────
   backend:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -76,14 +45,20 @@ jobs:
       - name: Lint — syntax check
         run: python -m py_compile main.py api/assist/pipeline.py api/common/router.py
 
-      - name: Run unit tests
+      - name: Full backend test suite
+        run: python -m pytest -q --tb=short
+
+      - name: Intelligence strict eval (exact route accuracy, not alias-lenient)
         run: |
-          python -m pytest tests/test_api_contracts.py tests/test_wave1_backend_concurrency.py tests/test_session_integration.py tests/test_assist_asr_interrupt.py tests/test_preflight_real_audio.py tests/test_prompt_polish.py tests/test_bench_prompt.py tests/test_router_p0.py tests/test_pipeline_p0.py tests/test_resume_optimizer.py -q --tb=short
+          python -c "import sys, json; sys.path.insert(0, '.'); from evals.runners.route_runner import run_route_eval, run_seven_turn; r = run_route_eval(); s7 = run_seven_turn(); print(json.dumps({'exact': r['route_accuracy_exact'], 'semantic': r['route_accuracy_semantic'], 'seven_exact': s7['route_accuracy_exact'], 'unsupported_blocked': r['unsupported_claim_rate']})); assert r['route_accuracy_exact'] >= 0.9; assert s7['route_accuracy_exact'] >= 0.85; assert r['unsupported_claim_rate'] >= 0.95"
+          python -m evals.r2_eval --check
+
+      - name: License gate (MIT root + generated third-party notices)
+        working-directory: .
+        run: python scripts/generate_third_party_notices.py --check
 
   # ── Frontend ─────────────────────────────────────────────
   frontend:
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -122,8 +97,6 @@ jobs:
   # Keep the Electron main-process helpers covered even though the desktop
   # package does not participate in the frontend build.
   desktop:
-    needs: changes
-    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -144,12 +117,11 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run desktop unit tests
-        run: node --test multiScreenBatch.test.js windowOptions.test.js shortcuts.test.js preload.test.js
+        run: node --test *.test.js
 
   # ── Playwright E2E (mocked backend, no live API needed) ──
   e2e-playwright:
-    needs: [changes, frontend]
-    if: needs.changes.outputs.frontend == 'true'
+    needs: [frontend]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -216,8 +188,7 @@ jobs:
   # UI changes break this job, trigger the `update-visual-snapshots`
   # workflow on the feature branch to regenerate them.
   e2e-visual:
-    needs: [changes, frontend]
-    if: needs.changes.outputs.frontend == 'true'
+    needs: [frontend]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -266,17 +237,7 @@ jobs:
 
   # ── End-to-end smoke (real backend boot + API contracts) ─
   e2e-smoke:
-    needs: [changes, backend, frontend]
-    # This job builds the frontend itself, so a path-filtered frontend job
-    # being skipped must not prevent backend-only smoke coverage.  Keep the
-    # smoke test out of runs where either prerequisite actually failed.
-    if: |
-      always() &&
-      needs.changes.outputs.e2e == 'true' &&
-      needs.backend.result != 'failure' &&
-      needs.backend.result != 'cancelled' &&
-      needs.frontend.result != 'failure' &&
-      needs.frontend.result != 'cancelled'
+    needs: [backend, frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -323,12 +284,43 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
+  # ── Windows packaged smoke (sidecar exe, no Python assumption) ──
+  packaged-smoke:
+    needs: [backend, frontend]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build frontend dist
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Build backend sidecar
+        run: python scripts/build_sidecar.py
+      - name: Packaged smoke
+        run: |
+          pip install websocket-client
+          python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report packaged-smoke.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: packaged-smoke-report
+          path: packaged-smoke.json
+          if-no-files-found: ignore
+
   # ── Aggregate gate so PR can require a single status check ──
-  # All required jobs must succeed (or be skipped via paths-filter).
+  # All required jobs must succeed; nothing is skipped by path filters.
   # When this gate fails on visual diff, regenerate baselines on the
   # branch via the `update-visual-snapshots` workflow.
   ci-gate:
-    needs: [backend, frontend, desktop, e2e-playwright, e2e-smoke, e2e-visual]
+    needs: [backend, frontend, desktop, e2e-playwright, e2e-smoke, e2e-visual, packaged-smoke]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -340,11 +332,12 @@ jobs:
                    "${{ needs.desktop.result }}" \
                    "${{ needs.e2e-playwright.result }}" \
                    "${{ needs.e2e-smoke.result }}" \
-                   "${{ needs.e2e-visual.result }}"; do
+                   "${{ needs.e2e-visual.result }}" \
+                   "${{ needs.packaged-smoke.result }}"; do
             case "$r" in
-              success|skipped) ;;
+              success) ;;
               *) echo "Job result: $r"; ok=false ;;
             esac
           done
           $ok || { echo "One or more required jobs failed"; exit 1; }
-          echo "All required jobs passed (or were skipped)."
+          echo "All required jobs passed."

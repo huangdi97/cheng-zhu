@@ -237,3 +237,22 @@ def update_skill_card(card_id: int, card: dict[str, Any], status: str, error: st
         )
         conn.commit()
         conn.close()
+
+
+def get_skill_card(card_id: int) -> Optional[dict[str, Any]]:
+    with _db_lock:
+        conn = _conn()
+        row = conn.execute("SELECT * FROM prep_skill_cards WHERE id = ?", (card_id,)).fetchone()
+        conn.close()
+    return _row_to_card(row) if row else None
+
+
+def set_skill_card_reviewed(card_id: int, reviewed: bool) -> bool:
+    """R2 Stage N: only user-reviewed cards may enter an InterviewPack."""
+    card = get_skill_card(card_id)
+    if card is None:
+        return False
+    body = dict(card.get("card") or {})
+    body["user_reviewed"] = bool(reviewed)
+    update_skill_card(card_id, body, card.get("status") or "done", card.get("error") or "")
+    return True

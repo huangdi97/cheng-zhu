@@ -448,6 +448,65 @@ class STTEngine:
         self._lock = threading.Lock()
         self._loading = False
         self._device = "cpu"
+        # Sticky language (auto mode): Whisper's language detection is a
+        # second encoder pass (~0.5 s for base on CPU) on every decode. After
+        # two consecutive confident detections agree, the language is pinned;
+        # every STICKY_RECHECK-th decode detects again and unpins on change.
+        self._sticky_lang: Optional[str] = None
+        self._lang_votes: list[str] = []
+        self._sticky_uses = 0
+
+    STICKY_MIN_PROB = 0.8
+    STICKY_RECHECK = 4
+
+    def _decode_language(self) -> tuple[Optional[str], bool]:
+        """(language to pass to Whisper, whether this decode auto-detects)."""
+        if self.language not in ("auto", "zh-en"):
+            return self.language, False
+        if self._sticky_lang and self._sticky_uses < self.STICKY_RECHECK - 1:
+            self._sticky_uses += 1
+            return self._sticky_lang, False
+        self._sticky_uses = 0
+        return None, True
+
+    def _observe_language(self, info, detected_now: bool) -> None:
+        if not detected_now or info is None:
+            return
+        lang = str(getattr(info, "language", "") or "")
+        prob = float(getattr(info, "language_probability", 0.0) or 0.0)
+        if not lang or prob < self.STICKY_MIN_PROB:
+            self._lang_votes.clear()
+            return
+        if self._sticky_lang and lang != self._sticky_lang:
+            _log.info("Whisper sticky language %s -> re-detecting (heard %s p=%.2f)", self._sticky_lang, lang, prob)
+            self._sticky_lang = None
+            self._lang_votes = [lang]
+            return
+        self._lang_votes = (self._lang_votes + [lang])[-2:]
+        if len(self._lang_votes) == 2 and self._lang_votes[0] == self._lang_votes[1]:
+            self._sticky_lang = lang
+
+    @property
+    def sticky_language(self) -> Optional[str]:
+        return self._sticky_lang
+
+    STICKY_MIN_AVG_LOGPROB = -0.9
+
+    def _sticky_mismatch(self, used_sticky: bool, segments, texts: list[str]) -> bool:
+        """A decode under the pinned language that heard nothing, or heard it
+        badly, is treated as a language switch: unpin and decode again with
+        detection (the question must never be lost to a wrong pin)."""
+        if not used_sticky:
+            return False
+        logprobs = [float(getattr(seg, "avg_logprob", 0.0) or 0.0) for seg in segments if (seg.text or "").strip()]
+        weak = bool(logprobs) and (sum(logprobs) / len(logprobs)) < self.STICKY_MIN_AVG_LOGPROB
+        if texts and not weak:
+            return False
+        _log.info("Whisper sticky language %s looks wrong (empty=%s weak=%s); re-detecting", self._sticky_lang, not texts, weak)
+        self._sticky_lang = None
+        self._lang_votes.clear()
+        self._sticky_uses = 0
+        return True
 
     @staticmethod
     def _best_device() -> tuple[str, str]:
@@ -548,7 +607,8 @@ class STTEngine:
         if audio_f.max() > 1.0:
             audio_f = audio_f / 32768.0
 
-        whisper_lang: Optional[str] = None if self.language in ("auto", "zh-en") else self.language
+        whisper_lang, detected_now = self._decode_language()
+        used_sticky = whisper_lang is not None and self.language in ("auto", "zh-en")
         initial_prompt = _build_initial_prompt(position, language)
 
         hotwords_list = []
@@ -576,7 +636,8 @@ class STTEngine:
             log_prob_threshold=-1.0,
         )
 
-        segments, _ = self._transcribe_with_runtime_fallback(audio_f, hotwords_str, kwargs)
+        segments, info = self._transcribe_with_runtime_fallback(audio_f, hotwords_str, kwargs)
+        self._observe_language(info, detected_now and len(audio_f) >= 1.5 * 16000)
 
         texts = []
         for seg in segments:
@@ -587,6 +648,8 @@ class STTEngine:
                 continue
             texts.append(text)
 
+        if self._sticky_mismatch(used_sticky, segments, texts):
+            return self.transcribe(audio, sample_rate, position=position, language=language)
         return _postprocess(" ".join(texts))
 
     def transcribe_fast(
@@ -610,7 +673,8 @@ class STTEngine:
         if audio_f.max() > 1.0:
             audio_f = audio_f / 32768.0
 
-        whisper_lang: Optional[str] = None if self.language in ("auto", "zh-en") else self.language
+        whisper_lang, detected_now = self._decode_language()
+        used_sticky = whisper_lang is not None and self.language in ("auto", "zh-en")
         initial_prompt = _build_initial_prompt(position, language)
 
         hotwords_list = []
@@ -633,7 +697,8 @@ class STTEngine:
             no_speech_threshold=0.6,
             log_prob_threshold=-1.0,
         )
-        segments, _ = self._transcribe_with_runtime_fallback(audio_f, hotwords_str, kwargs)
+        segments, info = self._transcribe_with_runtime_fallback(audio_f, hotwords_str, kwargs)
+        self._observe_language(info, detected_now and len(audio_f) >= 1.5 * 16000)
 
         texts = []
         for seg in segments:
@@ -641,6 +706,8 @@ class STTEngine:
             if not text:
                 continue
             texts.append(text)
+        if self._sticky_mismatch(used_sticky, segments, texts):
+            return self.transcribe_fast(audio, sample_rate, position=position, language=language)
         return _postprocess(" ".join(texts))
 
     @property

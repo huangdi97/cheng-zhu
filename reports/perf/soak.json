@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-09-30 10:23:40",
+  "results": [
+    {
+      "hours": 2,
+      "turns": 120,
+      "wall_seconds": 31.3,
+      "rss_start_mb": 108.7,
+      "rss_end_mb": 135.8,
+      "traced_peak_mb": 10.0,
+      "qa_pairs_in_session": 80,
+      "state_topic_stack": 12,
+      "state_open_threads": 0,
+      "db_bytes": 815104,
+      "prompt_chars_first_hour_avg": 451,
+      "prompt_chars_last_hour_avg": 494,
+      "context_pollution": false,
+      "pack_ids_seen": [
+        "pack-755a231588ec40ad"
+      ],
+      "pack_stable": true,
+      "session_claims": 1,
+      "provider_failures_injected": 4,
+      "coach_sessions_active_after": 0,
+      "latency_history_len": 116,
+      "checks": {
+        "no_context_pollution": true,
+        "pack_stable": true,
+        "state_bounded": true,
+        "coach_no_leak": true,
+        "latency_history_bounded": true
+      },
+      "passed": true
+    },
+    {
+      "hours": 3,
+      "turns": 180,
+      "wall_seconds": 42.2,
+      "rss_start_mb": 128.6,
+      "rss_end_mb": 129.3,
+      "traced_peak_mb": 0.7,
+      "qa_pairs_in_session": 80,
+      "state_topic_stack": 12,
+      "state_open_threads": 0,
+      "db_bytes": 1142784,
+      "prompt_chars_first_hour_avg": 451,
+      "prompt_chars_last_hour_avg": 485,
+      "context_pollution": false,
+      "pack_ids_seen": [
+        "pack-a78262683a9b4b0a"
+      ],
+      "pack_stable": true,
+      "session_claims": 1,
+      "provider_failures_injected": 7,
+      "coach_sessions_active_after": 0,
+      "latency_history_len": 289,
+      "checks": {
+        "no_context_pollution": true,
+        "pack_stable": true,
+        "state_bounded": true,
+        "coach_no_leak": true,
+        "latency_history_bounded": true
+      },
+      "passed": true
+    },
+    {
+      "hours": 5,
+      "turns": 300,
+      "wall_seconds": 57.8,
+      "rss_start_mb": 129.3,
+      "rss_end_mb": 130.1,
+      "traced_peak_mb": 1.0,
+      "qa_pairs_in_session": 80,
+      "state_topic_stack": 12,
+      "state_open_threads": 0,
+      "db_bytes": 1757184,
+      "prompt_chars_first_hour_avg": 451,
+      "prompt_chars_last_hour_avg": 490,
+      "context_pollution": false,
+      "pack_ids_seen": [
+        "pack-629ce9ad41a44545"
+      ],
+      "pack_stable": true,
+      "session_claims": 1,
+      "provider_failures_injected": 12,
+      "coach_sessions_active_after": 0,
+      "latency_history_len": 500,
+      "checks": {
+        "no_context_pollution": true,
+        "pack_stable": true,
+        "state_bounded": true,
+        "coach_no_leak": true,
+        "latency_history_bounded": true
+      },
+      "passed": true
+    }
+  ],
+  "not_simulated": {
+    "audio_switching": "BLOCKED-EXTERNAL",
+    "sleep_wake": "BLOCKED-EXTERNAL",
+    "real_participants": "BLOCKED-EXTERNAL"
+  }
+}

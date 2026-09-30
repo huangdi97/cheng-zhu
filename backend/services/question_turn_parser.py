@@ -287,4 +287,13 @@ def is_auto_answer_enabled(cfg) -> bool:
     mode = str(getattr(cfg, "assist_auto_answer_mode", "smart") or "smart").lower()
     if mode == "off":
         return False
-    return bool(getattr(cfg, "auto_detect", True))
+    if not bool(getattr(cfg, "auto_detect", True)):
+        return False
+    # Stage P: AI_LIMITED / AI_FORBIDDEN keep transcription but disable the
+    # auto-answer path; explicit asks still go through the live gate.
+    try:
+        from services.intelligence.policy import auto_answer_allowed
+
+        return auto_answer_allowed(cfg)
+    except Exception:  # noqa: BLE001
+        return True

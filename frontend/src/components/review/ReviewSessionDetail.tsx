@@ -1,3 +1,4 @@
+import ReviewR2Panel from './ReviewR2Panel'
 import { useState, useEffect, useRef } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import {
@@ -587,6 +588,8 @@ export default function ReviewSessionDetail({ sessionId, onBack }: Props) {
             </div>
           </div>
         </section>
+
+        <ReviewR2Panel reviewSessionId={sessionId} />
 
         {inlineNotice ? (
           <InlineNoticeBanner notice={inlineNotice} />

@@ -1016,17 +1016,8 @@ function ReviewQueueRow({
   return (
     <article
       onClick={() => onViewDetail(session.id)}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          onViewDetail(session.id)
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className={`cursor-pointer px-3 py-2 outline-none transition-colors hover:bg-bg-tertiary/18 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-blue/30 ${sessionRowTone(session.status)}`}
-      aria-label={`打开 ${title} 复盘详情`}
+      className={`cursor-pointer px-3 py-2 outline-none transition-colors hover:bg-bg-tertiary/18 focus-within:ring-2 focus-within:ring-inset focus-within:ring-accent-blue/30 ${sessionRowTone(session.status)}`}
+      aria-label={`${title} 复盘`}
     >
       <div className="flex gap-2.5">
         <div className={`hidden w-1 shrink-0 rounded-sm md:block ${sessionRailTone(session.status)}`} />
@@ -1034,7 +1025,16 @@ function ReviewQueueRow({
           <div className={`grid gap-2 ${hasPrimaryTrigger ? 'xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start' : ''}`}>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h4 className="text-sm font-semibold tracking-tight text-text-primary">{title}</h4>
+                <h4 className="text-sm font-semibold tracking-tight text-text-primary">
+                  <button
+                    type="button"
+                    className="text-left outline-none focus-visible:underline"
+                    aria-label={`打开 ${title} 复盘详情`}
+                    onClick={(event) => { event.stopPropagation(); onViewDetail(session.id) }}
+                  >
+                    {title}
+                  </button>
+                </h4>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${sourceMeta.badgeClassName}`}>
                   {sourceMeta.label}
                 </span>

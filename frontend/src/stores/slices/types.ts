@@ -140,6 +140,13 @@ export interface AppConfig {
   review_enabled?: boolean
   /** 复盘分析使用的模型索引 */
   review_model_index?: number
+  /** R2 per-session policy defaults */
+  ai_policy_mode?: string
+  human_assistance_policy?: string
+  share_privacy_mode?: string
+  speech_adoption_analytics_live?: boolean
+  fast_cue_model_index?: number
+  onboarding_completed?: boolean
 }
 
 export type QAStatus = 'streaming' | 'done' | 'cancelled' | 'error'
@@ -167,9 +174,32 @@ export interface QAPair {
   modelLabel?: string
   firstTokenMs?: number
   totalMs?: number
+  /** WS answer_done 携带的原始 guidance 负载（unknown），渲染时经 buildGuidanceViewModel 解析 */
+  guidance?: unknown
+  /** R2 guidance_fast 负载（unknown），经 buildFastCueViewModel 解析；先于 Deep Answer 到达 */
+  fastCue?: unknown
+  /** answer_done.latency：qbd / ttfug_user / ttfug_internal / ttfa / ttd（毫秒，可能为 null） */
+  latency?: Record<string, number | null>
   visionVerify?: { verdict: 'PASS' | 'FAIL' | 'UNKNOWN'; reason: string }
   status?: QAStatus
   errorMessage?: string
+}
+
+/** R2 Human Coach cue: advice only (source HUMAN_COACH), never evidence */
+export interface CoachCue {
+  id: string
+  text: string
+  voiceUrl: string
+  createdAt: number
+}
+
+/** R2 Session Claim：本场口述但暂无来源的陈述，私有提示 + 同场纠错入口 */
+export interface SessionClaimWarning {
+  id: string
+  qaId: string
+  text: string
+  message: string
+  actions: Array<{ id: string; label: string }>
 }
 
 export interface DeviceItem {

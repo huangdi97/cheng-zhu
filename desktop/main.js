@@ -62,8 +62,16 @@ const APP_DISPLAY_NAME = loadAppDisplayName();
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKEND_DIR = path.join(ROOT, 'backend');
-const PORT = parseInt(process.env.PORT || '18080', 10);
-const SERVER_URL = `http://127.0.0.1:${PORT}`;
+const PREFERRED_PORT = parseInt(process.env.PORT || '18080', 10);
+// Port is chosen at startup (the preferred one may be occupied).
+let PORT = PREFERRED_PORT;
+let SERVER_URL = `http://127.0.0.1:${PORT}`;
+const sharePrivacy = require('./sharePrivacy');
+const backendLauncher = require('./backendLauncher');
+// R2 Stage T: Share Privacy is OFF by default; one state drives both windows.
+const sharePrivacyState = sharePrivacy.createSharePrivacyState(sharePrivacy.DEFAULT_MODE);
+let backendStderrTail = '';
+const INSTANCE_NONCE = backendLauncher.newInstanceNonce();
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -131,7 +139,7 @@ const FRONT_REASSERT_INTERVAL = 500;
 function applyTopMost(win) {
   if (!win || win.isDestroyed()) return;
   win.setAlwaysOnTop(true, 'screen-saver', FRONT_REASSERT_LEVEL);
-  win.setContentProtection(true);
+  sharePrivacy.applyToWindow(win, sharePrivacyState.mode);
   win.moveTop();
 }
 
@@ -299,9 +307,20 @@ function waitForServer(timeout = 40000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
-      const req = http.get(`${SERVER_URL}/api/options`, { timeout: 1000 }, (res) => {
-        if (res.statusCode === 200) return resolve();
-        retry();
+      if (!pythonProcess && Date.now() - start > 1500) {
+        return reject(new Error('Backend process exited before it was ready'));
+      }
+      // Only our own sidecar (matching nonce) counts as ready.
+      const req = http.get(`${SERVER_URL}/api/instance`, { timeout: 1000 }, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode === 200 && backendLauncher.isOwnInstance(JSON.parse(body), INSTANCE_NONCE)) return resolve();
+          } catch { /* not ours */ }
+          retry();
+        });
       });
       req.on('error', retry);
       req.on('timeout', () => { req.destroy(); retry(); });
@@ -315,17 +334,34 @@ function waitForServer(timeout = 40000) {
 }
 
 function startPythonBackend() {
-  const python = process.env.IA_PYTHON_EXE || (process.platform === 'win32' ? 'python' : 'python3');
-  pythonProcess = spawn(python, [
-    path.join(ROOT, 'start.py'),
-    '--mode', 'network',
-    '--no-build',
-    '--port', String(PORT),
-  ], {
-    cwd: ROOT,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
-    windowsHide: true,
+  const userDataDir = app.getPath('userData');
+  if (app.isPackaged) backendLauncher.ensureUserDataLayout(userDataDir);
+  const plan = backendLauncher.resolveBackendCommand({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    repoRoot: ROOT,
+    port: PORT,
+    userDataDir,
+    nonce: INSTANCE_NONCE,
+  });
+  backendStderrTail = '';
+  try {
+    pythonProcess = spawn(plan.command, plan.args, {
+      cwd: plan.cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: plan.env,
+      windowsHide: true,
+    });
+  } catch (error) {
+    backendStderrTail = String(error?.message || error);
+    pythonProcess = null;
+    return;
+  }
+  pythonProcess.on('error', (error) => {
+    backendStderrTail += `\n${error?.code || ''} ${error?.message || error}`;
+  });
+  pythonProcess.stderr?.on('data', (chunk) => {
+    backendStderrTail = (backendStderrTail + chunk.toString('utf8')).slice(-4000);
   });
 
   relayChildOutput(pythonProcess.stdout, process.stdout, '[py] ');
@@ -334,13 +370,40 @@ function startPythonBackend() {
     console.log(`[py] exited with code ${code}`);
     pythonProcess = null;
     if (!isQuitting) {
-      if (mainWindow) {
-        const { dialog } = require('electron');
-        dialog.showErrorBox('后端已退出', `Python 后端进程异常退出 (code ${code})。\n可能原因：端口 ${PORT} 被占用。\n请关闭占用该端口的进程后重试。`);
-      }
+      const { dialog } = require('electron');
+      dialog.showErrorBox(
+        '成竹后端已退出',
+        backendLauncher.describeStartupFailure({ code, stderrTail: backendStderrTail, port: PORT, packaged: app.isPackaged }),
+      );
       app.quit();
     }
   });
+}
+
+// Pull the persisted Share Privacy default from the backend config.
+function syncSharePrivacyFromConfig() {
+  http.get(`${SERVER_URL}/api/config`, { timeout: 3000 }, (res) => {
+    let body = '';
+    res.setEncoding('utf8');
+    res.on('data', (chunk) => { body += chunk; });
+    res.on('end', () => {
+      try {
+        const cfg = JSON.parse(body);
+        setSharePrivacyMode(cfg.share_privacy_mode);
+      } catch { /* keep OFF */ }
+    });
+  }).on('error', () => { /* keep OFF */ });
+}
+
+function setSharePrivacyMode(mode) {
+  sharePrivacyState.set(mode);
+  sharePrivacy.applyToWindow(mainWindow, sharePrivacyState.mode);
+  sharePrivacy.applyToWindow(overlayWindow, sharePrivacyState.mode);
+  if (tray && !tray.isDestroyed?.()) {
+    tray.setToolTip(`${APP_DISPLAY_NAME} · 共享隐私：${sharePrivacyState.protected ? '开（私有悬浮窗）' : '关'}`);
+    try { createTrayMenu(); } catch { /* menu rebuild best effort */ }
+  }
+  return sharePrivacyState.mode;
 }
 
 function createWindow() {
@@ -353,8 +416,8 @@ function createWindow() {
     title: APP_DISPLAY_NAME,
     frame: false,
     show: false,
-    // Windows 下不在任务栏显示，只在托盘
-    skipTaskbar: isWindows,
+    // R2: a normal installed app shows in the taskbar (no stealth default).
+    skipTaskbar: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -362,7 +425,7 @@ function createWindow() {
     },
   });
 
-  mainWindow.setContentProtection(true);
+  sharePrivacy.applyToWindow(mainWindow, sharePrivacyState.mode);
 
   // 每次启动清除缓存，确保加载到最新的前端构建（避免设置里识别引擎等不更新）
   mainWindow.webContents.session.clearCache().then(() => {
@@ -433,7 +496,7 @@ function createOverlayWindow() {
 
   // Content protection 必须尽早调用 —— 等到 ready-to-show 时,
   // 窗口可能已经被 window server 登记过一次, 导致 NSWindowSharingNone 漏掉初始帧
-  overlayWindow.setContentProtection(true);
+  sharePrivacy.applyToWindow(overlayWindow, sharePrivacyState.mode);
   overlayWindow.setBackgroundColor('#00000000');
   overlayWindow.setAlwaysOnTop(true, 'screen-saver', FRONT_REASSERT_LEVEL);
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
@@ -449,7 +512,7 @@ function createOverlayWindow() {
 
   overlayWindow.once('ready-to-show', () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    overlayWindow.setContentProtection(true);
+    sharePrivacy.applyToWindow(overlayWindow, sharePrivacyState.mode);
     overlayWindow.setBackgroundColor('#00000000');
     overlayWindow.setFocusable(false);
     overlayWindow.setAlwaysOnTop(true, 'screen-saver', FRONT_REASSERT_LEVEL);
@@ -457,7 +520,7 @@ function createOverlayWindow() {
   overlayWindow.loadURL(`${SERVER_URL}?overlay=1`);
   overlayWindow.webContents.on('did-finish-load', () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    overlayWindow.setContentProtection(true);
+    sharePrivacy.applyToWindow(overlayWindow, sharePrivacyState.mode);
     overlayWindow.setBackgroundColor('#00000000');
     overlayWindow.setFocusable(false);
     if (lastOverlayState) {
@@ -474,7 +537,7 @@ function createOverlayWindow() {
   });
   overlayWindow.on('show', () => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
-    overlayWindow.setContentProtection(true);
+    sharePrivacy.applyToWindow(overlayWindow, sharePrivacyState.mode);
     overlayWindow.setBackgroundColor('#00000000');
     overlayWindow.setFocusable(false);
   });
@@ -528,7 +591,7 @@ function showOverlayWindow() {
   } else {
     overlayWindow.show();
   }
-  overlayWindow.setContentProtection(true);
+  sharePrivacy.applyToWindow(overlayWindow, sharePrivacyState.mode);
   keepWindowInFront(overlayWindow);
 }
 
@@ -623,18 +686,8 @@ async function addMultiServerScreenShot() {
   }
 }
 
-function createTray() {
-  const iconPath = path.join(__dirname, 'icon.png');
-  let icon;
-  try {
-    icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
-  } catch {
-    icon = createTrayIcon();
-  }
-
-  tray = new Tray(icon);
-  tray.setToolTip(APP_DISPLAY_NAME);
-
+function createTrayMenu() {
+  if (!tray) return;
   const contextMenu = Menu.buildFromTemplate([
     { label: '显示窗口', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
     { label: '隐藏到托盘', click: () => toggleWindow() },
@@ -648,11 +701,12 @@ function createTray() {
       },
     },
     {
-      label: '窗口隐私保护',
+      label: '共享隐私（私有悬浮窗）',
       type: 'checkbox',
-      checked: true,
+      checked: sharePrivacyState.protected,
+      toolTip: sharePrivacy.SHARE_PRIVACY_COPY,
       click: (menuItem) => {
-        mainWindow?.setContentProtection(menuItem.checked);
+        setSharePrivacyMode(menuItem.checked ? 'PRIVATE_OVERLAY' : 'OFF');
       },
     },
     { type: 'separator' },
@@ -660,6 +714,21 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
+}
+
+function createTray() {
+  const iconPath = path.join(__dirname, 'icon.png');
+  let icon;
+  try {
+    icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  } catch {
+    icon = createTrayIcon();
+  }
+
+  tray = new Tray(icon);
+  tray.setToolTip(`${APP_DISPLAY_NAME} · 共享隐私：${sharePrivacyState.protected ? '开（私有悬浮窗）' : '关'}`);
+
+  createTrayMenu();
   tray.on('click', () => { mainWindow?.show(); mainWindow?.focus(); });
   // Windows 双击托盘图标也能显示
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
@@ -891,16 +960,18 @@ ipcMain.handle('toggle-always-on-top', () => {
   return next;
 });
 ipcMain.handle('toggle-content-protection', () => {
-  if (!mainWindow) return true;
-  const webContents = mainWindow.webContents;
-  const isProtected = mainWindow._contentProtection !== false;
-  mainWindow._contentProtection = !isProtected;
-  mainWindow.setContentProtection(!isProtected);
-  return !isProtected;
+  const next = sharePrivacyState.protected ? 'OFF' : 'PRIVATE_OVERLAY';
+  return sharePrivacy.isProtected(setSharePrivacyMode(next));
 });
+ipcMain.handle('set-share-privacy', (_event, mode) => setSharePrivacyMode(mode));
+ipcMain.handle('get-share-privacy', () => ({
+  mode: sharePrivacyState.mode,
+  protected: sharePrivacyState.protected,
+  note: sharePrivacy.SHARE_PRIVACY_COPY,
+}));
 ipcMain.handle('get-window-state', () => ({
   alwaysOnTop: mainWindow?.isAlwaysOnTop() ?? false,
-  contentProtection: mainWindow?._contentProtection !== false,
+  contentProtection: sharePrivacyState.protected,
   visible: mainWindow?.isVisible() ?? false,
 }));
 ipcMain.handle('sync-overlay-window', (_event, payload = {}) => {
@@ -1211,18 +1282,35 @@ app.whenReady().then(async () => {
     /* 个别平台/版本可能不支持 */
   }
   createAppMenu();
-  console.log('Starting Python backend...');
+  const picked = await backendLauncher.pickPort(PREFERRED_PORT);
+  if (picked == null) {
+    const { dialog } = require('electron');
+    dialog.showErrorBox('成竹无法启动', `端口 ${PREFERRED_PORT}–${PREFERRED_PORT + 19} 都被占用。请关闭占用端口的程序后重试。`);
+    app.quit();
+    return;
+  }
+  PORT = picked;
+  SERVER_URL = `http://127.0.0.1:${PORT}`;
+  console.log(`Starting backend on ${SERVER_URL} (packaged=${app.isPackaged})...`);
   startPythonBackend();
 
   try {
-    await waitForServer();
+    // First launch of the packaged sidecar unpacks and imports more modules.
+    await waitForServer(app.isPackaged ? 90000 : 40000);
     console.log('Backend ready, creating window...');
   } catch (err) {
     console.error('Failed to start backend:', err.message);
+    const { dialog } = require('electron');
+    dialog.showErrorBox(
+      '成竹后端启动超时',
+      backendLauncher.describeStartupFailure({ code: 'timeout', stderrTail: backendStderrTail, port: PORT, packaged: app.isPackaged }),
+    );
+    isQuitting = true;
     app.quit();
     return;
   }
 
+  syncSharePrivacyFromConfig();
   createWindow();
   createTray();
   registerShortcuts();

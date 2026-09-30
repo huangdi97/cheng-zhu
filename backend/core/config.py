@@ -40,7 +40,14 @@ def normalize_llm_max_tokens(value: Any) -> int:
     return max(256, min(32768, int(parsed)))
 
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_FILE = os.environ.get("IA_CONFIG_PATH") or os.path.join(_BACKEND_DIR, "config.json")
+def _default_config_file() -> str:
+    # Packaged app: %APPDATA%\\Chengzhu\\config\\config.json (never the install dir).
+    from services.storage.paths import config_dir
+
+    return os.path.join(config_dir(), "config.json")
+
+
+CONFIG_FILE = os.environ.get("IA_CONFIG_PATH") or _default_config_file()
 CONFIG_EXAMPLE = os.path.join(_BACKEND_DIR, "config.example.json")
 
 
@@ -150,11 +157,11 @@ class AppConfig(BaseModel):
     language: str = "Python"
     # 回答语言：中文 / English（控制答案输出语言，区别于上面的编程语言）
     answer_language: str = "中文"
-    # ?? JD?PrepSpace ??/????????????????????????? <jd_context>?
+    # JD / PrepSpace 的岗位描述文本；注入回答 prompt 的 <jd_context> 段
     jd_text: Optional[str] = None
-    # ??????????????? <notes>?????
+    # 面试笔记文本；注入回答 prompt 的 <notes> 段
     interview_notes: Optional[str] = None
-    # ???? JD?????????? JD ??????????
+    # 回答时对齐 JD：把当前问题与 JD 要求一起交给模型参考
     assist_answer_align_jd_enabled: bool = True
     # ??????????????????????????
     assist_inline_translation_enabled: bool = False
@@ -167,6 +174,60 @@ class AppConfig(BaseModel):
     resume_text: Optional[str] = None
     # 当前生效的简历对应的历史记录 id（写入 config.json；简历正文仍不入库）
     resume_active_history_id: Optional[int] = None
+    # ----------------- Intelligence Core (v1.0-R1) -----------------
+    # 分阶段 feature flags（canonical Stage Y）：新路径先 flag 接入，收口后默认开启。
+    # Stage A：Candidate Representation（简历 → 结构化候选人表示）
+    intelligence_candidate_v1: bool = True
+    # Stage G：Context Compiler（最小充分上下文包）
+    intelligence_context_compiler_v1: bool = True
+    # Stage H：Answer Planner（结构化回答计划）
+    intelligence_answer_planner_v1: bool = True
+    # Stage J：Live cue-first 双路径（Fast/Deep）
+    intelligence_live_cue_v1: bool = True
+    # Stage F：Interviewer State（概率性面试官状态；关闭时系统功能完全正常）
+    interviewer_state_enabled: bool = True
+    # Stage M：Personal Voice（个人表达风格；关闭时答案不受风格影响）
+    voice_profile_enabled: bool = False
+    # Stage P：AI policy mode（AI_FORBIDDEN / AI_LIMITED / AI_ALLOWED / AI_EXPECTED）
+    ai_policy_mode: str = "AI_ALLOWED"
+    # R2 Stage R：人工协助策略，独立于 AI policy（AI_ALLOWED 不推出 HUMAN_ALLOWED）
+    # HUMAN_FORBIDDEN / HUMAN_PRACTICE_ONLY / HUMAN_ALLOWED
+    human_assistance_policy: str = "HUMAN_PRACTICE_ONLY"
+    # R2 Stage T：共享隐私（OFF / PRIVATE_OVERLAY），默认 OFF；不是“不可检测”保证
+    share_privacy_mode: str = "OFF"
+    # R2 Stage Y：正式 Live 的 cue 采纳 / 语速分析默认关闭，需用户显式开启（本地）
+    speech_adoption_analytics_live: bool = False
+    # R2 Stage G：Context Compiler 成功时成为唯一上下文来源（关闭 = legacy 注入）
+    intelligence_compiler_authoritative: bool = True
+    # R2 Stage K：独立 guidance_fast 事件（L0 确定性 cue，先于 Deep Answer）
+    intelligence_fast_cue_v2: bool = True
+    # R2 Stage K：L1 fast cue 使用的模型序号（-1 = 仅 L0 确定性 cue）
+    fast_cue_model_index: int = -1
+    # R2 Stage AA：首次运行引导是否完成
+    onboarding_completed: bool = False
+    # R2 Stage I：文本已是完整问句时立即结束合并等待（不再等满 merge gap）
+    assist_eot_fast_flush: bool = True
+    # 完整问句的合并等待（秒）；新的实时转写（仍在说话）会继续顺延
+    assist_eot_merge_gap_sec: float = 0.35
+    # R2 Stage I/K：问题分组确认后立即发 L0 Fast Cue，不等 late-constraint grace
+    intelligence_early_cue: bool = True
+    # v1.2-R2 延迟收口：自适应说话结束（流式 partial 已是完整问句且覆盖语音结尾时，
+    # 静音 assist_eot_min_silence_sec 即结束本段；silence_duration 仍是硬超时）
+    assist_adaptive_eot: bool = True
+    assist_eot_min_silence_sec: float = 0.55
+    # 预判最终转写（本地 Whisper）在尾部静音达到该秒数时启动；只是提前解码，不结束本段
+    assist_speculative_min_silence_sec: float = 0.30
+    # 本地 Whisper：尾部静音达到上面阈值即对已说内容做一次「预判最终转写」，
+    # 同一段音频被 VAD 结束时直接复用（远程 STT 不启用，避免重复计费）
+    assist_speculative_final: bool = True
+    # 稳定 partial 先出临时 Fast Cue，本地/批量最终转写到达后在同一张卡上确认/修正/替换
+    assist_provisional_cue: bool = True
+    # 临时 Cue 在该秒数内未被最终转写确认则撤回
+    assist_provisional_ttl_sec: float = 8.0
+    # 最终转写已是完整问句时立即出临时 Cue（合并/分组窗口随后在同一张卡上确认或修正）
+    assist_final_provisional_cue: bool = True
+    # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）
+    raw_audio_retention_sessions: int = 0
 
     auto_detect: bool = True
     # off=仅转录；smart=高置信度自动答、模糊题二次判定；always=有效问句直接入队。
@@ -395,7 +456,16 @@ def _load_config() -> AppConfig:
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return AppConfig(**json.load(f))
+                data = json.load(f)
+            if isinstance(data, dict) and "onboarding_completed" not in data:
+                # Pre-R2 installs that already have a real key are onboarded;
+                # only genuinely fresh configs see the first-run wizard.
+                data["onboarding_completed"] = any(
+                    str((m or {}).get("api_key") or "").strip()
+                    and not str((m or {}).get("api_key") or "").startswith("YOUR_")
+                    for m in (data.get("models") or [])
+                )
+            return AppConfig(**data)
         except Exception as e:
             print(f"[Config] 配置文件解析失败: {e}，使用默认配置")
     return AppConfig()

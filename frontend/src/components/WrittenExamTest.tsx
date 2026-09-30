@@ -471,7 +471,7 @@ export default function WrittenExamTest() {
             <span className="text-accent-blue font-semibold">Q:</span> {llmQuestion}
           </p>
           {modelName && (
-            <p className="text-[10px] text-text-muted/80 mb-1">模型：{modelName}</p>
+            <p className="text-[10px] text-text-muted mb-1">模型：{modelName}</p>
           )}
           <p className="text-xs text-text-primary leading-relaxed line-clamp-5 whitespace-pre-wrap">{llmAnswer}</p>
         </div>

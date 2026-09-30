@@ -14,6 +14,8 @@ declare global {
       resetShortcuts: () => Promise<{ ok: boolean; error?: string; shortcuts: Record<string, unknown> }>
       toggleAlwaysOnTop: () => Promise<boolean>
       toggleContentProtection: () => Promise<boolean>
+      setSharePrivacy?: (mode: 'OFF' | 'PRIVATE_OVERLAY' | string) => Promise<string>
+      getSharePrivacy?: () => Promise<{ mode: string; protected: boolean; note: string }>
       getWindowState: () => Promise<{ alwaysOnTop: boolean; contentProtection: boolean; visible: boolean }>
       captureRegion?: () => Promise<{ left: number; top: number; width: number; height: number } | null>
       syncOverlayWindow?: (payload: Partial<OverlayStatePayload> & { visible?: boolean }) => Promise<{ ok: boolean; visible: boolean }>

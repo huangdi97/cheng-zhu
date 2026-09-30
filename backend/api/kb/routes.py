@@ -57,7 +57,7 @@ async def kb_status() -> dict:
         "docx": _dep_ok("docx"),
         "pdf": _dep_ok("pypdf"),
         "ocr": _dep_ok("rapidocr_onnxruntime") and bool(getattr(cfg, "kb_ocr_enabled", False)),
-        "vision": _dep_ok("fitz") and bool(getattr(cfg, "kb_vision_caption_enabled", False)),
+        "vision": _dep_ok("pypdfium2") and bool(getattr(cfg, "kb_vision_caption_enabled", False)),
     }
     return {
         "enabled": bool(getattr(cfg, "kb_enabled", False)),

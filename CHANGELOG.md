@@ -1,5 +1,36 @@
 # 修复日志
 
+## 2026-09-30 - v1.2.0（R2）：可安装的 Interview Intelligence
+
+### 产品
+- 许可证改为 MIT；生成 THIRD_PARTY_NOTICES；PDF 页渲染由 PyMuPDF（AGPL-3.0）换为 pypdfium2（BSD-3-Clause / Apache-2.0），安装包不含 copyleft 组件
+- 事实三轴：来源状态 / 用户确认 / 本场口述，界面不再用“验证=真”
+- Interview Pack 冻结真实内容；上场只读本场 Pack，不再读取“最近分析的岗位”
+- Context Compiler 成为唯一上下文来源，同一片段只出现一次
+- Fast Cue（guidance_fast）先于完整回答到达；来源分为个人来源 / 资料 / 通用知识 / 教练建议
+- 流式事实守卫：只缓冲第一人称句子，知识内容照常流式
+- 本场口述无来源的陈述：私有提示 + 口误纠正，只有复盘能确认为长期事实
+- 导航：首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置；“准备”并入岗位目标
+- 我的成竹：概览 / 简历 / 项目 / 事实与来源 / Stories / Skills / 我的表达
+- 复盘 2.0：每轮 Fast Cue、来源、上下文、延迟、provider；口述确认 / 否认 / 口误 / 不记住
+- 人工教练 MVP（默认仅练习；独立于 AI 策略；令牌只存哈希、可撤销、限流）
+- 共享隐私默认关闭；AI / 人工 / 共享隐私三个策略独立并随 Pack 冻结
+- 首次运行引导 + 诊断（错误原因在界面说明）
+- WCAG AA 状态色与主题强调色；axe 无 critical/serious；键盘可达
+
+### 桌面与发布
+- Windows 安装包与便携版，内置后端 sidecar，无需 Python / Node
+- 数据写入 %APPDATA%\Chengzhu；后端只监听 127.0.0.1
+- CI 去掉路径过滤；新增严格评测、许可证、Windows 打包冒烟；release.yml 生成 SHA256 并发布
+
+### 延迟（实测，见 reports/CHENGZHU_V1_2_R2_LATENCY_FORENSICS.md）
+- 自适应说话结束（CONTINUE / LIKELY_END / CONFIRMED_END），硬超时保留；逗号停顿不截断
+- 稳定 partial / 完整最终转写先出临时 Fast Cue，同一张卡确认 / 修正 / 替换 / 撤回
+- 本地 Whisper：尾部静音即预判最终转写并复用；语言粘滞（错判即重检，不丢问题）；预览不再阻塞采集线程
+- Fast Cue 到达即渲染（不再等 answer_start 与 1.2s grace）
+- 受控基准（干净 4 核 Windows，34 条音频）：TTFUG_user（上屏）p50 5.3s → 1.3s，p95 5.9s → 2.5s（本地 CPU）；流式档（模拟）0.56s / 2.0s；Gate A 两档均达成，Gate B 仅流式档达成
+- 修复：smart 模式拒答英文问题；以“。”结尾、含“哪里/多少/会不会”等的中文问题被拒
+
 ## 2026-08-15 - MD 导航栏 + 胶囊按钮 + FAB（用户「都要」）
 
 ### 🎨 界面改进

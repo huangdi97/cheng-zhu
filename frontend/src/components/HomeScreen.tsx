@@ -34,7 +34,7 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'assist',
     icon: Radio,
-    title: '实时辅助',
+    title: '上场',
     desc: '对方声音实时转录 · AI 自动回答 · 滚动备忘',
     accent: 'text-container-on-secondary',
     tile: 'bg-container-secondary',
@@ -43,8 +43,8 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'prep',
     icon: BookOpenCheck,
-    title: '面试准备',
-    desc: '技能卡 · 真题预测 · 模拟面试',
+    title: '演练',
+    desc: '按岗位目标出题 · 薄弱点追问 · 自动复盘',
     accent: 'text-container-on-primary',
     tile: 'bg-container-primary',
     ring: 'hover:border-accent-blue/50',
@@ -52,26 +52,17 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'review',
     icon: ClipboardList,
-    title: '面试复盘',
-    desc: '逐轮亮点/风险 · 整体评价 · 导出 MD/JSON',
+    title: '复盘',
+    desc: '逐轮复盘 · 口述确认 · 能力分析',
     accent: 'text-container-on-tertiary',
     tile: 'bg-container-tertiary',
     ring: 'hover:border-accent-amber/50',
   },
   {
-    mode: 'knowledge',
-    icon: BrainCircuit,
-    title: '能力分析',
-    desc: '知识地图 · 薄弱点可视化',
-    accent: 'text-container-on-primary',
-    tile: 'bg-container-primary',
-    ring: 'hover:border-accent-blue/50',
-  },
-  {
     mode: 'resume-opt',
     icon: FileText,
-    title: '简历优化',
-    desc: '对照 JD 命中/缺失分析 · 逐条建议',
+    title: '我的成竹',
+    desc: '简历 · 事实与来源 · Stories · 我的表达',
     accent: 'text-container-on-secondary',
     tile: 'bg-container-secondary',
     ring: 'hover:border-accent-green/50',
@@ -79,8 +70,8 @@ const MODULES: ModuleDef[] = [
   {
     mode: 'job-tracker',
     icon: Kanban,
-    title: '求职看板',
-    desc: '投递进度 · Offer 对比 · 复盘串联',
+    title: '求职',
+    desc: '岗位目标 · 准备 · Interview Pack · 投递与 Offer',
     accent: 'text-container-on-tertiary',
     tile: 'bg-container-tertiary',
     ring: 'hover:border-accent-amber/50',
@@ -114,6 +105,7 @@ function StatusCard({ ok, label, sub, icon: Icon }: { ok: boolean; label: string
 
 export default function HomeScreen() {
   const setAppMode = useUiPrefsStore((s) => s.setAppMode)
+  const setJobHubTab = useUiPrefsStore((s) => s.setJobHubTab)
   const config = useInterviewStore((s) => s.config)
   const sessions = useInterviewStore((s) => s.sessions)
   const activeSessionId = useInterviewStore((s) => s.activeSessionId)
@@ -175,7 +167,7 @@ export default function HomeScreen() {
         {recentSpace && (
           <button
             type="button"
-            onClick={() => setAppMode('prep')}
+            onClick={() => { setJobHubTab('goals'); setAppMode('job-tracker') }}
             className="mb-6 group w-full text-left rounded-2xl border border-accent-blue/20 bg-gradient-to-r from-accent-blue/[0.07] via-bg-secondary/50 to-transparent p-4 md:p-5 card-lift transition-all hover:border-accent-blue/45 hover:shadow-lg hover:shadow-accent-blue/5"
           >
             <div className="flex items-center gap-3.5">
@@ -183,7 +175,7 @@ export default function HomeScreen() {
                 <Clock className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-accent-blue">继续上次准备</div>
+                <div className="text-xs font-semibold text-accent-blue">继续准备</div>
                 <div className="text-sm font-medium text-text-primary truncate mt-0.5">
                   {recentSpace.title}
                   {(recentSpace.company || recentSpace.role) && (
@@ -194,6 +186,19 @@ export default function HomeScreen() {
               <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-accent-blue transition-colors" />
             </div>
           </button>
+        )}
+
+        {recentSpace && (
+          <div className="mb-6 flex flex-wrap gap-2" aria-label="当前岗位目标">
+            <button type="button" onClick={() => setAppMode('prep')}
+              className="rounded-full border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover/60">
+              开始演练 · {recentSpace.title}
+            </button>
+            <button type="button" onClick={() => setAppMode('assist')}
+              className="rounded-full border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover/60">
+              上场
+            </button>
+          </div>
         )}
 
         {/* 模块卡片 */}
@@ -225,7 +230,7 @@ export default function HomeScreen() {
         </div>
 
         <p className="text-xs text-text-muted mt-8 leading-relaxed">
-          提示：面试前在「面试准备」里准备好岗位和技能卡；面试中用「实时辅助」抓对方问题，系统音频（★扬声器）→ 实时转录 → AI 自动回答；结束后去「面试复盘」生成分析。
+          提示：在「求职」里为目标岗位准备技能卡并冻结 Interview Pack；在「演练」里模拟；「上场」时先看 Fast Cue 再按需展开完整回答；结束后去「复盘」确认本场口述的内容。
         </p>
       </div>
 
@@ -234,7 +239,7 @@ export default function HomeScreen() {
         type="button"
         onClick={() => setAppMode('assist')}
         aria-label="开始面试"
-        title="进入实时辅助"
+        title="进入上场"
         className="fixed bottom-8 right-8 z-30 inline-flex items-center gap-2 rounded-full bg-accent-blue text-white pl-4 pr-5 py-3 text-sm font-semibold shadow-lg shadow-accent-blue/30 transition-all hover:brightness-110 active:scale-[0.98]"
       >
         <Mic className="w-4 h-4" aria-hidden />

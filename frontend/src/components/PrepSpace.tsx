@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, Sparkles, RefreshCw, ArrowLeft, Target, ListChecks, FolderKanban, Loader2, AlertTriangle, BriefcaseBusiness, ShieldCheck } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import JobWorkspacePanel from './JobWorkspacePanel'
 import PracticePanel from './PracticePanel'
 import SkillBuilderPanel from './SkillBuilderPanel'
-import { api, LaunchPack, PrepSpace as PrepSpaceType, PrepSpaceLite, ResumeHistoryItem } from '@/lib/api'
+import { api, LaunchPack, PackSummary, PrepSpace as PrepSpaceType, PrepSpaceLite, ResumeHistoryItem } from '@/lib/api'
 
 type View = { kind: 'list' } | { kind: 'new' } | { kind: 'detail'; id: number }
 
@@ -47,12 +48,29 @@ function FieldList({ title, items }: { title: string; items: string[] }) {
   )
 }
 
-function SkillCardView({ raw }: { raw: { project_name: string; card: Record<string, unknown> } }) {
+function SkillCardView({ raw, cardId }: { raw: { project_name: string; card: Record<string, unknown> }; cardId?: number }) {
   const card = { ...EMPTY_CARD, ...(raw.card || {}) }
+  // R2 Stage N: only cards the user confirmed enter the InterviewPack.
+  const [reviewed, setReviewed] = useState(Boolean((raw.card || {}).user_reviewed))
+  const toggleReviewed = async () => {
+    if (cardId == null) return
+    try {
+      await api.prepReviewSkillCard(cardId, !reviewed)
+      setReviewed(!reviewed)
+    } catch { /* keep state */ }
+  }
   const list = (key: string) => Array.isArray(card[key]) ? (card[key] as string[]) : []
   return (
     <div className="rounded-xl border border-bg-hover/50 bg-bg-secondary p-4">
-      <div className="text-sm font-semibold text-text-primary">{card.name || raw.project_name}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-sm font-semibold text-text-primary">{card.name || raw.project_name}</div>
+        {cardId != null && (
+          <button type="button" onClick={() => void toggleReviewed()} aria-pressed={reviewed}
+            className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${reviewed ? 'border-status-direct/40 text-status-direct' : 'border-bg-hover text-text-muted hover:text-text-primary'}`}>
+            {reviewed ? '已确认 · 进入 Pack' : '确认内容属实'}
+          </button>
+        )}
+      </div>
       {card.background ? <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">{card.background}</p> : null}
       {card.my_role ? (
         <p className="mt-1.5 text-[13px] text-text-secondary leading-relaxed">
@@ -79,6 +97,11 @@ export default function PrepSpace() {
   const [skillBuilderOpen, setSkillBuilderOpen] = useState(false)
   const [activatingPack, setActivatingPack] = useState(false)
   const [launchPack, setLaunchPack] = useState<LaunchPack | null>(null)
+  const [interviewPack, setInterviewPack] = useState<PackSummary | null>(null)
+  // R2 Stage R: three independent per-session policies, frozen into the pack.
+  const [aiPolicy, setAiPolicy] = useState('AI_ALLOWED')
+  const [humanPolicy, setHumanPolicy] = useState('HUMAN_PRACTICE_ONLY')
+  const [sharePrivacy, setSharePrivacy] = useState('OFF')
 
   // create form
   const [role, setRole] = useState('')
@@ -170,8 +193,13 @@ export default function PrepSpace() {
     setActivatingPack(true)
     setError(null)
     try {
-      const result = await api.prepActivateLaunchPack(space.id)
+      const result = await api.prepActivateLaunchPack(space.id, {
+        ai_policy: aiPolicy,
+        human_assistance_policy: humanPolicy,
+        share_privacy_policy: sharePrivacy,
+      })
       setLaunchPack(result.pack)
+      setInterviewPack(result.interview_pack ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : '启用上场包失败')
     } finally {
@@ -319,10 +347,32 @@ export default function PrepSpace() {
                 </button>
               )}
               {space && (
+                <div className="flex items-center gap-1" aria-label="本场策略">
+                  <select aria-label="AI 使用策略" value={aiPolicy} onChange={(e) => setAiPolicy(e.target.value)}
+                    className="rounded-lg border border-bg-hover/60 bg-bg-secondary px-1.5 py-1 text-[11px] text-text-secondary">
+                    <option value="AI_ALLOWED">AI 允许</option>
+                    <option value="AI_EXPECTED">AI 鼓励</option>
+                    <option value="AI_LIMITED">AI 受限</option>
+                    <option value="AI_FORBIDDEN">AI 禁止</option>
+                  </select>
+                  <select aria-label="人工协助策略" value={humanPolicy} onChange={(e) => setHumanPolicy(e.target.value)}
+                    className="rounded-lg border border-bg-hover/60 bg-bg-secondary px-1.5 py-1 text-[11px] text-text-secondary">
+                    <option value="HUMAN_PRACTICE_ONLY">人工协助：仅练习</option>
+                    <option value="HUMAN_FORBIDDEN">人工协助：禁止</option>
+                    <option value="HUMAN_ALLOWED">人工协助：允许</option>
+                  </select>
+                  <select aria-label="共享隐私" value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value)}
+                    className="rounded-lg border border-bg-hover/60 bg-bg-secondary px-1.5 py-1 text-[11px] text-text-secondary">
+                    <option value="OFF">共享隐私：关</option>
+                    <option value="PRIVATE_OVERLAY">共享隐私：私有悬浮窗</option>
+                  </select>
+                </div>
+              )}
+              {space && (
                 <button onClick={() => void handleActivateLaunchPack()} disabled={activatingPack}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-accent-blue px-3.5 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50">
                   {activatingPack ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BriefcaseBusiness className="h-3.5 w-3.5" />}
-                  {activatingPack ? '正在启用…' : launchPack ? '已用于本场' : '用于本场面试'}
+                  {activatingPack ? '正在冻结…' : interviewPack ? '已冻结 · 重新冻结' : '冻结并用于本场'}
                 </button>
               )}
             </div>
@@ -333,6 +383,20 @@ export default function PrepSpace() {
               <RefreshCw className="h-4 w-4 animate-spin" />
               正在生成岗位洞察、项目技能卡和预测真题，首次约 20-60 秒，请稍候…
             </div>
+          )}
+
+          {interviewPack && (
+            <section data-testid="interview-pack-preview" className="rounded-2xl border border-status-direct/30 bg-bg-secondary p-4" aria-label="Interview Pack">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+                <span className="inline-flex items-center gap-1 font-semibold text-status-direct">
+                  <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Interview Pack 已冻结 · rev {interviewPack.revision}
+                </span>
+                <span>岗位：{interviewPack.job.title || space?.title}</span>
+                <span>事实 {interviewPack.counts.claims} · 来源 {interviewPack.counts.evidence} · 技能卡 {interviewPack.counts.skill_cards} · Stories {interviewPack.counts.stories}</span>
+                <span className="font-mono text-text-muted">{interviewPack.content_hash}</span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-text-muted">上场只读取这份快照；之后再分析其他岗位不会进入本场。需要更新时重新冻结，会生成新 revision，旧版本保留供复盘追溯。</p>
+            </section>
           )}
 
           {launchPack && (
@@ -408,6 +472,8 @@ export default function PrepSpace() {
                 )}
               </div>
 
+              <JobWorkspacePanel jdText={space.jd_text || ''} resumeText={space.resume_text || ''} />
+
               <div className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -445,7 +511,7 @@ export default function PrepSpace() {
                 {space.skill_cards.length > 0 ? (
                   <div className="grid gap-3">
                     {space.skill_cards.map((c) => (
-                      <SkillCardView key={c.id} raw={{ project_name: c.project_name, card: c.card }} />
+                      <SkillCardView key={c.id} cardId={c.id} raw={{ project_name: c.project_name, card: c.card }} />
                     ))}
                   </div>
                 ) : (

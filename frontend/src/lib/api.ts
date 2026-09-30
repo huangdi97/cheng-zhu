@@ -104,6 +104,108 @@ async function request<T = any>(url: string, opts?: RequestInit): Promise<T> {
   return body as T
 }
 
+
+// ---------------------------------------------------------------------------
+// R2 intelligence: facts & sources, InterviewPack, session claims, preflight
+// ---------------------------------------------------------------------------
+
+export type ProvenanceStatus = 'DIRECT_EVIDENCE' | 'SUPPORTING_EVIDENCE' | 'NO_EVIDENCE' | 'CONFLICTING_EVIDENCE'
+export type UserAssertionStatus = 'UNREVIEWED' | 'USER_CONFIRMED' | 'USER_DENIED'
+
+export interface FactItem {
+  id: string
+  text: string
+  type: string
+  source: string
+  provenance_status: ProvenanceStatus
+  provenance_label: string
+  user_assertion_status: UserAssertionStatus
+  user_assertion_label: string
+  source_ids: string[]
+  updated_at?: number
+}
+
+export interface FactsPayload {
+  candidate_id: string
+  facts: FactItem[]
+  evidence: Array<{ id: string; source: string; text: string }>
+}
+
+export interface PackSummary {
+  id: string
+  session_id: string
+  revision: number
+  frozen: boolean
+  content_hash: string
+  parent_id: string
+  job: { id: string; title: string; company: string }
+  counts: { claims: number; evidence: number; skill_cards: number; stories: number }
+  policies: { ai_policy: string; human_assistance_policy: string; share_privacy_policy: string; screen_context_policy: string }
+  created_at?: number
+}
+
+export interface PreflightItem {
+  key: string
+  ok: boolean
+  detail: unknown
+  note?: string
+  reason?: string
+  live_coach_enabled?: boolean
+}
+
+export interface SessionClaimItem {
+  id: string
+  text: string
+  session_status: string
+  provenance_status: string
+  review_state: string
+  qa_id: string
+  session_label?: string
+  provenance_label?: string
+}
+
+export interface FreezePackBody {
+  session_id?: string
+  job_id?: string
+  prep_space_id?: number | null
+  selected_kb_paths?: string[] | null
+  ai_policy?: string
+  human_assistance_policy?: string
+  share_privacy_policy?: string
+  screen_context_policy?: string
+}
+
+
+export interface StoryItem {
+  id: string
+  title: string
+  situation: string
+  challenge: string
+  action: string
+  result: string
+  reflection: string
+  updated_at?: number
+}
+
+export interface VoicePreferences {
+  conclusion_first: boolean
+  target_seconds: number
+  language: string
+  term_style: string
+  shape: 'bullet' | 'narrative' | string
+  banned_phrases: string[]
+}
+
+export interface SkillCardOverview {
+  id: number
+  space_id: number
+  space_title: string
+  project_name: string
+  status: string
+  user_reviewed: boolean
+  card: Record<string, unknown>
+}
+
 export interface ResumeHistoryItem {
   id: number
   original_filename: string
@@ -617,11 +719,16 @@ export const api = {
     request<{ ok: boolean }>(`/api/prep/spaces/${id}`, { method: 'DELETE' }),
   prepGenerate: (id: number) =>
     request<PrepSpace>(`/api/prep/spaces/${id}/generate`, { method: 'POST', body: '{}' }),
-  prepActivateLaunchPack: (id: number) =>
-    request<{ ok: boolean; strategy_ready: boolean; strategy_generated: boolean; pack: LaunchPack }>(
+  prepActivateLaunchPack: (id: number, policies?: Pick<FreezePackBody, 'ai_policy' | 'human_assistance_policy' | 'share_privacy_policy' | 'screen_context_policy'>) =>
+    request<{ ok: boolean; strategy_ready: boolean; strategy_generated: boolean; pack: LaunchPack; interview_pack?: PackSummary | null }>(
       `/api/prep/spaces/${id}/launch-pack`,
-      { method: 'POST', body: '{}' },
+      { method: 'POST', body: JSON.stringify(policies ?? {}) },
     ),
+  prepReviewSkillCard: (cardId: number, reviewed = true) =>
+    request<{ id: number; user_reviewed: boolean }>(`/api/prep/skill-cards/${cardId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ reviewed }),
+    }),
 
   // Mock interview practice
   prepPracticeStart: (spaceId: number, rounds = 5) =>
@@ -687,4 +794,86 @@ export const api = {
       method: 'POST',
       body: '{}',
     }),
+
+  // R2: facts & sources (provenance and user confirmation are separate axes)
+  intelFacts: () => request<FactsPayload>('/api/intelligence/facts'),
+  intelUpdateFact: (id: string, body: { user_assertion_status?: UserAssertionStatus; text?: string; source_ids?: string[] }) =>
+    request<{ id: string; updated: boolean }>(`/api/intelligence/facts/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  intelDeleteFact: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/api/intelligence/facts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  intelFactSessions: (id: string) =>
+    request<Array<{ id: string; session_id: string; revision: number; created_at: number }>>(
+      `/api/intelligence/facts/${encodeURIComponent(id)}/sessions`,
+    ),
+
+  // R2: InterviewPack
+  intelPack: (sessionId?: string) =>
+    request<{ session_id: string; frozen: boolean; pack: PackSummary | null; revisions: Array<{ id: string; revision: number; reason: string; created_at: number }> }>(
+      `/api/intelligence/pack${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`,
+    ),
+  intelFreezePack: (body: FreezePackBody) =>
+    request<PackSummary>('/api/intelligence/pack/freeze', { method: 'POST', body: JSON.stringify(body) }),
+  intelRevisePack: (packId: string, body: { job_id?: string; refresh_candidate?: boolean; reason?: string }) =>
+    request<PackSummary>(`/api/intelligence/pack/${encodeURIComponent(packId)}/revise`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  intelPreflight: (sessionId?: string) =>
+    request<{ session_id: string; can_start_formal_session: boolean; items: PreflightItem[] }>(
+      `/api/intelligence/preflight${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`,
+    ),
+
+  // R2: session claims
+  intelSessionClaims: (sessionId?: string) =>
+    request<SessionClaimItem[]>(`/api/intelligence/session-claims${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`),
+  intelResolveSessionClaim: (id: string, action: string) =>
+    request<SessionClaimItem>(`/api/intelligence/session-claims/${encodeURIComponent(id)}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+  intelReviewSessionClaim: (id: string, decision: 'confirm' | 'deny' | 'forget') =>
+    request<{ id: string; long_term_claim_id: string }>(`/api/intelligence/session-claims/${encodeURIComponent(id)}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    }),
+  intelLatency: () =>
+    request<{ summary: Record<string, unknown>; recent: Array<Record<string, unknown>>; predictive: Record<string, number> }>(
+      '/api/intelligence/latency',
+    ),
+
+  // R2: stories / voice / skill cards
+  intelStories: () => request<StoryItem[]>('/api/intelligence/stories'),
+  intelCreateStory: (body: Omit<StoryItem, 'id' | 'updated_at'>) =>
+    request<{ id: string }>('/api/intelligence/stories', { method: 'POST', body: JSON.stringify(body) }),
+  intelUpdateStory: (id: string, body: Omit<StoryItem, 'id' | 'updated_at'>) =>
+    request<{ id: string }>(`/api/intelligence/stories/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  intelDeleteStory: (id: string) =>
+    request<{ id: string; deleted: boolean }>(`/api/intelligence/stories/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  intelVoice: () => request<VoicePreferences>('/api/intelligence/voice-preferences'),
+  intelSaveVoice: (body: VoicePreferences) =>
+    request<VoicePreferences>('/api/intelligence/voice-preferences', { method: 'PUT', body: JSON.stringify(body) }),
+  intelSkillCards: () => request<SkillCardOverview[]>('/api/intelligence/skill-cards'),
+  intelReviewR2: (reviewSessionId: number) =>
+    request<{ review_session_id: number; turns: Array<Record<string, unknown>>; session_claims: Array<Record<string, unknown>> }>(
+      `/api/intelligence/review/${reviewSessionId}/r2`,
+    ),
+  intelDiagnostics: () => request<Record<string, unknown>>('/api/intelligence/diagnostics'),
+  intelExplainError: (detail: string) =>
+    request<{ kind: string; cause: string; action: string }>('/api/intelligence/diagnostics/explain', {
+      method: 'POST',
+      body: JSON.stringify({ detail }),
+    }),
+  // R2 Human Coach (candidate side)
+  coachSessions: () =>
+    request<{ sessions: Array<Record<string, unknown>>; public_relay: string }>('/api/coach/sessions'),
+  coachCreate: (body: { session_kind: 'practice' | 'live'; permissions: Record<string, boolean>; lan?: boolean; ttl_min?: number }) =>
+    request<{ id: string; urls: Record<string, string>; public_relay: string }>('/api/coach/sessions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  coachRevoke: (id: string) =>
+    request<{ id: string; revoked: boolean }>(`/api/coach/sessions/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }),
 }

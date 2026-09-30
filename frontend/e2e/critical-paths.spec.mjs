@@ -26,14 +26,19 @@ test.describe('app shell', () => {
     await expect(page.getByText('STT 就绪')).toBeVisible({ timeout: 5000 })
   })
 
-  test('module tabs switch between assist / review / knowledge / resume / job-tracker', async ({ page }) => {
+  test('R2 nav: 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置; 能力分析 lives under 复盘', async ({ page }) => {
     await page.goto('/')
 
-    const assistTab = page.getByRole('tab', { name: '实时辅助' })
-    const reviewTab = page.getByRole('tab', { name: '面试复盘' })
-    const knowledgeTab = page.getByRole('tab', { name: '能力分析' })
-    const resumeTab = page.getByRole('tab', { name: '简历优化' })
-    const jobTab = page.getByRole('tab', { name: /求职看板/ })
+    const assistTab = page.getByRole('tab', { name: '上场' })
+    const reviewTab = page.getByRole('tab', { name: '复盘', exact: true })
+    const resumeTab = page.getByRole('tab', { name: '我的成竹' })
+    const jobTab = page.getByRole('tab', { name: '求职' })
+    const rehearseTab = page.getByRole('tab', { name: '演练' })
+
+    // 准备 is not a top-level destination any more; 设置 is.
+    await expect(page.getByRole('tab', { name: '准备' })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: '能力分析' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '设置' }).first()).toBeVisible()
 
     await expect(assistTab).toHaveAttribute('aria-selected', 'true')
 
@@ -41,6 +46,7 @@ test.describe('app shell', () => {
     await expect(reviewTab).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('heading', { name: '已完成', exact: true })).toBeVisible({ timeout: 8000 })
 
+    const knowledgeTab = page.getByRole('tab', { name: '能力分析' })
     await knowledgeTab.click()
     await expect(knowledgeTab).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText('薄弱点排名')).toBeVisible({ timeout: 8000 })
@@ -51,7 +57,13 @@ test.describe('app shell', () => {
 
     await jobTab.click()
     await expect(jobTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: '岗位目标' })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('tab', { name: '投递看板' }).click()
     await expect(page.getByRole('heading', { name: '求职进度', exact: true })).toBeVisible({ timeout: 8000 })
+
+    await rehearseTab.click()
+    await expect(rehearseTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByTestId('rehearse-hub')).toBeVisible({ timeout: 8000 })
   })
 
   test('does not log uncaught errors during initial render', async ({ page }) => {

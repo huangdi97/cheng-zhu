@@ -52,9 +52,14 @@ const APP_MODE_VALUES: ReadonlySet<AppMode> = new Set([
   'prep',
 ])
 
+export type JobHubTab = 'goals' | 'board'
+export type ReviewHubTab = 'sessions' | 'ability'
+
 function readAppMode(): AppMode {
   try {
     const v = localStorage.getItem(APP_MODE_KEY)
+    // R2 IA: 能力分析 lives under 复盘 now; old persisted value maps there.
+    if (v === 'knowledge') return 'review'
     if (v && APP_MODE_VALUES.has(v as AppMode)) return v as AppMode
   } catch {
     /* ignore */
@@ -283,6 +288,10 @@ interface UiPrefsState {
   jobTrackerDeepLink: JobTrackerDeepLink | null
   reviewDeepLinkSessionId: number | null
   setAppMode: (mode: AppMode) => void
+  jobHubTab: JobHubTab
+  setJobHubTab: (tab: JobHubTab) => void
+  reviewHubTab: ReviewHubTab
+  setReviewHubTab: (tab: ReviewHubTab) => void
   setJobTrackerDeepLink: (payload: JobTrackerDeepLink | null) => void
   clearJobTrackerDeepLink: () => void
   setReviewDeepLinkSessionId: (sessionId: number | null) => void
@@ -334,14 +343,20 @@ export const useUiPrefsStore = create<UiPrefsState>((set) => ({
   assistMode: readAssistMode(),
   jobTrackerDeepLink: null,
   reviewDeepLinkSessionId: null,
+  jobHubTab: 'goals',
+  setJobHubTab: (tab) => set({ jobHubTab: tab }),
+  reviewHubTab: 'sessions',
+  setReviewHubTab: (tab) => set({ reviewHubTab: tab }),
   setAppMode: (mode) => {
     if (!APP_MODE_VALUES.has(mode)) return
+    // R2 IA: 'knowledge' (能力分析) is a tab of 复盘, not a top-level mode.
+    const target: AppMode = mode === 'knowledge' ? 'review' : mode
     try {
-      localStorage.setItem(APP_MODE_KEY, mode)
+      localStorage.setItem(APP_MODE_KEY, target)
     } catch {
       /* ignore */
     }
-    set({ appMode: mode })
+    set(mode === 'knowledge' ? { appMode: target, reviewHubTab: 'ability' } : { appMode: target })
   },
   setAssistMode: (mode) => {
     try {
@@ -351,9 +366,9 @@ export const useUiPrefsStore = create<UiPrefsState>((set) => ({
     }
     set({ assistMode: mode })
   },
-  setJobTrackerDeepLink: (payload) => set({ jobTrackerDeepLink: payload }),
+  setJobTrackerDeepLink: (payload) => set(payload ? { jobTrackerDeepLink: payload, jobHubTab: 'board' } : { jobTrackerDeepLink: payload }),
   clearJobTrackerDeepLink: () => set({ jobTrackerDeepLink: null }),
-  setReviewDeepLinkSessionId: (sessionId) => set({ reviewDeepLinkSessionId: sessionId }),
+  setReviewDeepLinkSessionId: (sessionId) => set(sessionId != null ? { reviewDeepLinkSessionId: sessionId, reviewHubTab: 'sessions' } : { reviewDeepLinkSessionId: sessionId }),
   clearReviewDeepLinkSessionId: () => set({ reviewDeepLinkSessionId: null }),
   answerPanelLayout: readAnswerPanelLayout(),
   colorScheme: readStoredColorScheme(),

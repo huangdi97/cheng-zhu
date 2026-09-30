@@ -45,11 +45,12 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
     setStarting(true)
     setError(null)
     try {
-      const res = await api.prepPracticeStart(spaceId, 5) as { practice_id: string; rounds: number; question: PrepPracticeQuestion; weak_points?: string[] }
+      const res = await api.prepPracticeStart(spaceId, 5) as { practice_id: string; rounds: number; question: PrepPracticeQuestion; weak_points?: string[]; gap_focus?: string[] }
       setPracticeId(res.practice_id)
       setRounds(res.rounds)
       setCurrent(res.question)
-      setWeakPoints(res.weak_points ?? [])
+      // Stage L2：复盘弱项 + 本岗位 Gap 一起决定出题顺序
+      setWeakPoints(Array.from(new Set([...(res.weak_points ?? []), ...(res.gap_focus ?? [])])))
     } catch (e) {
       setError(e instanceof Error ? e.message : '开始练习失败')
     } finally {

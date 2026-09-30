@@ -85,6 +85,19 @@ def _deps(
 @pytest.fixture(autouse=True)
 def reset_worker_state(monkeypatch: pytest.MonkeyPatch):
     reset_session()
+    # Intelligence state is module-level (interview state + interviewer
+    # state); without a reset it accumulates across tests and inflates the
+    # compiled state context.
+    from services.intelligence.interview_state import drop_session as _drop_intel_state
+    from services.intelligence.realtime_bridge import _INTERVIEWER_STATES
+
+    for state_key in list(_INTERVIEWER_STATES):
+        _INTERVIEWER_STATES.pop(state_key, None)
+    import core.session as _session_mod
+
+    for session_obj in list(_session_mod.sessions.values()) if hasattr(_session_mod, "sessions") else []:
+        _drop_intel_state(str(getattr(session_obj, "id", "") or ""))
+    _drop_intel_state("default")
     monkeypatch.setattr(answer_worker, "get_config", _cfg)
     monkeypatch.setattr(answer_worker, "build_system_prompt", lambda **_kwargs: "system")
     monkeypatch.setattr(
@@ -113,16 +126,20 @@ def test_process_question_parallel_streams_and_commits_answer(monkeypatch: pytes
     )
 
     event_types = [event["type"] for event in broadcasts]
+    # R2 Stage K: the Fast Cue arrives right after answer_start, before any
+    # deep token.
     assert event_types == [
         "answer_start",
+        "guidance_fast",
         "answer_think_chunk",
         "answer_chunk",
         "answer_done",
         "token_update",
     ]
     assert broadcasts[0]["model_name"] == "模型一"
-    assert broadcasts[3]["answer"] == "用 AOF 和 RDB 组合。"
-    assert broadcasts[3]["think"] == "先判断场景"
+    assert broadcasts[1]["id"] == broadcasts[0]["id"]
+    assert broadcasts[4]["answer"] == "用 AOF 和 RDB 组合。"
+    assert broadcasts[4]["think"] == "先判断场景"
     assert knowledge == [("Redis 怎么持久化？", "用 AOF 和 RDB 组合。", broadcasts[0]["id"], "")]
 
     session = get_session()
@@ -517,7 +534,7 @@ def test_process_question_parallel_marks_seq_skipped_when_aborted(
     )
 
     event_types = [event["type"] for event in broadcasts]
-    assert event_types == ["answer_start", "answer_cancelled"]
+    assert event_types == ["answer_start", "guidance_fast", "answer_cancelled"]
     assert skipped == [5]
     assert get_session().qa_pairs == []
 
@@ -1338,7 +1355,7 @@ def test_non_followup_prompt_skips_unrelated_candidate_spoken_background(monkeyp
     )
 
     prompt = seen["user"]
-    assert prompt == "MySQL 索引为什么用 B+ 树？"
+    assert prompt.endswith("MySQL 索引为什么用 B+ 树？")
     assert "[候选人回答辅助背景]" not in prompt
     assert "风控规则引擎" not in prompt
 

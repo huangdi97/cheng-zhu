@@ -1,0 +1,60 @@
+name: latency-bench
+
+# Controlled Local-CPU latency benchmark on a clean GitHub Windows runner
+# (no background load, unlike a developer machine). Runs the committed audio
+# corpus through scripts/bench_latency.py with product defaults and uploads
+# the JSON + rendered tables. Triggered manually or when the harness changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Repeats for the final local profile"
+        required: false
+        default: "3"
+  push:
+    paths:
+      - ".github/workflows/latency-bench.yml"
+      - "scripts/bench_latency.py"
+      - "backend/api/assist/**"
+      - "backend/services/intelligence/end_of_turn.py"
+      - "backend/services/intelligence/live_turn.py"
+      - "backend/services/stt/**"
+      - "backend/services/audio.py"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt psutil
+
+      - name: Download Whisper base (not timed)
+        run: python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
+
+      - name: Benchmark
+        env:
+          PYTHONIOENCODING: utf-8
+          HF_HUB_OFFLINE: "1"
+        run: |
+          python -u scripts/bench_latency.py --repeats ${{ github.event.inputs.repeats || '3' }} --out dist/latency/latency_bench_ci.json
+          python scripts/render_latency_report.py dist/latency/latency_bench_ci.json > dist/latency/latency_tables_ci.md
+          python -c "import platform,os,json;print(json.dumps({'runner':'windows-latest','cpu':platform.processor(),'threads':os.cpu_count()}))" > dist/latency/runner.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latency-bench-windows
+          path: dist/latency
+          retention-days: 30

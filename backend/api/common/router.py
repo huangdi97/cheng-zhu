@@ -17,6 +17,7 @@ from core.config import (
     normalize_llm_max_tokens, normalize_llm_temperature,
 )
 from core.env import env_int
+from core.logger import get_logger
 from services.audio import AudioCapture
 from services.stt import get_stt_engine, set_whisper_language
 from api.common.config_payload import build_config_payload
@@ -38,6 +39,8 @@ from services.storage.resume_history import (
 )
 
 router = APIRouter()
+
+_rlog = get_logger(__name__)
 
 # 简历上传阈值从 services.storage.resume_history 引入 (单一来源 / DRY)。
 # Router 层做流式校验是为了在拿到 Content-Length 或读到超限时立即拒绝,
@@ -126,6 +129,13 @@ class ConfigUpdate(BaseModel):
     # Review (面试复盘)
     review_enabled: Optional[bool] = None
     review_model_index: Optional[int] = None
+    # R2 per-session policy defaults (each frozen into the InterviewPack)
+    ai_policy_mode: Optional[str] = None
+    human_assistance_policy: Optional[str] = None
+    share_privacy_mode: Optional[str] = None
+    speech_adoption_analytics_live: Optional[bool] = None
+    fast_cue_model_index: Optional[int] = None
+    onboarding_completed: Optional[bool] = None
 
 
 _MODEL_API_KEY_KEEP = "__IA_KEEP_EXISTING_API_KEY__"
@@ -281,6 +291,18 @@ async def api_update_config(body: ConfigUpdate):
     from core.config import ModelConfig
 
     d = body.model_dump(exclude_none=True)
+    # R2: policy fields accept only their enum values (server-side, not UI).
+    _allowed_policies = {
+        "ai_policy_mode": {"AI_FORBIDDEN", "AI_LIMITED", "AI_ALLOWED", "AI_EXPECTED"},
+        "human_assistance_policy": {"HUMAN_FORBIDDEN", "HUMAN_PRACTICE_ONLY", "HUMAN_ALLOWED"},
+        "share_privacy_mode": {"OFF", "PRIVATE_OVERLAY"},
+    }
+    for _key, _allowed in _allowed_policies.items():
+        if _key in d:
+            _value = str(d[_key]).strip().upper()
+            if _value not in _allowed:
+                raise HTTPException(status_code=422, detail=f"{_key} 必须是 {'/'.join(sorted(_allowed))} 之一")
+            d[_key] = _value
     try:
         if "assist_auto_answer_mode" in d:
             mode = str(d["assist_auto_answer_mode"] or "").strip().lower()
@@ -486,6 +508,16 @@ async def api_network_info(request: Request):
     }
 
 
+@router.get("/instance")
+async def api_instance():
+    """Identify this backend process. The desktop shell starts the sidecar
+    with a random CHENGZHU_INSTANCE_NONCE and only attaches when the nonce
+    matches, so it never talks to another program on the same port."""
+    import os
+
+    return {"app": "chengzhu", "nonce": os.environ.get("CHENGZHU_INSTANCE_NONCE", ""), "pid": os.getpid()}
+
+
 @router.get("/options")
 async def api_options():
     return {
@@ -540,11 +572,39 @@ async def api_upload_resume(request: Request, file: UploadFile = File(...)):
     content = b"".join(chunks)
 
     try:
-        return await run_in_threadpool(add_upload, content, file.filename)
+        result = await run_in_threadpool(add_upload, content, file.filename)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     except Exception as e:
         raise HTTPException(500, str(e)) from e
+    if bool(get_config().intelligence_candidate_v1):
+        # Stage A: structured representation follows the upload (background).
+        _schedule_candidate_rebuild()
+    return result
+
+
+
+
+def _schedule_candidate_rebuild() -> None:
+    """Stage A: rebuild the Candidate Representation after resume activation.
+
+    Runs in a daemon thread so the upload/apply response never waits on it;
+    failures are logged and never surface to the caller.
+    """
+
+    def _worker() -> None:
+        try:
+            from services.intelligence.candidate_representation import rebuild_and_persist
+
+            cfg = get_config()
+            resume_text = str(getattr(cfg, "resume_text", "") or "")
+            if len(resume_text.strip()) >= 20:
+                history_id = getattr(cfg, "resume_active_history_id", None)
+                rebuild_and_persist(resume_text, resume_history_id=history_id)
+        except Exception as exc:  # noqa: BLE001
+            _rlog.warning("candidate rebuild after resume activation failed: %s", exc)
+
+    threading.Thread(target=_worker, name="candidate-rebuild", daemon=True).start()
 
 
 @router.delete("/resume")
@@ -586,11 +646,15 @@ async def api_resume_history_update(entry_id: int, body: ResumeHistoryUpdateBody
 async def api_resume_history_apply(entry_id: int):
     """在线程池执行，避免大 PDF 解析阻塞事件循环导致其它请求（含预览）卡死。"""
     try:
-        return await run_in_threadpool(apply_entry, entry_id)
+        result = await run_in_threadpool(apply_entry, entry_id)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+    if bool(get_config().intelligence_candidate_v1):
+        # Stage A: structured representation follows the activation (background).
+        _schedule_candidate_rebuild()
+    return result
 
 
 @router.delete("/resume/history/{entry_id}")

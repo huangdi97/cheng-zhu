@@ -45,6 +45,27 @@ class UpdateTurnRequest(BaseModel):
     analyze: bool = True
 
 
+def _decode_wav_stdlib(data: bytes) -> Optional[np.ndarray]:
+    """16-bit PCM WAV via the standard library (mono mix + linear resample)."""
+    import wave
+
+    try:
+        with wave.open(io.BytesIO(data)) as wf:
+            if wf.getsampwidth() != 2:
+                return None
+            channels, rate = wf.getnchannels(), wf.getframerate()
+            samples = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32)
+    except Exception:  # noqa: BLE001
+        return None
+    if channels > 1:
+        samples = samples.reshape(-1, channels).mean(axis=1)
+    if rate != 16000 and len(samples):
+        target = int(round(len(samples) * 16000 / rate))
+        samples = np.interp(np.linspace(0, len(samples) - 1, target), np.arange(len(samples)), samples)
+    pcm = samples.astype(np.int16)
+    return pcm if len(pcm) >= 16000 else None
+
+
 def _decode_audio_to_pcm16k(data: bytes) -> Optional[np.ndarray]:
     """把任意常见音频(wav/mp3/m4a/ogg)解码为 16k 单声道 int16 PCM。
 
@@ -55,7 +76,8 @@ def _decode_audio_to_pcm16k(data: bytes) -> Optional[np.ndarray]:
     try:
         import av
     except Exception:  # noqa: BLE001
-        return None
+        # PyAV ships with faster-whisper; without it, plain WAV still decodes.
+        return _decode_wav_stdlib(data)
     try:
         container = av.open(io.BytesIO(data))
         resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)

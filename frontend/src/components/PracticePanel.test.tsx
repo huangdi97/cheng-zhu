@@ -52,6 +52,14 @@ describe('PracticePanel', () => {
     expect(screen.getByText('0/2 轮')).toBeTruthy()
   })
 
+  it('shows review weak points and job gaps as the session focus', async () => {
+    apiMock.prepPracticeStart.mockResolvedValue({
+      practice_id: 'p1', rounds: 2, question: Q1, weak_points: ['深度'], gap_focus: ['Kubernetes', '深度'],
+    })
+    render(<PracticePanel spaceId={1} onClose={() => {}} />)
+    expect(await screen.findByText(/本场优先补弱项：深度、Kubernetes —— /)).toBeTruthy()
+  })
+
   it('submits an answer and shows feedback + next question', async () => {
     render(<PracticePanel spaceId={1} onClose={() => {}} />)
     await screen.findByText('介绍一下你的项目')

@@ -33,6 +33,19 @@ PERMISSIVE = re.compile(
 )
 
 
+# Copyleft / non-commercial Python packages that must never ship in the MIT
+# desktop build, checked by name so the gate holds even where the package is
+# not installed (the Linux CI runner lacks some Windows-only wheels).
+KNOWN_COPYLEFT_PYTHON = {
+    "pymupdf": "AGPL-3.0",
+    "fitz": "AGPL-3.0",
+    "pyqt5": "GPL-3.0",
+    "pyqt6": "GPL-3.0",
+    "ghostscript": "AGPL-3.0",
+    "mysql-connector-python": "GPL-2.0",
+}
+
+
 # Packages whose lockfile entry has no license field (legacy `licenses: [...]`
 # in their package.json). Pinned here so the output does not depend on
 # node_modules being installed (CI's backend job has none).
@@ -105,8 +118,9 @@ def _is_permissive(lic: str) -> bool:
     return any(PERMISSIVE.match(part.strip().strip("()")) for part in parts)
 
 
-def render() -> tuple[str, list[str]]:
+def render() -> tuple[str, list[str], list[str]]:
     flagged: list[str] = []
+    unverified: list[str] = []
     out = [
         "# Third-Party Notices",
         "",
@@ -151,7 +165,14 @@ def render() -> tuple[str, list[str]]:
     out += ["## Backend (Python, bundled into the sidecar)", "", "| Package | Version | License |", "|---|---|---|"]
     for name, version, lic in py_rows:
         out.append(f"| `{name}` | {version} | {lic} |")
-        if not _is_permissive(lic):
+        if name.lower() in KNOWN_COPYLEFT_PYTHON:
+            flagged.append(f"python {name}: known copyleft ({KNOWN_COPYLEFT_PYTHON[name.lower()]})")
+        elif version == "(not installed)":
+            # Cannot be read on this machine (e.g. Windows-only wheels on the
+            # Linux CI runner); the Windows release job installs every
+            # requirement and verifies it there.
+            unverified.append(name)
+        elif not _is_permissive(lic):
             flagged.append(f"python {name}=={version}: {lic}")
     out.append("")
     out += [
@@ -166,11 +187,13 @@ def render() -> tuple[str, list[str]]:
     out += ["## Needs manual review", ""]
     out += [f"- {item}" for item in flagged] or ["- none"]
     out.append("")
-    return "\n".join(out), flagged
+    return "\n".join(out), flagged, unverified
 
 
 def main() -> int:
-    text, flagged = render()
+    text, flagged, unverified = render()
+    if unverified:
+        print("Not installed here; license verified by the Windows release job:", ", ".join(unverified))
     if "--check" in sys.argv:
         current = OUT.read_text(encoding="utf-8") if OUT.is_file() else ""
         # Versions differ between machines for Python; compare only the npm

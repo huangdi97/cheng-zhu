@@ -34,3 +34,27 @@ def test_no_agpl_pdf_renderer_shipped():
     notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
     backend_table = notices.split("## Backend")[1].split("## Copyleft")[0]
     assert "AGPL" not in backend_table and "pymupdf" not in backend_table.lower()
+
+
+def _notices_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("third_party_notices", ROOT / "scripts" / "generate_third_party_notices.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_license_gate_unverified_vs_known_copyleft(monkeypatch, tmp_path):
+    """Uninstalled wheels (Linux CI) are unverified, not failures; a known
+    copyleft package fails the gate even when it is not installed."""
+    notices = _notices_module()
+    req = tmp_path / "backend" / "requirements.txt"
+    req.parent.mkdir(parents=True)
+    req.write_text("fastapi>=0.1\nsome-windows-only-wheel>=1\n", encoding="utf-8")
+    monkeypatch.setattr(notices, "ROOT", tmp_path)
+    _text, flagged, unverified = notices.render()
+    assert flagged == [] and unverified == ["some-windows-only-wheel"]
+    req.write_text("fastapi>=0.1\npymupdf>=1.24\n", encoding="utf-8")
+    _text, flagged, _unverified = notices.render()
+    assert flagged and "pymupdf" in flagged[0] and "AGPL" in flagged[0]

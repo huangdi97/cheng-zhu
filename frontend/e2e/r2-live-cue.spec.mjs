@@ -84,3 +84,46 @@ test.describe('R2 live cue-first', () => {
     await expect(page.getByText(/MIT License/)).toBeVisible()
   })
 })
+
+test.describe('R2 first-run onboarding', () => {
+  test('fresh config shows the 10-step wizard and explains a failing model check', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'home' },
+      apiOverrides: async (pathname, method) => {
+        if (pathname === '/api/config' && method === 'GET') {
+          const { resolveApiPayload } = await import('./fixtures/sample-data.mjs')
+          return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
+        }
+        if (pathname === '/api/intelligence/diagnostics') {
+          return {
+            packaged: true, data_home: 'C:/Users/u/AppData/Roaming/Chengzhu', data_dir: 'x', logs_dir: 'y', data_writable: true,
+            models: [{ index: 0, name: 'M', model: 'm', has_key: true, enabled: true }], has_usable_model: true, stt_provider: 'whisper',
+            audio: { devices: [{ id: 1, name: 'Mic', is_loopback: false }, { id: 20000, name: 'Speakers (loopback)', is_loopback: true }] },
+            has_microphone: true, has_system_audio: true, onboarding_completed: false,
+          }
+        }
+        if (pathname === '/api/models/health/0') return { ok: false }
+        if (pathname === '/api/models/health') return { health: { 0: '不可用' }, detail: { 0: 'Error code: 401 invalid api key' } }
+        if (pathname === '/api/intelligence/diagnostics/explain') return { kind: 'auth', cause: 'API Key 无效或已过期', action: '在「设置 → 模型」里重新填写 API Key。' }
+        return undefined
+      },
+    })
+    await page.goto('/')
+    const wizard = page.getByTestId('onboarding')
+    await expect(wizard).toBeVisible({ timeout: 8000 })
+    await expect(wizard.getByText('第 1 / 10 步')).toBeVisible()
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await expect(wizard.getByText('数据目录：C:/Users/u/AppData/Roaming/Chengzhu')).toBeVisible()
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await wizard.getByRole('button', { name: '测试连接' }).click()
+    await expect(wizard.getByText(/原因：API Key 无效或已过期/)).toBeVisible()
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await expect(wizard.getByLabel('选择麦克风')).toBeVisible()
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await expect(wizard.getByLabel('选择系统音频设备')).toBeVisible()
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await expect(wizard.getByRole('radio', { name: '关闭（推荐默认）' })).toBeChecked()
+  })
+})

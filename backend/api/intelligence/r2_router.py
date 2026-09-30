@@ -424,6 +424,89 @@ def latency_summary(limit: int = Query(default=200, ge=1, le=500)):
     return {"summary": latency_clock.summary(), "recent": latency_clock.recent(limit), "predictive": predictive.stats()}
 
 
+def classify_provider_error(detail: str) -> dict[str, str]:
+    """Turn a raw provider / STT error into a user-facing cause + next step
+    (Stage AA: errors must never live only in a terminal)."""
+    text = str(detail or "").lower()
+    rules = [
+        (("401", "unauthorized", "invalid api key", "incorrect api key", "authentication"), "auth", "API Key 无效或已过期", "在「设置 → 模型」里重新填写 API Key。"),
+        (("403", "forbidden", "permission"), "forbidden", "账号无权访问该模型", "确认账号已开通该模型，或换一个模型名。"),
+        (("404", "not found", "model_not_found", "does not exist"), "not_found", "模型名或接口地址不存在", "检查 Base URL 与模型名是否匹配服务商文档。"),
+        (("429", "rate limit", "quota", "insufficient"), "quota", "额度不足或触发限流", "检查账户余额，或稍后重试。"),
+        (("timeout", "timed out", "超时"), "timeout", "连接服务商超时", "检查网络 / 代理，或换一个更近的接口地址。"),
+        (("connection", "resolve", "unreachable", "ssl", "proxy", "refused"), "network", "无法连接服务商", "检查网络、代理和 Base URL。"),
+        (("download", "hugging", "hf_hub", "snapshot"), "stt_download", "本地识别模型下载失败", "检查网络后重试；也可以在「设置 → 语音」切换到云端识别。"),
+        (("loading", "加载"), "loading", "模型正在加载", "首次加载本地识别模型需要一点时间，请稍候。"),
+        (("no device", "invalid device", "device unavailable", "无可用设备"), "no_device", "没有可用的音频设备", "连接麦克风/耳机后点击重新检测。"),
+        (("permission denied", "access denied", "拒绝"), "permission", "没有音频权限", "在系统设置里允许成竹使用麦克风后重试。"),
+    ]
+    for keys, kind, cause, action in rules:
+        if any(k in text for k in keys):
+            return {"kind": kind, "cause": cause, "action": action}
+    return {"kind": "unknown", "cause": "未知错误", "action": "查看日志目录中的 app.log，或把错误信息反馈给我们。"}
+
+
+@router.get("/diagnostics")
+def diagnostics():
+    """First-run / troubleshooting snapshot: where data lives, whether it is
+    writable, models, STT and audio devices. No secrets are returned."""
+    import tempfile
+
+    from core.config import get_config
+    from services.storage.paths import app_home, data_dir, is_packaged_home, logs_dir
+
+    cfg = get_config()
+    writable = True
+    try:
+        with tempfile.NamedTemporaryFile(dir=data_dir(), delete=True):
+            pass
+    except OSError:
+        writable = False
+    models = list(getattr(cfg, "models", []) or [])
+    configured = [
+        {"index": i, "name": str(getattr(m, "name", "")), "model": str(getattr(m, "model", "")), "has_key": bool(str(getattr(m, "api_key", "") or "").strip()) and not str(getattr(m, "api_key", "")).startswith("YOUR_"), "enabled": bool(getattr(m, "enabled", True))}
+        for i, m in enumerate(models)
+    ]
+    audio: dict[str, Any] = {"devices": [], "error": ""}
+    try:
+        from services.audio import AudioCapture
+
+        devices = AudioCapture.list_devices()
+        audio["devices"] = [
+            {"id": d.get("id"), "name": d.get("name"), "is_loopback": bool(d.get("is_loopback") or d.get("loopback"))}
+            for d in devices
+        ]
+        audio["platform"] = AudioCapture.get_platform_info(devices=devices)
+    except Exception as exc:  # noqa: BLE001
+        audio["error"] = str(exc)
+        audio["explain"] = classify_provider_error(str(exc))
+    inputs = [d for d in audio["devices"] if not d["is_loopback"]]
+    loopbacks = [d for d in audio["devices"] if d["is_loopback"]]
+    return {
+        "packaged": is_packaged_home(),
+        "data_home": app_home(),
+        "data_dir": data_dir(),
+        "logs_dir": logs_dir(),
+        "data_writable": writable,
+        "models": configured,
+        "has_usable_model": any(m["has_key"] and m["enabled"] for m in configured),
+        "stt_provider": str(getattr(cfg, "stt_provider", "") or ""),
+        "audio": audio,
+        "has_microphone": bool(inputs),
+        "has_system_audio": bool(loopbacks),
+        "onboarding_completed": bool(getattr(cfg, "onboarding_completed", False)),
+    }
+
+
+class ExplainErrorRequest(BaseModel):
+    detail: str = Field(default="", max_length=4000)
+
+
+@router.post("/diagnostics/explain")
+def explain_error(body: ExplainErrorRequest):
+    return classify_provider_error(body.detail)
+
+
 @router.get("/preflight")
 def preflight(session_id: Optional[str] = None):
     """Preflight R2 checklist. A formal session requires a frozen pack."""

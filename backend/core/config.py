@@ -203,6 +203,8 @@ class AppConfig(BaseModel):
     intelligence_fast_cue_v2: bool = True
     # R2 Stage K：L1 fast cue 使用的模型序号（-1 = 仅 L0 确定性 cue）
     fast_cue_model_index: int = -1
+    # R2 Stage AA：首次运行引导是否完成
+    onboarding_completed: bool = False
     # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）
     raw_audio_retention_sessions: int = 0
 
@@ -433,7 +435,16 @@ def _load_config() -> AppConfig:
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return AppConfig(**json.load(f))
+                data = json.load(f)
+            if isinstance(data, dict) and "onboarding_completed" not in data:
+                # Pre-R2 installs that already have a real key are onboarded;
+                # only genuinely fresh configs see the first-run wizard.
+                data["onboarding_completed"] = any(
+                    str((m or {}).get("api_key") or "").strip()
+                    and not str((m or {}).get("api_key") or "").startswith("YOUR_")
+                    for m in (data.get("models") or [])
+                )
+            return AppConfig(**data)
         except Exception as e:
             print(f"[Config] 配置文件解析失败: {e}，使用默认配置")
     return AppConfig()

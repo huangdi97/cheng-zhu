@@ -18,6 +18,7 @@ import ControlBar from '@/components/ControlBar'
 import CopilotHintPanel from '@/components/CopilotHintPanel'
 import LivePackBar from '@/components/live/LivePackBar'
 import SessionClaimWarnings from '@/components/live/SessionClaimWarnings'
+import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 import QuestionBoundaryPanel from '@/components/QuestionBoundaryPanel'
 import ScreenshotModePanel from '@/components/ScreenshotModePanel'
 import SettingsDrawer from '@/components/SettingsDrawer'
@@ -741,6 +742,7 @@ export default function App() {
 
       <SettingsDrawer />
       <KnowledgeDrawer />
+      <OnboardingWizard />
         </div>
       </div>
     </div>

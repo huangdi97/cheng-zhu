@@ -135,6 +135,7 @@ class ConfigUpdate(BaseModel):
     share_privacy_mode: Optional[str] = None
     speech_adoption_analytics_live: Optional[bool] = None
     fast_cue_model_index: Optional[int] = None
+    onboarding_completed: Optional[bool] = None
 
 
 _MODEL_API_KEY_KEEP = "__IA_KEEP_EXISTING_API_KEY__"

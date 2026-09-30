@@ -120,6 +120,7 @@ def build_config_payload(cfg) -> dict:
         "share_privacy_mode": str(getattr(cfg, "share_privacy_mode", "OFF") or "OFF"),
         "speech_adoption_analytics_live": bool(getattr(cfg, "speech_adoption_analytics_live", False)),
         "fast_cue_model_index": int(getattr(cfg, "fast_cue_model_index", -1)),
+        "onboarding_completed": bool(getattr(cfg, "onboarding_completed", False)),
         "written_exam_think": bool(getattr(cfg, "written_exam_think", False)),
         "kb_enabled": bool(getattr(cfg, "kb_enabled", False)),
         "kb_top_k": int(getattr(cfg, "kb_top_k", 4) or 4),

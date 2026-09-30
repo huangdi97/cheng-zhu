@@ -860,4 +860,10 @@ export const api = {
     request<{ review_session_id: number; turns: Array<Record<string, unknown>>; session_claims: Array<Record<string, unknown>> }>(
       `/api/intelligence/review/${reviewSessionId}/r2`,
     ),
+  intelDiagnostics: () => request<Record<string, unknown>>('/api/intelligence/diagnostics'),
+  intelExplainError: (detail: string) =>
+    request<{ kind: string; cause: string; action: string }>('/api/intelligence/diagnostics/explain', {
+      method: 'POST',
+      body: JSON.stringify({ detail }),
+    }),
 }

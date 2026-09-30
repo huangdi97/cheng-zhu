@@ -146,6 +146,7 @@ export interface AppConfig {
   share_privacy_mode?: string
   speech_adoption_analytics_live?: boolean
   fast_cue_model_index?: number
+  onboarding_completed?: boolean
 }
 
 export type QAStatus = 'streaming' | 'done' | 'cancelled' | 'error'

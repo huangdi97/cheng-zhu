@@ -147,8 +147,13 @@ def test_helper_page_keeps_token_out_of_requests(client):
 
 
 def test_helper_app_exposes_only_coach_routes():
+    """Behavioral check (independent of FastAPI's internal route types): the
+    LAN helper app serves the coach page and endpoints and nothing else."""
     from api.coach.router import helper_app
 
-    paths = {getattr(r, "path", "") for r in helper_app.routes}
-    assert paths == {"/coach", "/coach/api/state", "/coach/api/cue", "/coach/api/voice"}
-    assert SimpleNamespace  # keep import used
+    c = TestClient(helper_app)
+    assert c.get("/coach").status_code == 200
+    assert c.get("/coach/api/state").status_code == 401
+    assert c.post("/coach/api/cue", json={"text": "x"}).status_code == 401
+    for path in ("/api/options", "/api/config", "/api/intelligence/facts", "/docs", "/openapi.json", "/"):
+        assert c.get(path).status_code == 404, path

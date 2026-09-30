@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from typing import Any, Callable, Optional
 
 from services.stt import (
@@ -24,6 +26,34 @@ class PendingASRGroup:
     first_mono: float = 0.0
     last_mono: float = 0.0
     has_promote: bool = False
+
+
+@dataclass
+class ProvisionalCue:
+    """A Fast Cue emitted from a stable streaming partial before the
+    authoritative (batch) transcription confirmed the question."""
+    qa_id: str
+    question: str
+    emitted_mono: float
+
+
+_QUESTION_NOISE = re.compile(r"[\s\u3000，,。.？?！!、；;：:\"'\u201c\u201d\u2018\u2019]+")
+
+
+def _norm_question(text: str) -> str:
+    return _QUESTION_NOISE.sub("", (text or "").lower())
+
+
+def reconcile_relation(provisional: str, final: str) -> str:
+    """same | corrected (same question, better text) | replaced (different question)."""
+    a, b = _norm_question(provisional), _norm_question(final)
+    if not a or not b:
+        return "replaced"
+    if a == b:
+        return "same"
+    if a in b or b in a or SequenceMatcher(None, a, b).ratio() >= 0.6:
+        return "corrected"
+    return "replaced"
 
 
 class AssistAsrStateMachine:
@@ -53,6 +83,95 @@ class AssistAsrStateMachine:
         self.merge_mono_first: Optional[float] = None
         self.merge_mono_last: Optional[float] = None
         self.pending_group: Optional[PendingASRGroup] = None
+        self.provisional: Optional[ProvisionalCue] = None
+        self._provisional_seq = 0
+        self.provisional_stats = {"emitted": 0, "same": 0, "corrected": 0, "replaced": 0, "retracted": 0}
+
+    # ------------------------------------------------------------------
+    # Provisional Fast Cue (streaming partial) + reconcile
+    # ------------------------------------------------------------------
+
+    def submit_provisional(self, cfg, session, partial: str, source: str, now_mono: float) -> Optional[str]:
+        """Emit a Fast Cue from a stable, end-covering streaming partial.
+
+        Read-only: no turn id, no interview-state event, no answer task. The
+        authoritative transcription later confirms it on the same card
+        (``same``), corrects the text (``corrected``) or replaces it
+        (``replaced``); an unconfirmed cue is retracted.
+        """
+        if self.early_cue is None or not bool(getattr(cfg, "intelligence_early_cue", True)):
+            return None
+        if not bool(getattr(cfg, "assist_provisional_cue", True)) or not is_auto_answer_enabled(cfg):
+            return None
+        if self.provisional is not None:
+            return None
+        text = (partial or "").strip()
+        kind, cleaned = classify_asr_question_candidate(text, getattr(cfg, "transcription_min_sig_chars", 2))
+        if not cleaned or kind == "ignore":
+            return None
+        prefix = list(self.merge_parts)
+        if self.pending_group is not None:
+            prefix = list(self.pending_group.utterances) + prefix
+        last_qa = session.get_last_qa() if hasattr(session, "get_last_qa") else None
+        parsed = parse_question_turn(
+            prefix + [text],
+            previous_question=str(getattr(last_qa, "question", "") or ""),
+        )
+        if not parsed.clusters:
+            return None
+        # The partial is the newest speech: it belongs to the last cluster
+        # (earlier clusters come from text already assembling in this turn).
+        cluster = parsed.clusters[-1]
+        self._provisional_seq += 1
+        qa_id = f"qa-p{self._provisional_seq}-{int(time.time() * 1000)}"
+        question = cluster.task_question()
+        try:
+            self.early_cue(question, qa_id, {
+                "source": source,
+                "question_type": cluster.question_type,
+                "provisional": True,
+                "display_question": cluster.display_question(),
+            })
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("provisional cue failed: %s", exc)
+            return None
+        self.provisional = ProvisionalCue(qa_id=qa_id, question=question, emitted_mono=now_mono)
+        self.provisional_stats["emitted"] += 1
+        self.logger.info("ASR_PROVISIONAL_CUE qa_id=%s text=%r", qa_id, question[:120])
+        return qa_id
+
+    def _provisional_cluster_index(self, clusters) -> int:
+        """The final cluster that confirms the provisional cue: the best
+        textual match, else the last cluster (the newest speech)."""
+        prov = self.provisional
+        if prov is None or not clusters:
+            return -1
+        best, best_score = len(clusters) - 1, -1.0
+        for index, cluster in enumerate(clusters):
+            relation = reconcile_relation(prov.question, cluster.task_question())
+            score = {"same": 2.0, "corrected": 1.0}.get(relation, 0.0) + SequenceMatcher(
+                None, _norm_question(prov.question), _norm_question(cluster.task_question())
+            ).ratio()
+            if score > best_score:
+                best, best_score = index, score
+        return best
+
+    def retract_provisional(self, reason: str) -> None:
+        prov = self.provisional
+        if prov is None:
+            return
+        self.provisional = None
+        self.provisional_stats["retracted"] += 1
+        self.logger.info("ASR_PROVISIONAL_RETRACT qa_id=%s reason=%s", prov.qa_id, reason)
+        self.broadcast({"type": "guidance_fast_retract", "id": prov.qa_id, "reason": reason})
+
+    def expire_provisional(self, cfg, now_mono: float) -> None:
+        prov = self.provisional
+        if prov is None or self.pending_group is not None or self.merge_parts:
+            return
+        ttl = float(getattr(cfg, "assist_provisional_ttl_sec", 8.0) or 8.0)
+        if now_mono - prov.emitted_mono >= ttl:
+            self.retract_provisional("not_confirmed")
 
     def reset_merge_buffer(self):
         self.merge_parts = []
@@ -91,6 +210,7 @@ class AssistAsrStateMachine:
                 "message": "这段内容不像完整问题，已继续等待",
                 "raw_text": " ".join(group.utterances),
             })
+            self.retract_provisional("final_not_a_question")
             return
         last_qa = session.get_last_qa() if hasattr(session, "get_last_qa") else None
         parsed = parse_question_turn(
@@ -104,6 +224,7 @@ class AssistAsrStateMachine:
                 "message": "未识别到可回答的问题",
                 **parsed.payload(),
             })
+            self.retract_provisional("final_not_a_question")
             return
         now_mono = self.clock()
         high_churn_short = self.is_high_churn_submission(cfg, now_mono)
@@ -126,15 +247,31 @@ class AssistAsrStateMachine:
             **parsed.payload(),
         })
         cluster_count = len(parsed.clusters)
+        prov_index = self._provisional_cluster_index(parsed.clusters)
         for cluster_index, cluster in enumerate(parsed.clusters):
             # The answer id is assigned here so an early Fast Cue (emitted
             # before the late-constraint grace) and the later deep answer
             # land on the same card.
             qa_id = f"qa-t{turn_id}-{cluster_index}-{int(time.time() * 1000)}"
             early = bool(getattr(cfg, "intelligence_early_cue", True)) and self.early_cue is not None
-            if early:
+            prov = self.provisional if cluster_index == prov_index else None
+            relation = ""
+            if prov is not None:
+                # The authoritative transcription confirms the provisional cue
+                # on the same card; a changed question re-renders the cue.
+                self.provisional = None
+                qa_id = prov.qa_id
+                relation = reconcile_relation(prov.question, cluster.task_question())
+                self.provisional_stats[relation] += 1
+                self.logger.info("ASR_PROVISIONAL_RECONCILE qa_id=%s relation=%s", qa_id, relation)
+            if early and relation != "same":
                 try:
-                    self.early_cue(cluster.task_question(), qa_id, {"source": group.source, "question_type": cluster.question_type})
+                    self.early_cue(cluster.task_question(), qa_id, {
+                        "source": group.source,
+                        "question_type": cluster.question_type,
+                        "display_question": cluster.display_question(),
+                        **({"reconciled": relation} if relation else {}),
+                    })
                 except Exception as exc:  # noqa: BLE001
                     early = False
                     self.logger.warning("early cue failed: %s", exc)
@@ -147,6 +284,8 @@ class AssistAsrStateMachine:
                     {
                         "qa_id": qa_id,
                         "early_cue_emitted": early,
+                        "provisional_relation": relation,
+                        "question_confirmed_mono": now_mono,
                         "origin": "asr",
                         "asr_kind": "promote" if group.has_promote else "candidate",
                         "asr_turn_id": turn_id,
@@ -167,6 +306,7 @@ class AssistAsrStateMachine:
     def try_flush_question_group(self, cfg, session, now_mono: float, force: bool = False) -> None:
         group = self.pending_group
         if group is None:
+            self.expire_provisional(cfg, now_mono)
             return
         confirm = _asr_confirm_window_sec(cfg)
         fast_confirm = _asr_fast_confirm_sec(cfg)

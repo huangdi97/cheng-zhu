@@ -71,11 +71,16 @@ class WhisperStreamSession:
         min_window_sec: float = DEFAULT_MIN_WINDOW_SEC,
         max_window_sec: float = DEFAULT_MAX_WINDOW_SEC,
         engine: Optional[STTEngine] = None,
+        on_decode: Optional[Callable[[str, int], None]] = None,
     ):
         self._engine = engine if engine is not None else _get_stream_engine(model_size, language)
         self._language = (language or "zh").strip() or "zh"
         self._position = position or "后端开发"
         self._on_partial = on_partial
+        # Called after every successful decode (changed or not) with the text
+        # and how many fed samples the decoded window covered, so the
+        # end-of-turn detector knows whether a partial includes the speech end.
+        self._on_decode = on_decode
         self._interval_sec = max(MIN_INTERVAL_SEC, float(interval_sec or DEFAULT_INTERVAL_SEC))
         self._min_window_sec = max(0.2, float(min_window_sec or DEFAULT_MIN_WINDOW_SEC))
         self._max_window_sec = max(2.0, float(max_window_sec or DEFAULT_MAX_WINDOW_SEC))
@@ -88,6 +93,8 @@ class WhisperStreamSession:
         self._started = False
         self._last_text = ""
         self._last_decode_mono = 0.0
+        self._last_decoded_samples = -1
+        self._last_decode_wall = 0.0
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -126,6 +133,15 @@ class WhisperStreamSession:
             self._thread.join(timeout=10)
         return self._decode_now(final=True)
 
+    def stop(self) -> None:
+        """Stop without a final decode (the caller already has a partial that
+        covers the speech end; a redundant decode would only compete with the
+        authoritative batch transcription for CPU)."""
+        if not self._started:
+            return
+        self._stop.set()
+        self._wake.set()
+
     def is_loaded(self) -> bool:
         return bool(self._engine is not None and self._engine.is_loaded)
 
@@ -144,13 +160,20 @@ class WhisperStreamSession:
         while not self._stop.is_set():
             now = time.monotonic()
             since_last = now - self._last_decode_mono
-            if since_last < self._interval_sec:
-                self._wake.wait(max(0.01, self._interval_sec - since_last))
+            # Adaptive throttle: on a busy CPU a preview decode can take longer
+            # than the interval; waiting 1.5x the last decode keeps previews
+            # under ~40% of the decoder so the authoritative final is not
+            # queued behind an in-flight preview when the speaker stops.
+            interval = max(self._interval_sec, 1.5 * self._last_decode_wall)
+            if since_last < interval:
+                self._wake.wait(max(0.01, interval - since_last))
                 self._wake.clear()
                 continue
             self._wake.clear()
+            started = time.monotonic()
             self._decode_now(final=False)
             self._last_decode_mono = time.monotonic()
+            self._last_decode_wall = self._last_decode_mono - started
 
     def _window_audio(self) -> Optional[np.ndarray]:
         with self._lock:
@@ -174,9 +197,16 @@ class WhisperStreamSession:
         if not _lock.acquire(blocking=False):
             return ""
         try:
+            with self._lock:
+                covered = self._buffer_samples
+            if not final and covered == self._last_decoded_samples:
+                # Nothing new was fed: the same window would decode to the
+                # same text and only take the CPU from the batch final.
+                return self._last_text
             audio = self._window_audio()
             if audio is None or len(audio) < int(self._min_window_sec * TARGET_SAMPLE_RATE):
                 return ""
+            self._last_decoded_samples = covered
             text = self._engine.transcribe_fast(
                 audio,
                 TARGET_SAMPLE_RATE,
@@ -184,6 +214,15 @@ class WhisperStreamSession:
                 language=self._language,
             )
             text = (text or "").strip()
+            if self._stop.is_set() and not final:
+                # Stopped mid-decode: this result belongs to a finished
+                # segment and must not reach the next turn's tracker.
+                return ""
+            if self._on_decode is not None and text:
+                try:
+                    self._on_decode(text, covered)
+                except Exception:
+                    pass
             if not text or text == self._last_text:
                 return text
             self._last_text = text

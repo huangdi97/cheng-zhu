@@ -124,8 +124,13 @@ class InterviewerSegment:
     started_mono: float
     ended_mono: float
     audio_sec: float
-    flush_reason: Literal["silence", "max_speech", "pause_flush", "stop_flush"]
+    flush_reason: Literal["silence", "eot", "max_speech", "pause_flush", "stop_flush", "speculative"]
     capture_is_loopback: bool
+    # v1.2-R2 speculative final: a decode of the pending audio started in the
+    # trailing silence. ``spec_key`` = voiced-end sample count it covers; a
+    # real segment with the same key reuses that transcription.
+    speculative: bool = False
+    spec_key: Optional[int] = None
 
 
 class _InterviewerRuntime:
@@ -142,6 +147,9 @@ class _InterviewerRuntime:
         self.max_observed_segment_queue_depth = 0
         self.loopback_discontinuity_count = 0
         self.max_raw_chunk_samples = 0
+        self.spec_results: dict[int, str] = {}
+        self.spec_lock = threading.Lock()
+        self.turn_tracker = None
 
 
 _interviewer_runtime: Optional[_InterviewerRuntime] = None
@@ -381,9 +389,11 @@ def _maybe_build_interviewer_segment(
     session,
     speech_audio,
     *,
-    flush_reason: Literal["silence", "max_speech", "pause_flush", "stop_flush"],
+    flush_reason: Literal["silence", "eot", "max_speech", "pause_flush", "stop_flush"],
     segment_started_mono: float,
     segment_ended_mono: float,
+    trailing_sec: Optional[float] = None,
+    spec_key: Optional[int] = None,
 ) -> bool:
     if speech_audio is None:
         return False
@@ -401,7 +411,10 @@ def _maybe_build_interviewer_segment(
     try:
         from services.intelligence import latency_clock
 
-        trailing = float(getattr(cfg, "silence_duration", 1.2) or 1.2) if flush_reason == "silence" else 0.0
+        if trailing_sec is not None:
+            trailing = max(0.0, float(trailing_sec))
+        else:
+            trailing = float(getattr(cfg, "silence_duration", 1.2) or 1.2) if flush_reason in ("silence", "eot") else 0.0
         latency_clock.mark_speech_end(
             str(getattr(session, "session_id", "") or "default"),
             max(started_mono, ended_mono - trailing),
@@ -416,6 +429,7 @@ def _maybe_build_interviewer_segment(
         audio_sec=audio_sec,
         flush_reason=flush_reason,
         capture_is_loopback=bool(getattr(session, "capture_is_loopback", False)),
+        spec_key=spec_key,
     )
     _emit_interviewer_segment(runtime, segment)
     return True
@@ -893,6 +907,15 @@ def _try_flush_asr_merge_buffer(cfg, session, now_mono: float, force: bool = Fal
 def _append_transcription_fragment(cfg, session, pub: str, now_mono: float, force_flush_tail: bool = False) -> None:
     with _asr_state_lock:
         _asr_state.append_transcription_fragment(cfg, session, pub, now_mono, force_flush_tail)
+
+
+def _submit_provisional_cue(cfg, session, text: str) -> None:
+    source = "conversation_loopback" if getattr(session, "capture_is_loopback", False) else "conversation_mic"
+    try:
+        with _asr_state_lock:
+            _asr_state.submit_provisional(cfg, session, text, source, time.monotonic())
+    except Exception as exc:  # noqa: BLE001
+        _elog.warning("provisional cue submit failed: %s", exc)
 
 
 def _note_interviewer_speech_activity(now_mono: float) -> None:
@@ -1418,19 +1441,32 @@ def _interviewer_asr_worker(runtime: _InterviewerRuntime, session, cfg) -> None:
         except queue.Empty:
             continue
         try:
+            if segment.speculative:
+                _run_speculative_segment(runtime, segment)
+                continue
             queue_delay_ms = max(0.0, (time.monotonic() - segment.ended_mono) * 1000.0)
             broadcast({"type": "transcribing", "value": True})
             t0 = time.monotonic()
             current_cfg = get_config()
-            text = transcribe_with_fallback(
-                segment.audio,
-                segment.sample_rate,
-                position=current_cfg.position,
-                language=current_cfg.language,
-                scope="interviewer",
-                fallback_on_empty_remote=True,
-            )
-            text = postprocess_interview_transcription(text)
+            reused = None
+            if segment.spec_key is not None:
+                with runtime.spec_lock:
+                    reused = runtime.spec_results.pop(segment.spec_key, None)
+            if reused is not None:
+                # Same audio (only more trailing silence) was already decoded
+                # speculatively; Whisper's VAD filter drops that silence.
+                text = reused
+                _ilog.info("INTERVIEWER_ASR_SPECULATIVE_REUSED key=%s", segment.spec_key)
+            else:
+                text = transcribe_with_fallback(
+                    segment.audio,
+                    segment.sample_rate,
+                    position=current_cfg.position,
+                    language=current_cfg.language,
+                    scope="interviewer",
+                    fallback_on_empty_remote=True,
+                )
+                text = postprocess_interview_transcription(text)
             stt_ms = (time.monotonic() - t0) * 1000
             pub = transcription_for_publish(
                 text,
@@ -1464,7 +1500,52 @@ def _interviewer_asr_worker(runtime: _InterviewerRuntime, session, cfg) -> None:
             _elog.error("interviewer ASR segment error: %s", e, exc_info=True)
         finally:
             runtime.segment_queue.task_done()
-            broadcast({"type": "transcribing", "value": False})
+            if not segment.speculative:
+                broadcast({"type": "transcribing", "value": False})
+
+
+def _run_speculative_segment(runtime: _InterviewerRuntime, segment: InterviewerSegment) -> None:
+    """Decode the pending audio during the trailing silence (v1.2-R2).
+
+    The result is both the end-covering "partial" for the end-of-turn
+    detector (-> provisional Fast Cue) and, when the VAD flushes the same
+    audio, the authoritative transcription (no second decode).
+    """
+    t0 = time.monotonic()
+    current_cfg = get_config()
+    text = transcribe_with_fallback(
+        segment.audio,
+        segment.sample_rate,
+        position=current_cfg.position,
+        language=current_cfg.language,
+        scope="interviewer",
+        fallback_on_empty_remote=True,
+    )
+    text = postprocess_interview_transcription(text)
+    with runtime.spec_lock:
+        runtime.spec_results[int(segment.spec_key or 0)] = text
+        while len(runtime.spec_results) > 4:
+            runtime.spec_results.pop(next(iter(runtime.spec_results)))
+    tracker = runtime.turn_tracker
+    if tracker is not None and text:
+        tracker.on_speculative_final(int(segment.spec_key or 0), text, len(segment.audio))
+    _ilog.info(
+        "INTERVIEWER_ASR_SPECULATIVE key=%s raw=%.1fs stt=%.0fms text=%r",
+        segment.spec_key,
+        segment.audio_sec,
+        (time.monotonic() - t0) * 1000,
+        (text or "")[:80],
+    )
+
+
+def _speculative_final_enabled(cfg) -> bool:
+    provider = (getattr(cfg, "stt_provider", "whisper") or "whisper").strip()
+    # Only for the local engine: a remote provider would bill a second call.
+    return (
+        provider == "whisper"
+        and bool(getattr(cfg, "assist_adaptive_eot", True))
+        and bool(getattr(cfg, "assist_speculative_final", True))
+    )
 
 
 def _interview_worker():
@@ -1499,6 +1580,28 @@ def _interview_worker():
     _reset_pending_asr_group()
     pause_flushed = False
 
+    # v1.2-R2 latency closure: adaptive end of turn driven by the streaming
+    # partial; silence_duration stays the hard timeout.
+    from services.intelligence.end_of_turn import EndOfTurnConfig
+    from services.intelligence.live_turn import LiveTurnTracker
+
+    turn_tracker = LiveTurnTracker(
+        sample_rate=AudioCapture.SAMPLE_RATE,
+        config=EndOfTurnConfig(
+            min_silence_sec=float(getattr(cfg, "assist_eot_min_silence_sec", 0.30) or 0.30),
+            hard_timeout_sec=float(getattr(cfg, "silence_duration", 1.2) or 1.2),
+        ),
+    )
+    voice_threshold = float(getattr(cfg, "silence_threshold", 0.01) or 0.01)
+    runtime.turn_tracker = turn_tracker
+    speculative_on = _speculative_final_enabled(cfg)
+    spec_min_silence = turn_tracker.detector.config.min_silence_sec
+    spec_state: dict[str, Optional[int]] = {"key": None}
+    if bool(getattr(cfg, "assist_adaptive_eot", True)):
+        vad.end_of_turn_probe = lambda silence: turn_tracker.probe(silence, vad.voiced_end_samples)
+        vad.end_of_turn_min_silence = turn_tracker.detector.config.min_silence_sec
+        vad.on_speech_resumed = turn_tracker.detector.note_resumed_after
+
     # Live streaming preview (additive): feed growing pending audio to Doubao
     # streaming ASR and broadcast partials; the batch segment path remains the
     # authoritative final transcription, so failures here never regress output.
@@ -1513,6 +1616,8 @@ def _interview_worker():
 
     def _on_interviewer_partial(text: str) -> None:
         try:
+            if dstream_is_doubao:
+                turn_tracker.on_remote_partial(text)
             if (text or "").strip():
                 _note_interviewer_speech_activity(time.monotonic())
                 if len((text or "").strip()) >= 4:
@@ -1550,6 +1655,8 @@ def _interview_worker():
                 dstream = DoubaoStreamSession(
                     eng,
                     on_partial=_on_interviewer_partial,
+                    # Definite utterance = the provider's endpoint event.
+                    on_final=lambda _text: turn_tracker.on_remote_endpoint(),
                     on_error=_on_interviewer_stream_error,
                 )
                 dstream.start()
@@ -1565,6 +1672,13 @@ def _interview_worker():
         try:
             lang = (getattr(cfg, "whisper_language", "auto") or "auto").strip()
             stream_lang = lang if lang and lang != "auto" else "zh"
+            if not lang or lang == "auto":
+                # Follow the batch engine's confidently pinned language so an
+                # English interview does not get zh-forced previews.
+                try:
+                    stream_lang = getattr(get_stt_engine(), "sticky_language", None) or stream_lang
+                except Exception:  # noqa: BLE001
+                    pass
             stream_engine = get_stt_engine(
                 provider="whisper",
                 model_size=(getattr(cfg, "whisper_model", "base") or "base").strip(),
@@ -1576,6 +1690,7 @@ def _interview_worker():
                 position=getattr(cfg, "position", "后端开发"),
                 engine=stream_engine,
                 on_partial=_on_interviewer_partial,
+                on_decode=lambda text, covered: turn_tracker.on_local_decode(text, covered),
                 interval_sec=max(
                     0.12,
                     float(getattr(cfg, "whisper_stream_interval_ms", 280) or 280) / 1000.0,
@@ -1722,13 +1837,46 @@ def _interview_worker():
                 for vad_chunk in _iter_vad_feed_chunks(chunk):
                     offset_samples += len(vad_chunk)
                     sub_ended_mono = batch_start_mono + (offset_samples / AudioCapture.SAMPLE_RATE)
-                    if AudioCapture.compute_energy(vad_chunk) > live_feed_gate:
+                    chunk_energy = AudioCapture.compute_energy(vad_chunk)
+                    if chunk_energy > voice_threshold:
+                        turn_tracker.note_voice(sub_ended_mono)
+                    if chunk_energy > live_feed_gate:
                         _feed_live_doubao(vad_chunk)
                     speech_audio = vad.feed(vad_chunk)
                     if speech_audio is None:
-                        # whisper 兜底仍按段增量喂（豆包走上面的连续流）
+                        in_tail = (
+                            speculative_on
+                            and not dstream_is_doubao
+                            and getattr(vad, "has_pending_audio", False)
+                            and vad.trailing_silence_sec >= spec_min_silence
+                        )
+                        if in_tail and spec_state["key"] != vad.voiced_end_samples and not _pause_event.is_set():
+                            # Speculative final: decode what was said so far now,
+                            # while the VAD is still waiting for the hard timeout.
+                            spec_audio = vad.pending_audio()
+                            if (
+                                spec_audio is not None
+                                and len(spec_audio) >= _assist_vad_min_samples(cfg)
+                                and _interviewer_segment_backlog(runtime) == 0
+                            ):
+                                spec_state["key"] = vad.voiced_end_samples
+                                turn_tracker.expect_speculative(vad.voiced_end_samples)
+                                runtime.segment_queue.put_nowait(InterviewerSegment(
+                                    audio=spec_audio,
+                                    sample_rate=AudioCapture.SAMPLE_RATE,
+                                    started_mono=sub_ended_mono - len(spec_audio) / AudioCapture.SAMPLE_RATE,
+                                    ended_mono=sub_ended_mono,
+                                    audio_sec=len(spec_audio) / AudioCapture.SAMPLE_RATE,
+                                    flush_reason="speculative",
+                                    capture_is_loopback=bool(getattr(session, "capture_is_loopback", False)),
+                                    speculative=True,
+                                    spec_key=vad.voiced_end_samples,
+                                ))
+                        # whisper 兜底仍按段增量喂（豆包走上面的连续流）；尾部静音里不再
+                        # 喂预览流：speculative final 已覆盖，预览解码只会抢 CPU。
                         if (
                             not dstream_is_doubao
+                            and not in_tail
                             and getattr(vad, "has_pending_audio", False)
                             and not _pause_event.is_set()
                         ):
@@ -1743,6 +1891,21 @@ def _interview_worker():
                             except Exception as e:
                                 _elog.debug("interviewer stream feed failed: %s", e)
                         continue
+                    flush_reason = getattr(vad, "last_flush_reason", None) or "silence"
+                    flush_spec_key = (
+                        spec_state["key"]
+                        if spec_state["key"] is not None and spec_state["key"] == turn_tracker.voiced_end_samples
+                        else None
+                    )
+                    spec_state["key"] = None
+                    # A stable partial that covers the speech end and reads as a
+                    # complete question drives a provisional Fast Cue now; the
+                    # batch transcription of this segment confirms it later.
+                    provisional_text = (
+                        turn_tracker.provisional_question()
+                        if flush_reason in ("eot", "silence")
+                        else ""
+                    )
                     # segment flushed: doubao 保留 WS 只重置展示; whisper 关闭重开
                     if dstream_is_doubao:
                         if dstream is not None:
@@ -1753,12 +1916,15 @@ def _interview_worker():
                     else:
                         if dstream is not None:
                             try:
-                                dstream.finish()
+                                # No final preview decode at a segment flush: finish()
+                                # joined the thread and decoded once more (~1 s on CPU)
+                                # on the capture thread before the segment was even
+                                # queued; the batch STT replaces that preview anyway.
+                                dstream.stop()
                             except Exception:
                                 pass
                             dstream = None
                         last_fed_len = 0
-                    flush_reason = getattr(vad, "last_flush_reason", None) or "silence"
                     segment_ended_mono = sub_ended_mono
                     segment_started_mono = max(
                         0.0,
@@ -1770,13 +1936,32 @@ def _interview_worker():
                         session,
                         speech_audio,
                         flush_reason=(
-                            "max_speech"
-                            if flush_reason == "max_speech"
+                            flush_reason
+                            if flush_reason in ("max_speech", "eot")
                             else "silence"
                         ),
                         segment_started_mono=segment_started_mono,
                         segment_ended_mono=segment_ended_mono,
+                        trailing_sec=(
+                            float(getattr(vad, "last_flush_trailing_sec", 0.0) or 0.0)
+                            if flush_reason in ("eot", "silence")
+                            else None
+                        ),
+                        spec_key=flush_spec_key,
                     )
+                    trace = turn_tracker.trace
+                    _ilog.info(
+                        "INTERVIEWER_EOT flush=%s trailing=%.2fs reason=%s provisional=%s partial=%r",
+                        flush_reason,
+                        float(getattr(vad, "last_flush_trailing_sec", 0.0) or 0.0),
+                        trace.confirm_reason or "-",
+                        bool(provisional_text),
+                        (turn_tracker.text or "")[:80],
+                    )
+                    if provisional_text:
+                        _submit_provisional_cue(cfg, session, provisional_text)
+                    last_qa = session.get_last_qa() if hasattr(session, "get_last_qa") else None
+                    turn_tracker.reset(previous_question=str(getattr(last_qa, "question", "") or ""))
 
         if dstream is not None:
             try:

@@ -1,0 +1,540 @@
+[
+  {
+    "id": "zh-short",
+    "audio": "zh-short.wav",
+    "transcript_expected": "Redis 是单线程的吗？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 2.1,
+    "question_expected": [
+      "单线程"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-long",
+    "audio": "zh-long.wav",
+    "transcript_expected": "你之前负责的订单系统，在大促的时候峰值流量大概是平时的几倍，你们当时是怎么做容量评估和限流降级的？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 11.06,
+    "question_expected": [
+      "限流"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-internal-pause",
+    "audio": "zh-internal-pause.wav",
+    "transcript_expected": "如果流量扩大十倍你的系统哪里会先扛不住？",
+    "speech_start_ground_truth": 0.46,
+    "speech_end_ground_truth": 5.2,
+    "question_expected": [
+      "扛不住"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 700,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-long-pause",
+    "audio": "zh-long-pause.wav",
+    "transcript_expected": "我们先聊聊缓存为什么选择 Redis 而不是 Memcached？",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 6.8,
+    "question_expected": [
+      "Memcached"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 1400,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-dangling-pause",
+    "audio": "zh-dangling-pause.wav",
+    "transcript_expected": "你们的服务拆分之后，然后调用链路是怎么做监控的？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 6.3,
+    "question_expected": [
+      "监控"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 900,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-slow",
+    "audio": "zh-slow.wav",
+    "transcript_expected": "消息队列怎么保证不丢消息？",
+    "speech_start_ground_truth": 0.48,
+    "speech_end_ground_truth": 4.26,
+    "question_expected": [
+      "消息"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": -4,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-fast",
+    "audio": "zh-fast.wav",
+    "transcript_expected": "数据库索引为什么用 B 加树？",
+    "speech_start_ground_truth": 0.36,
+    "speech_end_ground_truth": 1.84,
+    "question_expected": [
+      "索引"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 5,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-ne",
+    "audio": "zh-ne.wav",
+    "transcript_expected": "那你们的缓存一致性是怎么做的呢？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 3.32,
+    "question_expected": [
+      "一致性"
+    ],
+    "content_type": "FOLLOW_UP",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": "你们的缓存是怎么设计的？"
+  },
+  {
+    "id": "zh-ma",
+    "audio": "zh-ma.wav",
+    "transcript_expected": "你在生产环境用过 Kubernetes 吗？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 3.18,
+    "question_expected": [
+      "生产环境"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-zenme",
+    "audio": "zh-zenme.wav",
+    "transcript_expected": "线上出现慢查询的时候你一般怎么排查？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 4.26,
+    "question_expected": [
+      "慢查询"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-weishenme",
+    "audio": "zh-weishenme.wav",
+    "transcript_expected": "为什么你当时没有选择分库分表？",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 3.62,
+    "question_expected": [
+      "分库分表"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-request",
+    "audio": "zh-request.wav",
+    "transcript_expected": "讲讲你做过的订单系统重构。",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 3.04,
+    "question_expected": [
+      "订单"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-request-2",
+    "audio": "zh-request-2.wav",
+    "transcript_expected": "介绍一下你最有挑战的一个项目。",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 3.2,
+    "question_expected": [
+      "项目"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-followup-short",
+    "audio": "zh-followup-short.wav",
+    "transcript_expected": "为什么？",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 1.04,
+    "question_expected": [
+      "为什么"
+    ],
+    "content_type": "FOLLOW_UP",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": "你们为什么选择 Kafka？"
+  },
+  {
+    "id": "zh-coding",
+    "audio": "zh-coding.wav",
+    "transcript_expected": "写一个函数判断链表有没有环，说一下你的思路。",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 5.24,
+    "question_expected": [
+      "链表"
+    ],
+    "content_type": "CODING",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "zh-clarify",
+    "audio": "zh-clarify.wav",
+    "transcript_expected": "你刚才说的最终一致性，具体是指什么？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 4.08,
+    "question_expected": [
+      "一致性"
+    ],
+    "content_type": "CLARIFICATION",
+    "lang": "zh",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-short",
+    "audio": "en-short.wav",
+    "transcript_expected": "What is a deadlock?",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 1.36,
+    "question_expected": [
+      "deadlock"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-long",
+    "audio": "en-long.wav",
+    "transcript_expected": "Walk me through how you would design a URL shortener that handles a billion requests per day, including storage and caching.",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 7.1,
+    "question_expected": [
+      "shortener"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-pause",
+    "audio": "en-pause.wav",
+    "transcript_expected": "If the database becomes the bottleneck, what would you change first?",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 5.0,
+    "question_expected": [
+      "change first"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 800,
+    "previous_question": ""
+  },
+  {
+    "id": "en-technical",
+    "audio": "en-technical.wav",
+    "transcript_expected": "How does Kafka guarantee exactly once semantics with idempotent producers?",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 4.92,
+    "question_expected": [
+      "exactly once"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-followup",
+    "audio": "en-followup.wav",
+    "transcript_expected": "Why did you choose that approach?",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 2.08,
+    "question_expected": [
+      "approach"
+    ],
+    "content_type": "FOLLOW_UP",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": "How did you shard the user table?"
+  },
+  {
+    "id": "en-behavioral",
+    "audio": "en-behavioral.wav",
+    "transcript_expected": "Tell me about a time you disagreed with your team.",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 3.86,
+    "question_expected": [
+      "disagree"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "en",
+    "condition": "clean",
+    "rate": -3,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-coding",
+    "audio": "en-coding.wav",
+    "transcript_expected": "Can you write a function to reverse a linked list?",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 2.82,
+    "question_expected": [
+      "linked list"
+    ],
+    "content_type": "CODING",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-clarify",
+    "audio": "en-clarify.wav",
+    "transcript_expected": "What do you mean by eventual consistency here?",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 2.96,
+    "question_expected": [
+      "consistency"
+    ],
+    "content_type": "CLARIFICATION",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "en-rate-limiter",
+    "audio": "en-rate-limiter.wav",
+    "transcript_expected": "How would you design a rate limiter for a public API?",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 3.14,
+    "question_expected": [
+      "rate limit"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "en",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "mixed-rag",
+    "audio": "mixed-rag.wav",
+    "transcript_expected": "这个 RAG pipeline 如果 QPS 扩大一百倍，你会怎么 scale？",
+    "speech_start_ground_truth": 0.44,
+    "speech_end_ground_truth": 5.78,
+    "question_expected": [
+      "一百倍"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "mixed",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "mixed-kafka",
+    "audio": "mixed-kafka.wav",
+    "transcript_expected": "你在项目里用 Kafka 做过 exactly once 吗？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 3.88,
+    "question_expected": [
+      "exactly once"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "mixed",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "mixed-k8s",
+    "audio": "mixed-k8s.wav",
+    "transcript_expected": "你们的 Kubernetes 集群是怎么做 autoscaling 的？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 4.04,
+    "question_expected": [
+      "集群"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "mixed",
+    "condition": "clean",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "noise-bg-zh",
+    "audio": "noise-bg-zh.wav",
+    "transcript_expected": "消息队列的消费者挂了会发生什么？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 3.52,
+    "question_expected": [
+      "消费者"
+    ],
+    "content_type": "KNOWLEDGE",
+    "lang": "zh",
+    "condition": "background",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "noise-bg-en",
+    "audio": "noise-bg-en.wav",
+    "transcript_expected": "How would you monitor a distributed system?",
+    "speech_start_ground_truth": 0.4,
+    "speech_end_ground_truth": 2.5,
+    "question_expected": [
+      "monitor"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "en",
+    "condition": "background",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "noise-keyboard",
+    "audio": "noise-keyboard.wav",
+    "transcript_expected": "你是怎么定位内存泄漏的？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 2.58,
+    "question_expected": [
+      "内存泄漏"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "zh",
+    "condition": "keyboard",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "noise-echo-mixed",
+    "audio": "noise-echo-mixed.wav",
+    "transcript_expected": "你们的 Redis cluster 是怎么做 failover 的？",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 3.54,
+    "question_expected": [
+      "failover"
+    ],
+    "content_type": "SYSTEM_DESIGN",
+    "lang": "mixed",
+    "condition": "echo",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "noise-echo-en",
+    "audio": "noise-echo-en.wav",
+    "transcript_expected": "What trade offs did you make in the cache design?",
+    "speech_start_ground_truth": 0.42,
+    "speech_end_ground_truth": 2.82,
+    "question_expected": [
+      "trade"
+    ],
+    "content_type": "EXPERIENCE",
+    "lang": "en",
+    "condition": "echo",
+    "rate": 0,
+    "pause_ms": 0,
+    "previous_question": ""
+  },
+  {
+    "id": "silence-only",
+    "audio": "silence-only.wav",
+    "transcript_expected": "",
+    "speech_end_ground_truth": null,
+    "question_expected": [],
+    "content_type": "NONE",
+    "lang": "none",
+    "condition": "silence"
+  }
+]

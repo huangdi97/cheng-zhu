@@ -173,6 +173,9 @@ export function useInterviewWS(active = true) {
         if (msg.exam_preflight_id) return
         s.setFastCue(msg.id as string, msg)
         break
+      case 'guidance_fast_retract':
+        s.retractFastCue(msg.id as string)
+        break
       case 'coach_cue':
         s.pushCoachCue({
           id: String(msg.id ?? ''),

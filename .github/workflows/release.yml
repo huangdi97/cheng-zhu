@@ -111,5 +111,6 @@ jobs:
             dist/release/SHA256SUMS.txt `
             dist/release/LICENSE.txt `
             dist/release/THIRD_PARTY_NOTICES.md `
+            dist/release/RELEASE_NOTES_v1.2.0.md `
             --title "成竹 Chengzhu $tag" `
             --notes-file dist/release/RELEASE_NOTES_v1.2.0.md

@@ -65,7 +65,9 @@ def test_chinese_text_is_unicode_not_mojibake():
 
 
 def test_damaged_pdf_fails_loudly():
-    with pytest.raises(Exception):
+    from pypdf.errors import PdfReadError
+
+    with pytest.raises(PdfReadError):
         _load("damaged.pdf")
 
 

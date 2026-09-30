@@ -56,11 +56,32 @@ def mark_first_partial(session_id: str, mono: Optional[float] = None) -> None:
         pending.setdefault("Q0", float(mono if mono is not None else _now()))
 
 
-def start_turn(session_id: str, qa_id: str, *, q1: Optional[float] = None, source: str = "") -> None:
+def start_turn(
+    session_id: str,
+    qa_id: str,
+    *,
+    q1: Optional[float] = None,
+    source: str = "",
+    provisional: bool = False,
+) -> None:
+    """Start the turn clock at Q1.
+
+    A provisional cue (stable streaming partial) starts the turn early and
+    keeps E; the later authoritative confirmation on the same qa_id only
+    moves Q1 (QBD stays "speech end -> question confirmed") and never
+    resets E or an already recorded G0.
+    """
     q1_value = float(q1 if q1 is not None else _now())
     with _lock:
+        existing = _turns.get(qa_id)
+        if existing is not None:
+            if existing.get("provisional") and not provisional:
+                existing["provisional"] = False
+                existing["P1"] = existing.get("Q1")
+                existing["Q1"] = q1_value
+            return
         pending = _pending.pop(session_id or "default", {})
-        turn: dict[str, Any] = {"qa_id": qa_id, "session_id": session_id, "source": source, "Q1": q1_value}
+        turn: dict[str, Any] = {"qa_id": qa_id, "session_id": session_id, "source": source, "Q1": q1_value, "provisional": provisional}
         for key in ("E", "Q0"):
             value = pending.get(key)
             if value is not None and 0 <= q1_value - value <= _MAX_PENDING_AGE_SEC:

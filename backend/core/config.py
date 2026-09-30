@@ -211,6 +211,17 @@ class AppConfig(BaseModel):
     assist_eot_merge_gap_sec: float = 0.35
     # R2 Stage I/K：问题分组确认后立即发 L0 Fast Cue，不等 late-constraint grace
     intelligence_early_cue: bool = True
+    # v1.2-R2 延迟收口：自适应说话结束（流式 partial 已是完整问句且覆盖语音结尾时，
+    # 静音 assist_eot_min_silence_sec 即结束本段；silence_duration 仍是硬超时）
+    assist_adaptive_eot: bool = True
+    assist_eot_min_silence_sec: float = 0.30
+    # 本地 Whisper：尾部静音达到上面阈值即对已说内容做一次「预判最终转写」，
+    # 同一段音频被 VAD 结束时直接复用（远程 STT 不启用，避免重复计费）
+    assist_speculative_final: bool = True
+    # 稳定 partial 先出临时 Fast Cue，本地/批量最终转写到达后在同一张卡上确认/修正/替换
+    assist_provisional_cue: bool = True
+    # 临时 Cue 在该秒数内未被最终转写确认则撤回
+    assist_provisional_ttl_sec: float = 8.0
     # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）
     raw_audio_retention_sessions: int = 0
 

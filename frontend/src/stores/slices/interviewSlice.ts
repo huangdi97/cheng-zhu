@@ -143,6 +143,7 @@ export interface InterviewSliceActions {
     latency?: Record<string, number | null>,
   ) => void
   setFastCue: (id: string, payload: unknown) => void
+  retractFastCue: (id: string) => void
   pushSessionClaimWarning: (warning: SessionClaimWarning) => void
   dismissSessionClaimWarning: (id: string) => void
   pushCoachCue: (cue: CoachCue) => void
@@ -161,6 +162,11 @@ export interface InterviewSliceActions {
 export type InterviewSlice = InterviewSliceState & InterviewSliceActions
 
 const _pendingFastCue = new Map<string, unknown>()
+
+function _cueQuestion(payload: unknown): string {
+  const value = (payload as { question?: unknown } | null)?.question
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 function _takePendingFastCue(id: string): unknown {
   const payload = _pendingFastCue.get(id)
@@ -302,13 +308,48 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
 
   setFastCue: (id, payload) =>
     set((s) => {
+      const cueQuestion = _cueQuestion(payload)
       if (!s.qaPairs.some((qa) => qa.id === id)) {
-        // The cue can outrun its answer card on a reordered transport; keep
-        // it until startAnswer creates the card instead of dropping it.
+        if (cueQuestion) {
+          // v1.2-R2: the Fast Cue renders on arrival. The deep answer's
+          // answer_start comes after the late-constraint grace and fills
+          // this same card; it must not gate the first cue on screen.
+          return {
+            qaPairs: [
+              ...s.qaPairs,
+              {
+                id,
+                question: cueQuestion,
+                answer: '',
+                thinkContent: '',
+                isThinking: false,
+                timestamp: Date.now() / 1000,
+                fastCue: payload,
+                status: 'streaming' as QAStatus,
+              },
+            ],
+          }
+        }
+        // Older payloads without the question: keep the cue until
+        // startAnswer creates the card instead of dropping it.
         _pendingFastCue.set(id, payload)
         return {}
       }
-      return { qaPairs: s.qaPairs.map((qa) => (qa.id === id ? { ...qa, fastCue: payload } : qa)) }
+      return {
+        qaPairs: s.qaPairs.map((qa) => (qa.id === id
+          ? { ...qa, fastCue: payload, question: cueQuestion && !qa.answer ? cueQuestion : qa.question }
+          : qa)),
+      }
+    }),
+
+  retractFastCue: (id) =>
+    set((s) => {
+      _pendingFastCue.delete(id)
+      // Only a cue-only card (no deep answer started) is removed.
+      if (s.streamingIds.includes(id)) return {}
+      const target = s.qaPairs.find((qa) => qa.id === id)
+      if (!target || target.answer) return {}
+      return { qaPairs: s.qaPairs.filter((qa) => qa.id !== id) }
     }),
 
   pushSessionClaimWarning: (warning) =>

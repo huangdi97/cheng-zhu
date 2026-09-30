@@ -797,7 +797,12 @@ def emit_early_cue(question_text: str, qa_id: str, meta: dict, *, broadcast) -> 
 
     cfg = get_config()
     sid = _live_session_id()
-    latency_clock.start_turn(sid, qa_id, source=str(meta.get("source", "") or "asr"))
+    latency_clock.start_turn(
+        sid,
+        qa_id,
+        source=str(meta.get("source", "") or "asr"),
+        provisional=bool(meta.get("provisional")),
+    )
     pack = _resolve_live_pack(sid, cfg)
     understanding = understand_question(question_text)
     grounding = analyze_experience_grounding(question_text, resume_text=pack.profile_text, interview_notes=_pack_notes(pack, cfg))
@@ -829,6 +834,12 @@ def emit_early_cue(question_text: str, qa_id: str, meta: dict, *, broadcast) -> 
     latency_clock.mark(qa_id, "G0")
     payload = fast_cue.finalize(body, qa_id=qa_id, timing=latency_clock.metrics(qa_id))
     payload["early"] = True
+    # The cue can render its own card before answer_start (the deep answer
+    # waits for the late-constraint grace), so it carries the question.
+    payload["question"] = str(meta.get("display_question") or question_text)
+    payload["provisional"] = bool(meta.get("provisional"))
+    if meta.get("reconciled"):
+        payload["reconciled"] = str(meta["reconciled"])
     broadcast(payload)
     try:
         from api.coach.router import remember_fast_cue
@@ -1084,13 +1095,21 @@ def process_question_parallel(
     # job context on the Live path (never latest_job_id / latest resume).
     live_session_id = _live_session_id()
     live_pack = _resolve_live_pack(live_session_id, cfg)
-    if not early_cue_emitted:
+    if not early_cue_emitted or meta.get("provisional_relation"):
         # With an early cue the turn clock already started at Q1 (group
         # confirmed) and G0 is recorded; restarting it would hide the grace.
+        # A provisional cue started it at the partial: the authoritative
+        # confirmation only moves Q1 (start_turn never resets E / G0).
         try:
             from services.intelligence import latency_clock as _lat
 
-            _lat.start_turn(live_session_id, qa_id, source=str(source or ""))
+            confirmed = meta.get("question_confirmed_mono")
+            _lat.start_turn(
+                live_session_id,
+                qa_id,
+                q1=float(confirmed) if confirmed is not None else None,
+                source=str(source or ""),
+            )
         except Exception:  # noqa: BLE001
             pass
 

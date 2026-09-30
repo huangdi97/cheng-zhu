@@ -1588,14 +1588,14 @@ def _interview_worker():
     turn_tracker = LiveTurnTracker(
         sample_rate=AudioCapture.SAMPLE_RATE,
         config=EndOfTurnConfig(
-            min_silence_sec=float(getattr(cfg, "assist_eot_min_silence_sec", 0.30) or 0.30),
+            min_silence_sec=float(getattr(cfg, "assist_eot_min_silence_sec", 0.55) or 0.55),
             hard_timeout_sec=float(getattr(cfg, "silence_duration", 1.2) or 1.2),
         ),
     )
     voice_threshold = float(getattr(cfg, "silence_threshold", 0.01) or 0.01)
     runtime.turn_tracker = turn_tracker
     speculative_on = _speculative_final_enabled(cfg)
-    spec_min_silence = turn_tracker.detector.config.min_silence_sec
+    spec_min_silence = float(getattr(cfg, "assist_speculative_min_silence_sec", 0.30) or 0.30)
     spec_state: dict[str, Optional[int]] = {"key": None}
     if bool(getattr(cfg, "assist_adaptive_eot", True)):
         vad.end_of_turn_probe = lambda silence: turn_tracker.probe(silence, vad.voiced_end_samples)

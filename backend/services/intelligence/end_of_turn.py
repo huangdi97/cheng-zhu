@@ -71,7 +71,9 @@ _FOLLOW_UP = re.compile(
 
 @dataclass
 class EndOfTurnConfig:
-    min_silence_sec: float = 0.30
+    # Normal comma pauses run 0.3-0.55 s; ending a turn inside one cuts the
+    # speaker off whenever the first clause already reads as a question.
+    min_silence_sec: float = 0.55
     stable_sec: float = 0.20
     hard_timeout_sec: float = 1.2
     # Never wait less than the speaker's own mid-sentence pauses + margin.

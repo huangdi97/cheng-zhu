@@ -56,7 +56,8 @@ sys.path.insert(0, str(BACKEND))
 CORPUS = BACKEND / "evals" / "latency_corpus"
 SR = 16000
 FRAME = 320
-TAIL_SEC = 6.0
+TAIL_SEC = 14.0  # long enough that a slow decode on a busy CPU still lands
+PREMATURE_TOLERANCE = 0.15  # a cut-off word is longer than the ground-truth threshold jitter
 
 # Modeled constants (documented in the report; not measured here)
 GRACE_WORKER_OVERHEAD = 0.15   # answer worker pre-LLM work before answer_start (packaged TTFUG_internal ~156 ms)
@@ -78,7 +79,8 @@ def _norm(text: str) -> str:
 
 def _contains(text: str, keywords: list[str]) -> bool:
     body = _norm(text)
-    return bool(keywords) and all(_norm(k) in body for k in keywords)
+    # "a|b" = equivalent forms (e.g. 一百倍|100倍); ASR misrecognitions stay misses
+    return bool(keywords) and all(any(_norm(alt) in body for alt in k.split("|")) for k in keywords)
 
 
 class _Log:
@@ -263,7 +265,7 @@ def run_case(case: dict, mode: str, batch_engine, cfg_base, sim_cache: dict) -> 
                         endpoint_at.update(t=last_voice["t"] + PROVIDER_END_WINDOW + PROVIDER_LAG, gen=stream["gen"])
                     if voiced and endpoint_at["gen"] == stream["gen"]:
                         endpoint_at.update(t=None, gen=-1)
-                in_tail = speculative_on and vad.trailing_silence_sec >= tracker.detector.config.min_silence_sec
+                in_tail = speculative_on and vad.trailing_silence_sec >= cfg.assist_speculative_min_silence_sec
                 if (
                     not remote
                     and in_tail
@@ -420,8 +422,8 @@ def run_case(case: dict, mode: str, batch_engine, cfg_base, sim_cache: dict) -> 
         "ttd_ms": round((deep_first + 0.14 - q1) * 1000),
         "cue_before_deep": rendered < deep_first,
         "e_estimate_error_ms": round((flushes[-1]["e_est"] - gt_end) * 1000) if flushes else None,
-        "premature_end": any(f["t"] - f["trailing"] < gt_end - 0.05 for f in eot_flushes),
-        "premature_cue": first_cue_t is not None and first_cue_t < gt_end - 0.05,
+        "premature_end": any(f["t"] - f["trailing"] < gt_end - PREMATURE_TOLERANCE for f in eot_flushes),
+        "premature_cue": first_cue_t is not None and first_cue_t < gt_end - PREMATURE_TOLERANCE,
         "cue_renders": len(card_cues),
         "question_replaced": meta.get("provisional_relation") == "replaced" or sm.provisional_stats["retracted"] > 0,
         "cue_compute_ms": card_cues[0]["compute_ms"] if card_cues else None,
@@ -553,7 +555,7 @@ def main() -> int:
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "machine": {"cpu_threads": __import__("os").cpu_count(), "stt": "faster-whisper base int8 CPU (product STTEngine)"},
         "defaults": {k: getattr(cfg_base, k, None) for k in (
-            "silence_duration", "assist_eot_min_silence_sec", "assist_transcription_merge_gap_sec",
+            "silence_duration", "assist_eot_min_silence_sec", "assist_speculative_min_silence_sec", "assist_transcription_merge_gap_sec",
             "assist_eot_merge_gap_sec", "assist_asr_confirm_window_sec", "assist_asr_late_constraint_grace_sec",
             "whisper_language", "whisper_stream_interval_ms", "assist_auto_answer_mode")},
         "modeled_constants": {"answer_start_after_grace_s": GRACE_WORKER_OVERHEAD, "fake_ttfa_s": FAKE_TTFA,

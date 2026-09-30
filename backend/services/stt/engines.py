@@ -490,6 +490,24 @@ class STTEngine:
     def sticky_language(self) -> Optional[str]:
         return self._sticky_lang
 
+    STICKY_MIN_AVG_LOGPROB = -0.9
+
+    def _sticky_mismatch(self, used_sticky: bool, segments, texts: list[str]) -> bool:
+        """A decode under the pinned language that heard nothing, or heard it
+        badly, is treated as a language switch: unpin and decode again with
+        detection (the question must never be lost to a wrong pin)."""
+        if not used_sticky:
+            return False
+        logprobs = [float(getattr(seg, "avg_logprob", 0.0) or 0.0) for seg in segments if (seg.text or "").strip()]
+        weak = bool(logprobs) and (sum(logprobs) / len(logprobs)) < self.STICKY_MIN_AVG_LOGPROB
+        if texts and not weak:
+            return False
+        _log.info("Whisper sticky language %s looks wrong (empty=%s weak=%s); re-detecting", self._sticky_lang, not texts, weak)
+        self._sticky_lang = None
+        self._lang_votes.clear()
+        self._sticky_uses = 0
+        return True
+
     @staticmethod
     def _best_device() -> tuple[str, str]:
         try:
@@ -590,6 +608,7 @@ class STTEngine:
             audio_f = audio_f / 32768.0
 
         whisper_lang, detected_now = self._decode_language()
+        used_sticky = whisper_lang is not None and self.language in ("auto", "zh-en")
         initial_prompt = _build_initial_prompt(position, language)
 
         hotwords_list = []
@@ -629,6 +648,8 @@ class STTEngine:
                 continue
             texts.append(text)
 
+        if self._sticky_mismatch(used_sticky, segments, texts):
+            return self.transcribe(audio, sample_rate, position=position, language=language)
         return _postprocess(" ".join(texts))
 
     def transcribe_fast(
@@ -653,6 +674,7 @@ class STTEngine:
             audio_f = audio_f / 32768.0
 
         whisper_lang, detected_now = self._decode_language()
+        used_sticky = whisper_lang is not None and self.language in ("auto", "zh-en")
         initial_prompt = _build_initial_prompt(position, language)
 
         hotwords_list = []
@@ -684,6 +706,8 @@ class STTEngine:
             if not text:
                 continue
             texts.append(text)
+        if self._sticky_mismatch(used_sticky, segments, texts):
+            return self.transcribe_fast(audio, sample_rate, position=position, language=language)
         return _postprocess(" ".join(texts))
 
     @property

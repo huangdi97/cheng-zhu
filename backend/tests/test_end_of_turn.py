@@ -33,7 +33,7 @@ def _eval(**kw):
 
 
 def test_fast_confirm_needs_complete_stable_covering_partial():
-    d = _eval(silence_sec=0.35, partial_text="Redis 的持久化机制有哪些？", partial_covers_end=True, partial_stable_sec=0.3)
+    d = _eval(silence_sec=0.6, partial_text="Redis 的持久化机制有哪些？", partial_covers_end=True, partial_stable_sec=0.3)
     assert d.state is EotState.CONFIRMED_END and d.reason == "fast_confirm"
 
 
@@ -54,17 +54,17 @@ def test_open_condition_without_question_continues():
 
 
 def test_partial_behind_speech_end_is_only_likely():
-    d = _eval(silence_sec=0.5, partial_text="消息队列怎么保证不丢消息", partial_covers_end=False, partial_stable_sec=1.0)
+    d = _eval(silence_sec=0.6, partial_text="消息队列怎么保证不丢消息", partial_covers_end=False, partial_stable_sec=1.0)
     assert d.state is EotState.LIKELY_END
 
 
 def test_unstable_partial_is_only_likely():
-    d = _eval(silence_sec=0.5, partial_text="消息队列怎么保证不丢消息", partial_covers_end=True, partial_stable_sec=0.05)
+    d = _eval(silence_sec=0.6, partial_text="消息队列怎么保证不丢消息", partial_covers_end=True, partial_stable_sec=0.05)
     assert d.state is EotState.LIKELY_END
 
 
 def test_provider_endpoint_confirms():
-    d = _eval(silence_sec=0.35, partial_text="How would you design a rate limiter?", provider_endpoint=True)
+    d = _eval(silence_sec=0.6, partial_text="How would you design a rate limiter?", provider_endpoint=True)
     assert d.state is EotState.CONFIRMED_END and d.reason == "provider_endpoint"
 
 
@@ -74,7 +74,7 @@ def test_hard_timeout_is_kept():
 
 
 def test_short_follow_up_complete_only_with_previous_question():
-    base = dict(silence_sec=0.4, partial_text="为什么？", partial_covers_end=True, partial_stable_sec=0.5)
+    base = dict(silence_sec=0.6, partial_text="为什么？", partial_covers_end=True, partial_stable_sec=0.5)
     assert _eval(**base).state is EotState.CONTINUE
     assert _eval(**base, previous_question="你们为什么选 Kafka").state is EotState.CONFIRMED_END
 
@@ -84,7 +84,7 @@ def test_speaker_pause_pattern_raises_min_silence():
     det.note_resumed_after(0.6)
     det.note_resumed_after(0.7)
     assert det.min_silence_sec() > 0.7
-    sig = EotSignals(silence_sec=0.5, partial_text="消息队列怎么保证不丢消息", partial_covers_end=True, partial_stable_sec=1.0)
+    sig = EotSignals(silence_sec=0.6, partial_text="消息队列怎么保证不丢消息", partial_covers_end=True, partial_stable_sec=1.0)
     assert det.evaluate(sig).state is EotState.CONTINUE
 
 
@@ -139,11 +139,11 @@ def test_local_tracker_requires_decode_covering_speech_end():
     tr = LiveTurnTracker(clock=lambda: 10.0)
     tr.on_local_decode("消息队列怎么保证不丢消息", covered_samples=SR * 2, now=9.0)
     # speech ended at 2.5 s of pending audio: the decode (2.0 s) is behind it
-    assert not tr.probe(0.4, voiced_end_samples=int(SR * 2.5))
+    assert not tr.probe(0.6, voiced_end_samples=int(SR * 2.5))
     assert tr.last_decision.reason == "partial_behind_speech_end"
     assert tr.provisional_question() == ""
     tr.on_local_decode("消息队列怎么保证不丢消息？", covered_samples=int(SR * 2.8), now=10.0)
-    assert tr.probe(0.4, voiced_end_samples=int(SR * 2.5))
+    assert tr.probe(0.6, voiced_end_samples=int(SR * 2.5))
     assert tr.provisional_question() == "消息队列怎么保证不丢消息？"
 
 
@@ -153,9 +153,9 @@ def test_remote_tracker_uses_provider_lag_or_endpoint():
     tr.note_voice(5.0)
     tr.on_remote_partial("How would you design a rate limiter?", now=5.05)
     now["t"] = 5.2
-    assert not tr.probe(0.35, voiced_end_samples=0)  # lag not elapsed yet
+    assert not tr.probe(0.6, voiced_end_samples=0)  # lag not elapsed yet
     tr.on_remote_endpoint()
-    assert tr.probe(0.36, voiced_end_samples=0)
+    assert tr.probe(0.61, voiced_end_samples=0)
 
 
 # -- provisional cue + reconcile ---------------------------------------------------
@@ -272,3 +272,9 @@ def test_provisional_in_a_two_part_turn_maps_to_the_new_speech():
     sm.try_flush_question_group(CFG, SESSION, now["t"], False)
     confirmed = [task for task in tasks if task[4]["qa_id"] == qa]
     assert confirmed and "Memcached" in confirmed[0][0]
+
+
+def test_comma_pause_after_a_question_like_clause_keeps_listening():
+    """'写一个函数判断链表有没有环，<0.46 s> 说一下你的思路' must not end at the comma."""
+    d = _eval(silence_sec=0.46, partial_text="写一个函数判断链表有没有环", partial_covers_end=True, partial_stable_sec=0.4)
+    assert d.state is EotState.CONTINUE

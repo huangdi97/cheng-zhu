@@ -406,7 +406,7 @@
     "speech_start_ground_truth": 0.44,
     "speech_end_ground_truth": 5.78,
     "question_expected": [
-      "一百倍"
+      "一百倍|100倍"
     ],
     "content_type": "SYSTEM_DESIGN",
     "lang": "mixed",

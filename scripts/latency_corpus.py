@@ -63,7 +63,7 @@ CASES: list[dict] = [
     {"id": "en-clarify", "voice": DAVID, "text": "What do you mean by eventual consistency here?", "expect": ["consistency"], "type": "CLARIFICATION"},
     {"id": "en-rate-limiter", "voice": ZIRA, "text": "How would you design a rate limiter for a public API?", "expect": ["rate limit"], "type": "SYSTEM_DESIGN"},
     # --- Mixed ---
-    {"id": "mixed-rag", "voice": ZH, "text": "这个 RAG pipeline 如果 QPS 扩大一百倍，你会怎么 scale？", "expect": ["一百倍"], "type": "SYSTEM_DESIGN"},
+    {"id": "mixed-rag", "voice": ZH, "text": "这个 RAG pipeline 如果 QPS 扩大一百倍，你会怎么 scale？", "expect": ["一百倍|100倍"], "type": "SYSTEM_DESIGN"},
     {"id": "mixed-kafka", "voice": ZH, "text": "你在项目里用 Kafka 做过 exactly once 吗？", "expect": ["exactly once"], "type": "EXPERIENCE"},
     {"id": "mixed-k8s", "voice": ZH, "text": "你们的 Kubernetes 集群是怎么做 autoscaling 的？", "expect": ["集群"], "type": "SYSTEM_DESIGN"},
     # --- Noise conditions (same speech, different room) ---

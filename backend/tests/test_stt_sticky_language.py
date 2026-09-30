@@ -83,3 +83,25 @@ def test_explicit_language_is_never_overridden():
     for _ in range(3):
         engine.transcribe(AUDIO)
     assert engine._model.calls == ["zh", "zh", "zh"]
+
+
+class _WrongPinModel(_FakeModel):
+    """Hears nothing under a wrong pinned language, text under detection."""
+
+    def transcribe(self, audio, **kwargs):
+        forced = kwargs.get("language")
+        self.calls.append(forced)
+        if forced == "zh":
+            return iter([]), SimpleNamespace(language="zh", language_probability=1.0)
+        seg = SimpleNamespace(text="Tell me about a time you disagreed", no_speech_prob=0.0, avg_logprob=-0.3)
+        return iter([seg]), SimpleNamespace(language="en", language_probability=0.99)
+
+
+def test_wrong_pin_never_loses_the_question():
+    engine = STTEngine("base", "auto")
+    engine._model = _WrongPinModel([])
+    engine._sticky_lang = "zh"  # pinned by earlier Chinese questions
+    text = engine.transcribe(AUDIO)
+    assert "Tell me about a time" in text
+    assert engine._model.calls == ["zh", None]
+    assert engine.sticky_language is None

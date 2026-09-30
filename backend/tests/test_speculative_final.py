@@ -82,7 +82,7 @@ def test_speculative_decode_feeds_tracker_as_end_covering_partial(monkeypatch):
     tracker = LiveTurnTracker(clock=lambda: 10.0)
     tracker.expect_speculative(16000)
     tracker.on_speculative_final(16000, "消息队列怎么保证不丢消息？", covered_samples=20000)
-    assert tracker.probe(0.5, voiced_end_samples=16000)
+    assert tracker.probe(0.6, voiced_end_samples=16000)
     assert tracker.provisional_question() == "消息队列怎么保证不丢消息？"
 
 

@@ -20,7 +20,9 @@ Held-out v1 = `HELDOUT_CASES`, written before the router ran on it. It scored 0.
 generic classifier gaps (English coding/design phrasing, 你做的/你负责, 讲一次…经历, product metrics,
 OOD vs 设计一个, choice-rationale about the candidate's own profile). Those were fixed by category.
 Held-out v2 = `HELDOUT_V2_CASES`, written after v1 and before the fix was run on anything; it is
-the clean post-fix measurement and the CI gate.
+the clean post-fix measurement and the CI gate. v2 was first measured at 0.7917; a truth-safety bug it
+exposed (the English "did you use X" claim check was dead code, so gRPC counted as sourced) was then fixed,
+which moved v2 to its current value. No routing rule was tuned against v2.
 
 ## Mandatory cases
 
@@ -34,7 +36,7 @@ the clean post-fix measurement and the CI gate.
 | 06 Knowledge route 生成第一人称 → 改写 | PASS | rewrites=1 |
 | 07 RAG → OS reset | PASS | rag=KNOWLEDGE os=KNOWLEDGE |
 | 08 为什么不用那个？ | PASS | EXPERIENCE_KNOWLEDGE |
-| 09 Job A / Job B contamination | PASS | pack=pack-37f2751fad58458b job=job-A |
+| 09 Job A / Job B contamination | PASS | pack=pack-314ab25906f5487a job=job-A |
 | 10 Share Privacy OFF | PASS | OFF |
 | 11 AI_FORBIDDEN | PASS | True |
 | 12 HUMAN_PRACTICE_ONLY | PASS | HUMAN_PRACTICE_ONLY |

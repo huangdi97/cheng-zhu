@@ -97,7 +97,8 @@ jobs:
             $h = (Get-FileHash "dist/release/$f" -Algorithm SHA256).Hash.ToLower()
             "$h  $f"
           }
-          $lines | Set-Content -Encoding ascii dist/release/SHA256SUMS.txt
+          # LF line endings so `sha256sum -c SHA256SUMS.txt` works on Linux / macOS too
+          [IO.File]::WriteAllText("$PWD/dist/release/SHA256SUMS.txt", (($lines -join "`n") + "`n"), [Text.Encoding]::ASCII)
           Get-Content dist/release/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4

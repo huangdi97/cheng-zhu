@@ -37,6 +37,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
+SMOKE_NONCE = "smoke-nonce-0123456789abcdef"
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -108,6 +111,7 @@ def start(exe: Path, port: int, home: Path, frontend_dist: str) -> subprocess.Po
     # No Python assumption: strip interpreter dirs from PATH for the sidecar.
     env["PATH"] = os.pathsep.join(p for p in env.get("PATH", "").split(os.pathsep) if "python" not in p.lower())
     env["CHENGZHU_HOME"] = str(home)
+    env["CHENGZHU_INSTANCE_NONCE"] = SMOKE_NONCE
     if frontend_dist:
         env["CHENGZHU_FRONTEND_DIST"] = str(Path(frontend_dist).resolve())
     log = open(home / "sidecar-stdout.log", "ab")
@@ -175,6 +179,9 @@ def main() -> int:
     try:
         checks["cold_start_seconds"] = round(wait_ready(base, 120), 2)
         checks["options"] = bool(http_json(f"{base}/api/options"))
+        inst = http_json(f"{base}/api/instance")
+        checks["instance_nonce_echo"] = inst.get("app") == "chengzhu" and inst.get("nonce") == SMOKE_NONCE
+        ok &= bool(checks["instance_nonce_echo"])
         cfg = http_json(f"{base}/api/config")
         checks["config_share_privacy_default"] = cfg.get("share_privacy_mode")
         ok &= cfg.get("share_privacy_mode") == "OFF"

@@ -508,6 +508,16 @@ async def api_network_info(request: Request):
     }
 
 
+@router.get("/instance")
+async def api_instance():
+    """Identify this backend process. The desktop shell starts the sidecar
+    with a random CHENGZHU_INSTANCE_NONCE and only attaches when the nonce
+    matches, so it never talks to another program on the same port."""
+    import os
+
+    return {"app": "chengzhu", "nonce": os.environ.get("CHENGZHU_INSTANCE_NONCE", ""), "pid": os.getpid()}
+
+
 @router.get("/options")
 async def api_options():
     return {

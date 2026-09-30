@@ -73,3 +73,24 @@ test('startup failures are explained to the user', () => {
   assert.match(launcher.describeStartupFailure({ code: -2, stderrTail: 'spawn ENOENT', port: 1, packaged: true }), /重新安装/);
   assert.match(launcher.describeStartupFailure({ code: -2, stderrTail: 'spawn python ENOENT', port: 1, packaged: false }), /安装版无需 Python/);
 });
+
+test('only a backend echoing this launch nonce is attached', () => {
+  const nonce = launcher.newInstanceNonce();
+  assert.equal(nonce.length, 32);
+  assert.equal(launcher.isOwnInstance({ app: 'chengzhu', nonce }, nonce), true);
+  assert.equal(launcher.isOwnInstance({ app: 'chengzhu', nonce: 'other' }, nonce), false);
+  assert.equal(launcher.isOwnInstance({ app: 'chengzhu', nonce: '' }, ''), false);
+  assert.equal(launcher.isOwnInstance({ status: 'ok' }, nonce), false);
+  const cmd = launcher.resolveBackendCommand({ isPackaged: true, resourcesPath: 'r', repoRoot: 'x', port: 1, userDataDir: 'u', nonce, env: {}, platform: 'win32' });
+  assert.equal(cmd.env.CHENGZHU_INSTANCE_NONCE, nonce);
+});
+
+test('a port with a listener is not free even if a loopback bind would succeed', async () => {
+  const net = require('net');
+  const server = net.createServer();
+  await new Promise((r) => server.listen(0, '0.0.0.0', r));
+  const port = server.address().port;
+  assert.equal(await launcher.isPortAnswering(port), true);
+  assert.equal(await launcher.isPortFree(port), false);
+  await new Promise((r) => server.close(r));
+});

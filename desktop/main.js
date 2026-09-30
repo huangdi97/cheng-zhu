@@ -71,6 +71,7 @@ const backendLauncher = require('./backendLauncher');
 // R2 Stage T: Share Privacy is OFF by default; one state drives both windows.
 const sharePrivacyState = sharePrivacy.createSharePrivacyState(sharePrivacy.DEFAULT_MODE);
 let backendStderrTail = '';
+const INSTANCE_NONCE = backendLauncher.newInstanceNonce();
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -306,9 +307,20 @@ function waitForServer(timeout = 40000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
-      const req = http.get(`${SERVER_URL}/api/options`, { timeout: 1000 }, (res) => {
-        if (res.statusCode === 200) return resolve();
-        retry();
+      if (!pythonProcess && Date.now() - start > 1500) {
+        return reject(new Error('Backend process exited before it was ready'));
+      }
+      // Only our own sidecar (matching nonce) counts as ready.
+      const req = http.get(`${SERVER_URL}/api/instance`, { timeout: 1000 }, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode === 200 && backendLauncher.isOwnInstance(JSON.parse(body), INSTANCE_NONCE)) return resolve();
+          } catch { /* not ours */ }
+          retry();
+        });
       });
       req.on('error', retry);
       req.on('timeout', () => { req.destroy(); retry(); });
@@ -330,6 +342,7 @@ function startPythonBackend() {
     repoRoot: ROOT,
     port: PORT,
     userDataDir,
+    nonce: INSTANCE_NONCE,
   });
   backendStderrTail = '';
   try {

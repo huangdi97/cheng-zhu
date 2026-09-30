@@ -5,6 +5,7 @@
 //   via CHENGZHU_HOME; the prebuilt frontend is resources/frontend-dist.
 // Development: `python start.py --mode network --no-build` from the repo.
 
+const crypto = require('crypto');
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
@@ -14,7 +15,17 @@ function sidecarExecutable(resourcesPath, platform = process.platform) {
   return path.join(resourcesPath, 'backend', name);
 }
 
-function resolveBackendCommand({ isPackaged, resourcesPath, repoRoot, port, userDataDir, env = process.env, platform = process.platform }) {
+function newInstanceNonce() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+// Only a backend that echoes this launch's nonce is ours; anything else on the
+// port (another app, a dev server) must never be attached to the window.
+function isOwnInstance(body, nonce) {
+  return Boolean(body && body.app === 'chengzhu' && nonce && body.nonce === nonce);
+}
+
+function resolveBackendCommand({ isPackaged, resourcesPath, repoRoot, port, userDataDir, nonce = '', env = process.env, platform = process.platform }) {
   if (isPackaged) {
     const exe = sidecarExecutable(resourcesPath, platform);
     return {
@@ -25,6 +36,7 @@ function resolveBackendCommand({ isPackaged, resourcesPath, repoRoot, port, user
         ...env,
         CHENGZHU_HOME: userDataDir,
         CHENGZHU_FRONTEND_DIST: path.join(resourcesPath, 'frontend-dist'),
+        CHENGZHU_INSTANCE_NONCE: nonce,
         PYTHONIOENCODING: 'utf-8',
       },
       packaged: true,
@@ -35,7 +47,7 @@ function resolveBackendCommand({ isPackaged, resourcesPath, repoRoot, port, user
     command: python,
     args: [path.join(repoRoot, 'start.py'), '--mode', 'network', '--no-build', '--port', String(port)],
     cwd: repoRoot,
-    env: { ...env },
+    env: { ...env, CHENGZHU_INSTANCE_NONCE: nonce },
     packaged: false,
   };
 }
@@ -46,7 +58,20 @@ function ensureUserDataLayout(userDataDir) {
   }
 }
 
-function isPortFree(port, host = '127.0.0.1') {
+// Something already answering on the port means it is taken, even when a
+// bind on 127.0.0.1 would succeed next to a 0.0.0.0 listener (Windows).
+function isPortAnswering(port, host = '127.0.0.1', timeoutMs = 400) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ port, host });
+    const done = (value) => { socket.destroy(); resolve(value); };
+    socket.setTimeout(timeoutMs, () => done(false));
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+  });
+}
+
+async function isPortFree(port, host = '127.0.0.1') {
+  if (await isPortAnswering(port, host)) return false;
   return new Promise((resolve) => {
     const server = net.createServer();
     server.unref();
@@ -80,6 +105,9 @@ function describeStartupFailure({ code, stderrTail = '', port, packaged }) {
 }
 
 module.exports = {
+  newInstanceNonce,
+  isOwnInstance,
+  isPortAnswering,
   sidecarExecutable,
   resolveBackendCommand,
   ensureUserDataLayout,

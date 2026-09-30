@@ -1,0 +1,124 @@
+{
+  "captured_at": "2026-09-30T14:01:53.339Z",
+  "exe": "C:\\Users\\Kaiser\\AppData\\Local\\Temp\\chengzhu-v1.2.2-portable\\Chengzhu.exe",
+  "port": 18081,
+  "entries": [
+    {
+      "name": "first-launch",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\first-launch.png",
+      "note": "fresh user data: the first screen the installed app shows"
+    },
+    {
+      "name": "onboarding",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\onboarding.png",
+      "note": "first-run guide"
+    },
+    {
+      "name": "home",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\home.png",
+      "note": "home after onboarding"
+    },
+    {
+      "name": "facts",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\facts.png",
+      "note": "我的成竹 → 事实与来源"
+    },
+    {
+      "name": "prepare",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\prepare.png",
+      "note": "求职 → 岗位目标 (prepare)"
+    },
+    {
+      "name": "freeze",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\freeze.png",
+      "note": "job goal opened (prepare + 冻结并用于本场); the frozen pack itself: pack_frozen / pack_id / content hashes in this manifest and the \"Pack rev1\" bar in preflight / live-fast-cue"
+    },
+    {
+      "name": "preflight",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\preflight.png",
+      "note": "上场 → pack bar / preflight"
+    },
+    {
+      "name": "live-fast-cue",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\live-fast-cue.png",
+      "note": "Fast Cue rendered above the deep answer (fake provider)"
+    },
+    {
+      "name": "overlay",
+      "note": "the app overlay window (?overlay=1) after a Live question",
+      "error": "NOT CAPTURED: the overlay window was shown with a live question but rendered blank under Playwright automation; covered by the shared view-model unit tests, not by a screenshot"
+    },
+    {
+      "name": "review",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\review.png",
+      "note": "复盘"
+    },
+    {
+      "name": "settings",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\settings.png",
+      "note": "settings drawer"
+    },
+    {
+      "name": "about-version",
+      "file": "artifacts\\release-evidence\\v1.2.2-download-back\\about-version.png",
+      "note": "settings → 关于: version / license / source"
+    }
+  ],
+  "userData": "C:\\Users\\Kaiser\\AppData\\Local\\Temp\\chengzhu-release-evidence-vipaKT",
+  "config_result": "ok",
+  "resume_upload": 200,
+  "space_id": 1,
+  "launch_pack": {
+    "interview_pack": {
+      "id": "pack-e495837a9f6f413f",
+      "session_id": "default",
+      "revision": 1,
+      "frozen": true,
+      "content_hash": "7e81c20c609074ac",
+      "parent_id": "",
+      "job": {
+        "id": "job-space-1",
+        "title": "高级后端工程师",
+        "company": "示例公司"
+      },
+      "counts": {
+        "claims": 3,
+        "evidence": 4,
+        "skill_cards": 0,
+        "stories": 0
+      },
+      "policies": {
+        "ai_policy": "AI_ALLOWED",
+        "human_assistance_policy": "HUMAN_PRACTICE_ONLY",
+        "share_privacy_policy": "OFF",
+        "screen_context_policy": "ON_REQUEST"
+      },
+      "model_profile": {
+        "answer_model": "Fake (evidence)",
+        "model": "fake-model",
+        "stt_engine": "whisper"
+      },
+      "content_hashes": {
+        "candidate_context": "928145873438a029",
+        "claims": "75ae780fa007c255",
+        "evidence_refs": "637ef8eea00b5af8",
+        "skill_cards": "4f53cda18c2baa0c",
+        "stories": "4f53cda18c2baa0c",
+        "job": "4a0d2363dd90c98c",
+        "selected_kb": "7f32c0023aa7512c",
+        "voice_profile": "44136fa355b3678a",
+        "controlled_memory": "5c6b03ea0014ae93"
+      },
+      "created_at": 1790776951.139511
+    }
+  },
+  "pack_frozen": true,
+  "pack_id": "pack-e495837a9f6f413f",
+  "version_api": {
+    "app": "chengzhu",
+    "nonce": "2dc51f4b5187d8c5a01488e5158114d0",
+    "pid": 44392
+  },
+  "source": "portable zip downloaded from https://github.com/huangdi97/cheng-zhu/releases/download/v1.2.2/Chengzhu-Portable-x64.zip (sha256sum -c OK), extracted to a temp dir; isolated --user-data-dir; port 18081; local fake OpenAI-compatible provider",
+  "clean_vm_en_us": "clean-vm-en-us/: release-verify run 36716495128 on a fresh windows-2025 (en-US) VM: installer downloaded from the release URL, silent install, launch, onboarding, resume, job goal, freeze, Live ask (guidance_fast before answer_chunk), restart persistence, uninstall, portable"
+}

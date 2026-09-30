@@ -1,0 +1,72 @@
+﻿{
+    "started":  "2026-09-30T12:42:56.5729702+00:00",
+    "checks":  {
+                   "os":  "Microsoft Windows Server 2025 Datacenter 10.0.26100",
+                   "python_on_path":  true,
+                   "node_on_path":  false,
+                   "repo_checkout_present":  false,
+                   "sha256_Chengzhu-Setup-x64.exe":  {
+                                                         "expected":  "ca6448d01fa12863c99b7a47cb5b3de4a2b1ba736d4d081ec99c88c3612ee799",
+                                                         "match":  true,
+                                                         "actual":  "ca6448d01fa12863c99b7a47cb5b3de4a2b1ba736d4d081ec99c88c3612ee799"
+                                                     },
+                   "sha256_Chengzhu-Portable-x64.zip":  {
+                                                            "expected":  "4e3011873ac03d26336cfeb59ac0191eb81ce857ee102f20b7ae448612ff5638",
+                                                            "match":  true,
+                                                            "actual":  "4e3011873ac03d26336cfeb59ac0191eb81ce857ee102f20b7ae448612ff5638"
+                                                        },
+                   "sha256_all_match":  true,
+                   "install_seconds":  24.3,
+                   "install_dir":  "C:\\Users\\runneradmin\\AppData\\Local\\Programs\\Chengzhu",
+                   "installed_exe":  true,
+                   "bundled_license":  true,
+                   "bundled_notices":  true,
+                   "fake_provider_reachable":  true,
+                   "first_launch_backend_ready_seconds":  3.4,
+                   "instance":  {
+                                    "app":  "chengzhu",
+                                    "nonce":  "90833a6474e76bc533dcb22fdeb31122",
+                                    "pid":  6840
+                                },
+                   "share_privacy_default":  "OFF",
+                   "onboarding_completed_initially":  false,
+                   "app_data_dir_exists":  true,
+                   "app_data_layout":  "blob_storage,cache,Code Cache,config,data,DawnGraphiteCache,DawnWebGPUCache,exports,GPUCache,Local Storage,logs,Network,Session Storage,Shared Dictionary",
+                   "onboarding_completed_after":  true,
+                   "diagnostics_reachable":  true,
+                   "resume_upload_status":  200,
+                   "job_goal_created":  true,
+                   "pack_frozen":  true,
+                   "pack_id":  "pack-873f8bd19ad24aa1",
+                   "live_event_types":  "init,answer_start,guidance_fast,answer_chunk,answer_done",
+                   "fast_cue_before_deep":  true,
+                   "answer_done":  true,
+                   "restart_backend_ready_seconds":  2.1,
+                   "pack_persisted_after_restart":  true,
+                   "onboarding_persisted":  true,
+                   "resume_persisted":  true,
+                   "install_dir_unchanged_after_use":  true,
+                   "install_dir_removed_by_uninstall":  true,
+                   "user_data_kept_after_uninstall":  true,
+                   "portable_exe_found":  true,
+                   "portable_backend_ready_seconds":  2.7,
+                   "portable_sees_same_user_data":  true
+               },
+    "finished":  "2026-09-30T12:46:58.7299540+00:00",
+    "required_checks":  [
+                            "python_on_path",
+                            "node_on_path",
+                            "sha256_all_match",
+                            "installed_exe",
+                            "first_launch_backend_ready_seconds",
+                            "onboarding_completed_after",
+                            "resume_upload_status",
+                            "pack_frozen",
+                            "fast_cue_before_deep",
+                            "pack_persisted_after_restart",
+                            "install_dir_unchanged_after_use",
+                            "install_dir_removed_by_uninstall",
+                            "portable_backend_ready_seconds"
+                        ],
+    "passed":  false
+}

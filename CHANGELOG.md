@@ -23,9 +23,13 @@
 - 数据写入 %APPDATA%\Chengzhu；后端只监听 127.0.0.1
 - CI 去掉路径过滤；新增严格评测、许可证、Windows 打包冒烟；release.yml 生成 SHA256 并发布
 
-### 延迟（实测，见 reports/CHENGZHU_V1_2_R2_PERFORMANCE.md）
-- 完整问句提前结束合并等待；问题确认后立即出 L0 Cue
-- 受控基准（CPU 本地 Whisper base）：TTFUG_user p50 由 6.2s 降至 3.6s（p95 6.9s → 5.7s）；未达到 1.2s 目标（瓶颈为 CPU 语音识别与 VAD 静音等待）
+### 延迟（实测，见 reports/CHENGZHU_V1_2_R2_LATENCY_FORENSICS.md）
+- 自适应说话结束（CONTINUE / LIKELY_END / CONFIRMED_END），硬超时保留；逗号停顿不截断
+- 稳定 partial / 完整最终转写先出临时 Fast Cue，同一张卡确认 / 修正 / 替换 / 撤回
+- 本地 Whisper：尾部静音即预判最终转写并复用；语言粘滞（错判即重检，不丢问题）；预览不再阻塞采集线程
+- Fast Cue 到达即渲染（不再等 answer_start 与 1.2s grace）
+- 受控基准（干净 4 核 Windows，34 条音频）：TTFUG_user（上屏）p50 5.3s → 1.3s，p95 5.9s → 2.5s（本地 CPU）；流式档（模拟）0.56s / 2.0s；Gate A 两档均达成，Gate B 仅流式档达成
+- 修复：smart 模式拒答英文问题；以“。”结尾、含“哪里/多少/会不会”等的中文问题被拒
 
 ## 2026-08-15 - MD 导航栏 + 胶囊按钮 + FAB（用户「都要」）
 

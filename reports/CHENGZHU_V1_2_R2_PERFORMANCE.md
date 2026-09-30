@@ -1,3 +1,5 @@
+> **Superseded for latency** by `CHENGZHU_V1_2_R2_LATENCY_FORENSICS.md` (release closure): the numbers below measured the server emit with a raw decode; the rendered cue was later and the product STT slower. Kept as history.
+
 # Chengzhu v1.2-R2 — Performance
 
 Measured 2026-09-30 on the development machine (Windows 11, CPU only). Raw data: `reports/perf/ttfug_bench.json`, `reports/perf/soak.json`, `.tmp`-free and reproducible with `scripts/bench_ttfug.py` / `scripts/soak_sim.py`.

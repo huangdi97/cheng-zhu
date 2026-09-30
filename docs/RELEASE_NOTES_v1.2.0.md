@@ -45,7 +45,13 @@ A model is optional for onboarding, preparation and review. For AI answers, add 
 
 TTFUG_user = time from the interviewer finishing the question to the first useful cue **on screen**.
 
-{{LATENCY_TABLE}}
+| Profile | Speech recognition | First cue on screen, median | 95th percentile |
+|---|---|---|---|
+| **Local CPU** (default, offline) | Whisper `base` on the CPU | **1.3 s** | 2.5 s |
+| **Streaming** (your own streaming ASR key) | streaming provider + endpoint event | **0.6 s** (simulated) | 2.0 s (simulated) |
+| v1.2 pre-release build, for comparison | Whisper `base` on the CPU | 5.3 s | 5.9 s |
+
+Local figures were measured on a clean 4-core Windows machine with a 34-clip Chinese / English / mixed / noisy test corpus. The full answer still starts about 4 s after the question with a fast model; the short cue does not wait for it.
 
 Numbers depend heavily on your CPU and what else is running. The local profile needs no network. The streaming profile needs your own streaming ASR key, and its figures are simulated from a model of that provider, not measured against the live service.
 
@@ -59,7 +65,13 @@ Not available in this release (needs Apple hardware and a developer account for 
 
 ## Known limitations
 
-{{KNOWN_LIMITATIONS}}
+- Local speech recognition is Whisper `base` on the CPU: on a busy or slow CPU the first cue arrives later (the benchmark saw several-fold slowdowns with heavy background load). Latency Gate B (≤ 1.2 s median) is met only with a streaming ASR provider.
+- A cue shown from a recognized question is occasionally corrected in place when the final transcription differs (about 1 in 10 turns in the test corpus). In that corpus no cue was shown before the interviewer had finished the question.
+- Recognition errors of Whisper `base` (technical terms, homophones) pass through to the question text; a larger local model or a cloud ASR key improves this.
+- Long pauses (> 1.2 s) inside a question can still split it into two questions.
+- Real multi-hour sessions with real interview audio, and quality/latency of real paid model providers, were not measured for this release.
+- Overlay screenshots and a recorded Review session are not part of the release evidence.
+- Unsigned installer (SmartScreen warning); no macOS build; Human Coach works on the local network only.
 
 ## License
 

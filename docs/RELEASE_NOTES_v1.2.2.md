@@ -55,7 +55,13 @@ A model is optional for onboarding, preparation and review. For AI answers, add 
 
 TTFUG_user = time from the interviewer finishing the question to the first useful cue **on screen**.
 
-{{LATENCY_TABLE}}
+| Profile | Speech recognition | First cue on screen, median | 95th percentile |
+|---|---|---|---|
+| **Local CPU** (default, offline) | Whisper `base` on the CPU | **1.6 s** | 3.0 s |
+| **Streaming** (your own streaming ASR key) | streaming provider + endpoint event | **0.6 s** (simulated) | 2.1 s (simulated) |
+| v1.2 pre-release build, for comparison | Whisper `base` on the CPU | 5.6 s | 6.9 s |
+
+Measured on clean 4-core Windows machines (three independent runs, 34-clip Chinese / English / mixed / noisy test corpus). The local 95th percentile sits right at our 3-second target; long questions and noisy rooms are the slow end. The full answer starts about 4 s after the question with a fast model; the short cue does not wait for it.
 
 Numbers depend heavily on your CPU and what else is running. The local profile needs no network. The streaming profile needs your own streaming ASR key, and its figures are simulated from a model of that provider, not measured against the live service.
 
@@ -69,8 +75,8 @@ Not available in this release (needs Apple hardware and a developer account for 
 
 ## Known limitations
 
-- Local speech recognition is Whisper `base` on the CPU: on a busy or slow CPU the first cue arrives later (the benchmark saw several-fold slowdowns with heavy background load). Latency Gate B (≤ 1.2 s median) is met only with a streaming ASR provider.
-- A cue shown from a recognized question is occasionally corrected in place when the final transcription differs (about 1 in 10 turns in the test corpus). In that corpus no cue was shown before the interviewer had finished the question.
+- Local speech recognition is Whisper `base` on the CPU: on a busy or slow CPU the first cue arrives later (the benchmark saw several-fold slowdowns with heavy background load). The 1.2-second median target is met only with a streaming ASR provider.
+- A cue shown early is corrected in place when the final transcription refines the question: about 1 in 25 turns with local recognition, about 1 in 3 with a streaming provider (same question, cleaner text). In the test corpus no cue was shown before the interviewer had finished the question.
 - Recognition errors of Whisper `base` (technical terms, homophones) pass through to the question text; a larger local model or a cloud ASR key improves this.
 - Long pauses (> 1.2 s) inside a question can still split it into two questions.
 - Real multi-hour sessions with real interview audio, and quality/latency of real paid model providers, were not measured for this release.

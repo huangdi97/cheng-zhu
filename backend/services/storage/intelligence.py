@@ -116,6 +116,15 @@ def active_candidate_id() -> str:
     return str(rows[0]["id"]) if rows else ""
 
 
+_LEGACY_PROVENANCE = {
+    "SUPPORTED": "DIRECT_EVIDENCE",
+    "VERIFIED": "DIRECT_EVIDENCE",
+    "INFERRED": "SUPPORTING_EVIDENCE",
+    "CONTRADICTED": "CONFLICTING_EVIDENCE",
+    "UNKNOWN": "NO_EVIDENCE",
+}
+
+
 def save_claims(candidate_id: str, claims: list[dict[str, Any]]) -> int:
     """Replace the claim set for one rebuild batch. Returns rows written.
 
@@ -128,10 +137,17 @@ def save_claims(candidate_id: str, claims: list[dict[str, Any]]) -> int:
         conn = _conn()
         try:
             for claim in claims:
+                # R2: provenance comes from the source material (same mapping
+                # as migration v2); user_assertion is never set here, so a
+                # user's verdict is not overwritten by a rebuild.
+                provenance = claim.get("provenance_status") or _LEGACY_PROVENANCE.get(
+                    str(claim.get("truth_status", "SUPPORTED")), "NO_EVIDENCE"
+                )
                 conn.execute(
-                    "INSERT INTO claim (id, candidate_id, type, text, source, truth_status, confidence, metadata_json, created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                    "INSERT INTO claim (id, candidate_id, type, text, source, truth_status, confidence, metadata_json, created_at, updated_at, provenance_status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(id) DO UPDATE SET candidate_id=excluded.candidate_id, text=excluded.text, truth_status=excluded.truth_status, "
+                    "provenance_status=excluded.provenance_status, "
                     "confidence=excluded.confidence, metadata_json=excluded.metadata_json, updated_at=excluded.updated_at",
                     (
                         claim["id"],
@@ -144,6 +160,7 @@ def save_claims(candidate_id: str, claims: list[dict[str, Any]]) -> int:
                         json.dumps(claim.get("metadata", {}), ensure_ascii=False),
                         now,
                         now,
+                        provenance,
                     ),
                 )
                 written += 1

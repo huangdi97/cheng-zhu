@@ -96,6 +96,9 @@ def build_l0(
         if (getattr(item, "metadata", {}) or {}).get("cue_source") == CueSource.PERSONAL_EVIDENCE.value
         and (getattr(item, "metadata", {}) or {}).get("provenance") in {"DIRECT_EVIDENCE", "SUPPORTING_EVIDENCE"}
     ]
+    # Only personal items that share a term with the question are relevant
+    # anchors; an unrelated story or skill line is noise, not a cue.
+    personal = [it for it in personal if _overlap(question, getattr(it, "text", "")) > 0]
     personal.sort(key=lambda it: -_overlap(question, getattr(it, "text", "")))
 
     if response_mode in _BOUNDARY_MODES or assertion in {AssertionPolicy.REQUIRE_BOUNDARY.value, AssertionPolicy.BLOCK_ASSERTION.value}:

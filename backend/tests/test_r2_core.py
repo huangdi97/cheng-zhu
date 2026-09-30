@@ -766,3 +766,43 @@ def test_launch_pack_freezes_without_waiting_for_strategy_llm(monkeypatch, tmp_i
     assert elapsed < 3.0, elapsed
     assert result["interview_pack"] and result["interview_pack"]["policies"]["human_assistance_policy"] == "HUMAN_PRACTICE_ONLY"
     assert result["strategy_generating"] is True
+
+
+def test_new_resume_claims_get_provenance_from_the_source(tmp_intel_db):
+    from services.intelligence.candidate_representation import rebuild_and_persist
+
+    rep = rebuild_and_persist("WenNian 项目\n负责检索链路，使用 Redis 管理 session state\n技能：熟悉 Kafka")
+    rows = {r["text"]: r for r in intel_storage.list_claims(rep.candidate_id)}
+    action = next(r for t, r in rows.items() if "Redis" in t)
+    skill = next((r for t, r in rows.items() if "Kafka" in t), None)
+    assert action["provenance_status"] == "DIRECT_EVIDENCE"
+    assert action["user_assertion_status"] == "UNREVIEWED"
+    if skill is not None:
+        assert skill["provenance_status"] == "SUPPORTING_EVIDENCE"
+
+
+def test_editing_fact_text_keeps_user_established_provenance(tmp_intel_db):
+    from fastapi.testclient import TestClient
+
+    import main
+
+    intel_storage.save_candidate_profile("cand", profile_text=RESUME)
+    intel_storage.save_claims("cand", [{"id": "c1", "text": "我做过 X", "source": "resume", "truth_status": "UNKNOWN"}])
+    intel_storage.update_claim_axes("c1", provenance_status="SUPPORTING_EVIDENCE")
+    c = TestClient(main.app)
+    assert c.patch("/api/intelligence/facts/c1", json={"text": "我做过 X（修订）"}).status_code == 200
+    row = intel_storage.list_claims("cand")[0]
+    assert row["text"] == "我做过 X（修订）" and row["provenance_status"] == "SUPPORTING_EVIDENCE"
+
+
+def test_boundary_cue_skips_unrelated_personal_items():
+    story = _pack(stories=[{"id": "s1", "title": "灰度回滚事故", "situation": "上线后错误率升高"}])
+    compiled, _ = compile_live_context(story, "你用过 Redis Cluster 吗", deep=True)
+    body = fast_cue.build_l0(
+        question_raw="你用过 Redis Cluster 吗", resolved_question="你用过 Redis Cluster 吗",
+        plan_meta={"assertion_policy": "REQUIRE_BOUNDARY"}, response_mode="EXPERIENCE_BOUNDARY_KNOWLEDGE",
+        compiled_items=compiled.items,
+    )
+    texts = [c["text"] for c in body["cues"]]
+    assert not any("灰度回滚" in t for t in texts)
+    assert any("Redis" in t and t.startswith("可衔接") for t in texts)

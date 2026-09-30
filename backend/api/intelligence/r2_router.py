@@ -114,7 +114,9 @@ def update_fact(claim_id: str, body: FactAxesRequest):
         storage.save_claims(
             row["candidate_id"],
             [{"id": claim_id, "type": row.get("type", "fact"), "text": body.text, "source": row.get("source", ""),
-              "truth_status": row.get("truth_status", "UNKNOWN"), "confidence": row.get("confidence", 0.5)}],
+              "truth_status": row.get("truth_status", "UNKNOWN"), "confidence": row.get("confidence", 0.5),
+              # editing text must not reset provenance the user established
+              "provenance_status": row.get("provenance_status") or "NO_EVIDENCE"}],
         )
     updated = storage.update_claim_axes(
         claim_id,

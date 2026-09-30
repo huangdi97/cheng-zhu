@@ -289,3 +289,20 @@ def test_no_speculative_decode_on_a_mid_sentence_pause():
     tr.on_local_decode("消息队列怎么保证不丢消息", covered_samples=SR * 2, now=9.9)
     assert tr.should_speculate()
     assert LiveTurnTracker().should_speculate(), "no partial yet: speculate"
+
+
+def test_complete_final_text_shows_the_cue_before_the_confirm_windows():
+    sm, events, cues, tasks, now = _machine()
+    sm.append_transcription_fragment(CFG, SESSION, "消息队列怎么保证不丢消息？", now["t"], False)
+    assert cues and cues[0][2]["provisional"] is True, "cue must not wait for merge + group windows"
+    assert not tasks
+    now["t"] += 2.0
+    sm.try_flush_question_group(CFG, SESSION, now["t"], False)
+    assert tasks[0][4]["qa_id"] == cues[0][1] and tasks[0][4]["provisional_relation"] == "same"
+    assert len(cues) == 1
+
+
+def test_incomplete_final_text_waits_for_confirmation():
+    sm, events, cues, tasks, now = _machine()
+    sm.append_transcription_fragment(CFG, SESSION, "我们先聊聊缓存", now["t"], False)
+    assert not cues

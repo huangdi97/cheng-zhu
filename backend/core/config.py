@@ -224,6 +224,8 @@ class AppConfig(BaseModel):
     assist_provisional_cue: bool = True
     # 临时 Cue 在该秒数内未被最终转写确认则撤回
     assist_provisional_ttl_sec: float = 8.0
+    # 最终转写已是完整问句时立即出临时 Cue（合并/分组窗口随后在同一张卡上确认或修正）
+    assist_final_provisional_cue: bool = True
     # Stage P：原始音频保留策略（保留场次；0 = 不长期保存原始音频）
     raw_audio_retention_sessions: int = 0
 

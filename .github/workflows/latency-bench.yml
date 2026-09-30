@@ -16,6 +16,11 @@ on:
     paths:
       - ".github/workflows/latency-bench.yml"
       - "scripts/bench_latency.py"
+      - "backend/api/assist/**"
+      - "backend/services/intelligence/end_of_turn.py"
+      - "backend/services/intelligence/live_turn.py"
+      - "backend/services/stt/**"
+      - "backend/services/audio.py"
 
 permissions:
   contents: read

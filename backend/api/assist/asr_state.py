@@ -438,6 +438,16 @@ class AssistAsrStateMachine:
         now_mono: float,
         force_flush_tail: bool = False,
     ) -> None:
+        if (
+            self.provisional is None
+            and bool(getattr(cfg, "assist_final_provisional_cue", True))
+            and _looks_like_complete_question(pub)
+        ):
+            # The authoritative text already reads as a finished question:
+            # show the cue now; the merge / group windows (~0.8 s) that wait
+            # for a continuation then confirm or correct it on the same card.
+            source = "conversation_loopback" if getattr(session, "capture_is_loopback", False) else "conversation_mic"
+            self.submit_provisional(cfg, session, pub, source, now_mono)
         gap = float(getattr(cfg, "assist_transcription_merge_gap_sec", 2.0) or 0.0)
         if gap <= 0:
             session.add_transcription(pub)
@@ -458,6 +468,12 @@ class AssistAsrStateMachine:
             self.flush_merge_buffer_now(cfg, session)
         else:
             self.try_flush_merge_buffer(cfg, session, now_mono, False)
+
+
+def _looks_like_complete_question(text: str) -> bool:
+    from services.intelligence.eot import looks_like_complete_question
+
+    return looks_like_complete_question(text)
 
 
 def _asr_confirm_window_sec(cfg) -> float:

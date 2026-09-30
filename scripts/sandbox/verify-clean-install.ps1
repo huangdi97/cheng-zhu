@@ -88,7 +88,7 @@ try {
   # --- 4. fake OpenAI-compatible provider (local, in-sandbox) --------------------------
   $fakeJob = Start-Job -ScriptBlock {
     $l = New-Object System.Net.HttpListener
-    $l.Prefixes.Add('http://127.0.0.1:18999/')
+    $l.Prefixes.Add('http://localhost:18999/')
     $l.Start()
     $answer = '先讲结论：两级缓存加失效广播。本地缓存短 TTL，Redis 作共享层，写后删除并广播失效。'
     while ($l.IsListening) {
@@ -114,6 +114,12 @@ try {
     }
   }
 
+  Start-Sleep -Seconds 3
+  $fakeOk = $false
+  foreach ($i in 1..10) { try { $null = Invoke-WebRequest 'http://localhost:18999/v1/models' -UseBasicParsing -TimeoutSec 3; $fakeOk = $true; break } catch { Start-Sleep -Seconds 1 } }
+  Check 'fake_provider_reachable' $fakeOk
+  if (-not $fakeOk) { Check 'fake_provider_job' ((Receive-Job $fakeJob -Keep -ErrorAction SilentlyContinue | Out-String) + ($fakeJob.ChildJobs[0].Error | Out-String)) }
+
   # --- 5. launch + first screen --------------------------------------------------------
   $app = Start-Process (Join-Path $inst 'Chengzhu.exe') -PassThru
   $ready = WaitInstance 240
@@ -130,7 +136,7 @@ try {
   Check 'app_data_layout' ((Get-ChildItem $appdata -Directory -ErrorAction SilentlyContinue | ForEach-Object Name) -join ',')
 
   # --- 6. onboarding (model optional -> fake local provider), resume, job, freeze -----
-  $null = Api '/api/config' 'POST' @{ models = @(@{ name = 'Fake (sandbox)'; api_base_url = 'http://127.0.0.1:18999/v1'; api_key = 'test-key-not-real'; model = 'fake-model'; enabled = $true; supports_think = $false; supports_vision = $false }); active_model = 0; onboarding_completed = $true }
+  $null = Api '/api/config' 'POST' @{ models = @(@{ name = 'Fake (sandbox)'; api_base_url = 'http://localhost:18999/v1'; api_key = 'test-key-not-real'; model = 'fake-model'; enabled = $true; supports_think = $false; supports_vision = $false }); active_model = 0; onboarding_completed = $true }
   $cfg1 = Api '/api/config'
   Check 'onboarding_completed_after' $cfg1.onboarding_completed
   $diag = try { Api '/api/intelligence/diagnostics' } catch { "error: $_" }
@@ -174,6 +180,7 @@ try {
     $types.Add([string]$msg.type)
     if ($msg.type -eq 'guidance_fast' -and -not $firstCueAt) { $firstCueAt = Get-Date }
     if ($msg.type -eq 'answer_chunk' -and -not $firstChunkAt) { $firstChunkAt = Get-Date }
+    if ($msg.type -eq 'answer_error') { Check 'answer_error_message' ([string]$msg.message) }
     if ($msg.type -in @('answer_done', 'answer_error')) { break }
   }
   $cueIdx = $types.IndexOf('guidance_fast'); $chunkIdx = $types.IndexOf('answer_chunk')

@@ -82,7 +82,16 @@ const app = await electron.launch({
   env: { ...process.env, PORT: String(port) },
   timeout: 180000,
 })
-const win = await app.firstWindow({ timeout: 180000 })
+// The app also opens a hidden overlay window (?overlay=1) — pick the main one.
+async function mainWindow() {
+  for (let i = 0; i < 180; i++) {
+    const main = app.windows().find((w) => !w.url().includes('overlay=1') && w.url().startsWith('http'))
+    if (main) return main
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+  throw new Error('main window not found')
+}
+const win = await mainWindow()
 await win.setViewportSize({ width: 1440, height: 900 }).catch(() => {})
 
 async function shot(name, note, action) {
@@ -140,8 +149,9 @@ await shot('facts', '我的成竹 → 事实与来源', async () => {
   await win.getByRole('tab', { name: /事实与来源/ }).first().click()
 })
 await shot('prepare', '求职 → 岗位目标 (prepare)', async () => { await tab('求职') })
-await shot('freeze', 'frozen InterviewPack for the job goal', async () => {
-  await win.getByText(/已冻结|冻结|Pack/).first().scrollIntoViewIfNeeded()
+await shot('freeze', 'job goal opened: prepare + frozen InterviewPack', async () => {
+  await win.getByText('高级后端工程师').first().click()
+  await win.waitForTimeout(1500)
 })
 await shot('preflight', '上场 → pack bar / preflight', async () => { await tab('上场') })
 
@@ -152,28 +162,31 @@ await shot('live-fast-cue', 'Fast Cue rendered above the deep answer (fake provi
   await win.waitForTimeout(2500)
 })
 
-// Overlay: same view model in the overlay route, in its own window
+// Overlay: the app's own overlay window (?overlay=1), shown, with a live cue
 try {
-  const pagePromise = app.waitForEvent('window', { timeout: 20000 })
-  await app.evaluate(({ BrowserWindow }, url) => {
-    const w = new BrowserWindow({ width: 460, height: 640, show: true })
-    w.loadURL(url)
-  }, `${base}/?overlay=1`)
-  const overlay = await pagePromise
-  await overlay.waitForLoadState('domcontentloaded')
-  await overlay.waitForTimeout(2500)
+  const overlay = app.windows().find((w) => w.url().includes('overlay=1'))
+  if (!overlay) throw new Error('overlay window not found')
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('overlay=1'))
+    if (w) { w.setBounds({ width: 480, height: 420 }); w.show() }
+  })
+  await api('/api/ask', { method: 'POST', body: JSON.stringify({ text: '消息队列怎么保证不丢消息？' }) })
+  await overlay.waitForTimeout(4000)
   const file = path.join(outDir, 'overlay.png')
   await overlay.screenshot({ path: file })
-  await overlay.close()
-  manifest.entries.push({ name: 'overlay', file: path.relative(path.resolve(outDir, '..', '..', '..'), file), note: 'overlay cue mode (?overlay=1) in its own window' })
+  manifest.entries.push({ name: 'overlay', file: path.relative(path.resolve(outDir, '..', '..', '..'), file), note: 'the app overlay window (?overlay=1) after a Live question' })
 } catch (err) {
   manifest.entries.push({ name: 'overlay', error: String(err?.message || err).slice(0, 300) })
 }
 await shot('review', '复盘', async () => { await tab('复盘') })
 await shot('settings', 'settings drawer', async () => {
-  await win.getByRole('button', { name: /设置|Settings/ }).first().click()
+  await win.keyboard.press('Escape').catch(() => {})
+  await win.getByRole('button', { name: '设置', exact: true }).first().click()
 })
-await shot('about-version', 'settings → version / license section', async () => {
+await shot('about-version', 'settings → 关于: version / license / source', async () => {
+  const search = win.getByLabel('搜索设置项')
+  if (await search.isDisabled()) await win.getByRole('button', { name: '常用' }).first().click()
+  await search.fill('关于')
   const v = win.getByText(/1\.2\.0/).first()
   await v.scrollIntoViewIfNeeded()
   await v.waitFor({ timeout: 10000 })

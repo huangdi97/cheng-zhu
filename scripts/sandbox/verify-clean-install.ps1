@@ -74,11 +74,22 @@ try {
   Shot 'installer'
   try { Stop-Process -Id $ui.Id -Force } catch {}
   Get-Process | Where-Object { $_.Path -like '*Chengzhu-Setup*' -or $_.ProcessName -like 'Chengzhu-Setup*' } | Stop-Process -Force -ErrorAction SilentlyContinue
-  Start-Sleep -Seconds 2
+  # The killed UI instance can leave an NSIS child holding the installer
+  # mutex; wait for it, then install silently (retry if nothing landed).
+  $candidates = @((Join-Path $env:LOCALAPPDATA 'Programs\Chengzhu'), (Join-Path $env:LOCALAPPDATA 'Programs\chengzhu'), (Join-Path $env:ProgramFiles 'Chengzhu'))
   $t0 = Get-Date
-  Start-Process $setup -ArgumentList '/S' -Wait
+  $inst = $null
+  foreach ($attempt in 1..3) {
+    $waitUntil = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $waitUntil -and (Get-Process | Where-Object { $_.ProcessName -like 'Chengzhu-Setup*' -or $_.ProcessName -like 'Au_*' -or $_.ProcessName -like 'Un_*' })) { Start-Sleep -Seconds 1 }
+    Start-Process $setup -ArgumentList '/S' -Wait
+    $inst = $candidates | Where-Object { Test-Path (Join-Path $_ 'Chengzhu.exe') } | Select-Object -First 1
+    if ($inst) { break }
+    Log "silent install attempt $attempt left no Chengzhu.exe; retrying"
+    Start-Sleep -Seconds 5
+  }
   Check 'install_seconds' ([math]::Round(((Get-Date) - $t0).TotalSeconds, 1))
-  $inst = Join-Path $env:LOCALAPPDATA 'Programs\Chengzhu'
+  if (-not $inst) { $inst = $candidates[0] }
   Check 'install_dir' $inst
   Check 'installed_exe' (Test-Path (Join-Path $inst 'Chengzhu.exe'))
   Check 'bundled_license' ((Test-Path (Join-Path $inst 'resources\LICENSE')) -and ((Get-Content (Join-Path $inst 'resources\LICENSE') -TotalCount 1) -like 'MIT License*'))

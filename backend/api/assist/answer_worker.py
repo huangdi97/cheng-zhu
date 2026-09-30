@@ -923,6 +923,12 @@ def _emit_fast_cue(
         latency_clock.mark(qa_id, "G0")
         payload = fast_cue.finalize(body, qa_id=qa_id, timing=latency_clock.metrics(qa_id))
         broadcast(payload)
+        try:
+            from api.coach.router import remember_fast_cue
+
+            remember_fast_cue(payload)
+        except Exception:  # noqa: BLE001
+            pass
         _schedule_fast_cue_l1(qa_id, payload, live_pack, cfg, broadcast)
         return payload
     except Exception as exc:  # noqa: BLE001

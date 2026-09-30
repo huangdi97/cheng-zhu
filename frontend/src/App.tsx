@@ -19,6 +19,7 @@ import CopilotHintPanel from '@/components/CopilotHintPanel'
 import LivePackBar from '@/components/live/LivePackBar'
 import SessionClaimWarnings from '@/components/live/SessionClaimWarnings'
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
+import CoachCues from '@/components/coach/CoachCues'
 import QuestionBoundaryPanel from '@/components/QuestionBoundaryPanel'
 import ScreenshotModePanel from '@/components/ScreenshotModePanel'
 import SettingsDrawer from '@/components/SettingsDrawer'
@@ -587,6 +588,7 @@ export default function App() {
           {assistMode === 'voice' ? (
             <>
           <SessionClaimWarnings />
+          <CoachCues />
           {/* Mobile tab switcher */}
           <div className="flex md:hidden border-b border-bg-tertiary flex-shrink-0" role="tablist" aria-label="实时辅助面板">
             <button role="tab" aria-selected={mobileTab === 'transcript'} onClick={() => setMobileTab('transcript')}

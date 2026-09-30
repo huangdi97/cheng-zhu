@@ -20,8 +20,11 @@ for (const [name, mode] of SCREENS) {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: mode },
     })
+    // Reduced motion: axe must measure settled colors, not a mid-fade frame.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/')
     await expect(page.getByRole('heading', { name: '成竹', exact: true })).toBeVisible()
+    await page.waitForLoadState('networkidle')
     await page.waitForTimeout(600)
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
     const blocking = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious')

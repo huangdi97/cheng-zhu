@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { BookOpenCheck, Sparkles } from 'lucide-react'
 import { api, type PrepSpaceLite } from '@/lib/api'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
+import CoachPanel from '@/components/coach/CoachPanel'
 
 // R2 Stage O 信息架构：一级导航 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置。
 // “准备”不再是一级导航：它是 Job Goal（岗位目标）里的一个区块。
@@ -74,6 +75,7 @@ export function RehearseHub() {
           <button type="button" className="ml-2 text-accent-blue underline" onClick={() => { setJobHubTab('goals'); setAppMode('job-tracker') }}>去「求职」新建</button>
         </div>
       )}
+      <div className="mt-4 max-w-2xl"><CoachPanel sessionKind="practice" /></div>
       <ul className="mt-4 grid gap-3 md:grid-cols-2">
         {(spaces ?? []).map((space) => (
           <li key={space.id} className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-4">

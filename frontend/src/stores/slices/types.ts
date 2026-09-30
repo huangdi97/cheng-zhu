@@ -185,6 +185,14 @@ export interface QAPair {
   errorMessage?: string
 }
 
+/** R2 Human Coach cue: advice only (source HUMAN_COACH), never evidence */
+export interface CoachCue {
+  id: string
+  text: string
+  voiceUrl: string
+  createdAt: number
+}
+
 /** R2 Session Claim：本场口述但暂无来源的陈述，私有提示 + 同场纠错入口 */
 export interface SessionClaimWarning {
   id: string

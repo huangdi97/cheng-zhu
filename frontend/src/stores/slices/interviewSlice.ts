@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { RootState } from './rootState'
-import type { QAPair, QAStatus, SessionClaimWarning } from './types'
+import type { CoachCue, QAPair, QAStatus, SessionClaimWarning } from './types'
 
 const CHUNK_THROTTLE_MS = 50
 const MAX_TRANSCRIPTIONS = 200
@@ -102,6 +102,7 @@ export interface InterviewSliceState {
   sessions: Array<{ id: string; label: string; created_at: number; qa_count: number; transcription_count: number; is_active: boolean; is_recording: boolean; is_paused: boolean }>
   activeSessionId: string
   sessionClaimWarnings: SessionClaimWarning[]
+  coachCues: CoachCue[]
 }
 
 export interface InterviewSliceActions {
@@ -144,6 +145,8 @@ export interface InterviewSliceActions {
   setFastCue: (id: string, payload: unknown) => void
   pushSessionClaimWarning: (warning: SessionClaimWarning) => void
   dismissSessionClaimWarning: (id: string) => void
+  pushCoachCue: (cue: CoachCue) => void
+  dismissCoachCue: (id: string) => void
   cancelAnswer: (id: string) => void
   errorAnswer: (id: string, message: string) => void
   setVisionVerify: (id: string, verdict: 'PASS' | 'FAIL' | 'UNKNOWN', reason: string) => void
@@ -188,6 +191,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
   sessions: [],
   activeSessionId: '',
   sessionClaimWarnings: [],
+  coachCues: [],
 
   setRecording: (v) => set({ isRecording: v }),
   setPaused: (v) => set({ isPaused: v }),
@@ -311,6 +315,11 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
     set((s) => (s.sessionClaimWarnings.some((w) => w.id === warning.id)
       ? s
       : { sessionClaimWarnings: [...s.sessionClaimWarnings, warning].slice(-5) })),
+
+  pushCoachCue: (cue) =>
+    set((s) => ({ coachCues: [...s.coachCues.filter((c) => c.id !== cue.id), cue].slice(-10) })),
+
+  dismissCoachCue: (id) => set((s) => ({ coachCues: s.coachCues.filter((c) => c.id !== id) })),
 
   dismissSessionClaimWarning: (id) =>
     set((s) => ({ sessionClaimWarnings: s.sessionClaimWarnings.filter((w) => w.id !== id) })),
@@ -488,6 +497,7 @@ export const createInterviewSlice: StateCreator<RootState, [], [], InterviewSlic
       suggestionsById: {},
       questionParseStatus: null,
       sessionClaimWarnings: [],
+      coachCues: [],
     })
   },
 

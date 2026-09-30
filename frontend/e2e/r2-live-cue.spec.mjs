@@ -127,3 +127,31 @@ test.describe('R2 first-run onboarding', () => {
     await expect(wizard.getByRole('radio', { name: '关闭（推荐默认）' })).toBeChecked()
   })
 })
+
+test.describe('R2 human coach', () => {
+  test('coach cue shows as advice, not as a source', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: [
+        ...COMMON_WS_BOOTSTRAP,
+        { type: 'coach_cue', delay: 80, id: 'cc-1', coach_session_id: 'coach-1', text: '先说边界，再讲你做过的 Redis', voice_url: '', source: 'HUMAN_COACH', is_evidence: false, created_at: 1 },
+      ],
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'assist' },
+    })
+    await page.goto('/')
+    const cues = page.getByTestId('coach-cues')
+    await expect(cues).toBeVisible({ timeout: 8000 })
+    await expect(cues.getByText('教练建议')).toBeVisible()
+    await expect(cues.getByText('（建议，不是事实来源）')).toBeVisible()
+    await expect(cues.getByText('先说边界，再讲你做过的 Redis')).toBeVisible()
+  })
+
+  test('rehearse hub offers a practice coach panel', async ({ context, page }) => {
+    await installMocks(context, { messages: COMMON_WS_BOOTSTRAP, localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'prep' } })
+    await page.goto('/')
+    const panel = page.getByTestId('coach-panel')
+    await expect(panel).toBeVisible({ timeout: 8000 })
+    await expect(panel.getByText('人工教练（练习）')).toBeVisible()
+    await expect(panel.getByRole('checkbox', { name: '转写' })).toBeChecked()
+    await expect(panel.getByRole('checkbox', { name: 'AI Cue' })).not.toBeChecked()
+  })
+})

@@ -173,6 +173,14 @@ export function useInterviewWS(active = true) {
         if (msg.exam_preflight_id) return
         s.setFastCue(msg.id as string, msg)
         break
+      case 'coach_cue':
+        s.pushCoachCue({
+          id: String(msg.id ?? ''),
+          text: String(msg.text ?? ''),
+          voiceUrl: String(msg.voice_url ?? ''),
+          createdAt: Number(msg.created_at ?? Date.now() / 1000),
+        })
+        break
       case 'session_claim_warning':
         s.pushSessionClaimWarning({
           id: String(msg.id ?? ''),

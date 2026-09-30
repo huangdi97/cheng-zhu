@@ -866,4 +866,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ detail }),
     }),
+  // R2 Human Coach (candidate side)
+  coachSessions: () =>
+    request<{ sessions: Array<Record<string, unknown>>; public_relay: string }>('/api/coach/sessions'),
+  coachCreate: (body: { session_kind: 'practice' | 'live'; permissions: Record<string, boolean>; lan?: boolean; ttl_min?: number }) =>
+    request<{ id: string; urls: Record<string, string>; public_relay: string }>('/api/coach/sessions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  coachRevoke: (id: string) =>
+    request<{ id: string; revoked: boolean }>(`/api/coach/sessions/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }),
 }

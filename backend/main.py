@@ -252,6 +252,12 @@ app.include_router(copilot_api.router, prefix="/api")
 app.include_router(sessions_api.router, prefix="/api")
 app.include_router(intelligence_api.intelligence_router, prefix="/api/intelligence")
 app.include_router(intelligence_api.intelligence_r2_router, prefix="/api/intelligence")
+# R2 Human Coach: candidate routes under /api (loopback-authenticated like the
+# rest); the helper page + token-guarded helper endpoints under /coach.
+from api import coach as coach_api  # noqa: E402
+
+app.include_router(coach_api.candidate_router, prefix="/api")
+app.include_router(coach_api.helper_router)
 
 
 if os.path.isdir(FRONTEND_DIR):

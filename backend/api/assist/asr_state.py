@@ -418,13 +418,11 @@ class AssistAsrStateMachine:
         since_last = now_mono - self.merge_mono_last
         burst_age = (now_mono - self.merge_mono_first) if self.merge_mono_first is not None else 0.0
         if bool(getattr(cfg, "assist_eot_fast_flush", True)):
-            from services.intelligence.eot import looks_like_complete_question
-
             # R2: when the merged text already reads as a finished question,
             # only a short quiet period is needed. Speech activity (a newer
             # streaming partial) still moves merge_mono_last forward, so a
             # speaker who keeps talking is never cut off.
-            if looks_like_complete_question(" ".join(self.merge_parts)):
+            if _looks_like_complete_question(" ".join(self.merge_parts), _previous_question(session)):
                 eot_gap = float(getattr(cfg, "assist_eot_merge_gap_sec", 0.35) or 0.35)
                 gap = min(gap, max(0.1, eot_gap))
         if since_last >= gap or burst_age >= max_wait:
@@ -441,7 +439,7 @@ class AssistAsrStateMachine:
         if (
             self.provisional is None
             and bool(getattr(cfg, "assist_final_provisional_cue", True))
-            and _looks_like_complete_question(pub)
+            and _looks_like_complete_question(pub, _previous_question(session))
         ):
             # The authoritative text already reads as a finished question:
             # show the cue now; the merge / group windows (~0.8 s) that wait
@@ -470,10 +468,18 @@ class AssistAsrStateMachine:
             self.try_flush_merge_buffer(cfg, session, now_mono, False)
 
 
-def _looks_like_complete_question(text: str) -> bool:
-    from services.intelligence.eot import looks_like_complete_question
+def _looks_like_complete_question(text: str, previous_question: str = "") -> bool:
+    from services.intelligence.end_of_turn import is_complete_turn
 
-    return looks_like_complete_question(text)
+    return is_complete_turn(text, previous_question)
+
+
+def _previous_question(session) -> str:
+    try:
+        last_qa = session.get_last_qa() if hasattr(session, "get_last_qa") else None
+    except Exception:  # noqa: BLE001
+        return ""
+    return str(getattr(last_qa, "question", "") or "")
 
 
 def _asr_confirm_window_sec(cfg) -> float:

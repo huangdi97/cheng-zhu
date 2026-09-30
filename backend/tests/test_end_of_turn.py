@@ -306,3 +306,16 @@ def test_incomplete_final_text_waits_for_confirmation():
     sm, events, cues, tasks, now = _machine()
     sm.append_transcription_fragment(CFG, SESSION, "我们先聊聊缓存", now["t"], False)
     assert not cues
+
+
+def test_short_follow_up_is_fast_after_a_previous_question():
+    """'为什么？' must not wait the full 2 s merge gap when it follows a question."""
+    sm, events, cues, tasks, now = _machine()
+    session = SimpleNamespace(capture_is_loopback=False, add_transcription=lambda _t: None,
+                              get_last_qa=lambda: SimpleNamespace(question="你们为什么选择 Kafka？"))
+    cfg = SimpleNamespace(**{**vars(CFG), "assist_transcription_merge_gap_sec": 2.0, "assist_eot_merge_gap_sec": 0.35})
+    sm.append_transcription_fragment(cfg, session, "为什么？", now["t"], False)
+    assert cues and cues[0][2]["provisional"] is True
+    now["t"] += 0.4
+    sm.try_flush_merge_buffer(cfg, session, now["t"])
+    assert sm.pending_group is not None, "merge flushed after the short EOT gap, not the 2 s gap"

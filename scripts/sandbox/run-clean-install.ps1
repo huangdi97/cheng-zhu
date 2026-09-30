@@ -37,8 +37,17 @@ $wsb = @"
 "@
 $wsbPath = Join-Path $stage 'chengzhu-clean-install.wsb'
 Set-Content -Path $wsbPath -Value $wsb -Encoding UTF8
-Write-Host "Starting Windows Sandbox: $wsbPath"
-Start-Process "$env:windir\System32\WindowsSandbox.exe" -ArgumentList "`"$wsbPath`""
+# A previous sandbox may still be shutting down (only one instance can run):
+# launch, and relaunch once if the verification never starts.
+foreach ($attempt in 1..2) {
+  Write-Host "Starting Windows Sandbox (attempt $attempt): $wsbPath"
+  Start-Process "$env:windir\System32\WindowsSandbox.exe" -ArgumentList "`"$wsbPath`""
+  $startBy = (Get-Date).AddMinutes(3)
+  while ((Get-Date) -lt $startBy -and -not (Test-Path (Join-Path $OutDir 'verify.log'))) { Start-Sleep -Seconds 5 }
+  if (Test-Path (Join-Path $OutDir 'verify.log')) { break }
+  Get-Process WindowsSandboxClient, WindowsSandboxRemoteSession, WindowsSandbox -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 20
+}
 $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
 while ((Get-Date) -lt $deadline -and -not (Test-Path (Join-Path $OutDir 'done.flag'))) { Start-Sleep -Seconds 10 }
 if (-not (Test-Path (Join-Path $OutDir 'done.flag'))) { Write-Host 'TIMEOUT'; exit 2 }

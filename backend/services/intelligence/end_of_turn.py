@@ -70,6 +70,15 @@ _FOLLOW_UP = re.compile(
 )
 
 
+def is_complete_turn(text: str, previous_question: str = "") -> bool:
+    """A finished question, or a short follow-up ("为什么？", "那如果并发更高呢？")
+    that is complete relative to the previous question."""
+    value = (text or "").strip()
+    if looks_like_complete_question(value):
+        return True
+    return bool((previous_question or "").strip()) and bool(_FOLLOW_UP.match(value))
+
+
 def reads_mid_sentence(text: str) -> bool:
     """The partial clearly stops mid-sentence (dangling connector, or an
     open condition that has not asked anything yet)."""
@@ -124,9 +133,7 @@ class EndOfTurnDetector:
             return EotDecision(EotState.CONTINUE, "no_partial")
         if _DANGLING_TAIL.search(text):
             return EotDecision(EotState.CONTINUE, "dangling_connector")
-        complete = looks_like_complete_question(text) or (
-            bool(signals.previous_question.strip()) and bool(_FOLLOW_UP.match(text))
-        )
+        complete = is_complete_turn(text, signals.previous_question)
         if not complete:
             if _OPEN_CONDITION.search(text):
                 return EotDecision(EotState.CONTINUE, "open_condition")

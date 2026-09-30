@@ -29,9 +29,9 @@ from services.intelligence.end_of_turn import (
     EotDecision,
     EotSignals,
     EotState,
+    is_complete_turn,
     reads_mid_sentence,
 )
-from services.intelligence.eot import looks_like_complete_question
 
 
 @dataclass
@@ -188,4 +188,4 @@ class LiveTurnTracker:
                 "not_a_complete_question",
             }:
                 return ""
-            return self.text if looks_like_complete_question(self.text) else ""
+            return self.text if is_complete_turn(self.text, self.previous_question) else ""

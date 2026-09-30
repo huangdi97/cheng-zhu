@@ -278,3 +278,14 @@ def test_comma_pause_after_a_question_like_clause_keeps_listening():
     """'写一个函数判断链表有没有环，<0.46 s> 说一下你的思路' must not end at the comma."""
     d = _eval(silence_sec=0.46, partial_text="写一个函数判断链表有没有环", partial_covers_end=True, partial_stable_sec=0.4)
     assert d.state is EotState.CONTINUE
+
+
+def test_no_speculative_decode_on_a_mid_sentence_pause():
+    tr = LiveTurnTracker(clock=lambda: 10.0)
+    tr.on_local_decode("你们的服务拆分之后，然后", covered_samples=SR * 2, now=9.0)
+    assert not tr.should_speculate()
+    tr.on_local_decode("如果流量扩大十倍", covered_samples=SR * 2, now=9.5)
+    assert not tr.should_speculate()
+    tr.on_local_decode("消息队列怎么保证不丢消息", covered_samples=SR * 2, now=9.9)
+    assert tr.should_speculate()
+    assert LiveTurnTracker().should_speculate(), "no partial yet: speculate"

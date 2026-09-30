@@ -99,6 +99,12 @@ def _mode_cfg(cfg_base, mode: str):
     })
 
 
+def _pipeline_vad_value(name: str) -> float:
+    from api.assist import pipeline
+
+    return float(getattr(pipeline, name))
+
+
 def run_case(case: dict, mode: str, batch_engine, cfg_base, sim_cache: dict) -> dict:
     from api.assist.answer_worker import emit_early_cue
     from api.assist.asr_state import AssistAsrStateMachine
@@ -163,6 +169,10 @@ def run_case(case: dict, mode: str, batch_engine, cfg_base, sim_cache: dict) -> 
         silence_duration=cfg.silence_duration,
         max_speech_duration=cfg.assist_vad_max_speech_sec,
         min_speech_duration=cfg.assist_vad_min_speech_sec,
+        # same preroll / rollover as the product's interviewer VAD: Whisper
+        # needs the audio just before the first voiced frame
+        preroll_duration=_pipeline_vad_value("_interviewer_vad_preroll_sec"),
+        rollover_duration=_pipeline_vad_value("_interviewer_vad_rollover_sec"),
     )
     if final_code:
         vad.end_of_turn_probe = lambda silence: tracker.probe(silence, vad.voiced_end_samples)
@@ -270,6 +280,7 @@ def run_case(case: dict, mode: str, batch_engine, cfg_base, sim_cache: dict) -> 
                     not remote
                     and in_tail
                     and spec["key"] != vad.voiced_end_samples
+                    and tracker.should_speculate()
                     and worker["free_at"] <= t
                     and not batch_queue
                 ):

@@ -29,6 +29,7 @@ from services.intelligence.end_of_turn import (
     EotDecision,
     EotSignals,
     EotState,
+    reads_mid_sentence,
 )
 from services.intelligence.eot import looks_like_complete_question
 
@@ -167,6 +168,13 @@ class LiveTurnTracker:
                 self.trace.confirmed_end = now
                 self.trace.confirm_reason = decision.reason
             return decision.state is EotState.CONFIRMED_END
+
+    def should_speculate(self) -> bool:
+        """Skip the speculative final when the newest partial clearly stops
+        mid-sentence: a pause there is a thinking pause, and a wasted decode
+        would make the real final wait behind it on a busy CPU."""
+        with self._lock:
+            return not reads_mid_sentence(self.text)
 
     def provisional_question(self, now: Optional[float] = None) -> str:
         """The partial that may drive a provisional Fast Cue, or ""."""

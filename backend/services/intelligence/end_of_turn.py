@@ -61,12 +61,24 @@ _DANGLING_TAIL = re.compile(
     re.IGNORECASE,
 )
 # A clause that opens a condition but has not asked anything yet.
-_OPEN_CONDITION = re.compile(r"^(?:如果|假如|假设|要是|当|if|when|suppose|assuming)\b", re.IGNORECASE)
+# (\b only for English: between two CJK characters there is no word boundary.)
+_OPEN_CONDITION = re.compile(r"^(?:如果|假如|假设|要是|当|(?:if|when|suppose|assuming)\b)", re.IGNORECASE)
 # Short follow-ups that are complete only relative to a previous question.
 _FOLLOW_UP = re.compile(
     r"^(?:为什么|为啥|怎么说|然后呢|还有呢|具体呢|比如呢|举个例子|那.{0,12}呢|why|how so|such as|for example|and then|what else)[？?。.!！]?$",
     re.IGNORECASE,
 )
+
+
+def reads_mid_sentence(text: str) -> bool:
+    """The partial clearly stops mid-sentence (dangling connector, or an
+    open condition that has not asked anything yet)."""
+    value = (text or "").strip()
+    if not value:
+        return False
+    if _DANGLING_TAIL.search(value):
+        return True
+    return bool(_OPEN_CONDITION.search(value)) and not looks_like_complete_question(value)
 
 
 @dataclass

@@ -1850,7 +1850,12 @@ def _interview_worker():
                             and getattr(vad, "has_pending_audio", False)
                             and vad.trailing_silence_sec >= spec_min_silence
                         )
-                        if in_tail and spec_state["key"] != vad.voiced_end_samples and not _pause_event.is_set():
+                        if (
+                            in_tail
+                            and spec_state["key"] != vad.voiced_end_samples
+                            and not _pause_event.is_set()
+                            and turn_tracker.should_speculate()
+                        ):
                             # Speculative final: decode what was said so far now,
                             # while the VAD is still waiting for the hard timeout.
                             spec_audio = vad.pending_audio()

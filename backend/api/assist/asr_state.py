@@ -38,7 +38,9 @@ class AssistAsrStateMachine:
         logger,
         append_late_constraint_tail: Callable[[str, str, float], bool] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        early_cue: Callable[[str, str, dict], None] | None = None,
     ):
+        self.early_cue = early_cue
         self.broadcast = broadcast
         self.submit_answer_task = submit_answer_task
         self.begin_asr_turn = begin_asr_turn
@@ -125,6 +127,17 @@ class AssistAsrStateMachine:
         })
         cluster_count = len(parsed.clusters)
         for cluster_index, cluster in enumerate(parsed.clusters):
+            # The answer id is assigned here so an early Fast Cue (emitted
+            # before the late-constraint grace) and the later deep answer
+            # land on the same card.
+            qa_id = f"qa-t{turn_id}-{cluster_index}-{int(time.time() * 1000)}"
+            early = bool(getattr(cfg, "intelligence_early_cue", True)) and self.early_cue is not None
+            if early:
+                try:
+                    self.early_cue(cluster.task_question(), qa_id, {"source": group.source, "question_type": cluster.question_type})
+                except Exception as exc:  # noqa: BLE001
+                    early = False
+                    self.logger.warning("early cue failed: %s", exc)
             self.submit_answer_task(
                 (
                     cluster.task_question(),
@@ -132,6 +145,8 @@ class AssistAsrStateMachine:
                     False,
                     group.source,
                     {
+                        "qa_id": qa_id,
+                        "early_cue_emitted": early,
                         "origin": "asr",
                         "asr_kind": "promote" if group.has_promote else "candidate",
                         "asr_turn_id": turn_id,
@@ -289,6 +304,11 @@ class AssistAsrStateMachine:
             self.merge_mono_first = now_mono
         self.merge_parts.append(pub)
         self.merge_mono_last = now_mono
+        if not force_flush_tail and bool(getattr(cfg, "assist_eot_fast_flush", True)):
+            from services.intelligence.eot import looks_like_complete_question
+
+            # R2: a finished question does not need to wait the merge gap.
+            force_flush_tail = looks_like_complete_question(" ".join(self.merge_parts))
         if force_flush_tail:
             self.flush_merge_buffer_now(cfg, session)
         else:

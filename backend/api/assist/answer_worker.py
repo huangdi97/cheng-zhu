@@ -783,6 +783,62 @@ def _schedule_answer_suggestion(qa_id: str, question: str, answer: str, model_cf
         pass
 
 
+def emit_early_cue(question_text: str, qa_id: str, meta: dict, *, broadcast) -> dict:
+    """R2 Stage I/K: deterministic L0 cue right after the question group is
+    confirmed, before the late-constraint grace delays the deep answer.
+    Read-only: no interview-state event is committed here (the answer
+    worker does that), only understanding + frozen-pack compile + L0."""
+    from services.intelligence import fast_cue, latency_clock
+    from services.intelligence.answer_planner import create_plan
+    from services.intelligence.context_compiler import compile_live_context
+    from services.intelligence.question_understanding import understand_question
+    from services.intelligence.semantics import provenance_from_grounding
+    from services.answer_grounding import analyze_experience_grounding
+
+    cfg = get_config()
+    sid = _live_session_id()
+    latency_clock.start_turn(sid, qa_id, source=str(meta.get("source", "") or "asr"))
+    pack = _resolve_live_pack(sid, cfg)
+    understanding = understand_question(question_text)
+    grounding = analyze_experience_grounding(question_text, resume_text=pack.profile_text, interview_notes=_pack_notes(pack, cfg))
+    plan = create_plan(
+        understanding.question_type,
+        resolved_question=understanding.resolved_question,
+        intent=understanding.intent,
+        expected_depth=understanding.expected_depth,
+        personal_fact_required=understanding.personal_fact_required,
+        open_world_allowed=understanding.open_world_allowed,
+        provenance=provenance_from_grounding(grounding.status, has_profile=bool(pack.profile_text.strip()), question=question_text, profile_text=pack.profile_text),
+        raw_question=question_text,
+        profile_text=pack.profile_text,
+        ai_policy=pack.ai_policy,
+    )
+    from services.intelligence.policy import live_guidance_allowed_for_pack
+
+    if not live_guidance_allowed_for_pack(pack, cfg):
+        return {}
+    compiled, _sections = compile_live_context(pack, question_text, deep=False)
+    body = fast_cue.build_l0(
+        question_raw=question_text,
+        resolved_question=understanding.resolved_question,
+        plan_meta=dict(plan.metadata or {}),
+        response_mode=plan.mode.value,
+        compiled_items=compiled.items,
+        job_requirements=pack.job_requirements,
+    )
+    latency_clock.mark(qa_id, "G0")
+    payload = fast_cue.finalize(body, qa_id=qa_id, timing=latency_clock.metrics(qa_id))
+    payload["early"] = True
+    broadcast(payload)
+    try:
+        from api.coach.router import remember_fast_cue
+
+        remember_fast_cue(payload)
+    except Exception:  # noqa: BLE001
+        pass
+    return payload
+
+
 def _live_session_id() -> str:
     try:
         from core.session import session_id as _sid
@@ -981,7 +1037,8 @@ def process_question_parallel(
 ):
     question_text, image, manual_input, source, meta = task
     exam_preflight_id = str(meta.get("exam_preflight_id") or "") if meta.get("exam_preflight") else ""
-    qa_id = f"qa-{seq}-{int(time.time() * 1000)}"
+    qa_id = str(meta.get("qa_id") or "") or f"qa-{seq}-{int(time.time() * 1000)}"
+    early_cue_emitted = bool(meta.get("early_cue_emitted"))
 
     def _broadcast(data: dict) -> None:
         if exam_preflight_id:
@@ -1027,12 +1084,15 @@ def process_question_parallel(
     # job context on the Live path (never latest_job_id / latest resume).
     live_session_id = _live_session_id()
     live_pack = _resolve_live_pack(live_session_id, cfg)
-    try:
-        from services.intelligence import latency_clock as _lat
+    if not early_cue_emitted:
+        # With an early cue the turn clock already started at Q1 (group
+        # confirmed) and G0 is recorded; restarting it would hide the grace.
+        try:
+            from services.intelligence import latency_clock as _lat
 
-        _lat.start_turn(live_session_id, qa_id, source=str(source or ""))
-    except Exception:  # noqa: BLE001
-        pass
+            _lat.start_turn(live_session_id, qa_id, source=str(source or ""))
+        except Exception:  # noqa: BLE001
+            pass
 
     # Stage P: AI policy gate — AI_FORBIDDEN disables realtime AI guidance
     # server-side (never by hiding a UI button). Prepare/Mock/Review are
@@ -1549,6 +1609,8 @@ def process_question_parallel(
     )
     fast_cue_payload: dict = {}
     if bool(getattr(cfg, "intelligence_fast_cue_v2", True)) and not written_exam and not images:
+        # Re-emitted even after an early cue: the resolved question may have
+        # gained a late constraint; G0 keeps the first (earliest) timestamp.
         fast_cue_payload = _emit_fast_cue(
             qa_id=qa_id,
             question_text=question_text,

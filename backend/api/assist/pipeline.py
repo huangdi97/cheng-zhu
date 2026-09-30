@@ -107,7 +107,14 @@ _asr_state = AssistAsrStateMachine(
     is_high_churn_submission=lambda cfg, now_mono: _is_high_churn_asr_submission(cfg, now_mono),
     append_late_constraint_tail=lambda text, source, now_mono: _append_late_asr_constraint_tail(text, source, now_mono),
     logger=_ilog,
+    early_cue=lambda question, qa_id, meta: _emit_early_cue(question, qa_id, meta),
 )
+
+
+def _emit_early_cue(question: str, qa_id: str, meta: dict) -> None:
+    from api.assist.answer_worker import emit_early_cue
+
+    emit_early_cue(question, qa_id, meta, broadcast=broadcast)
 
 
 @dataclass

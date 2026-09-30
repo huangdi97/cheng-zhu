@@ -616,3 +616,112 @@ def test_turn_trace_saved_for_review(monkeypatch, tmp_intel_db):
     assert "ttfug_internal_ms" in trace["latency"]
     assert trace["axes"]["content_type"] == "KNOWLEDGE"
     assert all("api_key" not in str(v) for v in trace.values())
+
+
+# ---------------------------------------------------------------------------
+# G7 end-of-turn fast flush + early cue
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Redis 的持久化机制有哪些？", True),
+        ("消息队列怎么保证不丢消息", True),
+        ("讲讲你做过的订单系统重构。", True),
+        ("How would you design a rate limiter", True),
+        ("我们先聊聊缓存和", False),
+        ("如果流量扩大十倍，因为", False),
+        ("好的", False),
+        ("嗯那个", False),
+    ],
+)
+def test_end_of_turn_cue(text, expected):
+    from services.intelligence.eot import looks_like_complete_question
+
+    assert looks_like_complete_question(text) is expected
+
+
+def _asr_machine(submitted, early_calls, clock):
+    from api.assist.asr_state import AssistAsrStateMachine
+
+    class _L:
+        def info(self, *a, **k):
+            pass
+
+        warning = debug = info
+
+    return AssistAsrStateMachine(
+        broadcast=lambda _d: None,
+        submit_answer_task=lambda task: submitted.append((clock["t"], task)) or True,
+        begin_asr_turn=lambda: 1,
+        record_asr_turn=lambda _t: None,
+        is_high_churn_submission=lambda _c, _t: False,
+        logger=_L(),
+        clock=lambda: clock["t"],
+        early_cue=lambda q, qa_id, meta: early_calls.append((clock["t"], q, qa_id)),
+    )
+
+
+def test_complete_question_skips_merge_gap_and_emits_early_cue():
+    from core.config import AppConfig
+    from core.session import Session
+
+    cfg = AppConfig().model_copy(update={"assist_auto_answer_mode": "always"})
+    submitted, early, clock = [], [], {"t": 10.0}
+    sm = _asr_machine(submitted, early, clock)
+    session = Session(session_id="t")
+    sm.append_transcription_fragment(cfg, session, "Redis 的持久化机制有哪些？", clock["t"], False)
+    # merge gap (2.0 s) is skipped: the transcription is already published
+    assert session.transcription_history[-1].startswith("Redis")
+    while not submitted and clock["t"] < 14:
+        clock["t"] += 0.02
+        sm.try_flush_question_group(cfg, session, clock["t"])
+    t_submit, task = submitted[0]
+    assert t_submit - 10.0 < 1.3  # group confirm only, no 2 s merge gap
+    assert early and early[0][2] == task[4]["qa_id"] and task[4]["early_cue_emitted"] is True
+    # The deep answer still honors the late-constraint grace.
+    assert task[4]["dispatch_after_mono"] > t_submit
+
+
+def test_baseline_flags_keep_old_timing():
+    from core.config import AppConfig
+    from core.session import Session
+
+    cfg = AppConfig().model_copy(update={"assist_auto_answer_mode": "always", "assist_eot_fast_flush": False, "intelligence_early_cue": False})
+    submitted, early, clock = [], [], {"t": 10.0}
+    sm = _asr_machine(submitted, early, clock)
+    session = Session(session_id="t")
+    sm.append_transcription_fragment(cfg, session, "Redis 的持久化机制有哪些？", clock["t"], False)
+    assert not session.transcription_history  # waiting for the merge gap
+    while not submitted and clock["t"] < 16:
+        clock["t"] += 0.02
+        sm.try_flush_merge_buffer(cfg, session, clock["t"])
+        sm.try_flush_question_group(cfg, session, clock["t"])
+    assert submitted and submitted[0][0] - 10.0 >= 2.0 and not early
+
+
+def test_early_cue_and_worker_share_qa_id_and_first_g0(monkeypatch, tmp_intel_db):
+    from api.assist import answer_worker
+    from core.session import reset_session
+    from tests.test_assist_answer_worker import _cfg, _deps
+
+    reset_session()
+    latency_clock.reset()
+    cfg = _cfg()
+    cfg.resume_text = RESUME
+    monkeypatch.setattr(answer_worker, "get_config", lambda: cfg)
+    sent: list[dict] = []
+    early = answer_worker.emit_early_cue("RAG 和微调怎么选", "qa-early-1", {"source": "asr"}, broadcast=sent.append)
+    assert early["type"] == "guidance_fast" and early["early"] is True and early["id"] == "qa-early-1"
+    monkeypatch.setattr(answer_worker, "chat_stream_single_model", lambda *_a, **_k: iter([("text", "RAG 适合频繁更新。")]))
+    broadcasts: list[dict] = []
+    answer_worker.process_question_parallel(
+        ("RAG 和微调怎么选", None, False, "asr", {"origin": "asr", "qa_id": "qa-early-1", "early_cue_emitted": True}),
+        seq=0, model_idx=0, sess_v=0, deps=_deps(broadcasts=broadcasts),
+    )
+    start = next(e for e in broadcasts if e["type"] == "answer_start")
+    done = next(e for e in broadcasts if e["type"] == "answer_done")
+    assert start["id"] == "qa-early-1" and done["id"] == "qa-early-1"
+    # G0 is the early emit, so TTFUG_internal is measured from the early turn start.
+    assert done["latency"]["ttfug_internal_ms"] is not None
+    assert done["latency"]["ttfug_internal_ms"] <= done["latency"]["ttfa_ms"]

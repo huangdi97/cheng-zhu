@@ -7,6 +7,16 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Build (never publish) the installer + portable on PRs that touch packaging,
+  # so a release is proven reproducible before the tag.
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "desktop/package.json"
+      - "packaging/**"
+      - "scripts/build_sidecar.py"
+      - "scripts/packaged_smoke.py"
+      - "backend/requirements.txt"
   workflow_dispatch:
     inputs:
       publish:

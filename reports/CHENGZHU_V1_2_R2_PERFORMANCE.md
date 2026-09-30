@@ -21,25 +21,28 @@ Setup: 9 prerecorded questions (Windows SAPI offline voices; zh normal / request
 
 | | QBD p50 | QBD p95 | TTFUG_user p50 | TTFUG_user p95 | STT p50 | Cue compute p50 | Question text correct |
 |---|---|---|---|---|---|---|---|
-| baseline | 5580 ms | 5780 ms | 6785 ms | 6983 ms | 1909 ms | 3 ms | 0.667 |
-| **r2** | **3500 ms** | 5560 ms | **3505 ms** | **5564 ms** | 1831 ms | 3 ms | 0.667 |
+| baseline | 5040 ms | 5660 ms | 6244 ms | 6863 ms | 1380 ms | 2 ms | 0.667 |
+| **r2** | **3620 ms** | 5680 ms | **3622 ms** | **5682 ms** | 1595 ms | 2 ms | 0.667 |
 | Release SLO | ≤ 500 | ≤ 900 | ≤ 1200 | ≤ 2000 | | | |
 
-**Result: SLO NOT MET on this hardware.** R2 removes ~3.3 s at p50 (the 2.0 s merge gap and the 1.2 s late-constraint grace no longer sit in front of the first cue) without changing question assembly (same correctness in both modes; misses are Whisper-base recognition errors on synthetic speech, e.g. "B+树" → "比加速").
+These are from the final committed code (end-of-turn gap 0.35 s that ongoing speech still extends). An earlier run of the same benchmark with an unsafe immediate flush (since reverted: it could cut off a speaker who kept talking) gave r2 p50 3505 ms; the difference to the committed number is the 0.35 s safety gap plus machine variance in STT time (1.4–2.4 s across runs).
 
-### Where the remaining ~3.5 s goes (r2, per case median)
+**Result: SLO NOT MET on this hardware.** R2 removes ~2.6 s at p50 (the 2.0 s merge gap and the 1.2 s late-constraint grace no longer sit in front of the first cue) without changing question assembly (same correctness in both modes; misses are Whisper-base recognition errors on synthetic speech, e.g. "B+树" → "比加速").
+
+### Where the remaining ~3.6 s goes (r2, per case median)
 
 | Stage | Time |
 |---|---|
 | VAD end-of-speech wait (`silence_duration`) | 1200 ms |
 | Batch STT on CPU (Whisper base) | ~1800–2000 ms |
+| End-of-turn gap (complete question) | 350 ms |
 | Question group confirm window | ~450 ms |
 | Fast Cue compute (understanding + pack compile + L0) | ~3 ms |
 
 ### Per-case notes
 
 - `zh-long-pause` (1.4 s pause mid-sentence): VAD splits the utterance and the first half ("我们先聊聊缓存") is submitted as the question in **both** modes. This is an existing product limitation of a fixed silence threshold; adaptive end-of-turn inside the VAD needs streaming partial text and is not implemented yet.
-- `mixed`: STT garbles "Kafka … 吗" → "Calf … 嘛", the end-of-turn cue does not fire and the 2 s merge gap applies (5.4 s).
+- `mixed`: STT garbles "Kafka … 吗" → "Calf … 嘛", the end-of-turn cue does not fire and the 2 s merge gap applies (5.0 s).
 - Cue compute is ~3 ms: the deterministic L0 path is not the bottleneck.
 
 ### What it would take to meet the SLO

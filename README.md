@@ -155,7 +155,18 @@ sequenceDiagram
 
 ## 快速开始
 
-### 1. 准备环境
+### 下载安装（推荐，Windows 10/11 x64）
+
+到 [GitHub Releases](https://github.com/huangdi97/cheng-zhu/releases) 下载：
+
+- `Chengzhu-Setup-x64.exe`：安装版（按用户安装，无需管理员）
+- `Chengzhu-Portable-x64.zip`：解压即用
+
+不需要安装 Python、Node.js 或 pip。首次打开会有引导：本地数据位置 → 模型（填自己的 API Key）→ 语音识别 → 麦克风 / 系统音频测试 → 共享隐私默认值（默认关闭）→ 导入简历 → 第一个目标岗位。所有数据保存在 `%APPDATA%\Chengzhu`。安装包暂未代码签名，首次运行时 Windows SmartScreen 可能提示，选择「仍要运行」即可；请核对 Release 中的 `SHA256SUMS.txt`。
+
+### 从源码运行
+
+#### 1. 准备环境
 
 - Python `3.10+`
 - Node.js `22.12+`（桌面模式所需；纯浏览器模式在已有构建产物时可不启动 Node）
@@ -222,7 +233,7 @@ python -m pytest backend/tests -q
 
 ## 文档
 
-canonical（唯一当前最高优先级设计）：[docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md](docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md)；架构与专题文档：
+canonical（当前最高优先级设计）：[docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：
 
 | 分类 | 文档 |
 | --- | --- |

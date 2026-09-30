@@ -34,7 +34,7 @@ the clean post-fix measurement and the CI gate.
 | 06 Knowledge route 生成第一人称 → 改写 | PASS | rewrites=1 |
 | 07 RAG → OS reset | PASS | rag=KNOWLEDGE os=KNOWLEDGE |
 | 08 为什么不用那个？ | PASS | EXPERIENCE_KNOWLEDGE |
-| 09 Job A / Job B contamination | PASS | pack=pack-f4cc9d6126d94d7e job=job-A |
+| 09 Job A / Job B contamination | PASS | pack=pack-37f2751fad58458b job=job-A |
 | 10 Share Privacy OFF | PASS | OFF |
 | 11 AI_FORBIDDEN | PASS | True |
 | 12 HUMAN_PRACTICE_ONLY | PASS | HUMAN_PRACTICE_ONLY |

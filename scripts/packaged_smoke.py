@@ -175,6 +175,24 @@ def main() -> int:
     port = free_port()
     base = f"http://127.0.0.1:{port}"
     ok = True
+
+    # Fresh first run: no config at all, the exact state of a new user. The
+    # sidecar prints Chinese while creating the config; v1.2.0 crashed here
+    # on a cp1252 (non-Chinese) Windows locale.
+    fresh_home = Path(tempfile.mkdtemp(prefix="chengzhu-smoke-fresh-"))
+    fresh = start(exe, port, fresh_home, args.frontend_dist)
+    try:
+        checks["fresh_first_run_seconds"] = round(wait_ready(base, 120), 2)
+        checks["fresh_first_run_ok"] = http_json(f"{base}/api/instance").get("app") == "chengzhu"
+    except Exception as exc:  # noqa: BLE001
+        checks["fresh_first_run_ok"] = False
+        log_tail = (fresh_home / "sidecar-stdout.log").read_text(encoding="utf-8", errors="replace")[-800:] if (fresh_home / "sidecar-stdout.log").exists() else ""
+        checks["fresh_first_run_error"] = f"{type(exc).__name__}: {exc} | {log_tail}"
+    finally:
+        stop(fresh)
+    ok &= bool(checks.get("fresh_first_run_ok"))
+    shutil.rmtree(fresh_home, ignore_errors=True)
+
     proc = start(exe, port, home, args.frontend_dist)
     try:
         checks["cold_start_seconds"] = round(wait_ready(base, 120), 2)
@@ -187,7 +205,9 @@ def main() -> int:
         ok &= cfg.get("share_privacy_mode") == "OFF"
         ver = subprocess.run([str(exe), "--version"], capture_output=True, text=True, timeout=60)
         checks["version"] = ver.stdout.strip()
-        ok &= ver.stdout.strip() == "1.2.0"
+        expected_version = json.loads((Path(__file__).resolve().parents[1] / "desktop" / "package.json").read_text(encoding="utf-8"))["version"]
+        checks["version_expected"] = expected_version
+        ok &= ver.stdout.strip() == expected_version
 
         db = home / "data" / "intelligence.db"
         user_version = sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] if db.exists() else None

@@ -33,8 +33,18 @@ PERMISSIVE = re.compile(
 )
 
 
+# Packages whose lockfile entry has no license field (legacy `licenses: [...]`
+# in their package.json). Pinned here so the output does not depend on
+# node_modules being installed (CI's backend job has none).
+KNOWN_LEGACY_LICENSES = {
+    "format": "MIT",
+}
+
+
 def _installed_npm_license(pkg_root: Path, name: str) -> str:
     """Old packages declare `licenses: [{type}]`, which the lockfile drops."""
+    if name in KNOWN_LEGACY_LICENSES:
+        return KNOWN_LEGACY_LICENSES[name]
     manifest = pkg_root / "node_modules" / name / "package.json"
     try:
         data = json.loads(manifest.read_text(encoding="utf-8"))

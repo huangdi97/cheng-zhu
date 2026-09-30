@@ -207,30 +207,42 @@ async def api_activate_launch_pack(space_id: int, body: Optional[LaunchPackReque
         "resume_text": str(space.get("resume_text") or "") or None,
         "assist_answer_align_jd_enabled": True,
     })
-    tree = copilot_strategy.load_tree(space_id)
-    generated = False
-    if tree is None and prep_service.prep_configured():
-        tree = await run_in_threadpool(
-            copilot_strategy.generate_strategy_tree,
-            str(space.get("role") or ""),
-            str(space.get("jd_text") or ""),
-            str(space.get("resume_text") or ""),
-            list(space.get("questions") or []),
-        )
-        if tree:
-            copilot_strategy.save_tree(tree, space_id)
-            generated = True
-    if tree is not None:
-        copilot_strategy.activate_tree(space_id, get_session().session_id)
+    # R2: freezing the InterviewPack is the essential step and takes well
+    # under a second; it must not wait behind the optional strategy-tree LLM
+    # call (up to 90 s). Freeze first, generate the strategy in the background.
     try:
         interview_pack_summary = await run_in_threadpool(_freeze_space_pack, space, body)
     except Exception as exc:  # noqa: BLE001
         _rlog.warning("interview pack freeze failed space=%s: %s", space_id, exc)
         interview_pack_summary = None
+    live_session_id = get_session().session_id
+    tree = copilot_strategy.load_tree(space_id)
+    generating = False
+    if tree is not None:
+        copilot_strategy.activate_tree(space_id, live_session_id)
+    elif prep_service.prep_configured():
+        generating = True
+
+        def _generate_in_background() -> None:
+            try:
+                generated_tree = copilot_strategy.generate_strategy_tree(
+                    str(space.get("role") or ""),
+                    str(space.get("jd_text") or ""),
+                    str(space.get("resume_text") or ""),
+                    list(space.get("questions") or []),
+                )
+                if generated_tree:
+                    copilot_strategy.save_tree(generated_tree, space_id)
+                    copilot_strategy.activate_tree(space_id, live_session_id)
+            except Exception as exc:  # noqa: BLE001
+                _rlog.warning("strategy tree generation failed space=%s: %s", space_id, exc)
+
+        threading.Thread(target=_generate_in_background, name="strategy-tree", daemon=True).start()
     return {
         "ok": True,
         "strategy_ready": tree is not None,
-        "strategy_generated": generated,
+        "strategy_generated": False,
+        "strategy_generating": generating,
         "pack": prep_service.build_launch_pack(space),
         "interview_pack": interview_pack_summary,
     }

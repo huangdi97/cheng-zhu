@@ -742,3 +742,27 @@ def test_early_cue_and_worker_share_qa_id_and_first_g0(monkeypatch, tmp_intel_db
     # G0 is the early emit, so TTFUG_internal is measured from the early turn start.
     assert done["latency"]["ttfug_internal_ms"] is not None
     assert done["latency"]["ttfug_internal_ms"] <= done["latency"]["ttfa_ms"]
+
+
+def test_launch_pack_freezes_without_waiting_for_strategy_llm(monkeypatch, tmp_intel_db):
+    import asyncio
+    import time as _time
+
+    import importlib
+
+    prep_router = importlib.import_module("api.prep.router")
+    from services import copilot_strategy, prep_service
+    from services.storage import prep_space
+
+    monkeypatch.setattr(prep_space, "DB_PATH", str(tmp_intel_db / "prep.db"))
+    prep_space.init_db()
+    space = prep_space.get_space(prep_space.create_space(title="AI Agent", role="AI Agent Engineer", company="X", jd_text="任职要求：\n熟悉 RAG", resume_text=RESUME))
+    monkeypatch.setattr(copilot_strategy, "load_tree", lambda _sid: None)
+    monkeypatch.setattr(prep_service, "prep_configured", lambda: True)
+    monkeypatch.setattr(copilot_strategy, "generate_strategy_tree", lambda *a, **k: _time.sleep(5) or None)
+    t0 = _time.monotonic()
+    result = asyncio.run(prep_router.api_activate_launch_pack(space["id"], prep_router.LaunchPackRequest(human_assistance_policy="HUMAN_PRACTICE_ONLY")))
+    elapsed = _time.monotonic() - t0
+    assert elapsed < 3.0, elapsed
+    assert result["interview_pack"] and result["interview_pack"]["policies"]["human_assistance_policy"] == "HUMAN_PRACTICE_ONLY"
+    assert result["strategy_generating"] is True

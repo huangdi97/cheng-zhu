@@ -961,6 +961,17 @@ def delete_turn(session_id: int, qa_id: str) -> bool:
     return changed
 
 
+def delete_session(session_id: int) -> bool:
+    """v1.3 Data & Export: user-initiated deletion of one session and its turns."""
+    with _db_lock:
+        conn = _conn()
+        conn.execute("DELETE FROM review_turns WHERE session_id = ?", (int(session_id),))
+        cur = conn.execute("DELETE FROM review_sessions WHERE id = ?", (int(session_id),))
+        conn.commit()
+        conn.close()
+    return cur.rowcount > 0
+
+
 def recent_profile(limit: int = 10) -> dict:
     """聚合最近 N 场已完成复盘的强弱项/行为特征/领域掌握度，构成长期画像。
 

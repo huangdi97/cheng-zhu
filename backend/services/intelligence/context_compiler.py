@@ -372,6 +372,70 @@ class LongTermMemoryProvider:
         ]
 
 
+class InterviewPackUserNoteProvider:
+    """v1.3 Quick Notes. Rendered as the user's own reminders: they are never
+    cited as personal evidence and never raise provenance (canonical §9)."""
+
+    source_type = ContextSource.USER_NOTE
+
+    def __init__(self, pack):
+        self._pack = pack
+
+    def collect(self, question_text: str, *, limit: int = 4) -> list[ContextItem]:
+        items = []
+        for note in getattr(self._pack, "user_notes", []) or []:
+            body = str(note.get("content", "") or "")
+            title = str(note.get("title", "") or "")
+            text = (f"{title}：{body}" if title else body)[:400]
+            if not text.strip():
+                continue
+            items.append(
+                ContextItem(
+                    id=str(note.get("id")),
+                    source_type=self.source_type,
+                    text=text,
+                    evidence_strength=0.2,
+                    token_estimate=estimate_tokens(text),
+                    metadata={"source_id": str(note.get("id")), "cue_source": "USER_NOTE", "provenance": "USER_NOTE"},
+                )
+            )
+        return items[:limit]
+
+
+class InterviewPackGoalMaterialProvider:
+    """v1.3 READY Goal materials. Project facts material is supporting
+    personal evidence; technical-reference material is knowledge only."""
+
+    source_type = ContextSource.EVIDENCE
+
+    def __init__(self, pack):
+        self._pack = pack
+
+    def collect(self, question_text: str, *, limit: int = 4) -> list[ContextItem]:
+        items = []
+        for material in getattr(self._pack, "goal_materials", []) or []:
+            text = str(material.get("excerpt", "") or "")[:500]
+            if not text.strip():
+                continue
+            personal = bool(material.get("is_personal_evidence"))
+            items.append(
+                ContextItem(
+                    id=str(material.get("version_id") or material.get("material_id")),
+                    source_type=ContextSource.EVIDENCE if personal else ContextSource.KB,
+                    text=f"{material.get('title', '')}：{text}",
+                    evidence_strength=0.7 if personal else 0.5,
+                    topic=str(material.get("title", "")),
+                    token_estimate=estimate_tokens(text),
+                    metadata={
+                        "source_id": str(material.get("material_id")),
+                        "cue_source": "PERSONAL_EVIDENCE" if personal else "KB_KNOWLEDGE",
+                        "provenance": "SUPPORTING_EVIDENCE" if personal else "",
+                    },
+                )
+            )
+        return items[:limit]
+
+
 def pack_job_provider(pack) -> JobProvider:
     job = pack.job
     summary = ""
@@ -533,6 +597,9 @@ def render_context_sections(context: CompiledContext) -> list[str]:
     provenance, not truth."""
     by_source: dict[str, list[str]] = {}
     for item in context.items:
+        if str(item.metadata.get("provenance", "") or "") == "USER_NOTE":
+            by_source.setdefault(item.source_type.value, []).append(f"(用户速记，不是证据) {item.text}")
+            continue
         tag = _PROVENANCE_TAG.get(str(item.metadata.get("provenance", "") or ""), "")
         if str(item.metadata.get("user_assertion", "")) == "USER_CONFIRMED":
             tag = f"{tag}·用户已确认" if tag else "用户已确认"
@@ -572,6 +639,8 @@ def compile_live_context(
         InterviewPackEvidenceProvider(pack),
         InterviewPackSkillCardProvider(pack),
         InterviewPackStoryProvider(pack),
+        InterviewPackGoalMaterialProvider(pack),
+        InterviewPackUserNoteProvider(pack),
         SessionMemoryProvider(memo_context=memo_context, compact_state=compact_state),
         LongTermMemoryProvider(pack),
         pack_job_provider(pack),

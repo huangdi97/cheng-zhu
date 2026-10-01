@@ -144,4 +144,9 @@ def build_config_payload(cfg) -> dict:
         "assist_suggestion_enabled": bool(getattr(cfg, "assist_suggestion_enabled", False)),
         "assist_prefix_cache_warmup_enabled": bool(getattr(cfg, "assist_prefix_cache_warmup_enabled", True)),
         "rolling_memo_enabled": bool(getattr(cfg, "rolling_memo_enabled", True)),
+        "technical_term_policy": str(getattr(cfg, "technical_term_policy", "AUTO") or "AUTO"),
+        "ui_language": str(getattr(cfg, "ui_language", "zh-CN") or "zh-CN"),
+        "proactive_guidance_enabled": bool(getattr(cfg, "proactive_guidance_enabled", True)),
+        "practice_delivery_analytics_enabled": bool(getattr(cfg, "practice_delivery_analytics_enabled", True)),
+        "remote_telemetry_opt_in": bool(getattr(cfg, "remote_telemetry_opt_in", False)),
     }

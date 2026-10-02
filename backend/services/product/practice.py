@@ -348,7 +348,8 @@ def _known_claims() -> list[dict[str, Any]]:
         from services.intelligence.job_workspace import active_claims
 
         return active_claims()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — claims enrich practice, they are not required
+        _log.debug("active claims unavailable for practice: %s", exc)
         return []
 
 

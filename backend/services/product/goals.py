@@ -421,7 +421,8 @@ def _legacy_space(space_id: int) -> Optional[dict[str, Any]]:
         from services.storage import prep_space
 
         return prep_space.get_space(space_id)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — legacy prep space is optional
+        _log.debug("prep space %s unavailable: %s", space_id, exc)
         return None
 
 

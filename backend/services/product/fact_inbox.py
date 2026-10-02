@@ -90,7 +90,8 @@ def _evidence_text(claim_id: str) -> str:
             return ""
         rows = intel.list_evidence(intel.active_candidate_id(), limit=2000)
         return "\n".join(str(r.get("text") or "") for r in rows if r.get("id") in ids)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — provenance text is optional context
+        _log.debug("evidence text for inbox card unavailable: %s", exc)
         return ""
 
 

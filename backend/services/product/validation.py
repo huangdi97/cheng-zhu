@@ -15,8 +15,11 @@ import statistics
 from collections import defaultdict
 from typing import Any, Optional
 
+from core.logger import get_logger
 from services.product import events
 from services.storage import product as store
+
+_log = get_logger(__name__)
 
 SYNTHETIC_MARKER = "dogfood_synthetic"
 
@@ -94,7 +97,8 @@ def cue_usefulness() -> dict[str, Any]:
 
         summary = latency_clock.summary() if hasattr(latency_clock, "summary") else None
         latency = summary
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — latency stats are optional evidence
+        _log.debug("latency clock unavailable for cue report: %s", exc)
         latency = None
 
     def rate(name: str) -> Optional[float]:

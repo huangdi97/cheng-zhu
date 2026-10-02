@@ -115,7 +115,8 @@ def _skill_card_count(goal: dict[str, Any]) -> int:
         from services.storage import prep_space
 
         return len((prep_space.get_space(int(space_id)) or {}).get("skill_cards") or [])
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — skill cards are optional context
+        _log.debug("prep space skill cards unavailable: %s", exc)
         return 0
 
 
@@ -189,8 +190,9 @@ def end(session_id: str = "", review_session_id: Optional[int] = None) -> dict[s
                 from services.product.goals import update_interview
 
                 update_interview(link["goal_interview_id"], {"status": "DONE"})
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("marking goal interview %s DONE after live failed: %s",
+                             link["goal_interview_id"], exc)
         try:
             from services.product.question_banks import remember_session_questions
             from services.storage import review as review_storage
@@ -211,7 +213,8 @@ def _find_review_for(started_after: float) -> Optional[int]:
         from services.storage import review as review_storage
 
         items = review_storage.list_sessions(page=1, page_size=20).get("items") or []
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — the review store is optional here
+        _log.debug("review sessions unavailable while linking a live session: %s", exc)
         return None
     candidates = [i for i in items if str(i.get("source") or "") in ("assist", "written_exam")
                   and float(i.get("started_at") or 0) >= started_after - 5]

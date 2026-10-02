@@ -9,8 +9,11 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from core.logger import get_logger
 from services.product import events
 from services.storage import product as store
+
+_log = get_logger(__name__)
 
 TAGS = ("IMPORTANT", "BAD_ANSWER", "COUNTERPARTY_INFO", "PREP_NEXT", "FACT_CHECK", "CUSTOM")
 SESSION_KINDS = ("LIVE", "PRACTICE")
@@ -38,7 +41,8 @@ def _excerpt_from_session(session_id: str, turn_id: str) -> tuple[str, str]:
             (session_id,),
         )
         turns = [dict(r) for r in rows][::-1]
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — surrounding transcript is best-effort
+        _log.debug("turns around pin %s unavailable: %s", session_id, exc)
         return "", ""
     if not turns:
         return "", ""

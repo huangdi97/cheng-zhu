@@ -144,7 +144,8 @@ def _story_candidates(goal: dict[str, Any]) -> list[dict[str, Any]]:
         from services.product.workspace import story_coverage, stories_list
 
         missing = story_coverage(stories_list())["missing"]
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — story coverage is an enrichment, not a gate
+        _log.debug("story coverage unavailable for next focus: %s", exc)
         return []
     preferred = ("Ownership", "Failure", "Conflict", "Difficult Problem")
     ranked = sorted(missing, key=lambda m: preferred.index(m["key"]) if m["key"] in preferred else 9)

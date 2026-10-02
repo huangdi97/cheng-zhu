@@ -94,13 +94,14 @@ def goal_workspace(goal: dict[str, Any]) -> dict[str, Any]:
 
 
 def stories_list() -> list[dict[str, Any]]:
+    """Every user-authored story (all candidate ids, like the Stories API)."""
+    import json
+
     try:
-        from services.intelligence import job_workspace as jw
+        from services.storage import intelligence as intel_storage
 
         out = []
-        for story in jw.stored_stories():
-            import json
-
+        for story in intel_storage.list_all_stories():
             try:
                 tags = json.loads(story.get("tags_json") or "[]")
             except (TypeError, ValueError):

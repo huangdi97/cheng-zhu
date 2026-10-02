@@ -27,6 +27,9 @@ function deferred<T>() {
 
 vi.mock('@/lib/api', () => ({
   api: apiMock,
+  // v1.3 product API transport (lib/productApi.ts); product calls are not under test here
+  apiRequest: vi.fn(() => Promise.reject(new Error('product api not mocked'))),
+  apiUpload: vi.fn(() => Promise.reject(new Error('product api not mocked'))),
 }))
 
 vi.mock('@/hooks/useInterviewWS', () => ({
@@ -111,7 +114,8 @@ describe('App bootstrap', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: '上场' })).toBeInTheDocument()
+      // v1.3 IA: 上场 is a global action; the nav is Goal-centered
+      expect(screen.getByRole('button', { name: '求职目标' })).toBeInTheDocument()
     })
 
     expect(screen.queryByText('连接后端失败')).not.toBeInTheDocument()
@@ -338,7 +342,8 @@ describe('Window control buttons', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: '上场' })).toBeInTheDocument()
+      // v1.3 IA: 上场 is a global action; the nav is Goal-centered
+      expect(screen.getByRole('button', { name: '求职目标' })).toBeInTheDocument()
     })
 
     expect(screen.queryByRole('button', { name: '最小化窗口' })).not.toBeInTheDocument()

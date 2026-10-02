@@ -68,6 +68,7 @@ let PORT = PREFERRED_PORT;
 let SERVER_URL = `http://127.0.0.1:${PORT}`;
 const sharePrivacy = require('./sharePrivacy');
 const backendLauncher = require('./backendLauncher');
+const overlayLayout = require('./overlayLayout');
 // R2 Stage T: Share Privacy is OFF by default; one state drives both windows.
 const sharePrivacyState = sharePrivacy.createSharePrivacyState(sharePrivacy.DEFAULT_MODE);
 let backendStderrTail = '';
@@ -75,6 +76,7 @@ const INSTANCE_NONCE = backendLauncher.newInstanceNonce();
 
 let mainWindow = null;
 let overlayWindow = null;
+let overlayLayoutState = { dock: 'FREE', interaction: 'INTERACTIVE', size: 'STANDARD' };
 let tray = null;
 let pythonProcess = null;
 let isQuitting = false;
@@ -578,6 +580,23 @@ function sendShortcutsState() {
   });
 }
 
+function applyOverlayLayout() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const flags = overlayLayout.interactionFlags(overlayLayoutState.interaction);
+  overlayWindow.setIgnoreMouseEvents(flags.ignoreMouseEvents, { forward: true });
+  overlayWindow.setFocusable(flags.focusable);
+  if (!overlayLayout.layoutOwnsBounds(overlayLayoutState)) return;
+  const current = overlayWindow.getBounds();
+  const display = screen.getDisplayMatching(current);
+  const bounds = overlayLayout.computeOverlayBounds(display.workArea, overlayLayoutState, current, {
+    widthPct: lastOverlayState?.focusWidthPct,
+    heightPct: lastOverlayState?.focusHeightPct,
+  });
+  overlayAutoResizeUntil = Date.now() + 500;
+  overlayWindow.setMinimumSize(Math.min(200, bounds.width), Math.min(40, bounds.height));
+  overlayWindow.setBounds(bounds, false);
+}
+
 function showOverlayWindow() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   if (!overlayWindow._overlayReady) {
@@ -586,6 +605,7 @@ function showOverlayWindow() {
   }
   applyOverlayModeBounds();
   overlayWindow.setFocusable(false);
+  applyOverlayLayout();
   if (process.platform === 'darwin' || process.platform === 'win32') {
     overlayWindow.showInactive();
   } else {
@@ -1055,6 +1075,13 @@ ipcMain.handle('sync-overlay-window', (_event, payload = {}) => {
   return { ok: true, visible: true };
 });
 ipcMain.handle('get-overlay-state', () => lastOverlayState);
+// v1.3 Overlay 3.0: Dock × Interaction × Size, requested by the overlay renderer
+// (it knows when it is idle → COMPACT or showing a cue → STANDARD/FOCUS).
+ipcMain.handle('set-overlay-layout', (_event, payload = {}) => {
+  overlayLayoutState = overlayLayout.normalizeLayout({ ...overlayLayoutState, ...payload });
+  applyOverlayLayout();
+  return { ok: true, layout: overlayLayoutState };
+});
 ipcMain.handle('resize-overlay-window', (_event, payload = {}) => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return { ok: false };
   const mode = lastOverlayState?.mode || (lastOverlayState?.showBg === false ? 'prompt' : 'glass');

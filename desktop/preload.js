@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   overlayDragStart: () => ipcRenderer.sendSync('overlay-drag-start'),
   overlayDragEnd: () => ipcRenderer.send('overlay-drag-end'),
   getOverlayState: () => ipcRenderer.invoke('get-overlay-state'),
+  // v1.3 Overlay 3.0 (Dock × Interaction × Size)
+  setOverlayLayout: (layout) => ipcRenderer.invoke('set-overlay-layout', layout),
   onOverlayState: (listener) => {
     const wrapped = (_event, payload) => listener(payload);
     ipcRenderer.on('overlay-state', wrapped);

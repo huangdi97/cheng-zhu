@@ -38,6 +38,7 @@ const GoalWorkspace = lazy(() => import('@/components/v13/GoalWorkspace'))
 const LibraryWorkspace = lazy(() => import('@/components/v13/LibraryWorkspace'))
 const CommandPalette = lazy(() => import('@/components/v13/CommandPalette'))
 const LivePinShortcut = lazy(() => import('@/components/v13/LivePinShortcut'))
+const LiveConversationAssist = lazy(() => import('@/components/v13/LiveConversationAssist'))
 
 // R2 Stage O: 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置.
 // 设置 opens the settings drawer; 准备 lives inside each Job Goal.
@@ -604,6 +605,7 @@ export default function App() {
             <>
           <SessionClaimWarnings />
           <CoachCues />
+          <Suspense fallback={null}><LiveConversationAssist /></Suspense>
           {/* Mobile tab switcher */}
           <div className="flex md:hidden border-b border-bg-tertiary flex-shrink-0" role="tablist" aria-label="实时辅助面板">
             <button role="tab" aria-selected={mobileTab === 'transcript'} onClick={() => setMobileTab('transcript')}

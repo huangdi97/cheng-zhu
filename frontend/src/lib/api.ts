@@ -405,6 +405,75 @@ export interface SkillBuilderAnswerResult {
   project_done?: string
 }
 
+
+export interface ProductGoal {
+  id: number
+  goal_id: number
+  title: string
+  role: string
+  company: string
+  jd_text?: string
+  resume_text?: string
+  insight_status?: string
+  questions_status?: string
+  skill_card_count?: number
+  stage: string
+  interview_round: string
+  next_interview_at?: number | null
+  next_focus: Array<{ type?: string; title: string; reason?: string; action?: string; priority?: string }>
+  offer: Record<string, unknown>
+  quick_note_count: number
+  updated_at?: number
+}
+
+export interface QuickNote {
+  id: number
+  scope: 'GLOBAL' | 'GOAL' | string
+  goal_id?: number | null
+  title: string
+  content: string
+  pinned: number | boolean
+  sort_order: number
+  created_at: number
+  updated_at: number
+}
+
+export interface QuestionBank {
+  id: number
+  name: string
+  scope: string
+  role: string
+  company: string
+  source_type: string
+  item_count?: number
+  items?: QuestionBankItem[]
+  created_at: number
+  updated_at: number
+}
+
+export interface QuestionBankItem {
+  id: number
+  bank_id: number
+  question: string
+  category: string
+  difficulty: string
+  origin: string
+  source_url: string
+  created_at: number
+}
+
+export interface PinMoment {
+  id: number
+  session_id: string
+  goal_id?: number | null
+  turn_id: string
+  label: string
+  question: string
+  transcript_excerpt: string
+  note: string
+  created_at: number
+}
+
 export const api = {
   getConfig: () => request('/api/config'),
   updateConfig: (data: Record<string, any>) =>
@@ -876,4 +945,36 @@ export const api = {
     }),
   coachRevoke: (id: string) =>
     request<{ id: string; revoked: boolean }>(`/api/coach/sessions/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }),
+
+  // v1.3/v1.4 goal-centered product experience
+  productGoals: () => request<{ items: ProductGoal[] }>('/api/product/goals'),
+  productGoal: (goalId: number) => request<ProductGoal>(`/api/product/goals/${goalId}`),
+  productPatchGoal: (goalId: number, body: Partial<Pick<ProductGoal, 'stage' | 'interview_round' | 'next_interview_at' | 'next_focus' | 'offer'>>) =>
+    request<ProductGoal>(`/api/product/goals/${goalId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  productQuickNotes: (goalId?: number) =>
+    request<{ items: QuickNote[] }>(`/api/product/quick-notes${goalId != null ? `?goal_id=${goalId}` : ''}`),
+  productCreateQuickNote: (body: { title: string; content?: string; scope?: string; goal_id?: number | null; pinned?: boolean }) =>
+    request<QuickNote>('/api/product/quick-notes', { method: 'POST', body: JSON.stringify(body) }),
+  productPatchQuickNote: (id: number, body: Partial<QuickNote>) =>
+    request<QuickNote>(`/api/product/quick-notes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  productDeleteQuickNote: (id: number) =>
+    request<{ ok: boolean }>(`/api/product/quick-notes/${id}`, { method: 'DELETE' }),
+  productQuestionBanks: () => request<{ items: QuestionBank[] }>('/api/product/question-banks'),
+  productCreateQuestionBank: (body: { name: string; scope?: string; role?: string; company?: string; source_type?: string }) =>
+    request<QuestionBank>('/api/product/question-banks', { method: 'POST', body: JSON.stringify(body) }),
+  productQuestionBank: (id: number) => request<QuestionBank>(`/api/product/question-banks/${id}`),
+  productAddQuestion: (bankId: number, body: { question: string; category?: string; difficulty?: string; origin?: string; source_url?: string }) =>
+    request<QuestionBankItem>(`/api/product/question-banks/${bankId}/items`, { method: 'POST', body: JSON.stringify(body) }),
+  productPins: (params?: { sessionId?: string; goalId?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.sessionId) q.set('session_id', params.sessionId)
+    if (params?.goalId != null) q.set('goal_id', String(params.goalId))
+    return request<{ items: PinMoment[] }>(`/api/product/pins${q.size ? `?${q}` : ''}`)
+  },
+  productCreatePin: (body: { session_id?: string; goal_id?: number | null; turn_id?: string; label?: string; question?: string; transcript_excerpt?: string; note?: string }) =>
+    request<PinMoment>('/api/product/pins', { method: 'POST', body: JSON.stringify(body) }),
+  productEvent: (name: string, body: { goal_id?: number | null; session_id?: string; payload?: Record<string, unknown> } = {}) =>
+    request<{ ok: boolean }>('/api/product/events', { method: 'POST', body: JSON.stringify({ name, ...body }) }),
+  productEventSummary: (goalId?: number) =>
+    request<{ events: Record<string, number> }>(`/api/product/events/summary${goalId != null ? `?goal_id=${goalId}` : ''}`),
 }

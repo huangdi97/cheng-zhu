@@ -343,6 +343,10 @@ export interface PrepPracticeQuestion {
   question: string
   type: string
   why: string
+  origin?: string
+  persona?: { role: string; demeanor: string; domain?: string }
+  round_type?: string
+  difficulty?: string
 }
 
 export interface PrepPracticeFeedback {
@@ -352,6 +356,20 @@ export interface PrepPracticeFeedback {
   improvement_advice: string
   follow_up_questions: string[]
   tags: string[]
+  content?: {
+    strengths: string[]
+    risks: string[]
+    scorecard: Record<string, number>
+    improvement_advice: string
+    follow_up_questions: string[]
+    tags: string[]
+  }
+  delivery?: {
+    answer_chars?: number
+    sentence_count?: number
+    time_to_conclusion_proxy_chars?: number
+    findings?: string[]
+  }
 }
 
 export interface PrepPracticeReport {
@@ -361,6 +379,9 @@ export interface PrepPracticeReport {
   weak_points: string[]
   turn_count: number
   avg_score: number | null
+  content_coach?: { strong_points?: string[]; weak_points?: string[] }
+  delivery_coach?: { findings?: string[] }
+  practice_config?: Record<string, unknown>
 }
 
 export interface SessionInfo {
@@ -800,10 +821,21 @@ export const api = {
     }),
 
   // Mock interview practice
-  prepPracticeStart: (spaceId: number, rounds = 5) =>
-    request<{ practice_id: string; rounds: number; question: PrepPracticeQuestion }>(
+  prepPracticeStart: (
+    spaceId: number,
+    rounds = 5,
+    options: {
+      round_type?: string
+      persona?: string
+      demeanor?: string
+      difficulty?: string
+      question_bank_ids?: number[]
+      panel_personas?: Array<{ role: string; demeanor?: string; domain?: string }>
+    } = {},
+  ) =>
+    request<{ practice_id: string; rounds: number; question: PrepPracticeQuestion; weak_points?: string[]; gap_focus?: string[]; config?: Record<string, unknown> }>(
       '/api/prep/practice/start',
-      { method: 'POST', body: JSON.stringify({ space_id: spaceId, rounds }) },
+      { method: 'POST', body: JSON.stringify({ space_id: spaceId, rounds, ...options }) },
     ),
   prepPracticeAnswer: (practiceId: string, answer: string) =>
     request<PrepPracticeAnswerResult>(`/api/prep/practice/${practiceId}/answer`, {

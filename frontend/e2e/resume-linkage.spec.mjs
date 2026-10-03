@@ -127,9 +127,11 @@ test.describe('shared resume mount', () => {
 
     await page.getByRole('button', { name: '选用' }).first().click()
     await expect(page.getByTestId('resume-mount-filename')).toHaveText('李四_后端.pdf')
-    await expect(page.getByTestId('resume-mount-inline-filename')).toHaveText('李四_后端.pdf')
 
-    // v1.3 keeps Live as a global action instead of the retired top-level 上场 tab.
+    // The mount is shared product state, not a page-local copy: a full reload
+    // must hydrate the newly selected history record from /api/config.
+    await page.reload()
+    await expect(page.getByTestId('resume-mount-filename')).toHaveText('李四_后端.pdf')
     await expect(page.getByTestId('go-live')).toBeVisible()
   })
 })

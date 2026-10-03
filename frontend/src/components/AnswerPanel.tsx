@@ -258,7 +258,7 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
               )}
             </div>
             <KbReferenceBanner qaId={qa.id} />
-            {cue && <GuidanceFirstScreen cue={cue} />}
+            {cue && <GuidanceFirstScreen cue={cue} qaId={qa.id} />}
             {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
           </div>
         </div>
@@ -322,7 +322,7 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
             )}
           </div>
           <KbReferenceBanner qaId={qa.id} />
-          {cue && <GuidanceFirstScreen cue={cue} />}
+          {cue && <GuidanceFirstScreen cue={cue} qaId={qa.id} />}
           {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
         </div>
       </div>

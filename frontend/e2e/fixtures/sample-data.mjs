@@ -10,6 +10,32 @@ const sampleEpoch = now()
 const daysAgo = (days) => sampleEpoch - (days * 24 * 60 * 60)
 const daysFromNow = (days) => sampleEpoch + (days * 24 * 60 * 60)
 
+// `/api/config/models-full` feeds the Settings → Models group. Without it the
+// page correctly renders its empty state, but then no test can verify that a
+// configured model actually shows up.
+export const SAMPLE_MODELS_FULL = [
+  {
+    name: 'GPT-4.1 Mini',
+    api_base_url: 'https://api.openai.com/v1',
+    api_key: 'sk-e2e',
+    model: 'gpt-4.1-mini',
+    supports_think: true,
+    supports_vision: true,
+    enabled: true,
+    has_key: true,
+  },
+  {
+    name: 'DeepSeek V3',
+    api_base_url: 'https://api.deepseek.com/v1',
+    api_key: 'sk-e2e',
+    model: 'deepseek-chat',
+    supports_think: true,
+    supports_vision: false,
+    enabled: true,
+    has_key: true,
+  },
+]
+
 export const SAMPLE_CONFIG = {
   models: [
     { name: 'GPT-4.1 Mini', supports_think: true, supports_vision: true, enabled: true },
@@ -726,6 +752,7 @@ export const SAMPLE_REVIEW_SESSION_DETAILS = Object.fromEntries(
  */
 export function resolveApiPayload(pathname, method) {
   if (pathname === '/api/config') return SAMPLE_CONFIG
+  if (pathname === '/api/config/models-full') return { models: SAMPLE_MODELS_FULL }
   if (pathname === '/api/options') return SAMPLE_OPTIONS
   if (pathname === '/api/devices') return SAMPLE_DEVICES
   if (pathname === '/api/network-info') return { ip: '127.0.0.1', port: 18999 }

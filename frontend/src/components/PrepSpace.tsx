@@ -85,8 +85,13 @@ function SkillCardView({ raw, cardId }: { raw: { project_name: string; card: Rec
   )
 }
 
-export default function PrepSpace() {
-  const [view, setView] = useState<View>({ kind: 'list' })
+/**
+ * v1.3: embedded in Goal Room → Prepare with ``initialSpaceId`` (the Goal's
+ * legacy prep space). Embedded mode opens that space directly and hides the
+ * space list, since the Goal Room already owns navigation.
+ */
+export default function PrepSpace({ initialSpaceId, embedded = false }: { initialSpaceId?: number; embedded?: boolean } = {}) {
+  const [view, setView] = useState<View>(initialSpaceId ? { kind: 'detail', id: initialSpaceId } : { kind: 'list' })
   const [spaces, setSpaces] = useState<PrepSpaceLite[]>([])
   const [space, setSpace] = useState<PrepSpaceType | null>(null)
   const [loadingList, setLoadingList] = useState(true)
@@ -126,8 +131,8 @@ export default function PrepSpace() {
   }, [])
 
   useEffect(() => {
-    loadList()
-  }, [loadList])
+    if (!embedded) loadList()
+  }, [loadList, embedded])
 
   useEffect(() => {
     if (view.kind !== 'new') return
@@ -147,6 +152,10 @@ export default function PrepSpace() {
       setLoadingDetail(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (initialSpaceId) void loadDetail(initialSpaceId)
+  }, [initialSpaceId, loadDetail])
 
   const handleCreate = async () => {
     if (!role.trim() && !jdText.trim() && !resumeText.trim()) {
@@ -317,9 +326,11 @@ export default function PrepSpace() {
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
+            {embedded ? <span /> : (
             <button onClick={backToList} className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-accent-blue transition-colors">
               <ArrowLeft className="h-4 w-4" /> 返回列表
             </button>
+            )}
             <div className="flex items-center gap-2">
               {space && (
                 <>

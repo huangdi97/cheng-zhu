@@ -9,7 +9,10 @@ import {
   warnInterviewOverlaySyncIssue,
 } from '@/lib/interviewOverlay'
 import { getShortcutDisplay } from '@/lib/shortcuts'
-import { buildLiveGuidance, CUE_SOURCE_LABELS, type FastCueViewModel } from '@/lib/guidanceViewModel'
+import { buildLiveGuidance, CUE_SOURCE_LABELS, deriveLiveStatus, LIVE_STATUS_LABELS, type FastCueViewModel } from '@/lib/guidanceViewModel'
+import { effectiveOverlaySize, OVERLAY_LAYOUT_KEY, useOverlayLayout } from '@/stores/overlayLayoutStore'
+import { LIVE_CONTEXT_KEY } from '@/lib/liveContext'
+import { track } from '@/lib/productApi'
 import { useInterviewStore } from '@/stores/configStore'
 import { useShortcutsStore } from '@/stores/shortcutsStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
@@ -27,6 +30,7 @@ type VisionVerifyState = {
 }
 
 const FOCUS_TAB_CACHE_LIMIT = 20
+const COMPACT_AFTER_MS = 25000
 const FOCUS_TEXT_COLOR = '#263241'
 
 const OVERLAY_MARKDOWN_COMPONENTS: Components = {
@@ -363,8 +367,61 @@ export default function InterviewOverlay() {
     return window.electronAPI?.onOverlayQuestionCommand?.((direction) => { moveOverlayQuestion(direction) })
   }, [moveOverlayQuestion])
 
+  // v1.3 Overlay 3.0: idle -> one-line compact strip; a cue expands it; it
+  // returns to compact after COMPACT_AFTER_MS without new guidance.
+  const overlayLayout = useOverlayLayout()
+  const wsConnected = useInterviewStore((s) => s.wsConnected)
+  const [lastActivityAt, setLastActivityAt] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
+  const [contextLabel, setContextLabel] = useState(() => {
+    try { return localStorage.getItem(LIVE_CONTEXT_KEY) || '' } catch { return '' }
+  })
+  const reloadLayout = overlayLayout.reload
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === OVERLAY_LAYOUT_KEY) reloadLayout()
+      if (e.key === LIVE_CONTEXT_KEY) setContextLabel(e.newValue || '')
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [reloadLayout])
+  const activityKey = `${displayedQa?.id ?? ''}:${displayedQa?.fastCue ? 1 : 0}:${(displayedQa?.answer ?? '').length > 0 ? 1 : 0}`
+  useEffect(() => {
+    if (activityKey !== '::0') setLastActivityAt(Date.now())
+  }, [activityKey])
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 2000)
+    return () => window.clearInterval(t)
+  }, [])
+  // Compact applies to a running session that is idle ("Listening · …"); before
+  // recording and in written-exam mode the v1.2 standby view stays.
+  const overlayActive = !isRecording || isExamMode || isStreaming || Boolean(reviewQaId)
+    || (Boolean(displayedQa) && now - lastActivityAt < COMPACT_AFTER_MS)
+  const effectiveSize = effectiveOverlaySize(overlayLayout, overlayActive)
+  useEffect(() => {
+    void window.electronAPI?.setOverlayLayout?.({ dock: overlayLayout.dock, interaction: overlayLayout.interaction, size: effectiveSize })
+  }, [effectiveSize, overlayLayout.dock, overlayLayout.interaction])
+  const liveStatus = deriveLiveStatus({
+    isRecording, wsConnected, qa: displayedQa ?? null, streaming: isStreaming,
+    questionAgeMs: displayedQa ? now - lastActivityAt : null,
+  })
+
   if (!enabled) {
     return <div className="h-screen w-screen bg-transparent" />
+  }
+
+  if (effectiveSize === 'COMPACT' && overlayMode !== 'focus') {
+    return (
+      <div className="ov-root ov-root--compact" data-testid="overlay-compact">
+        <div className="ov-compact" style={{ opacity: Math.max(0.6, opacity), color: fontColor }} role="status" aria-live="polite">
+          <span className={`ov-compact-dot ${isRecording ? 'ov-compact-dot--on' : ''}`} aria-hidden />
+          <span className="ov-compact-text">{LIVE_STATUS_LABELS[liveStatus]}{contextLabel ? ` · ${contextLabel}` : ''}</span>
+          {displayedQa && overlayLayout.interaction === 'INTERACTIVE' ? (
+            <button type="button" className="ov-cue-toggle" onClick={() => setLastActivityAt(Date.now())}>展开</button>
+          ) : null}
+        </div>
+      </div>
+    )
   }
 
   const answerFontSize = Math.max(12, fontSize)
@@ -388,6 +445,7 @@ export default function InterviewOverlay() {
   const toggleCueExpanded = () => {
     if (!displayedQa) return
     const qaId = displayedQa.id
+    if (!expandedQaIds[qaId]) track('deep_opened', { surface: 'overlay' })
     setExpandedQaIds((current) => ({ ...current, [qaId]: !current[qaId] }))
   }
   const renderedAnswer = hasContent ? (

@@ -116,6 +116,20 @@ class InterviewPack:
         return dict(self.payload.get("answer_preferences") or {})
 
     @property
+    def user_notes(self) -> list[dict[str, Any]]:
+        """v1.3 Quick Notes selected into this pack. Never evidence."""
+        return list(self.payload.get("user_notes") or [])
+
+    @property
+    def goal_materials(self) -> list[dict[str, Any]]:
+        """v1.3 READY Goal materials frozen into this pack."""
+        return list(self.payload.get("goal_materials") or [])
+
+    @property
+    def goal_id(self) -> str:
+        return str(self.payload.get("goal_id", "") or "")
+
+    @property
     def controlled_memory(self) -> dict[str, list[str]]:
         return dict(self.payload.get("controlled_memory") or {})
 

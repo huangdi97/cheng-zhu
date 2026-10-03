@@ -130,6 +130,8 @@ class ContextSource(str, Enum):
     KB = "kb"
     SCREEN = "screen"
     WORLD_KNOWLEDGE = "world_knowledge"
+    # v1.3: the user's own Quick Notes — a reminder, never evidence
+    USER_NOTE = "user_note"
 
 
 class InterviewPhase(str, Enum):

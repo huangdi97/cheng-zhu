@@ -1,14 +1,36 @@
 /**
  * Critical-path smoke tests with mocked backend and WebSocket.
  *
- * Goal: catch regressions that break the app's main navigation, settings
- * panel, and module switches without needing a live backend or any audio
- * device. Each test runs in <5s.
+ * Goal: catch regressions that break the v1.3 Goal-centered shell — the nav
+ * rail, the global 上场 action, per-route rendering, and the settings page —
+ * without needing a live backend or any audio device.
+ *
+ * The product API is deliberately left at the shared fixture fallback, so every
+ * routed screen is exercised against a partial payload. A screen that only
+ * survives a complete response would fail here on purpose.
  */
 import { test, expect } from '@playwright/test'
 import { installMocks, COMMON_WS_BOOTSTRAP } from './fixtures/setup.mjs'
 
-test.describe('app shell', () => {
+/** The canonical §3 IA: 首页 / 求职目标 / 我的成竹 / 练习 / 资料库 / 历史 / 设置. */
+const NAV_ITEMS = ['首页', '求职目标', '我的成竹', '练习', '资料库', '历史', '设置']
+/** v1.2 module-centric destinations that must no longer be top-level. */
+const RETIRED_NAV_ITEMS = ['准备', '复盘', '上场']
+
+const ROUTES = [
+  ['/home', '首页'],
+  ['/goals', '求职目标'],
+  ['/me', '我的成竹'],
+  ['/practice', '练习'],
+  ['/library', '资料库'],
+  ['/history', '历史'],
+  ['/settings', '设置'],
+]
+
+const IGNORABLE_ERROR = (e) =>
+  e.includes('favicon') || e.includes('downloadable font') || e.toLowerCase().includes('manifest')
+
+test.describe('app shell (live)', () => {
   test.beforeEach(async ({ context }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,
@@ -26,46 +48,6 @@ test.describe('app shell', () => {
     await expect(page.getByText('STT 就绪')).toBeVisible({ timeout: 5000 })
   })
 
-  test('R2 nav: 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置; 能力分析 lives under 复盘', async ({ page }) => {
-    await page.goto('/')
-
-    const assistTab = page.getByRole('tab', { name: '上场' })
-    const reviewTab = page.getByRole('tab', { name: '复盘', exact: true })
-    const resumeTab = page.getByRole('tab', { name: '我的成竹' })
-    const jobTab = page.getByRole('tab', { name: '求职' })
-    const rehearseTab = page.getByRole('tab', { name: '演练' })
-
-    // 准备 is not a top-level destination any more; 设置 is.
-    await expect(page.getByRole('tab', { name: '准备' })).toHaveCount(0)
-    await expect(page.getByRole('tab', { name: '能力分析' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '设置' }).first()).toBeVisible()
-
-    await expect(assistTab).toHaveAttribute('aria-selected', 'true')
-
-    await reviewTab.click()
-    await expect(reviewTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('heading', { name: '已完成', exact: true })).toBeVisible({ timeout: 8000 })
-
-    const knowledgeTab = page.getByRole('tab', { name: '能力分析' })
-    await knowledgeTab.click()
-    await expect(knowledgeTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByText('薄弱点排名')).toBeVisible({ timeout: 8000 })
-
-    await resumeTab.click()
-    await expect(resumeTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByPlaceholder('将招聘 JD 粘贴到这里...')).toBeVisible({ timeout: 8000 })
-
-    await jobTab.click()
-    await expect(jobTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: '岗位目标' })).toHaveAttribute('aria-selected', 'true')
-    await page.getByRole('tab', { name: '投递看板' }).click()
-    await expect(page.getByRole('heading', { name: '求职进度', exact: true })).toBeVisible({ timeout: 8000 })
-
-    await rehearseTab.click()
-    await expect(rehearseTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByTestId('rehearse-hub')).toBeVisible({ timeout: 8000 })
-  })
-
   test('does not log uncaught errors during initial render', async ({ page }) => {
     /** @type {string[]} */
     const errors = []
@@ -78,13 +60,98 @@ test.describe('app shell', () => {
     await expect(page.getByRole('heading', { name: '成竹', exact: true })).toBeVisible()
     await page.waitForTimeout(500)
 
-    const significant = errors.filter(
-      (e) =>
-        !e.includes('favicon') &&
-        !e.includes('downloadable font') &&
-        !e.toLowerCase().includes('manifest'),
-    )
+    const significant = errors.filter((e) => !IGNORABLE_ERROR(e))
     expect(significant, `Console errors:\n${significant.join('\n')}`).toEqual([])
+  })
+})
+
+test.describe('v1.3 goal-centered navigation', () => {
+  test.beforeEach(async ({ context }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+    })
+  })
+
+  test('primary nav exposes the Goal-centered IA and retires the module tabs', async ({ page }) => {
+    await page.goto('/#/home')
+
+    const nav = page.getByRole('navigation', { name: '主导航' })
+    for (const label of NAV_ITEMS) {
+      await expect(nav.getByRole('button', { name: label })).toBeVisible()
+    }
+    for (const label of RETIRED_NAV_ITEMS) {
+      await expect(nav.getByRole('button', { name: label })).toHaveCount(0)
+    }
+
+    // 上场 is a global action in the header, not a navigation destination.
+    await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '上场' })).toHaveCount(0)
+    await expect(page.getByTestId('go-live')).toBeVisible()
+
+    await expect(nav.getByRole('button', { name: '首页' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('clicking each nav item navigates and marks the current page', async ({ page }) => {
+    await page.goto('/#/home')
+    const nav = page.getByRole('navigation', { name: '主导航' })
+
+    for (const [path, label] of ROUTES) {
+      await nav.getByRole('button', { name: label }).click()
+      await expect(page).toHaveURL(new RegExp(`#${path}`))
+      await expect(nav.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
+    }
+  })
+
+  test('every v1.3 route renders against a partial payload without uncaught errors', async ({ page }) => {
+    const collected = []
+    page.on('pageerror', (err) => collected.push(String(err)))
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') collected.push(msg.text())
+    })
+
+    for (const [path] of ROUTES) {
+      collected.length = 0
+      // A reload gives each route a fresh document, so one screen's crash can
+      // never be masked by the previous route's state.
+      await page.goto(`/#${path}`)
+      await page.reload()
+      await expect(page.getByRole('heading', { name: '成竹', exact: true })).toBeVisible()
+      await page.waitForTimeout(500)
+
+      const significant = collected.filter((e) => !IGNORABLE_ERROR(e))
+      expect(significant, `${path} produced console errors:\n${significant.join('\n')}`).toEqual([])
+      // The shell must survive: the nav rail is only gone if the root unmounted.
+      await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
+      // A screen that blew up renders the boundary state instead of its content.
+      await expect(page.getByTestId('page-error')).toHaveCount(0)
+    }
+  })
+})
+
+test.describe('settings', () => {
+  test('opens from the nav rail, groups by layer, and searches', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+    })
+    await page.goto('/#/home')
+
+    await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '设置' }).click()
+    await expect(page.getByTestId('settings-page')).toBeVisible()
+
+    // Canonical §37 groups.
+    const groups = page.getByRole('navigation', { name: '设置分组' })
+    for (const label of ['通用', '模型', '语音与音频', '语言', '上场与浮窗', '隐私', '知识库', '快捷键', '数据与导出', '诊断']) {
+      await expect(groups.getByRole('button', { name: new RegExp(label) })).toBeVisible()
+    }
+
+    // Settings Search (canonical §54).
+    await page.getByTestId('settings-search').fill('模型')
+    await expect(page.getByRole('listbox', { name: '搜索结果' })).toBeVisible()
+
+    // The Models group renders the configured model list.
+    await page.goto('/#/settings/models')
+    await expect(page.getByText(/GPT-4\.1 Mini/).first()).toBeVisible({ timeout: 8000 })
   })
 })
 
@@ -129,17 +196,5 @@ test.describe('assist mode with WebSocket-driven Q/A', () => {
     await expect(
       page.getByText('核心要点是先讲背景与目标、再讲关键决策、最后讲量化结果。'),
     ).toBeVisible({ timeout: 5000 })
-  })
-})
-
-test.describe('settings drawer', () => {
-  test('opens and shows model list / position config', async ({ context, page }) => {
-    await installMocks(context, { messages: COMMON_WS_BOOTSTRAP })
-    await page.goto('/')
-    await expect(page.getByRole('heading', { name: '成竹', exact: true })).toBeVisible()
-
-    await page.getByRole('button', { name: /设置|Settings/i }).first().click()
-
-    await expect(page.getByText(/GPT-4\.1 Mini/).first()).toBeVisible({ timeout: 5000 })
   })
 })

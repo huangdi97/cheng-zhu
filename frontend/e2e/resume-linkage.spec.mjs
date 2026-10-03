@@ -121,14 +121,17 @@ test.describe('shared resume mount', () => {
       localStorage.setItem('ia-color-scheme', 'vscode-light-plus')
     })
 
-    await page.goto('/')
-    await page.getByRole('tab', { name: '我的成竹' }).click()
-    await expect(page.getByText('张三_后端开发.pdf').first()).toBeVisible()
+    await page.goto('/#/me/resume')
+    await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
+    await expect(page.getByTestId('resume-mount-filename')).toHaveText('张三_后端开发.pdf')
 
     await page.getByRole('button', { name: '选用' }).first().click()
-    await expect(page.getByText('李四_后端.pdf').first()).toBeVisible()
+    await expect(page.getByTestId('resume-mount-filename')).toHaveText('李四_后端.pdf')
 
-    await page.getByRole('tab', { name: '上场' }).click()
-    await expect(page.getByRole('heading', { name: '成竹', exact: true })).toBeVisible()
+    // The mount is shared product state, not a page-local copy: a full reload
+    // must hydrate the newly selected history record from /api/config.
+    await page.reload()
+    await expect(page.getByTestId('resume-mount-filename')).toHaveText('李四_后端.pdf')
+    await expect(page.getByTestId('go-live')).toBeVisible()
   })
 })

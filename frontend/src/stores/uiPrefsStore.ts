@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { navigate as navigateToRoute, routeForLegacyMode } from '@/lib/router'
 import type { ColorSchemeId } from '@/lib/colorScheme'
 import {
   COLOR_SCHEME_STORAGE_KEY,
@@ -357,6 +358,8 @@ export const useUiPrefsStore = create<UiPrefsState>((set) => ({
       /* ignore */
     }
     set(mode === 'knowledge' ? { appMode: target, reviewHubTab: 'ability' } : { appMode: target })
+    // v1.3 route adapter: legacy callers move the object-centric router too.
+    navigateToRoute(routeForLegacyMode(target))
   },
   setAssistMode: (mode) => {
     try {

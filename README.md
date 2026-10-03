@@ -4,7 +4,7 @@
 
 成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
 
-> 当前最高优先级设计（Single Source of Truth）：[docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md](docs/canonical/Chengzhu_v1.0-R1_CANONICAL.md)（canonical version: v1.0-R1 · date: 2026-09-25）。历史文档（DESIGN.md / PRODUCT.md）已标注 HISTORICAL。
+> 当前 Canonical：[docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)（Current Canonical = v1.3-R2 · Goal-centered Interview OS · 2026-10-01）；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.2.2](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.2.2)。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
 实时听题，自动生成专业面试回答。它是一个开着就能用的面试辅助工具：你负责听题和临场反应，它负责转写、答题、截图审题，卡壳的时候还能把问答框挂在旁边。
 
@@ -233,7 +233,7 @@ python -m pytest backend/tests -q
 
 ## 文档
 
-canonical（当前最高优先级设计）：[docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：
+canonical（当前最高优先级设计）：[v1.3-R2](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；冻结核心：[v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：
 
 | 分类 | 文档 |
 | --- | --- |

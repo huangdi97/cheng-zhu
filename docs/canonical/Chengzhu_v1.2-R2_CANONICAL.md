@@ -1,6 +1,7 @@
 # 成竹 Chengzhu v1.2-R2 — Canonical
 
-Status: current source of truth for product semantics (supersedes v1.2-R1 / v1.1-R1 / v1.0-R1 where they conflict).
+Status: **FROZEN VERIFIED CORE** (2026-10-01). Product experience is now defined by the [v1.3-R2 Canonical](Chengzhu_v1.3-R2_CANONICAL.md); every live-intelligence semantic below stays authoritative and must not regress.
+Historical status: source of truth for product semantics (supersedes v1.2-R1 / v1.1-R1 / v1.0-R1 where they conflict).
 Priority when sources disagree: running code → repository → DB → release artifact → test/CI evidence → this document → older design docs (provenance only).
 
 ## 1. Principles

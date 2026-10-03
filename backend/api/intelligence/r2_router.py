@@ -165,7 +165,13 @@ class StoryRequest(BaseModel):
 
 @router.get("/stories")
 def list_stories():
-    return storage.list_all_stories()
+    rows = storage.list_all_stories()
+    for row in rows:
+        try:
+            row["tags"] = json.loads(row.get("tags_json") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            row["tags"] = []
+    return rows
 
 
 @router.post("/stories")

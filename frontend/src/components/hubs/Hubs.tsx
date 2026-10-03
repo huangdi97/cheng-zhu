@@ -3,6 +3,7 @@ import { BookOpenCheck, Sparkles } from 'lucide-react'
 import { api, type PrepSpaceLite } from '@/lib/api'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import CoachPanel from '@/components/coach/CoachPanel'
+import PinnedMoments from '@/components/v13/PinnedMoments'
 
 // v1.3 compatibility hubs: Goal-centered primary IA lives in App. These hubs keep
 // existing Practice/History components reusable without duplicating domain state.
@@ -107,6 +108,7 @@ export function ReviewHub() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <SubTabs label="历史" value={reviewHubTab} onChange={setReviewHubTab} tabs={[['sessions', 'Sessions / Reflection'], ['ability', '能力趋势']]} />
+      {reviewHubTab === 'sessions' && <PinnedMoments />}
       <Suspense fallback={<Loading label="加载中…" />}>
         {reviewHubTab === 'sessions' ? <ReviewMode /> : <KnowledgeMap />}
       </Suspense>

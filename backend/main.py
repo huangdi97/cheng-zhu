@@ -29,6 +29,7 @@ from api import kb as kb_api
 from api import copilot as copilot_api
 from api import sessions as sessions_api
 from api import intelligence as intelligence_api
+from api import product_experience as product_experience_api
 
 setup_logging()
 _log = get_logger("app.main")
@@ -252,6 +253,7 @@ app.include_router(copilot_api.router, prefix="/api")
 app.include_router(sessions_api.router, prefix="/api")
 app.include_router(intelligence_api.intelligence_router, prefix="/api/intelligence")
 app.include_router(intelligence_api.intelligence_r2_router, prefix="/api/intelligence")
+app.include_router(product_experience_api.router, prefix="/api")
 # R2 Human Coach: candidate routes under /api (loopback-authenticated like the
 # rest); the helper page + token-guarded helper endpoints under /coach.
 from api import coach as coach_api  # noqa: E402

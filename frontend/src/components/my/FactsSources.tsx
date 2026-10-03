@@ -41,9 +41,10 @@ function FactRow({ fact, evidence, onChanged }: { fact: FactItem; evidence: Fact
   const user = USER_META[fact.user_assertion_status] ?? USER_META.UNREVIEWED
   const sources = evidence.filter((e) => fact.source_ids.includes(e.id))
 
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async (fn: () => Promise<unknown>, eventName?: string) => {
     try {
       await fn()
+      if (eventName) void api.productEvent(eventName, { payload: { fact_id: fact.id } })
       onChanged()
     } catch (error) {
       pushToast(getErrorMessage(error, '操作失败'), 'error')
@@ -83,10 +84,10 @@ function FactRow({ fact, evidence, onChanged }: { fact: FactItem; evidence: Fact
         <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-secondary hover:bg-bg-hover/60" onClick={() => setLinking((v) => !v)}>补来源</button>
         <button type="button" disabled={fact.user_assertion_status === 'USER_CONFIRMED'}
           className="rounded-full border border-status-direct/40 px-2 py-0.5 text-status-direct disabled:opacity-40"
-          onClick={() => run(() => api.intelUpdateFact(fact.id, { user_assertion_status: 'USER_CONFIRMED' }))}>用户确认</button>
+          onClick={() => run(() => api.intelUpdateFact(fact.id, { user_assertion_status: 'USER_CONFIRMED' }), 'fact_resolved')}>这是我的真实情况</button>
         <button type="button" disabled={fact.user_assertion_status === 'USER_DENIED'}
           className="rounded-full border border-status-risk/40 px-2 py-0.5 text-status-risk disabled:opacity-40"
-          onClick={() => run(() => api.intelUpdateFact(fact.id, { user_assertion_status: 'USER_DENIED' }))}>用户否认</button>
+          onClick={() => run(() => api.intelUpdateFact(fact.id, { user_assertion_status: 'USER_DENIED' }), 'fact_dismissed')}>这不准确</button>
         <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-secondary hover:bg-bg-hover/60"
           onClick={() => api.intelFactSessions(fact.id).then(setSessions).catch(() => setSessions([]))}>在哪些场次使用</button>
         {fact.user_assertion_status !== 'USER_CONFIRMED' && fact.source !== 'resume' && (
@@ -127,10 +128,17 @@ export default function FactsSources() {
   const load = useCallback(() => {
     api.intelFacts().then((res) => { setData(res); setError(null) }).catch((e) => setError(getErrorMessage(e, '加载失败')))
   }, [])
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    void api.productEvent('fact_inbox_opened')
+  }, [load])
 
   const facts = useMemo(() => {
-    const all = data?.facts ?? []
+    const all = [...(data?.facts ?? [])].sort((a, b) => {
+      const ap = a.user_assertion_status === 'UNREVIEWED' ? 0 : 1
+      const bp = b.user_assertion_status === 'UNREVIEWED' ? 0 : 1
+      return ap - bp
+    })
     if (filter === 'all') return all
     if (filter === 'USER_CONFIRMED' || filter === 'USER_DENIED') return all.filter((f) => f.user_assertion_status === filter)
     return all.filter((f) => f.provenance_status === filter)
@@ -158,9 +166,12 @@ export default function FactsSources() {
 
   return (
     <div className="p-4 space-y-3" data-testid="facts-sources">
-      <p className="text-xs text-text-muted">
-        “来源状态”只说明当前资料是否覆盖这句话；“用户确认”是你本人的判断。两者独立，上场时共同决定能否说“我做过”。
-      </p>
+      <div>
+        <h3 className="text-base font-semibold text-text-primary">需要你确认 · {data.facts.filter((f) => f.user_assertion_status === 'UNREVIEWED').length}</h3>
+        <p className="mt-1 text-xs text-text-muted">
+          成竹从你的材料中整理出这些个人陈述。先确认“这是不是你的真实情况”；来源强度会单独显示，用户确认不等于有独立证据。
+        </p>
+      </div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="筛选">
         {filters.map(([key, label]) => (
           <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}

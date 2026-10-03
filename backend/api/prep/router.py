@@ -249,7 +249,13 @@ async def api_activate_launch_pack(space_id: int, body: Optional[LaunchPackReque
 
 class StartPracticeRequest(BaseModel):
     space_id: int
-    rounds: int = 5
+    rounds: int = Field(default=5, ge=1, le=12)
+    round_type: str = Field(default="technical", max_length=60)
+    persona: str = Field(default="Tech Lead", max_length=120)
+    demeanor: str = Field(default="neutral", max_length=40)
+    difficulty: str = Field(default="standard", max_length=30)
+    question_bank_ids: list[int] = Field(default_factory=list)
+    panel_personas: list[dict] = Field(default_factory=list)
 
 
 class PracticeAnswerRequest(BaseModel):
@@ -261,7 +267,19 @@ async def api_practice_start(req: StartPracticeRequest):
     if not prep_service.prep_configured():
         raise HTTPException(400, "尚未配置有效的模型 API Key，请先在设置中配置模型")
     try:
-        return await run_in_threadpool(practice_service.start_session, req.space_id, req.rounds)
+        return await run_in_threadpool(
+            practice_service.start_session,
+            req.space_id,
+            req.rounds,
+            {
+                "round_type": req.round_type,
+                "persona": req.persona,
+                "demeanor": req.demeanor,
+                "difficulty": req.difficulty,
+                "question_bank_ids": req.question_bank_ids,
+                "panel_personas": req.panel_personas,
+            },
+        )
     except ValueError as e:
         raise HTTPException(400, str(e))
 

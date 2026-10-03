@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef, lazy, Suspense } from 'react'
-import { Settings, SlidersHorizontal, MonitorSmartphone, PanelLeftClose, PanelLeftOpen, Minus, X, ChevronDown, Mic, Camera, Home, Radio, ClipboardList, BrainCircuit, FileText, Kanban, BookOpenCheck } from 'lucide-react'
+import { Settings, SlidersHorizontal, MonitorSmartphone, PanelLeftClose, PanelLeftOpen, Minus, X, ChevronDown, Mic, Camera, Home, History, FileText, Target, BookOpenCheck, Library } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore, type AppMode } from '@/stores/uiPrefsStore'
@@ -33,17 +33,22 @@ const MyChengzhu = lazy(() => import('@/components/my/MyChengzhu'))
 const JobHub = lazy(() => import('@/components/hubs/Hubs').then((m) => ({ default: m.JobHub })))
 const RehearseHub = lazy(() => import('@/components/hubs/Hubs').then((m) => ({ default: m.RehearseHub })))
 const ReviewHub = lazy(() => import('@/components/hubs/Hubs').then((m) => ({ default: m.ReviewHub })))
-const HomeScreen = lazy(() => import('@/components/HomeScreen'))
+const ActionHome = lazy(() => import('@/components/v13/ActionHome'))
+const GoalWorkspace = lazy(() => import('@/components/v13/GoalWorkspace'))
+const LibraryWorkspace = lazy(() => import('@/components/v13/LibraryWorkspace'))
+const CommandPalette = lazy(() => import('@/components/v13/CommandPalette'))
+const LivePinShortcut = lazy(() => import('@/components/v13/LivePinShortcut'))
+const LiveConversationAssist = lazy(() => import('@/components/v13/LiveConversationAssist'))
 
 // R2 Stage O: 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置.
 // 设置 opens the settings drawer; 准备 lives inside each Job Goal.
 const APP_MODE_TABS = [
   ['home', '首页'],
+  ['goals', '求职目标'],
   ['resume-opt', '我的成竹'],
-  ['job-tracker', '求职'],
-  ['prep', '演练'],
-  ['assist', '上场'],
-  ['review', '复盘'],
+  ['prep', '练习'],
+  ['library', '资料库'],
+  ['history', '历史'],
 ] as const
 
 const HEADER_ICON_BTN =
@@ -67,11 +72,11 @@ function WorkbenchMark({ className }: { className?: string }) {
 /* MD3 导航栏（Navigation Rail）：桌面端左侧功能切换 */
 const NAV_ITEMS: Array<[AppMode, string, typeof Home]> = [
   ['home', '首页', Home],
+  ['goals', '求职目标', Target],
   ['resume-opt', '我的成竹', FileText],
-  ['job-tracker', '求职', Kanban],
-  ['prep', '演练', BookOpenCheck],
-  ['assist', '上场', Radio],
-  ['review', '复盘', ClipboardList],
+  ['prep', '练习', BookOpenCheck],
+  ['library', '资料库', Library],
+  ['history', '历史', History],
 ]
 
 function AppNavRail({ appMode, onSelect, onSettings }: { appMode: AppMode; onSelect: (mode: AppMode) => void; onSettings: () => void }) {
@@ -514,6 +519,17 @@ export default function App() {
               )}
             </button>
           )}
+          {appMode !== 'assist' && (
+            <button
+              type="button"
+              onClick={() => setAppMode('assist')}
+              className="app-no-drag inline-flex items-center gap-1.5 rounded-xl bg-container-primary px-3 py-1.5 text-xs font-semibold text-container-on-primary shadow-sm"
+              title="进入 Preflight / Live"
+            >
+              <Mic className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">上场</span>
+            </button>
+          )}
           <KnowledgeButton />
         <button
           type="button"
@@ -554,10 +570,10 @@ export default function App() {
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
 
       {/* ── Assist Mode ── */}
-      {/* Home (two entry cards) */}
+      {/* v1.3 Action Home */}
       {appMode === 'home' && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载中…</div>}>
-          <HomeScreen />
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">正在恢复求职上下文…</div>}>
+          <ActionHome />
         </Suspense>
       )}
 
@@ -589,6 +605,7 @@ export default function App() {
             <>
           <SessionClaimWarnings />
           <CoachCues />
+          <Suspense fallback={null}><LiveConversationAssist /></Suspense>
           {/* Mobile tab switcher */}
           <div className="flex md:hidden border-b border-bg-tertiary flex-shrink-0" role="tablist" aria-label="实时辅助面板">
             <button role="tab" aria-selected={mobileTab === 'transcript'} onClick={() => setMobileTab('transcript')}
@@ -707,9 +724,9 @@ export default function App() {
       </>
       )}
 
-      {/* ── 复盘（场次复盘 + 能力分析） ── */}
-      {(appMode === 'review' || appMode === 'knowledge') && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载面试复盘中…</div>}>
+      {/* ── 历史 / Reflection ── */}
+      {(appMode === 'history' || appMode === 'review' || appMode === 'knowledge') && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载历史中…</div>}>
           <ReviewHub />
         </Suspense>
       )}
@@ -721,10 +738,17 @@ export default function App() {
         </Suspense>
       )}
 
-      {/* ── 求职（岗位目标 + 投递看板） ── */}
-      {appMode === 'job-tracker' && (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载求职中…</div>}>
-          <JobHub />
+      {/* ── Goal-centered 求职目标 ── */}
+      {(appMode === 'goals' || appMode === 'job-tracker') && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载求职目标中…</div>}>
+          <GoalWorkspace />
+        </Suspense>
+      )}
+
+      {/* ── 资料库：Knowledge / Quick Notes / Question Banks ── */}
+      {appMode === 'library' && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-text-muted">加载资料库中…</div>}>
+          <LibraryWorkspace />
         </Suspense>
       )}
 
@@ -745,6 +769,8 @@ export default function App() {
       <SettingsDrawer />
       <KnowledgeDrawer />
       <OnboardingWizard />
+      <Suspense fallback={null}><CommandPalette /></Suspense>
+      <Suspense fallback={null}><LivePinShortcut /></Suspense>
         </div>
       </div>
     </div>

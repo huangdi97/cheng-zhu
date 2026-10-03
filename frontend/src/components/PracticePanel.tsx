@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Send, Sparkles, Loader2, CheckCircle2, XCircle, AlertTriangle, RotateCcw, Mic, Target } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { api, PrepPracticeQuestion, PrepPracticeAnswerResult } from '@/lib/api'
+import PracticeSetup, { type PracticeSetupValue } from '@/components/practice/PracticeSetup'
 
 interface TurnItem {
   question: PrepPracticeQuestion
@@ -34,22 +35,21 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
   const [recordingMsg, setRecordingMsg] = useState<string | null>(null)
   const [liveText, setLiveText] = useState('')
   const [liveLevel, setLiveLevel] = useState(0)
-  const [starting, setStarting] = useState(true)
+  const [starting, setStarting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [report, setReport] = useState<PrepPracticeAnswerResult['report'] | null>(null)
   const [weakPoints, setWeakPoints] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (setup: PracticeSetupValue) => {
     setStarting(true)
     setError(null)
     try {
-      const res = await api.prepPracticeStart(spaceId, 5) as { practice_id: string; rounds: number; question: PrepPracticeQuestion; weak_points?: string[]; gap_focus?: string[] }
+      const res = await api.prepPracticeStart(spaceId, setup.rounds, setup)
       setPracticeId(res.practice_id)
       setRounds(res.rounds)
       setCurrent(res.question)
-      // Stage L2：复盘弱项 + 本岗位 Gap 一起决定出题顺序
       setWeakPoints(Array.from(new Set([...(res.weak_points ?? []), ...(res.gap_focus ?? [])])))
     } catch (e) {
       setError(e instanceof Error ? e.message : '开始练习失败')
@@ -57,10 +57,6 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
       setStarting(false)
     }
   }, [spaceId])
-
-  useEffect(() => {
-    start()
-  }, [start])
 
   useEffect(() => {
     api.getDevices().then((res: any) => {
@@ -151,7 +147,7 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
     setCurrent(null)
     setAnswer('')
     setError(null)
-    start()
+    setWeakPoints([])
   }
 
   return (
@@ -191,7 +187,9 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
       )}
 
       <div className="flex-1 overflow-y-auto min-h-0 py-4 space-y-4">
-        {starting ? (
+        {!practiceId && !report && !starting ? (
+          <PracticeSetup busy={starting} onStart={(setup) => void start(setup)} />
+        ) : starting ? (
           <div className="py-16 text-center text-sm text-text-muted flex items-center justify-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> 正在准备第一题…
           </div>
@@ -201,7 +199,10 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
               <div key={i} className="space-y-2">
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-bg-hover/40 bg-bg-secondary/70 px-4 py-3">
-                    <div className="text-[11px] text-text-muted mb-1">面试官 Q{i + 1}</div>
+                    <div className="text-[11px] text-text-muted mb-1">
+                      {t.question.persona?.role || '面试官'} · Q{i + 1}
+                      {t.question.persona?.demeanor ? ` · ${t.question.persona.demeanor}` : ''}
+                    </div>
                     <div className="text-sm text-text-primary leading-relaxed">{t.question.question}</div>
                   </div>
                 </div>
@@ -234,6 +235,12 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
                     {t.result.feedback.improvement_advice ? (
                       <div className="text-[13px] text-text-muted mt-1">💡 {t.result.feedback.improvement_advice}</div>
                     ) : null}
+                    {t.result.feedback.delivery?.findings?.length ? (
+                      <div className="mt-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 p-2.5">
+                        <div className="text-[11px] font-semibold text-accent-amber">Delivery Coach</div>
+                        <div className="mt-1 text-[12px] text-text-secondary">{t.result.feedback.delivery.findings.join('；')}</div>
+                      </div>
+                    ) : null}
                     {t.result.feedback.follow_up_questions && t.result.feedback.follow_up_questions.length > 0 ? (
                       <div className="text-[12px] text-text-muted mt-1">可能被追问：{t.result.feedback.follow_up_questions.join('；')}</div>
                     ) : null}
@@ -246,7 +253,10 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
               <div className="space-y-2">
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-accent-blue/30 bg-accent-blue/10 px-4 py-3">
-                    <div className="text-[11px] text-text-muted mb-1">面试官 · 第 {turns.length + 1} 题</div>
+                    <div className="text-[11px] text-text-muted mb-1">
+                      {current.persona?.role || '面试官'} · 第 {turns.length + 1} 题
+                      {current.difficulty ? ` · ${current.difficulty}` : ''}
+                    </div>
                     <div className="text-sm text-text-primary leading-relaxed">{current.question}</div>
                     {current.why ? <div className="mt-1 text-xs text-text-muted">考察：{current.why}</div> : null}
                   </div>
@@ -268,14 +278,21 @@ export default function PracticePanel({ spaceId, onClose }: Props) {
                     <ReactMarkdown>{report.summary_markdown}</ReactMarkdown>
                   </div>
                 ) : null}
-                {report.strong_points && report.strong_points.length > 0 ? (
-                  <div className="text-[13px] text-text-secondary"><span className="text-text-muted">亮点关键词：</span>{report.strong_points.join('、')}</div>
-                ) : null}
-                {report.weak_points && report.weak_points.length > 0 ? (
-                  <div className="text-[13px] text-text-secondary"><span className="text-text-muted">待加强：</span>{report.weak_points.join('、')}</div>
-                ) : null}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl bg-bg-secondary p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-accent-green">Content Coach</div>
+                    {report.strong_points?.length ? <div className="mt-2 text-[13px] text-text-secondary"><span className="text-text-muted">做得好：</span>{report.strong_points.join('、')}</div> : null}
+                    {report.weak_points?.length ? <div className="mt-2 text-[13px] text-text-secondary"><span className="text-text-muted">下一步：</span>{report.weak_points.join('、')}</div> : null}
+                  </div>
+                  <div className="rounded-xl bg-bg-secondary p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-accent-amber">Delivery Coach</div>
+                    {report.delivery_coach?.findings?.length
+                      ? <ul className="mt-2 space-y-1 text-[13px] text-text-secondary">{report.delivery_coach.findings.map((x, i) => <li key={i}>• {x}</li>)}</ul>
+                      : <div className="mt-2 text-[13px] text-text-muted">本场没有明显表达节奏问题。</div>}
+                  </div>
+                </div>
                 {report.review_session_id ? (
-                  <div className="text-xs text-text-muted">本场已自动保存到「面试复盘」（记录 #{report.review_session_id}），可去复盘模块查看逐题分析。</div>
+                  <div className="text-xs text-text-muted">本场已自动保存到「面试复盘」（记录 #{report.review_session_id}），可去「历史」查看逐题分析。</div>
                 ) : null}
                 <button onClick={restart} className="inline-flex items-center gap-1.5 rounded-xl bg-accent-blue px-3.5 py-1.5 text-xs font-medium text-white shadow-sm shadow-accent-blue/20 hover:bg-accent-blue/90">
                   <RotateCcw className="h-3.5 w-3.5" /> 再练一场

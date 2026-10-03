@@ -21,7 +21,7 @@ const ASSIST_TRANSCRIPT_COLLAPSED_KEY = 'ia_assist_transcript_collapsed'
 const APP_MODE_KEY = 'ia_app_mode'
 const ASSIST_MODE_KEY = 'ia_assist_mode'
 
-export type AppMode = 'home' | 'assist' | 'review' | 'knowledge' | 'resume-opt' | 'job-tracker' | 'prep'
+export type AppMode = 'home' | 'assist' | 'review' | 'knowledge' | 'resume-opt' | 'job-tracker' | 'prep' | 'goals' | 'library' | 'history'
 export type JobTrackerDeepLink = {
   applicationId: number
   openReviews?: boolean
@@ -50,16 +50,33 @@ const APP_MODE_VALUES: ReadonlySet<AppMode> = new Set([
   'resume-opt',
   'job-tracker',
   'prep',
+  'goals',
+  'library',
+  'history',
 ])
 
 export type JobHubTab = 'goals' | 'board'
 export type ReviewHubTab = 'sessions' | 'ability'
 
+const ACTIVE_GOAL_KEY = 'chengzhu_v13_active_goal'
+
+function readActiveGoalId(): number | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_GOAL_KEY)
+    if (!raw) return null
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 function readAppMode(): AppMode {
   try {
     const v = localStorage.getItem(APP_MODE_KEY)
-    // R2 IA: 能力分析 lives under 复盘 now; old persisted value maps there.
-    if (v === 'knowledge') return 'review'
+    // v1.3 IA migration: preserve old persisted module-centric values.
+    if (v === 'knowledge' || v === 'review') return 'history'
+    if (v === 'job-tracker') return 'goals'
     if (v && APP_MODE_VALUES.has(v as AppMode)) return v as AppMode
   } catch {
     /* ignore */
@@ -285,6 +302,8 @@ function persistOverlayPrefSilently(key: string, value: string) {
 
 interface UiPrefsState {
   appMode: AppMode
+  activeGoalId: number | null
+  setActiveGoalId: (goalId: number | null) => void
   jobTrackerDeepLink: JobTrackerDeepLink | null
   reviewDeepLinkSessionId: number | null
   setAppMode: (mode: AppMode) => void
@@ -340,6 +359,16 @@ interface UiPrefsState {
 
 export const useUiPrefsStore = create<UiPrefsState>((set) => ({
   appMode: readAppMode(),
+  activeGoalId: readActiveGoalId(),
+  setActiveGoalId: (goalId) => {
+    try {
+      if (goalId == null) localStorage.removeItem(ACTIVE_GOAL_KEY)
+      else localStorage.setItem(ACTIVE_GOAL_KEY, String(goalId))
+    } catch {
+      /* ignore */
+    }
+    set({ activeGoalId: goalId })
+  },
   assistMode: readAssistMode(),
   jobTrackerDeepLink: null,
   reviewDeepLinkSessionId: null,
@@ -349,8 +378,13 @@ export const useUiPrefsStore = create<UiPrefsState>((set) => ({
   setReviewHubTab: (tab) => set({ reviewHubTab: tab }),
   setAppMode: (mode) => {
     if (!APP_MODE_VALUES.has(mode)) return
-    // R2 IA: 'knowledge' (能力分析) is a tab of 复盘, not a top-level mode.
-    const target: AppMode = mode === 'knowledge' ? 'review' : mode
+    // v1.3 IA: old module routes remain accepted as compatibility aliases.
+    const target: AppMode =
+      mode === 'knowledge' || mode === 'review'
+        ? 'history'
+        : mode === 'job-tracker'
+          ? 'goals'
+          : mode
     try {
       localStorage.setItem(APP_MODE_KEY, target)
     } catch {

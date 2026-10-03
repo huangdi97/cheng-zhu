@@ -37,6 +37,7 @@ const ActionHome = lazy(() => import('@/components/v13/ActionHome'))
 const GoalWorkspace = lazy(() => import('@/components/v13/GoalWorkspace'))
 const LibraryWorkspace = lazy(() => import('@/components/v13/LibraryWorkspace'))
 const CommandPalette = lazy(() => import('@/components/v13/CommandPalette'))
+const LivePinShortcut = lazy(() => import('@/components/v13/LivePinShortcut'))
 
 // R2 Stage O: 首页 / 我的成竹 / 求职 / 演练 / 上场 / 复盘 / 设置.
 // 设置 opens the settings drawer; 准备 lives inside each Job Goal.
@@ -767,6 +768,7 @@ export default function App() {
       <KnowledgeDrawer />
       <OnboardingWizard />
       <Suspense fallback={null}><CommandPalette /></Suspense>
+      <Suspense fallback={null}><LivePinShortcut /></Suspense>
         </div>
       </div>
     </div>

@@ -77,7 +77,8 @@ test.describe('Goal and History linkage', () => {
 
     const realSection = page.getByRole('heading', { name: /真实面试 · 1/ })
     await expect(realSection).toBeVisible()
-    await expect(page.getByRole('button', { name: /真实面试 · 技术面/ })).toBeVisible()
+    const realRegion = page.getByRole('region', { name: /真实面试 · 1/ })
+    await expect(realRegion.getByRole('button', { name: /真实面试 · 技术面/ })).toBeVisible()
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     expect(overflow).toBeLessThanOrEqual(0)
@@ -91,7 +92,7 @@ test.describe('Goal and History linkage', () => {
     })
 
     await page.goto('/#/goals/goal-mm/interviews')
-    const goalSession = page.getByRole('button', { name: /真实面试 · 技术面/ })
+    const goalSession = page.getByRole('region', { name: /真实面试 · 1/ }).getByRole('button', { name: /真实面试 · 技术面/ })
     await expect(goalSession).toBeVisible()
     await goalSession.click()
     await expect(page).toHaveURL(/#\/reflection\/review\/902/)

@@ -5,14 +5,14 @@ import FactsSources from './FactsSources'
 
 const ResumeOptimizer = lazy(() => import('@/components/ResumeOptimizer'))
 
-// R2 Stage M「我的成竹」：概览 / 简历 / 项目 / 事实与来源 / Stories / Skills / 我的表达。
+// v1.3 Person Workspace：底层仍是 Provenance Graph，产品层把未确认内容收敛成 Fact Inbox。
 type TabKey = 'overview' | 'resume' | 'projects' | 'facts' | 'stories' | 'skills' | 'voice'
 
 const TABS: Array<[TabKey, string]> = [
   ['overview', '概览'],
   ['resume', '简历'],
   ['projects', '项目'],
-  ['facts', '事实与来源'],
+  ['facts', '待确认'],
   ['stories', 'Stories'],
   ['skills', 'Skills'],
   ['voice', '我的表达'],
@@ -236,7 +236,7 @@ function Voice() {
 }
 
 export default function MyChengzhu() {
-  const [tab, setTab] = useState<TabKey>('resume')
+  const [tab, setTab] = useState<TabKey>('overview')
   return (
     <div className="flex-1 flex flex-col min-h-0" data-testid="my-chengzhu">
       <div role="tablist" aria-label="我的成竹" className="flex gap-1 overflow-x-auto scrollbar-none px-3 md:px-5 py-2 border-b border-bg-tertiary/70 bg-bg-secondary/40 flex-shrink-0">

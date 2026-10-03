@@ -369,6 +369,21 @@ def add_question_item(
     return dict(row)
 
 
+def list_question_items(bank_ids: list[int]) -> list[dict[str, Any]]:
+    ids = [int(v) for v in bank_ids if int(v) > 0]
+    if not ids:
+        return []
+    placeholders = ",".join("?" for _ in ids)
+    with _lock:
+        conn = _conn()
+        rows = conn.execute(
+            f"SELECT * FROM question_bank_items WHERE bank_id IN ({placeholders}) ORDER BY bank_id, id",
+            ids,
+        ).fetchall()
+        conn.close()
+    return [dict(row) for row in rows]
+
+
 def create_pin(
     *,
     session_id: str,

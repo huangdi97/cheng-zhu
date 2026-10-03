@@ -145,9 +145,26 @@ test.describe('R2 human coach', () => {
     await expect(cues.getByText('先说边界，再讲你做过的 Redis')).toBeVisible()
   })
 
-  test('rehearse hub offers a practice coach panel', async ({ context, page }) => {
-    await installMocks(context, { messages: COMMON_WS_BOOTSTRAP, localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'prep' } })
-    await page.goto('/')
+  test('practice setup offers a Human Coach panel when explicitly enabled', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: {
+        'GET /api/product/goals': { items: [] },
+        'GET /api/product/practice/options': {
+          rounds: [{ key: 'TECHNICAL', label: '技术一面' }],
+          demeanors: [{ key: 'NEUTRAL', label: '中性' }],
+          difficulties: [{ key: 'STANDARD', label: '标准' }],
+          sources: [{ key: 'ROLE_BANK', label: '岗位题库' }],
+          personas: [{ key: 'TECH_LEAD', label: 'Tech Lead', concern: '技术深度', followup_style: '深挖', demeanor: 'NEUTRAL' }],
+          defaults: { round: 'TECHNICAL', focus: null, demeanor: 'NEUTRAL', difficulty: 'STANDARD', sources: ['ROLE_BANK'] },
+        },
+      },
+    })
+    await page.goto('/#/practice')
+    await expect(page.getByTestId('practice-setup')).toBeVisible()
+
+    await page.getByRole('checkbox', { name: '邀请真人教练一起练' }).check()
     const panel = page.getByTestId('coach-panel')
     await expect(panel).toBeVisible({ timeout: 8000 })
     await expect(panel.getByText('人工教练（练习）')).toBeVisible()

@@ -15,14 +15,19 @@ export default function HomePage() {
   if (error) return <Page testId="action-home"><ErrorState message={error} onRetry={reload} /></Page>
   if (!data) return null
 
-  if (data.state === 'NO_GOAL') {
+  if (data.state === 'NO_GOAL' || (!data.focus_goal && !data.next_interview)) {
     return (
       <Page testId="action-home">
         <h1 className="sr-only">首页</h1>
         <div className="py-10">
           <EmptyState testId="home-empty" title="从一个具体的求职目标开始"
             body="告诉成竹你要面的公司和岗位，它会围绕这个目标安排准备、练习、上场和复盘。"
-            action={<PrimaryButton onClick={openCreateGoal} testId="create-first-goal">创建第一个求职目标</PrimaryButton>} />
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <PrimaryButton onClick={openCreateGoal} testId="create-first-goal">创建第一个求职目标</PrimaryButton>
+                <SecondaryButton onClick={() => navigate(paths.goals())}>查看求职目标</SecondaryButton>
+              </div>
+            } />
         </div>
         <Attention items={data.needs_attention} />
       </Page>

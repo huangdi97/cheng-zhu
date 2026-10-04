@@ -560,6 +560,41 @@ function withFactInboxDefaults(payload: unknown): FactInbox {
   }
 }
 
+function withTrendsDefaults(payload: unknown): Trends {
+  const p = (payload ?? {}) as Partial<Trends>
+  const dimensions = Array.isArray(p.dimensions)
+    ? p.dimensions
+        .filter((d): d is TrendDimension => Boolean(d && typeof d === 'object'))
+        .map((d) => ({
+          dimension: typeof d.dimension === 'string' ? d.dimension : '',
+          label: typeof d.label === 'string' ? d.label : (typeof d.dimension === 'string' ? d.dimension : '趋势'),
+          series: Array.isArray(d.series) ? d.series.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)) : [],
+          direction: (['IMPROVING', 'DECLINING', 'REPEATING', 'STABLE', 'INSUFFICIENT'] as const).includes(d.direction)
+            ? d.direction
+            : 'INSUFFICIENT',
+          text: typeof d.text === 'string' ? d.text : '',
+        }))
+        .filter((d) => d.dimension || d.label)
+    : []
+  const rawDelivery = p.delivery
+  const delivery = rawDelivery && typeof rawDelivery === 'object'
+    ? {
+        text: typeof rawDelivery.text === 'string' ? rawDelivery.text : '',
+        direction: typeof rawDelivery.direction === 'string' ? rawDelivery.direction : 'INSUFFICIENT',
+        series: Array.isArray(rawDelivery.series)
+          ? rawDelivery.series.filter((n): n is number => typeof n === 'number' && Number.isFinite(n))
+          : [],
+      }
+    : null
+  return {
+    goal_id: typeof p.goal_id === 'string' ? p.goal_id : null,
+    sessions: typeof p.sessions === 'number' && Number.isFinite(p.sessions) ? p.sessions : 0,
+    dimensions,
+    delivery,
+    note: typeof p.note === 'string' ? p.note : '',
+  }
+}
+
 export const productApi = {
   home: () => request<unknown>(`${B}/home`).then(withHomeDefaults),
 
@@ -588,7 +623,7 @@ export const productApi = {
     request<unknown>(`${B}/history${q(params)}`).then((b) => itemsList<HistoryItem>(b)),
   linkHistoryGoal: (reviewSessionId: number, goalId: string, kind = 'REAL') =>
     request(`${B}/history/${reviewSessionId}/goal`, json('POST', { goal_id: goalId, kind })),
-  trends: (goalId = '') => request<Trends>(`${B}/trends${q({ goal_id: goalId })}`),
+  trends: (goalId = '') => request<unknown>(`${B}/trends${q({ goal_id: goalId })}`).then(withTrendsDefaults),
 
   materials: (kind = '') => request<unknown>(`${B}/materials${q({ kind })}`).then((b) => itemsList<Material>(b)),
   createMaterial: (fields: { title: string; kind: string; usage: string; text?: string; file?: File | null }) => {

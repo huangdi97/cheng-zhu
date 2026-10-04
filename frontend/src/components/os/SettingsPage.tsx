@@ -147,6 +147,89 @@ function DataGroup() {
   )
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function metric(value: unknown, empty = '—'): string {
+  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100)
+  if (typeof value === 'string' && value) return value
+  return empty
+}
+
+function rate(value: unknown): string {
+  return typeof value === 'number' ? `${Math.round(value * 100)}%` : '—'
+}
+
+function ValidationSummary({ data }: { data: Record<string, unknown> }) {
+  const goal = asRecord(data.A_goal_reuse)
+  const reflection = asRecord(data.B_reflection_to_prepare)
+  const cue = asRecord(data.C_fast_cue_usefulness)
+  const usefulness = asRecord(cue.usefulness)
+  const transfer = asRecord(data.D_practice_transfer)
+  const inbox = asRecord(data.E_fact_inbox_burden)
+  const value = asRecord(data.F_quick_notes_and_pins)
+  const notes = asRecord(value.quick_notes)
+  const pins = asRecord(value.pins)
+  const evidence = String(data.evidence_level || 'NO_DATA')
+  const real = String(data.real_user_validation || 'REAL_USER_VALIDATION_PENDING')
+  const evidenceTone = evidence === 'LOCAL_DEVICE_USAGE' ? 'info' : evidence === 'SYNTHETIC_DOGFOOD' ? 'warn' : 'muted'
+
+  const cards = [
+    {
+      key: 'A', title: 'Goal 是否持续复用', value: rate(goal.goal_reopen_rate),
+      detail: `${metric(goal.goals, '0')} 个 Goal · 平均 ${metric(goal.sessions_per_goal, '0')} 场/Goal`,
+    },
+    {
+      key: 'B', title: 'Reflection 是否改变下一步', value: rate(reflection.follow_through_rate),
+      detail: `${metric(reflection.next_focus_from_reflection, '0')} 个 Next Focus 来自复盘`,
+    },
+    {
+      key: 'C', title: 'Fast Cue 是否有帮助', value: metric(cue.rendered, '0'),
+      detail: `已显示 Cue · 说话跟随率 ${rate(usefulness.speech_after_cue_rate)}`,
+    },
+    {
+      key: 'D', title: 'Practice 是否迁移', value: metric(transfer.measured, '0'),
+      detail: `${metric(transfer.improved, '0')} 个可测链路改善；Mock 不能冒充真实面试`,
+    },
+    {
+      key: 'E', title: 'Fact Inbox 是否成负担', value: metric(inbox.backlog_size, '0'),
+      detail: `当前 backlog · 解决率 ${rate(inbox.resolution_rate)}`,
+    },
+    {
+      key: 'F', title: 'Quick Notes / Pin 是否有价值', value: metric(notes.selected_into_pack, '0'),
+      detail: `速记进 Pack · Pin→Next Focus ${metric(pins.next_focus_from_pin, '0')}`,
+    },
+  ]
+
+  return (
+    <div className="mt-2 space-y-3" data-testid="validation-summary">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge tone={evidenceTone}>证据：{evidence}</StatusBadge>
+        <StatusBadge tone={real === 'REAL_USER_VALIDATION_PENDING' ? 'warn' : 'ok'}>{real}</StatusBadge>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {cards.map((card) => (
+          <article key={card.key} className="rounded-xl border border-bg-hover/60 p-3">
+            <div className="flex items-start gap-2">
+              <span className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-bg-tertiary text-[10px] font-bold text-text-secondary">{card.key}</span>
+              <div className="min-w-0">
+                <h4 className="text-xs font-semibold text-text-primary">{card.title}</h4>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-text-primary">{card.value}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{card.detail}</p>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="text-[11px] leading-relaxed text-text-muted">
+        这里只显示这台电脑上的本地使用信号。Synthetic / automated evidence 只能证明工程闭环；
+        没有真实用户证据时，成竹不会把它写成 PMF 或“面试成功率”。
+      </p>
+    </div>
+  )
+}
+
 function DiagnosticsGroup() {
   const config = useInterviewStore((s) => s.config)
   const kb = useKbStore((s) => s.status)
@@ -165,11 +248,23 @@ function DiagnosticsGroup() {
         <summary className="cursor-pointer text-text-secondary">运行诊断（v1.2 Core）</summary>
         <pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-bg-tertiary/50 p-2 text-[11px]">{JSON.stringify(diag.data, null, 2)}</pre>
       </details>
-      <details className="text-xs">
-        <summary className="cursor-pointer text-text-secondary">产品循环验证（v1.4，本地数据）</summary>
-        <p className="mt-1 text-[11px] text-text-muted">只基于这台电脑上的使用记录。真实用户验证仍在进行中（REAL_USER_VALIDATION_PENDING）。</p>
-        <pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-bg-tertiary/50 p-2 text-[11px]">{JSON.stringify(validation.data, null, 2)}</pre>
-      </details>
+      <section aria-label="产品循环验证（v1.4）" className="rounded-2xl border border-bg-hover/60 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">产品循环验证（v1.4）</h3>
+            <p className="text-[11px] text-text-muted">Goal → Practice → Live → Reflection → Next Focus 的本地证据。</p>
+          </div>
+          {validation.loading ? <StatusBadge tone="busy">整理中</StatusBadge> : null}
+        </div>
+        {validation.error ? <div className="mt-2"><ErrorState message={validation.error} onRetry={validation.reload} /></div> : null}
+        {validation.data ? <ValidationSummary data={validation.data} /> : null}
+        {validation.data ? (
+          <details className="mt-3 text-xs">
+            <summary className="cursor-pointer text-text-secondary">查看原始本地指标</summary>
+            <pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-bg-tertiary/50 p-2 text-[11px]">{JSON.stringify(validation.data, null, 2)}</pre>
+          </details>
+        ) : null}
+      </section>
     </div>
   )
 }

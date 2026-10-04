@@ -6,9 +6,6 @@ name: update-visual-snapshots
 # visual-regression check on a feature PR.
 
 on:
-  push:
-    branches:
-      - feat/chengzhu-v1.3-goal-centered-experience
   workflow_dispatch:
     inputs:
       base_branch:
@@ -22,7 +19,7 @@ on:
 
 jobs:
   update:
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner_os || 'ubuntu-latest' }}
+    runs-on: ${{ github.event.inputs.runner_os || 'ubuntu-latest' }}
     permissions:
       contents: write
       pull-requests: write
@@ -31,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.base_branch || github.ref_name }}
+          ref: ${{ github.event.inputs.base_branch }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -53,7 +50,7 @@ jobs:
       - name: Install Playwright browsers
         working-directory: frontend
         run: |
-          if [[ "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner_os || 'ubuntu-latest' }}" == ubuntu-* ]]; then
+          if [[ "${{ github.event.inputs.runner_os || 'ubuntu-latest' }}" == ubuntu-* ]]; then
             npx playwright install --with-deps chromium
           else
             npx playwright install chromium
@@ -73,7 +70,7 @@ jobs:
       - name: Upload generated snapshots
         uses: actions/upload-artifact@v4
         with:
-          name: visual-snapshots-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner_os || 'ubuntu-latest' }}-${{ github.run_number }}
+          name: visual-snapshots-${{ github.event.inputs.runner_os || 'ubuntu-latest' }}-${{ github.run_number }}
           path: frontend/e2e/__screenshots__/**
           if-no-files-found: error
           retention-days: 14

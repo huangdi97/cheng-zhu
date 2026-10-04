@@ -134,13 +134,48 @@ try {
   const realUserData = await app.evaluate(({ app: a }) => a.getPath('userData'))
   manifest.push({ name: '_runtime', note: `origin=${base} userData=${realUserData} exe=${EXE}` })
 
-  // Fresh-install evidence.
-  await page.getByTestId('onboarding').waitFor({ timeout: 20000 })
+  // Fresh-install evidence: run the canonical 11-step onboarding instead
+  // of taking one screenshot and bypassing the product loop.
+  const wizard = page.getByTestId('onboarding')
+  await wizard.waitFor({ timeout: 20000 })
   await shot(page, '01-onboarding', 'fresh install: first-run onboarding')
-  await page.getByRole('button', { name: '跳过引导' }).click()
-  await page.waitForTimeout(500)
+  for (let i = 0; i < 8; i++) {
+    await wizard.getByRole('button', { name: '下一步' }).click()
+    await page.waitForTimeout(120)
+  }
+  await wizard.getByLabel('目标公司').fill('Onboarding Demo')
+  await wizard.getByLabel('目标岗位').fill('AI Agent Engineer')
+  await wizard.getByLabel('岗位 JD').fill('负责 Agent、RAG、评估与系统设计。')
+  await shot(page, '01b-first-goal', 'onboarding creates a real v1.3 Goal, not a legacy PrepSpace')
+  await wizard.getByRole('button', { name: '下一步' }).click()
 
-  // Seed Person + Goal + material roles using public APIs only.
+  await wizard.getByRole('button', { name: '开始第一次演练' }).click()
+  await wizard.getByTestId('guided-question').waitFor({ timeout: 20000 })
+  await shot(page, '01c-guided-practice-question', 'Guided First Practice uses the real Practice 3.0 session')
+
+  await wizard.getByRole('button', { name: '生成 Fast Cue' }).click()
+  try {
+    await wizard.getByTestId('guided-fast-cue').waitFor({ timeout: 30000 })
+  } catch {
+    // A packaged environment may deliberately run without a provider. The
+    // fallback remains valid onboarding UX but is labelled as non-runtime
+    // evidence; this branch should not be hit with the fake provider above.
+    const fallback = wizard.getByRole('button', { name: '使用标记明确的示例 Cue 继续' })
+    await fallback.waitFor({ timeout: 5000 })
+    await fallback.click()
+    await wizard.getByTestId('guided-fast-cue-fallback').waitFor()
+  }
+  await shot(page, '01d-guided-fast-cue', 'Guided First Practice: Fast Cue or explicitly-labelled fallback')
+
+  await wizard.getByLabel('第一次演练回答').fill('先给结论：知识会频繁更新而且需要来源追溯，所以这个场景优先用 RAG。')
+  await wizard.getByRole('button', { name: '提交演练' }).click()
+  await wizard.getByTestId('guided-practice-complete').waitFor({ timeout: 20000 })
+  await shot(page, '01e-guided-practice-complete', 'Guided First Practice reaches Content + Delivery feedback before onboarding completes')
+  await wizard.getByRole('button', { name: '下一步' }).click()
+  await wizard.getByRole('button', { name: '进入成竹' }).click()
+  await page.waitForTimeout(700)
+
+  // Seed Person + the richer evidence Goal + material roles using public APIs only.
   const resume = 'WenNian：我负责 RAG 检索链路，用 Redis 管理 session state。\nPLI：负责 Agent 产品设计与多端体验。'
   await api(base, 'POST', '/api/intelligence/candidate/rebuild', { resume_text: resume, interview_notes: '' })
   await api(base, 'POST', '/api/config', { resume_text: resume })

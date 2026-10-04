@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, CircleAlert, Play, Sparkles } from 'lucide-react'
+import { CheckCircle2, CircleAlert, MonitorUp, NotebookPen, Play, Sparkles } from 'lucide-react'
 import { api, getErrorMessage } from '@/lib/api'
 import { buildFastCueViewModel, CUE_SOURCE_LABELS } from '@/lib/guidanceViewModel'
-import { productApi, type PracticeFeedback } from '@/lib/productApi'
+import { productApi, type PracticeFeedback, type PracticeReport } from '@/lib/productApi'
 import { useInterviewStore } from '@/stores/configStore'
 
 interface Props {
@@ -23,6 +23,11 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [feedback, setFeedback] = useState<PracticeFeedback | null>(null)
+  const [report, setReport] = useState<PracticeReport | null>(null)
+  const [quickNote, setQuickNote] = useState('')
+  const [quickNoteSaved, setQuickNoteSaved] = useState(false)
+  const [overlayState, setOverlayState] = useState<'IDLE' | 'OPENED' | 'UNAVAILABLE' | 'ERROR'>('IDLE')
+  const [screenshotState, setScreenshotState] = useState<'IDLE' | 'TRIED' | 'UNAVAILABLE'>('IDLE')
   const [busy, setBusy] = useState(false)
   const [cueBusy, setCueBusy] = useState(false)
   const [cueError, setCueError] = useState('')
@@ -109,11 +114,71 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
     try {
       const res = await productApi.answerPractice(practiceId, { answer: answer.trim() })
       setFeedback(res.feedback)
-      if (!res.done) await productApi.finishPractice(practiceId)
+      if (res.report) setReport(res.report)
+      else setReport(await productApi.finishPractice(practiceId))
     } catch (e) {
       setError(getErrorMessage(e, '提交演练失败'))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const tryOverlay = async () => {
+    const electron = window.electronAPI
+    if (!electron?.syncOverlayWindow) {
+      setOverlayState('UNAVAILABLE')
+      return
+    }
+    try {
+      await electron.setOverlayLayout?.({ dock: 'TOP', interaction: 'INTERACTIVE', size: 'COMPACT' })
+      await electron.syncOverlayWindow({
+        enabled: true,
+        visible: true,
+        mode: 'prompt',
+        opacity: 0.92,
+        fontSize: 16,
+        fontColor: '#ffffff',
+        showBg: false,
+        maxLines: 4,
+      })
+      setOverlayState('OPENED')
+    } catch {
+      setOverlayState('ERROR')
+    }
+  }
+
+  const saveQuickNote = async () => {
+    if (!quickNote.trim() || quickNoteSaved) return
+    setBusy(true)
+    setError('')
+    try {
+      await productApi.createQuickNote({
+        title: '第一次演练速记',
+        content: quickNote.trim(),
+        scope: goalId ? 'GOAL' : 'GLOBAL',
+        goal_id: goalId,
+        pinned: true,
+        tags: ['ONBOARDING'],
+      })
+      setQuickNoteSaved(true)
+    } catch (e) {
+      setError(getErrorMessage(e, '速记保存失败'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const tryScreenshot = async () => {
+    const capture = window.electronAPI?.captureRegion
+    if (!capture) {
+      setScreenshotState('UNAVAILABLE')
+      return
+    }
+    try {
+      await capture()
+      setScreenshotState('TRIED')
+    } catch {
+      setScreenshotState('UNAVAILABLE')
     }
   }
 
@@ -206,6 +271,54 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
               : <p className="mt-1 text-[11px] text-text-secondary">本次没有明显表达问题。</p>}
           </section>
         </div>
+      ) : null}
+
+      {cueReady ? (
+        <section className="rounded-xl border border-bg-hover/60 bg-bg-tertiary/15 p-3" aria-label="第一次演练辅助工具">
+          <h3 className="text-xs font-semibold text-text-primary">顺手试一下上场工具</h3>
+          <p className="mt-0.5 text-[11px] text-text-muted">Overlay、速记和截图不是完成演练的硬门槛；不可用时会明确标记，不会伪装成功。</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-bg-hover/50 p-2">
+              <button type="button" onClick={() => void tryOverlay()} className="inline-flex items-center gap-1 text-xs font-medium text-accent-blue">
+                <MonitorUp className="h-3.5 w-3.5" aria-hidden /> 打开 Compact Overlay
+              </button>
+              <p className="mt-1 text-[10px] text-text-muted" data-testid="guided-overlay-state">
+                {overlayState === 'OPENED' ? 'Overlay 已打开；上场时 Cue 会出现在这里。'
+                  : overlayState === 'UNAVAILABLE' ? '当前浏览器环境没有 Electron Overlay；安装版中可用。'
+                    : overlayState === 'ERROR' ? 'Overlay 打开失败；进入设置 → Live & Overlay 可重试。'
+                      : '可选：先看一下上场时的 Compact Overlay。'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-bg-hover/50 p-2">
+              <label className="text-[11px] font-medium text-text-secondary" htmlFor="guided-note">速记一条容易忘的点</label>
+              <div className="mt-1 flex gap-1.5">
+                <input id="guided-note" aria-label="第一次演练速记" value={quickNote} disabled={quickNoteSaved}
+                  onChange={(e) => setQuickNote(e.target.value)} placeholder="例如：Redis 没做过 Cluster"
+                  className="min-w-0 flex-1 rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-xs text-text-primary" />
+                <button type="button" disabled={!quickNote.trim() || quickNoteSaved || busy} onClick={() => void saveQuickNote()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-bg-hover px-2 py-1 text-[11px] text-text-secondary disabled:opacity-40">
+                  <NotebookPen className="h-3 w-3" aria-hidden /> {quickNoteSaved ? '已保存' : '存入速记'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <button type="button" onClick={() => void tryScreenshot()} className="mt-2 text-[11px] text-text-muted underline decoration-dotted">
+            测试截图区域（可选，会让你选择一个区域）
+          </button>
+          {screenshotState !== 'IDLE' ? <span className="ml-2 text-[10px] text-text-muted">
+            {screenshotState === 'TRIED' ? '已完成一次区域选择。' : '当前环境不支持区域截图；不影响完成。'}
+          </span> : null}
+        </section>
+      ) : null}
+
+      {report ? (
+        <section className="rounded-xl border border-accent-blue/25 bg-accent-blue/5 p-3" data-testid="guided-reflection">
+          <p className="text-xs font-semibold text-text-primary">第一次演练复盘</p>
+          <p className="mt-1 text-[11px] text-text-muted">这不是综合分；只告诉你下一轮具体该保留和改什么。</p>
+          {report.went_well?.slice(0, 2).map((x) => <p key={x} className="mt-1 text-[11px] text-status-direct">✓ {x}</p>)}
+          {report.to_improve?.slice(0, 2).map((x) => <p key={x} className="mt-1 text-[11px] text-status-inferred">→ {x}</p>)}
+          {!report.went_well?.length && !report.to_improve?.length ? <p className="mt-1 text-[11px] text-text-secondary">本场已保存；以后每场都会进入 Reflection，再回写到 Goal 的 Next Focus。</p> : null}
+        </section>
       ) : null}
 
       {complete ? (

@@ -169,6 +169,65 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await expect(page.getByLabel('面试官')).toContainText('Hiring Manager · 正在提问')
   })
 
+  test('Goal trends stay explainable and never turn into an offer-probability score', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: {
+        'GET /api/product/goals/goal-v13': GOAL_DETAIL,
+        'GET /api/product/trends?goal_id=goal-v13': {
+          goal_id: GOAL.id,
+          sessions: 4,
+          dimensions: [
+            { dimension: 'technical_depth', label: '技术深度', series: [1, 2, 2, 3], direction: 'IMPROVING', text: '最近几次回答的技术深度在改善。' },
+            { dimension: 'ownership', label: 'Ownership', series: [2, 2, 1, 1], direction: 'REPEATING', text: '个人职责仍然反复不够清楚。' },
+          ],
+          delivery: { text: '结论出现得更早。', direction: 'IMPROVING', series: [18, 13, 9] },
+          note: '同一 Goal 内的本地趋势，不是候选人排名。',
+        },
+      },
+    })
+    await page.goto('/#/goals/goal-v13')
+    const trends = page.getByTestId('goal-progress-trends')
+    await expect(trends).toBeVisible()
+    await expect(trends).toContainText('技术深度')
+    await expect(trends).toContainText('在改善')
+    await expect(trends).toContainText('Ownership')
+    await expect(page.getByText('这些是同一 Goal 内的练习/复盘观察')).toBeVisible()
+    await expect(page.getByText(/录用概率/)).toHaveCount(0)
+  })
+
+  test('v1.4 diagnostics renders six product-loop questions without claiming PMF', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: {
+        'GET /api/product/goals': { items: [GOAL] },
+        'GET /api/product/validation': {
+          evidence_level: 'LOCAL_DEVICE_USAGE',
+          real_user_validation: 'REAL_USER_VALIDATION_PENDING',
+          A_goal_reuse: { goals: 2, goal_reopen_rate: 0.5, sessions_per_goal: 3.5 },
+          B_reflection_to_prepare: { next_focus_from_reflection: 3, follow_through_rate: 0.667 },
+          C_fast_cue_usefulness: { rendered: 8, usefulness: { speech_after_cue_rate: 0.75 } },
+          D_practice_transfer: { measured: 2, improved: 1 },
+          E_fact_inbox_burden: { backlog_size: 3, resolution_rate: 0.8 },
+          F_quick_notes_and_pins: { quick_notes: { selected_into_pack: 4 }, pins: { next_focus_from_pin: 2 } },
+          nudges: { shown: 2, dismissed: 1, actioned: 1, disabled: 0 },
+          note: '本地产品分析。',
+        },
+      },
+    })
+    await page.goto('/#/settings/diagnostics')
+    const summary = page.getByTestId('validation-summary')
+    await expect(summary).toBeVisible()
+    for (const title of ['Goal 是否持续复用', 'Reflection 是否改变下一步', 'Fast Cue 是否有帮助', 'Practice 是否迁移', 'Fact Inbox 是否成负担', 'Quick Notes / Pin 是否有价值']) {
+      await expect(summary.getByText(title)).toBeVisible()
+    }
+    await expect(summary).toContainText('REAL_USER_VALIDATION_PENDING')
+    await expect(summary).toContainText('不能')
+    await expect(summary).toContainText('PMF')
+  })
+
   test('Overlay 3.0 persists Dock × Interaction × Size and stays usable at 390px', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,

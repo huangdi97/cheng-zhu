@@ -58,7 +58,7 @@ function useResumeMountState() {
     try {
       await api.deleteResume()
       await refreshConfig()
-      setToastMessage('已移除当前挂载简历')
+      setToastMessage('已移除当前简历')
     } catch (err) {
       const message = err instanceof Error ? err.message : '移除失败'
       setUploadError(message)
@@ -134,7 +134,7 @@ export function ResumeMountInline({
             onClick={handleRemove}
             className="inline-flex items-center justify-center h-5 w-5 rounded text-text-muted hover:text-accent-red hover:bg-bg-hover/60 transition-colors flex-shrink-0"
             aria-label="移除已上传的简历"
-            title="移除简历 (仅取消挂载,不会删除历史文件)"
+            title="移除简历 (仅取消选用,不会删除历史文件)"
           >
             <X className="w-2.5 h-2.5" />
           </button>
@@ -240,7 +240,7 @@ export function ResumeMountPanel({
           {sharedNote && <p className={noteClass}>{sharedNote}</p>}
         </div>
         <span className={`rounded-full px-3 py-1 text-[11px] ${statusClass}`}>
-          {statusLabel || (hasResume ? '已挂载' : '待挂载')}
+          {statusLabel || (hasResume ? '已选用' : '待选用')}
         </span>
       </div>
 
@@ -249,11 +249,11 @@ export function ResumeMountPanel({
           <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${hasResume ? 'text-accent-green' : 'text-text-muted'}`} />
           <div className="min-w-0 flex-1">
             <p className="font-medium truncate" data-testid="resume-mount-filename">
-              {activeFilename || emptyHint || '当前没有挂载简历'}
+              {activeFilename || emptyHint || '当前没有选用简历'}
             </p>
             <p className={secondaryTextClass}>
               {hasResume
-                ? `当前挂载记录 ID：${activeHistoryId ?? '—'}`
+                ? `当前选用记录 ID：${activeHistoryId ?? '—'}`
                 : '上传或从历史中选用一份简历后，主流程、面试复盘和简历优化都会一起切换。'}
             </p>
           </div>
@@ -277,7 +277,7 @@ export function ResumeMountPanel({
             className={secondaryButtonClass}
           >
             <X className="w-3.5 h-3.5" />
-            取消挂载
+            取消选用
           </button>
         )}
         {historyMode === 'popover' && <ResumeHistoryPopover />}

@@ -99,7 +99,7 @@ test.describe('v1.3 Goal-centered product loop', () => {
 
     await page.goto('/#/reflection/review/902')
     await expect(page.getByTestId('reflection-page')).toBeVisible()
-    await expect(page.getByText(PIN.note)).toBeVisible()
+    await expect(page.getByText(`备注：${PIN.note}`, { exact: true })).toBeVisible()
     await expect(page.getByText('Agent eval').first()).toBeVisible()
   })
 

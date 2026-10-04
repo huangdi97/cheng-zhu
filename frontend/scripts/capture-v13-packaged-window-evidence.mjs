@@ -215,7 +215,10 @@ try {
   })
   await waitForBackend(backendBase, sidecar, nonce)
 
-  // Launch 1: prove a fresh packaged install renders the real onboarding.
+  // Launch 1: prove the *actual* first-use loop in the packaged app. Do not
+  // flip onboarding_completed through the backend: the renderer must create a
+  // Goal, run a Guided First Practice, receive a Fast Cue, show Reflection,
+  // exercise Overlay + Quick Notes, and finish onboarding itself.
   const first = await runPlan({
     name: 'fresh-install',
     userData,
@@ -225,11 +228,57 @@ try {
     steps: [
       { kind: 'wait', selector: '[data-testid="onboarding"]', timeout_ms: 30000 },
       { kind: 'capture', name: '01-onboarding', note: 'real packaged fresh-install onboarding' },
+
+      // Welcome → local data → model → STT → mic → system audio → privacy → resume → first Goal.
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'wait', selector: '[data-testid="onboarding-goal-role"]', timeout_ms: 10000 },
+      { kind: 'fill', selector: '[data-testid="onboarding-goal-company"]', value: 'Onboarding Demo' },
+      { kind: 'fill', selector: '[data-testid="onboarding-goal-role"]', value: 'AI Agent Engineer' },
+      { kind: 'fill', selector: '[data-testid="onboarding-goal-jd"]', value: '负责 Agent、RAG、评估与系统设计。' },
+      { kind: 'capture', name: '01b-first-goal', note: 'first packaged Goal during onboarding' },
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+
+      { kind: 'wait', selector: '[data-testid="guided-first-practice"]', timeout_ms: 10000 },
+      { kind: 'click', selector: '[data-testid="guided-start"]' },
+      { kind: 'wait', selector: '[data-testid="guided-question"]', timeout_ms: 20000 },
+      { kind: 'capture', name: '01c-guided-question', note: 'real Practice 3.0 question in onboarding' },
+
+      { kind: 'click', selector: '[data-testid="guided-cue"]' },
+      { kind: 'wait', selector: '[data-testid="guided-fast-cue"]', timeout_ms: 30000 },
+      { kind: 'capture', name: '01d-guided-fast-cue', note: 'real Fast Cue in packaged Guided First Practice' },
+
+      { kind: 'click', selector: '[data-testid="guided-overlay-open"]' },
+      { kind: 'sleep', ms: 800 },
+      { kind: 'capture', target: 'overlay', name: '01e-guided-overlay', note: 'Compact Overlay opened from onboarding' },
+
+      { kind: 'fill', selector: '[data-testid="guided-note"]', value: 'Redis 没做过 Cluster；只讲 session state。' },
+      { kind: 'click', selector: '[data-testid="guided-note-save"]' },
+      { kind: 'sleep', ms: 500 },
+      { kind: 'capture', name: '01f-guided-quick-note', note: 'Quick Note created inside first practice' },
+
+      { kind: 'fill', selector: '[data-testid="guided-answer"]', value: '先给结论：知识更新频繁且需要来源追溯，所以这个场景优先用 RAG。' },
+      { kind: 'click', selector: '[data-testid="guided-submit"]' },
+      { kind: 'wait', selector: '[data-testid="guided-reflection"]', timeout_ms: 20000 },
+      { kind: 'wait', selector: '[data-testid="guided-practice-complete"]', timeout_ms: 20000 },
+      { kind: 'capture', name: '01g-guided-reflection', note: 'Content/Delivery feedback plus Demo Reflection closes the first-use loop' },
+
+      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'wait', selector: '[data-testid="onboarding-complete-step"]', timeout_ms: 5000 },
+      { kind: 'capture', name: '01h-onboarding-complete', note: 'canonical Goal-centered completion message' },
+      { kind: 'click', selector: '[data-testid="onboarding-finish"]' },
+      { kind: 'wait', selector: '[data-testid="action-home"]', timeout_ms: 10000 },
     ],
   })
 
-  // Seed only through the real packaged sidecar HTTP API.
-  await request(backendBase, 'POST', '/api/config', { onboarding_completed: true })
+  // Seed the richer release-evidence scenario only after the packaged renderer
+  // has completed onboarding through the real UI.
   const resume = 'WenNian：我负责 RAG 检索链路，用 Redis 管理 session state。'
   await request(backendBase, 'POST', '/api/intelligence/candidate/rebuild', { resume_text: resume, interview_notes: '' })
   await request(backendBase, 'POST', '/api/config', { resume_text: resume })
@@ -397,7 +446,7 @@ try {
     entries: [...(first.entries || []), ...(second.entries || [])],
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (manifest.entries.length < 29) throw new Error('expected at least 29 packaged UI captures, got ' + manifest.entries.length)
+  if (manifest.entries.length < 36) throw new Error('expected at least 36 packaged UI captures, got ' + manifest.entries.length)
   console.log('done', OUT, 'captures=' + manifest.entries.length)
 } catch (error) {
   console.error(error)

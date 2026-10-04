@@ -27,6 +27,13 @@ on:
 permissions:
   contents: write
 
+# A PR that changes release engineering is rebuilt on every new commit.
+# Cancel superseded PR builds so the Windows runner validates only the newest
+# v1.3 head instead of burning time on obsolete packaged-app evidence.
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   windows:
     runs-on: windows-latest

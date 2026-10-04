@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from services.product import (fact_inbox, goals, live, materials, next_focus, pins, practice, quick_notes,
+from services.product import (events, fact_inbox, goals, live, materials, next_focus, pins, practice, quick_notes,
                               reflection, trends, validation)
 from services.storage import product as store
 
@@ -104,6 +104,16 @@ def run_week(set_clock: Callable[[Callable[[], float]], None]) -> dict[str, Any]
                   .load_frozen_pack(started["session_id"]).user_notes]
     checks["day4_pack_has_goal_note"] = note["id"] in pack_notes
     checks["day4_no_cross_goal_note"] = other_note["id"] not in pack_notes
+
+    # v1.4 question C/F: synthetic dogfood must exercise the *usage* signals,
+    # not merely prove those event names exist. These remain explicitly marked
+    # SYNTHETIC_DOGFOOD and can never be promoted to real-user evidence.
+    events.record("fast_cue_rendered", goal_id=goal["id"], session_id=started["session_id"])
+    events.record("fast_cue_expanded", goal_id=goal["id"], session_id=started["session_id"])
+    events.record("speech_after_cue", goal_id=goal["id"], session_id=started["session_id"])
+    events.record("deep_opened", goal_id=goal["id"], session_id=started["session_id"])
+    events.record("fast_cue_helpful", goal_id=goal["id"], session_id=started["session_id"])
+    events.record("quick_note_opened_in_live", goal_id=goal["id"], session_id=started["session_id"])
     from services.storage import review
 
     rid = review.create_session(started_at=clock.t, interviewer_enabled=True, candidate_enabled=True)

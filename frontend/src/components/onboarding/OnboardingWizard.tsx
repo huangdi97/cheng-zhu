@@ -4,7 +4,7 @@ import { api, getErrorMessage } from '@/lib/api'
 import { updateConfigAndRefresh } from '@/lib/configSync'
 import { useInterviewStore } from '@/stores/configStore'
 import { SHARE_PRIVACY_COPY } from '@/components/settings/PolicyPrivacySection'
-import { productApi } from '@/lib/productApi'
+import { productApi, track } from '@/lib/productApi'
 import GuidedFirstPractice from './GuidedFirstPractice'
 
 // v1.3 首次运行引导。前十步配置真实环境，第十一步只有在跑通一次
@@ -125,6 +125,7 @@ export default function OnboardingWizard() {
   const finish = async () => {
     try {
       await updateConfigAndRefresh({ onboarding_completed: true })
+      track('onboarding_completed', { guided: guidedComplete })
     } catch (error) {
       pushToast(getErrorMessage(error, '保存失败'), 'error')
     }

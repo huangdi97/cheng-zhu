@@ -161,16 +161,24 @@ class StoryRequest(BaseModel):
     result: str = Field(default="", max_length=4000)
     reflection: str = Field(default="", max_length=4000)
     tags: list[str] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    skill_ids: list[str] = Field(default_factory=list)
+    last_used_session: str = Field(default="", max_length=200)
 
 
 @router.get("/stories")
 def list_stories():
     rows = storage.list_all_stories()
     for row in rows:
-        try:
-            row["tags"] = json.loads(row.get("tags_json") or "[]")
-        except (TypeError, json.JSONDecodeError):
-            row["tags"] = []
+        for raw_key, public_key in (
+            ("tags_json", "tags"),
+            ("source_ids_json", "source_ids"),
+            ("skill_ids_json", "skill_ids"),
+        ):
+            try:
+                row[public_key] = json.loads(row.get(raw_key) or "[]")
+            except (TypeError, json.JSONDecodeError):
+                row[public_key] = []
     return rows
 
 

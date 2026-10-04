@@ -214,7 +214,7 @@ def main() -> int:
         checks["intelligence_schema_version"] = user_version
         migrations_source = (Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "intelligence_migrations.py").read_text(encoding="utf-8")
         import re
-        version_match = re.search(r"^LATEST_SCHEMA_VERSION\\s*=\\s*(\\d+)", migrations_source, re.MULTILINE)
+        version_match = re.search(r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)", migrations_source, re.MULTILINE)
         expected_schema = int(version_match.group(1)) if version_match else None
         checks["intelligence_schema_expected"] = expected_schema
         ok &= expected_schema is not None and user_version == expected_schema

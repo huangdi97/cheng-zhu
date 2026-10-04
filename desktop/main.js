@@ -1802,11 +1802,15 @@ app.whenReady().then(async () => {
 
   syncSharePrivacyFromConfig();
   createWindow();
-  startRuntimeEvidenceBridge();
   if (runtimeEvidencePlanPath()) {
+    // File-plan mode avoids a localhost listener entirely. This matters on
+    // hosted Windows runners where Defender can block a newly packaged GUI
+    // executable from opening a server socket even though capturePage works.
     void runRuntimeEvidencePlan().catch((error) => {
       console.error('Runtime evidence plan failed:', error?.message || error);
     });
+  } else {
+    startRuntimeEvidenceBridge();
   }
   createTray();
   registerShortcuts();

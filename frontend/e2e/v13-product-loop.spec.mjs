@@ -68,12 +68,12 @@ test.describe('v1.3 Goal-centered product loop', () => {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
       apiOverrides: (pathname, method) => {
-        if (pathname === '/api/v3/goals' && method === 'GET') return { items: [GOAL] }
-        if (pathname === '/api/v3/goals/goal-v13' && method === 'GET') return GOAL_DETAIL
-        if (pathname === '/api/v3/live/preflight' && method === 'POST') return PREFLIGHT
-        if (pathname === '/api/v3/live/start' && method === 'POST') return { session_id: 'live-1', goal_id: GOAL.id, pack: { id: 'pack-1' } }
-        if (pathname === '/api/v3/pins' && method === 'POST') return PIN
-        if (pathname === '/api/v3/reflection/review/902' && method === 'GET') return REFLECTION
+        if (pathname === '/api/product/goals' && method === 'GET') return { items: [GOAL] }
+        if (pathname === '/api/product/goals/goal-v13' && method === 'GET') return GOAL_DETAIL
+        if (pathname === '/api/product/live/preflight' && method === 'POST') return PREFLIGHT
+        if (pathname === '/api/product/live/start' && method === 'POST') return { session_id: 'live-1', goal_id: GOAL.id, pack: { id: 'pack-1' } }
+        if (pathname === '/api/product/pins' && method === 'POST') return PIN
+        if (pathname === '/api/product/reflection/review/902' && method === 'GET') return REFLECTION
         return undefined
       },
     })
@@ -109,9 +109,9 @@ test.describe('v1.3 Goal-centered product loop', () => {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
       apiOverrides: async (pathname, method, request) => {
-        if (pathname === '/api/v3/goals' && method === 'GET') return { items: [GOAL] }
-        if (pathname === '/api/v3/practice/options' && method === 'GET') return OPTIONS
-        if (pathname === '/api/v3/practice' && method === 'POST') {
+        if (pathname === '/api/product/goals' && method === 'GET') return { items: [GOAL] }
+        if (pathname === '/api/product/practice/options' && method === 'GET') return OPTIONS
+        if (pathname === '/api/product/practice' && method === 'POST') {
           startBody = request.postDataJSON()
           return {
             practice_id: 'practice-1', config: startBody,
@@ -121,7 +121,7 @@ test.describe('v1.3 Goal-centered product loop', () => {
             pool_size: 6, total: 2,
           }
         }
-        if (pathname === '/api/v3/practice/practice-1' && method === 'GET') {
+        if (pathname === '/api/product/practice/practice-1' && method === 'GET') {
           return {
             status: 'ACTIVE', goal_id: GOAL.id, review_session_id: null,
             panel: { personas: OPTIONS.personas.slice(0, 2).map((p) => ({ id: p.key, label: p.label, concern: p.concern, followup_style: p.followup_style, demeanor: p.demeanor })),
@@ -129,7 +129,7 @@ test.describe('v1.3 Goal-centered product loop', () => {
             turns: [{ id: 'q1', seq: 1, question: '你会怎么设计 Agent eval？', move: 'OPEN', source: 'GOAL_GRAPH', persona_id: 'TECH_LEAD', persona_label: 'Tech Lead', answer: '', content: {}, delivery: {} }],
           }
         }
-        if (pathname === '/api/v3/practice/practice-1/answer' && method === 'POST') {
+        if (pathname === '/api/product/practice/practice-1/answer' && method === 'POST') {
           return {
             done: false, answered: 1,
             feedback: {
@@ -174,8 +174,8 @@ test.describe('v1.3 Goal-centered product loop', () => {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-dark-plus' },
       apiOverrides: {
-        'GET /api/v3/goals': { items: [GOAL] },
-        'GET /api/v3/settings/layers': { items: {}, origin_labels: {} },
+        'GET /api/product/goals': { items: [GOAL] },
+        'GET /api/product/settings/layers': { items: {}, origin_labels: {} },
       },
     })
     await page.setViewportSize({ width: 390, height: 844 })

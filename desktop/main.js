@@ -297,15 +297,21 @@ function startRuntimeEvidenceBridge() {
       }
       if (req.method === 'POST' && url.pathname === '/capture') {
         const name = evidenceSafeName(body.name);
-        const image = await mainWindow.capturePage();
+        const target = body.target === 'overlay' ? overlayWindow : mainWindow;
+        if (!target || target.isDestroyed()) {
+          evidenceJson(res, 409, { ok: false, error: `${body.target || 'main'} window unavailable` });
+          return;
+        }
+        const image = await target.capturePage();
         const file = path.join(outputDir, name.endsWith('.png') ? name : `${name}.png`);
         fs.writeFileSync(file, image.toPNG());
         evidenceJson(res, 200, {
           ok: true,
           file,
+          target: body.target === 'overlay' ? 'overlay' : 'main',
           width: image.getSize().width,
           height: image.getSize().height,
-          url: mainWindow.webContents.getURL(),
+          url: target.webContents.getURL(),
         });
         return;
       }

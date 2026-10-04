@@ -199,6 +199,12 @@ export interface StoryItem {
   reflection: string
   /** v1.3 Stories 3.0: capability category travels as a tag. */
   tags?: string[]
+  /** Stable ids of evidence/material records linked by the user or Reflection. */
+  source_ids?: string[]
+  /** Stable ids of confirmed skill cards linked to this Story. */
+  skill_ids?: string[]
+  /** Most recent session whose frozen InterviewPack included this Story. */
+  last_used_session?: string
   updated_at?: number
 }
 

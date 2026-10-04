@@ -287,12 +287,12 @@ export default function OnboardingWizard() {
             <>
               <p>建第一个求职目标。之后的准备、练习、上场和复盘都会围绕这个 Goal 连起来。</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                <input aria-label="目标公司" value={goalCompany} onChange={(e) => setGoalCompany(e.target.value)} placeholder="例如：MindRank"
+                <input data-testid="onboarding-goal-company" aria-label="目标公司" value={goalCompany} onChange={(e) => setGoalCompany(e.target.value)} placeholder="例如：MindRank"
                   className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
-                <input aria-label="目标岗位" value={goalRole} onChange={(e) => setGoalRole(e.target.value)} placeholder="例如：AIDD Agent Engineer"
+                <input data-testid="onboarding-goal-role" aria-label="目标岗位" value={goalRole} onChange={(e) => setGoalRole(e.target.value)} placeholder="例如：AIDD Agent Engineer"
                   className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
               </div>
-              <textarea aria-label="岗位 JD" rows={4} value={jd} onChange={(e) => setJd(e.target.value)} placeholder="粘贴 JD（可选）"
+              <textarea data-testid="onboarding-goal-jd" aria-label="岗位 JD" rows={4} value={jd} onChange={(e) => setJd(e.target.value)} placeholder="粘贴 JD（可选）"
                 className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
               {createdGoalId ? <Status ok label="第一个求职目标已创建" /> : null}
             </>
@@ -301,25 +301,25 @@ export default function OnboardingWizard() {
             <GuidedFirstPractice goalId={createdGoalId} onCompleted={markGuidedComplete} />
           )}
           {step === 10 && (
-            <>
+            <div data-testid="onboarding-complete-step">
               <p>准备好了。之后只记住一条路径：打开 Goal → 看 Next Focus → 准备或练习 → 上场 → Reflection → 下一步。</p>
               <p className="text-xs text-text-muted">系统的复杂度留在后台；你下一步该做什么应该始终很清楚。所有默认值都可以在「设置」里调整。</p>
-            </>
+            </div>
           )}
         </div>
         <div className="flex items-center justify-between border-t border-bg-hover/60 px-5 py-3">
-          <button type="button" onClick={() => void finish()} className="text-xs text-text-muted hover:text-text-primary">跳过引导</button>
+          <button type="button" data-testid="onboarding-skip" onClick={() => void finish()} className="text-xs text-text-muted hover:text-text-primary">跳过引导</button>
           <div className="flex gap-2">
             {step > 0 && (
               <button type="button" onClick={() => setStep((s) => s - 1)} className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary">上一步</button>
             )}
             {step < STEPS.length - 1 ? (
-              <button type="button" onClick={() => void next()} disabled={STEPS[step] === '第一次演练' && !guidedComplete}
+              <button type="button" data-testid="onboarding-next" onClick={() => void next()} disabled={STEPS[step] === '第一次演练' && !guidedComplete}
                 className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">
                 {STEPS[step] === '第一次演练' && !guidedComplete ? '先完成这次演练' : '下一步'}
               </button>
             ) : (
-              <button type="button" onClick={() => void finish()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">进入成竹</button>
+              <button type="button" data-testid="onboarding-finish" onClick={() => void finish()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">进入成竹</button>
             )}
           </div>
         </div>

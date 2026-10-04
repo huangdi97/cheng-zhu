@@ -17,9 +17,13 @@ if (process.env.CHENGZHU_USER_DATA_DIR) {
 // 保留硬件加速可以让成竹的窗口隐私保护标记按系统能力工作；
 // 这只是尽量减少本机录屏/截图的意外捕获，不承诺对第三方会议软件或系统策略隐身。
 // 如个别旧设备透明窗口出现渲染异常，可设环境变量 ELECTRON_DISABLE_HW_ACCEL=1 回退。
+const RUNTIME_EVIDENCE_MODE = process.env.CHENGZHU_RUNTIME_EVIDENCE === '1';
+
 if (process.platform === 'win32') {
-  app.commandLine.appendSwitch('enable-transparent-visuals');
-  if (process.env.ELECTRON_DISABLE_HW_ACCEL === '1') {
+  if (!RUNTIME_EVIDENCE_MODE) {
+    app.commandLine.appendSwitch('enable-transparent-visuals');
+  }
+  if (process.env.ELECTRON_DISABLE_HW_ACCEL === '1' || RUNTIME_EVIDENCE_MODE) {
     app.disableHardwareAcceleration();
   }
 }
@@ -679,12 +683,17 @@ function createWindow() {
     title: APP_DISPLAY_NAME,
     frame: false,
     show: false,
+    // Hosted Windows CI has no reliable interactive DWM desktop. Runtime
+    // evidence therefore renders the *real packaged BrowserWindow* offscreen;
+    // production remains the normal visible window path.
+    offscreen: RUNTIME_EVIDENCE_MODE,
     // R2: a normal installed app shows in the taskbar (no stealth default).
     skipTaskbar: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      offscreen: RUNTIME_EVIDENCE_MODE,
     },
   });
 
@@ -702,7 +711,7 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    if (!RUNTIME_EVIDENCE_MODE) mainWindow.show();
   });
 
   // Windows 下最小化 = 隐藏到托盘
@@ -754,6 +763,7 @@ function createOverlayWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      offscreen: RUNTIME_EVIDENCE_MODE,
     },
   });
 

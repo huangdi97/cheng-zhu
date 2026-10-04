@@ -4,9 +4,13 @@ import { api, getErrorMessage } from '@/lib/api'
 import { updateConfigAndRefresh } from '@/lib/configSync'
 import { useInterviewStore } from '@/stores/configStore'
 import { SHARE_PRIVACY_COPY } from '@/components/settings/PolicyPrivacySection'
+import { productApi } from '@/lib/productApi'
+import GuidedFirstPractice from './GuidedFirstPractice'
 
-// R2 Stage AA：首次运行引导。每一步都能跳过；失败原因在界面里说明，不只在终端。
-// 1 欢迎 2 本地数据 3 模型 4 语音识别 5 麦克风 6 系统音频 7 共享隐私 8 简历 9 第一个岗位 10 完成
+// v1.3 首次运行引导。前十步配置真实环境，第十一步只有在跑通一次
+// Guided First Practice 后才允许正常完成；用户仍可显式「跳过引导」。
+// 1 欢迎 2 本地数据 3 模型 4 语音识别 5 麦克风 6 系统音频
+// 7 共享隐私 8 简历 9 第一个目标 10 第一次演练 11 完成
 
 interface Diagnostics {
   packaged: boolean
@@ -28,7 +32,7 @@ interface Explained {
   action: string
 }
 
-const STEPS = ['欢迎', '本地数据', '模型', '语音识别', '麦克风', '系统音频', '共享隐私', '简历', '第一个岗位', '完成'] as const
+const STEPS = ['欢迎', '本地数据', '模型', '语音识别', '麦克风', '系统音频', '共享隐私', '简历', '第一个目标', '第一次演练', '完成'] as const
 
 function Status({ ok, label, explain }: { ok: boolean | null; label: string; explain?: Explained | null }) {
   return (
@@ -100,10 +104,14 @@ export default function OnboardingWizard() {
   const [modelCheck, setModelCheck] = useState<{ ok: boolean | null; label: string; explain?: Explained | null } | null>(null)
   const [sttCheck, setSttCheck] = useState<{ ok: boolean | null; label: string; explain?: Explained | null } | null>(null)
   const [share, setShare] = useState('OFF')
-  const [jobTitle, setJobTitle] = useState('')
+  const [goalCompany, setGoalCompany] = useState('')
+  const [goalRole, setGoalRole] = useState('')
   const [jd, setJd] = useState('')
+  const [createdGoalId, setCreatedGoalId] = useState<string | null>(null)
+  const [guidedComplete, setGuidedComplete] = useState(false)
   const [resumeName, setResumeName] = useState('')
   const [dismissed, setDismissed] = useState(false)
+  const markGuidedComplete = useCallback(() => setGuidedComplete(true), [])
 
   const open = config?.onboarding_completed === false && !dismissed
 
@@ -165,20 +173,32 @@ export default function OnboardingWizard() {
     }
   }
 
-  const createJob = async () => {
-    if (!jobTitle.trim()) return true
+  const createGoal = async () => {
+    if (!goalCompany.trim() && !goalRole.trim()) return true
+    if (!goalRole.trim()) {
+      pushToast('请填写目标岗位；公司可以暂时留空', 'warning')
+      return false
+    }
     try {
-      await api.prepCreateSpace({ title: jobTitle.trim(), jd_text: jd })
+      const goal = await productApi.createGoal({
+        company: goalCompany.trim(),
+        role: goalRole.trim(),
+        jd,
+        stage: '准备中',
+        interview_round: '',
+      })
+      setCreatedGoalId(goal.id)
       return true
     } catch (error) {
-      pushToast(getErrorMessage(error, '创建失败'), 'error')
+      pushToast(getErrorMessage(error, '创建求职目标失败'), 'error')
       return false
     }
   }
 
   const next = async () => {
     if (STEPS[step] === '共享隐私') await updateConfigAndRefresh({ share_privacy_mode: share })
-    if (STEPS[step] === '第一个岗位' && !(await createJob())) return
+    if (STEPS[step] === '第一个目标' && !(await createGoal())) return
+    if (STEPS[step] === '第一次演练' && !guidedComplete) return
     setStep((s) => Math.min(STEPS.length - 1, s + 1))
   }
 
@@ -256,7 +276,7 @@ export default function OnboardingWizard() {
           )}
           {step === 7 && (
             <>
-              <p>导入简历后，成竹会抽取事实并标注来源。你可以在「我的成竹 → 事实与来源」里确认或否认。</p>
+              <p>导入简历后，成竹会抽取事实并标注来源。你可以在「我的成竹 → 待确认」里确认、否认或补来源。</p>
               <input type="file" accept=".pdf,.docx,.txt,.md" aria-label="选择简历文件" onChange={(e) => void onResume(e.target.files?.[0])}
                 className="block w-full text-xs text-text-secondary" />
               {resumeName && <Status ok label={`已导入：${resumeName}`} />}
@@ -264,17 +284,25 @@ export default function OnboardingWizard() {
           )}
           {step === 8 && (
             <>
-              <p>建一个目标岗位（之后可以在「求职」里补全 JD、生成技能卡并冻结 Interview Pack）。</p>
-              <input aria-label="岗位名称" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="例如：AI Agent 工程师 @ 某公司"
-                className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
+              <p>建第一个求职目标。之后的准备、练习、上场和复盘都会围绕这个 Goal 连起来。</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input aria-label="目标公司" value={goalCompany} onChange={(e) => setGoalCompany(e.target.value)} placeholder="例如：MindRank"
+                  className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
+                <input aria-label="目标岗位" value={goalRole} onChange={(e) => setGoalRole(e.target.value)} placeholder="例如：AIDD Agent Engineer"
+                  className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
+              </div>
               <textarea aria-label="岗位 JD" rows={4} value={jd} onChange={(e) => setJd(e.target.value)} placeholder="粘贴 JD（可选）"
                 className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
+              {createdGoalId ? <Status ok label="第一个求职目标已创建" /> : null}
             </>
           )}
           {step === 9 && (
+            <GuidedFirstPractice goalId={createdGoalId} onCompleted={markGuidedComplete} />
+          )}
+          {step === 10 && (
             <>
-              <p>准备好了。建议顺序：「我的成竹」确认事实 → 「求职」准备并冻结 Interview Pack → 「演练」 → 「上场」 → 「复盘」。</p>
-              <p className="text-xs text-text-muted">随时可以在「设置」里修改这些选项。</p>
+              <p>准备好了。之后只记住一条路径：打开 Goal → 看 Next Focus → 准备或练习 → 上场 → Reflection → 下一步。</p>
+              <p className="text-xs text-text-muted">系统的复杂度留在后台；你下一步该做什么应该始终很清楚。所有默认值都可以在「设置」里调整。</p>
             </>
           )}
         </div>
@@ -285,9 +313,12 @@ export default function OnboardingWizard() {
               <button type="button" onClick={() => setStep((s) => s - 1)} className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary">上一步</button>
             )}
             {step < STEPS.length - 1 ? (
-              <button type="button" onClick={() => void next()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">下一步</button>
+              <button type="button" onClick={() => void next()} disabled={STEPS[step] === '第一次演练' && !guidedComplete}
+                className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">
+                {STEPS[step] === '第一次演练' && !guidedComplete ? '先完成这次演练' : '下一步'}
+              </button>
             ) : (
-              <button type="button" onClick={() => void finish()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">开始使用</button>
+              <button type="button" onClick={() => void finish()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">进入成竹</button>
             )}
           </div>
         </div>

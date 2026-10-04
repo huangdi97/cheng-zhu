@@ -684,9 +684,8 @@ function createWindow() {
     frame: false,
     show: false,
     // Hosted Windows CI has no reliable interactive DWM desktop. Runtime
-    // evidence therefore renders the *real packaged BrowserWindow* offscreen;
-    // production remains the normal visible window path.
-    offscreen: RUNTIME_EVIDENCE_MODE,
+    // evidence renders through webPreferences.offscreen below; production
+    // remains the normal visible window path.
     // R2: a normal installed app shows in the taskbar (no stealth default).
     skipTaskbar: false,
     webPreferences: {

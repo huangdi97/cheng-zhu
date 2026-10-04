@@ -4,6 +4,15 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
+// Release/runtime evidence needs a disposable profile so CI never touches a
+// developer or runner's normal Chengzhu data. Electron's Chromium
+// --user-data-dir flag does not reliably change app.getPath('userData') early
+// enough for our backend launcher, so support an explicit process-level
+// override before app.whenReady(). Normal users never set this variable.
+if (process.env.CHENGZHU_USER_DATA_DIR) {
+  app.setPath('userData', path.resolve(process.env.CHENGZHU_USER_DATA_DIR));
+}
+
 // Windows: 透明 BrowserWindow 需要 DWM 硬件加速。
 // 保留硬件加速可以让成竹的窗口隐私保护标记按系统能力工作；
 // 这只是尽量减少本机录屏/截图的意外捕获，不承诺对第三方会议软件或系统策略隐身。

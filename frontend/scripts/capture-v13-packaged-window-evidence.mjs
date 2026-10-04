@@ -1,6 +1,10 @@
-// Packaged BrowserWindow evidence for Chengzhu v1.3.
-// Runs only against the opt-in localhost bridge exposed by desktop/main.js
-// when CHENGZHU_RUNTIME_EVIDENCE=1. Screenshots are taken by BrowserWindow.capturePage().
+// Real packaged Windows UI evidence for Chengzhu v1.3.
+//
+// Hosted Windows runners can block a newly packaged GUI executable from
+// opening a localhost listener. Instead of weakening the runtime evidence gate,
+// this harness gives the real Chengzhu.exe a file-based evidence plan. The app
+// still renders every frame in its actual packaged BrowserWindow and captures
+// with BrowserWindow.capturePage().
 import { spawn, spawnSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -17,7 +21,6 @@ const BACKEND_EXE = path.join(RESOURCES, 'backend', 'chengzhu-backend.exe')
 const FRONTEND_DIST = path.join(RESOURCES, 'frontend-dist')
 const OUT = path.join(ROOT, 'artifacts', 'release-evidence', 'v1.3')
 fs.mkdirSync(OUT, { recursive: true })
-const manifest = []
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -46,18 +49,14 @@ function fakeProvider() {
       if (!request.stream) {
         res.setHeader('content-type', 'application/json')
         res.end(JSON.stringify({
-          id: 'c',
-          object: 'chat.completion',
-          model: 'fake-model',
+          id: 'c', object: 'chat.completion', model: 'fake-model',
           choices: [{ index: 0, message: { role: 'assistant', content: answer }, finish_reason: 'stop' }],
         }))
         return
       }
       res.writeHead(200, { 'content-type': 'text/event-stream' })
       res.write('data: ' + JSON.stringify({
-        id: 'c',
-        object: 'chat.completion.chunk',
-        model: 'fake-model',
+        id: 'c', object: 'chat.completion.chunk', model: 'fake-model',
         choices: [{ index: 0, delta: { content: answer }, finish_reason: null }],
       }) + '\n\n')
       res.write('data: [DONE]\n\n')
@@ -67,10 +66,10 @@ function fakeProvider() {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)))
 }
 
-async function request(base, method, pathname, body, headers = {}) {
+async function request(base, method, pathname, body) {
   const res = await fetch(base + pathname, {
     method,
-    headers: { ...headers, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const text = await res.text()
@@ -106,36 +105,71 @@ async function waitForBackend(base, proc, nonce) {
   throw new Error('packaged sidecar timeout: ' + last)
 }
 
-async function waitForBridge(bridge, proc) {
-  const deadline = Date.now() + 210000
-  let last = ''
+async function waitForFile(file, proc, timeoutMs = 180000) {
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (proc.exitCode != null) throw new Error('packaged app exited before evidence bridge was ready')
-    try {
-      const status = await bridge('GET', '/status')
-      if (status.ready && status.backend_url) return status
-    } catch (error) {
-      last = error instanceof Error ? error.message : String(error)
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (proc.exitCode != null) throw new Error('packaged app exited before writing evidence result (code=' + proc.exitCode + ')')
+    await new Promise((resolve) => setTimeout(resolve, 300))
   }
-  throw new Error('runtime evidence bridge timeout: ' + last)
+  throw new Error('packaged evidence plan timed out: ' + file)
+}
+
+async function runPlan({ name, userData, backendBase, nonce, token, steps }) {
+  const planPath = path.join(userData, name + '-plan.json')
+  const resultPath = path.join(userData, name + '-result.json')
+  try { fs.unlinkSync(resultPath) } catch {}
+  fs.writeFileSync(planPath, JSON.stringify({ auto_quit: true, steps }, null, 2))
+
+  let stdout = ''
+  let stderr = ''
+  const proc = spawn(EXE, [], {
+    env: {
+      ...process.env,
+      CHENGZHU_USER_DATA_DIR: userData,
+      CHENGZHU_RUNTIME_EVIDENCE: '1',
+      CHENGZHU_EVIDENCE_BACKEND_URL: backendBase,
+      CHENGZHU_INSTANCE_NONCE: nonce,
+      CHENGZHU_RUNTIME_EVIDENCE_TOKEN: token,
+      CHENGZHU_RUNTIME_EVIDENCE_DIR: OUT,
+      CHENGZHU_RUNTIME_EVIDENCE_PLAN: planPath,
+      CHENGZHU_RUNTIME_EVIDENCE_RESULT: resultPath,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  })
+  proc.stdout?.on('data', (chunk) => {
+    const text = chunk.toString('utf8')
+    stdout = (stdout + text).slice(-16000)
+    process.stdout.write('[app] ' + text)
+  })
+  proc.stderr?.on('data', (chunk) => {
+    const text = chunk.toString('utf8')
+    stderr = (stderr + text).slice(-16000)
+    process.stderr.write('[app] ' + text)
+  })
+  try {
+    const result = await waitForFile(resultPath, proc)
+    if (!result.ok) throw new Error('evidence plan failed: ' + result.error)
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    return result
+  } catch (error) {
+    console.error('app stdout tail:', stdout.slice(-5000))
+    console.error('app stderr tail:', stderr.slice(-5000))
+    throw error
+  } finally {
+    if (proc.exitCode == null) {
+      if (process.platform === 'win32' && proc.pid) spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' })
+      else proc.kill('SIGKILL')
+    }
+  }
 }
 
 const provider = await fakeProvider()
 const backendPort = await freePort()
 const backendBase = 'http://127.0.0.1:' + backendPort
-const instanceNonce = crypto.randomBytes(18).toString('hex')
-const evidencePort = await freePort()
+const nonce = crypto.randomBytes(18).toString('hex')
 const token = crypto.randomBytes(18).toString('hex')
-const evidenceBase = 'http://127.0.0.1:' + evidencePort
-const bridge = (method, pathname, body) => request(
-  evidenceBase,
-  method,
-  pathname,
-  body,
-  { 'x-chengzhu-evidence-token': token },
-)
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'chengzhu-v13-evidence-'))
 fs.mkdirSync(path.join(userData, 'config'), { recursive: true })
 fs.writeFileSync(path.join(userData, 'config', 'config.json'), JSON.stringify({
@@ -154,23 +188,16 @@ fs.writeFileSync(path.join(userData, 'config', 'config.json'), JSON.stringify({
   practice_delivery_analytics_enabled: true,
 }))
 
-let proc
 let sidecar
-let stdout = ''
-let stderr = ''
 let sidecarOut = ''
 try {
-  // Start the actual packaged sidecar explicitly. The production app still
-  // owns its sidecar normally; this evidence-only orchestration avoids a
-  // Windows GitHub runner deadlock caused by a GUI process spawning another
-  // long-lived child while also being driven by a localhost capture bridge.
   sidecar = spawn(BACKEND_EXE, ['--port', String(backendPort), '--host', '127.0.0.1'], {
     cwd: path.dirname(BACKEND_EXE),
     env: {
       ...process.env,
       CHENGZHU_HOME: userData,
       CHENGZHU_FRONTEND_DIST: FRONTEND_DIST,
-      CHENGZHU_INSTANCE_NONCE: instanceNonce,
+      CHENGZHU_INSTANCE_NONCE: nonce,
       PYTHONIOENCODING: 'utf-8',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -178,82 +205,36 @@ try {
   })
   sidecar.stdout?.on('data', (chunk) => {
     const text = chunk.toString('utf8')
-    sidecarOut = (sidecarOut + text).slice(-12000)
+    sidecarOut = (sidecarOut + text).slice(-16000)
     process.stdout.write('[sidecar] ' + text)
   })
   sidecar.stderr?.on('data', (chunk) => {
     const text = chunk.toString('utf8')
-    sidecarOut = (sidecarOut + text).slice(-12000)
+    sidecarOut = (sidecarOut + text).slice(-16000)
     process.stderr.write('[sidecar] ' + text)
   })
-  await waitForBackend(backendBase, sidecar, instanceNonce)
+  await waitForBackend(backendBase, sidecar, nonce)
 
-  proc = spawn(EXE, [], {
-    env: {
-      ...process.env,
-      CHENGZHU_USER_DATA_DIR: userData,
-      CHENGZHU_RUNTIME_EVIDENCE: '1',
-      CHENGZHU_EVIDENCE_BACKEND_URL: backendBase,
-      CHENGZHU_INSTANCE_NONCE: instanceNonce,
-      CHENGZHU_RUNTIME_EVIDENCE_PORT: String(evidencePort),
-      CHENGZHU_RUNTIME_EVIDENCE_TOKEN: token,
-      CHENGZHU_RUNTIME_EVIDENCE_DIR: OUT,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  })
-  proc.stdout?.on('data', (chunk) => {
-    const text = chunk.toString('utf8')
-    stdout = (stdout + text).slice(-12000)
-    process.stdout.write('[app] ' + text)
-  })
-  proc.stderr?.on('data', (chunk) => {
-    const text = chunk.toString('utf8')
-    stderr = (stderr + text).slice(-12000)
-    process.stderr.write('[app] ' + text)
+  // Launch 1: prove a fresh packaged install renders the real onboarding.
+  const first = await runPlan({
+    name: 'fresh-install',
+    userData,
+    backendBase,
+    nonce,
+    token,
+    steps: [
+      { kind: 'wait', selector: '[data-testid="onboarding"]', timeout_ms: 30000 },
+      { kind: 'capture', name: '01-onboarding', note: 'real packaged fresh-install onboarding' },
+    ],
   })
 
-  const status = await waitForBridge(bridge, proc)
-  const backend = status.backend_url
-  manifest.push({
-    name: '_runtime',
-    note: 'packaged=' + status.packaged + ' version=' + status.version + ' backend=' + backend
-      + ' transport=BrowserWindow.capturePage orchestration=external-packaged-sidecar',
-  })
-
-  async function capture(name, note, target = 'main') {
-    const result = await bridge('POST', '/capture', { name, target })
-    manifest.push({
-      name,
-      note,
-      target,
-      file: path.relative(ROOT, result.file),
-      width: result.width,
-      height: result.height,
-    })
-    console.log('captured', name)
-  }
-
-  async function route(hash, selector, name, note) {
-    await bridge('POST', '/navigate', { hash, selector, timeout_ms: 30000 })
-    await capture(name, note)
-  }
-
-  await bridge('POST', '/wait', { selector: '[data-testid="onboarding"]', timeout_ms: 30000 })
-  await capture('01-onboarding', 'real packaged first-run onboarding')
-
-  await request(backend, 'POST', '/api/config', { onboarding_completed: true })
-  await bridge('POST', '/reload', { timeout_ms: 30000 })
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-
+  // Seed only through the real packaged sidecar HTTP API.
+  await request(backendBase, 'POST', '/api/config', { onboarding_completed: true })
   const resume = 'WenNian：我负责 RAG 检索链路，用 Redis 管理 session state。'
-  await request(backend, 'POST', '/api/intelligence/candidate/rebuild', {
-    resume_text: resume,
-    interview_notes: '',
-  })
-  await request(backend, 'POST', '/api/config', { resume_text: resume })
+  await request(backendBase, 'POST', '/api/intelligence/candidate/rebuild', { resume_text: resume, interview_notes: '' })
+  await request(backendBase, 'POST', '/api/config', { resume_text: resume })
 
-  const goal = await request(backend, 'POST', '/api/product/goals', {
+  const goal = await request(backendBase, 'POST', '/api/product/goals', {
     company: 'MindRank',
     role: 'AIDD Agent Engineer',
     jd: '负责 Agent / RAG / CADD；要求系统设计、评估与高可用。',
@@ -261,20 +242,20 @@ try {
     interview_round: 'TECHNICAL',
     next_interview_at: Math.floor(Date.now() / 1000) + 86400,
   })
-  await request(backend, 'POST', '/api/product/goals/' + goal.id + '/interviews', {
+  await request(backendBase, 'POST', '/api/product/goals/' + goal.id + '/interviews', {
     round: '技术二面',
     scheduled_at: Math.floor(Date.now() / 1000) + 86400,
     kind: 'REAL',
     notes: 'v1.3 packaged evidence',
   })
-  const material = await formRequest(backend, '/api/product/materials', {
+  const material = await formRequest(backendBase, '/api/product/materials', {
     title: 'WenNian 架构说明',
     kind: 'PROJECT',
     usage: 'FACTS',
     text: 'Redis 只用于 session state，没有 Redis Cluster 生产经历。',
     background: 'false',
   })
-  const note = await request(backend, 'POST', '/api/product/quick-notes', {
+  const note = await request(backendBase, 'POST', '/api/product/quick-notes', {
     title: 'MindRank 二面速记',
     content: 'Redis：只讲 session state；反问 Agent eval 上线门槛。',
     scope: 'GOAL',
@@ -282,62 +263,26 @@ try {
     pinned: true,
     tags: ['想问'],
   })
-  const bank = await request(backend, 'POST', '/api/product/question-banks', {
+  const bank = await request(backendBase, 'POST', '/api/product/question-banks', {
     name: 'AIDD Agent 深挖',
     scope: 'GOAL',
     role: 'AI_ML_ENGINEER',
     goal_id: goal.id,
   })
-  await request(backend, 'POST', '/api/product/question-banks/' + bank.id + '/items', {
+  await request(backendBase, 'POST', '/api/product/question-banks/' + bank.id + '/items', {
     text: '如果 Agent 线上效果下降，你怎么定位？',
     category: 'SYSTEM_DESIGN',
     difficulty: 'STANDARD',
     origin: 'USER_ADDED',
     rounds: ['TECHNICAL'],
   })
-  await request(backend, 'PATCH', '/api/product/goals/' + goal.id, {
+  await request(backendBase, 'PATCH', '/api/product/goals/' + goal.id, {
     selected_material_ids: [material.id],
     selected_quick_note_ids: [note.id],
     active_question_bank_ids: [bank.id],
     role_family: 'AI_ML_ENGINEER',
   })
-
-  await bridge('POST', '/reload', { timeout_ms: 30000 })
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-
-  await route('#/home', '[data-testid="action-home"]', '02-action-home', 'Action Home')
-  await route('#/goals', '[data-testid="goals-page"]', '03-goal-list', 'Goal list')
-  await route('#/goals/' + goal.id, '[data-testid="goal-room"]', '04-goal-overview', 'Goal Room overview')
-  await route('#/goals/' + goal.id + '/prepare', '[data-testid="goal-room"]', '05-goal-prepare', 'Goal Prepare')
-  await route('#/goals/' + goal.id + '/interviews', '[data-testid="goal-room"]', '06-goal-interviews', 'Goal interviews')
-  await route('#/goals/' + goal.id + '/offer', '[data-testid="goal-room"]', '07-goal-offer', 'Goal Offer')
-
-  await route('#/me/resume', '[data-testid="me-page"]', '08-me-resume', 'Person workspace')
-  await route('#/me/inbox', '[data-testid="me-page"]', '09-fact-inbox', 'Fact Inbox')
-  await route('#/library/materials', '[data-testid="library-page"]', '10-library-materials', 'Material taxonomy')
-  await route('#/library/notes', '[data-testid="library-page"]', '11-quick-notes', 'Quick Notes')
-  await route('#/library/banks', '[data-testid="library-page"]', '12-question-banks', 'Question Banks')
-
-  await bridge('POST', '/navigate', {
-    hash: '#/home',
-    selector: '[data-testid="action-home"]',
-    timeout_ms: 30000,
-  })
-  try {
-    await bridge('POST', '/key', { key: 'K', modifiers: ['control'] })
-    await bridge('POST', '/wait', { selector: '[data-testid="command-palette"]', timeout_ms: 5000 })
-    await capture('13-command-palette', 'Ctrl+K contextual commands')
-    await bridge('POST', '/key', { key: 'Escape', modifiers: [] })
-  } catch (error) {
-    manifest.push({
-      name: '13-command-palette',
-      note: 'Shortcut capture unavailable in packaged timing; functional E2E remains authoritative: '
-        + (error instanceof Error ? error.message : String(error)),
-    })
-  }
-
-  await route('#/practice?goal=' + goal.id, '[data-testid="practice-setup"]', '14-practice-setup', 'Practice 3.0')
-  const practice = await request(backend, 'POST', '/api/product/practice', {
+  const practice = await request(backendBase, 'POST', '/api/product/practice', {
     goal_id: goal.id,
     round: 'TECHNICAL',
     personas: ['TECH_LEAD', 'HIRING_MANAGER'],
@@ -349,111 +294,118 @@ try {
     human_coach: false,
     delivery_analytics: true,
   })
-  await route(
-    '#/practice/' + practice.practice_id,
-    '[data-testid="practice-session"]',
-    '15-panel-practice',
-    'Panel practice',
-  )
-  await request(backend, 'POST', '/api/product/practice/' + practice.practice_id + '/answer', {
+  await request(backendBase, 'POST', '/api/product/practice/' + practice.practice_id + '/answer', {
     answer: '先给结论，我会同时看离线回归集、线上成功率和失败分桶。',
   })
-  await bridge('POST', '/reload', {
-    selector: '[data-testid="practice-session"]',
-    timeout_ms: 30000,
-  })
-  await capture('16-content-delivery-coach', 'Content Coach and Delivery Coach stay separate')
-  await request(backend, 'POST', '/api/product/practice/' + practice.practice_id + '/finish', {})
-  await route(
-    '#/reflection/practice/' + practice.practice_id,
-    '[data-testid="reflection-page"]',
-    '17-reflection',
-    'Reflection first screen',
-  )
 
-  await bridge('POST', '/navigate', {
-    hash: '#/goals/' + goal.id,
-    selector: '[data-testid="goal-room"]',
-    timeout_ms: 30000,
-  })
-  await bridge('POST', '/click', { selector: '[data-testid="go-live"]' })
-  await bridge('POST', '/wait', { selector: '[data-testid="preflight"]', timeout_ms: 10000 })
-  await capture('18-preflight', 'Preflight 3.0')
+  // Launch 2: real packaged BrowserWindow, real routes and real UI interactions.
+  const steps = [
+    { kind: 'wait', selector: '[data-testid="action-home"]', timeout_ms: 30000 },
+    { kind: 'capture', name: '02-action-home', note: 'Action Home' },
 
-  const live = await request(backend, 'POST', '/api/product/live/start', { goal_id: goal.id })
-  await route(
-    '#/live/' + live.session_id,
-    '[data-testid="live-status-line"]',
-    '19-live-idle',
-    'Live Cockpit',
-  )
-  await request(backend, 'POST', '/api/ask', { text: 'RAG 和微调怎么选？' })
-  await new Promise((resolve) => setTimeout(resolve, 3500))
-  await capture('20-live-guidance', 'Packaged Live after cue request')
+    { kind: 'navigate', hash: '#/goals', selector: '[data-testid="goals-page"]' },
+    { kind: 'capture', name: '03-goal-list', note: 'Goal list' },
+    { kind: 'navigate', hash: '#/goals/' + goal.id, selector: '[data-testid="goal-room"]' },
+    { kind: 'capture', name: '04-goal-overview', note: 'Goal Room overview with Next Focus and trends' },
+    { kind: 'navigate', hash: '#/goals/' + goal.id + '/prepare', selector: '[data-testid="goal-room"]' },
+    { kind: 'capture', name: '05-goal-prepare', note: 'Goal Prepare' },
+    { kind: 'navigate', hash: '#/goals/' + goal.id + '/interviews', selector: '[data-testid="goal-room"]' },
+    { kind: 'capture', name: '06-goal-interviews', note: 'Goal interviews' },
+    { kind: 'navigate', hash: '#/goals/' + goal.id + '/offer', selector: '[data-testid="goal-room"]' },
+    { kind: 'capture', name: '07-goal-offer', note: 'Offer metadata without ATS-first UI' },
 
-  await bridge('POST', '/key', { key: 'P', modifiers: ['control'] })
-  try {
-    await bridge('POST', '/wait', { selector: '[data-testid="pin-dialog"]', timeout_ms: 5000 })
-    await capture('21-pin-moment', 'Pin Moment')
-  } catch {
-    manifest.push({ name: '21-pin-moment', note: 'Pin dialog unavailable in packaged timing; functional E2E is authoritative.' })
-  }
+    { kind: 'navigate', hash: '#/me/resume', selector: '[data-testid="me-page"]' },
+    { kind: 'capture', name: '08-me-resume', note: 'Person workspace: current resume' },
+    { kind: 'navigate', hash: '#/me/inbox', selector: '[data-testid="me-page"]' },
+    { kind: 'capture', name: '09-fact-inbox', note: 'Fact Inbox' },
+    { kind: 'navigate', hash: '#/me/stories', selector: '[data-testid="me-page"]' },
+    { kind: 'capture', name: '10-stories', note: 'Stories 3.0 and competency coverage' },
 
-  await route('#/settings/live', '[data-testid="settings-page"]', '22-settings-live-overlay', 'Settings + Overlay 3.0')
-  await bridge('POST', '/storage', { key: 'ia-color-scheme', value: 'vscode-dark-plus' })
-  await bridge('POST', '/reload', { timeout_ms: 30000 })
-  await route('#/home', '[data-testid="action-home"]', '23-dark-home', 'Dark theme')
+    { kind: 'navigate', hash: '#/library/materials', selector: '[data-testid="library-page"]' },
+    { kind: 'capture', name: '11-library-materials', note: 'Material taxonomy/lifecycle' },
+    { kind: 'navigate', hash: '#/library/notes', selector: '[data-testid="library-page"]' },
+    { kind: 'capture', name: '12-quick-notes', note: 'Quick Notes' },
+    { kind: 'navigate', hash: '#/library/banks', selector: '[data-testid="library-page"]' },
+    { kind: 'capture', name: '13-question-banks', note: 'Question Banks' },
 
-  await bridge('POST', '/storage', { key: 'ia-color-scheme', value: 'vscode-light-plus' })
-  await bridge('POST', '/resize', { width: 390, height: 844 })
-  await bridge('POST', '/reload', { timeout_ms: 30000 })
-  await route(
-    '#/goals/' + goal.id + '/prepare',
-    '[data-testid="goal-room"]',
-    '24-mobile-390-goal-prepare',
-    '390px Goal Prepare',
-  )
-  await route('#/history', '[data-testid="history-page"]', '25-history', 'History')
+    { kind: 'navigate', hash: '#/home', selector: '[data-testid="action-home"]' },
+    { kind: 'key', key: 'K', modifiers: ['control'] },
+    { kind: 'wait', selector: '[data-testid="command-palette"]', timeout_ms: 5000 },
+    { kind: 'capture', name: '14-command-palette', note: 'Ctrl+K contextual command palette' },
+    { kind: 'key', key: 'Escape', modifiers: [] },
 
-  try {
-    await capture('26-overlay', 'Real packaged Electron overlay BrowserWindow', 'overlay')
-  } catch (error) {
-    manifest.push({
-      name: '26-overlay',
-      note: 'Overlay capture unavailable: ' + (error instanceof Error ? error.message : String(error)),
-    })
-  }
+    { kind: 'navigate', hash: '#/practice?goal=' + goal.id, selector: '[data-testid="practice-setup"]' },
+    { kind: 'capture', name: '15-practice-setup', note: 'Practice 3.0 setup' },
+    { kind: 'navigate', hash: '#/practice/' + practice.practice_id, selector: '[data-testid="practice-session"]' },
+    { kind: 'capture', name: '16-panel-practice', note: 'Panel practice with controlled personas and split coaching' },
 
-  fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({
+    { kind: 'navigate', hash: '#/reflection/practice/' + practice.practice_id, selector: '[data-testid="reflection-page"]' },
+    { kind: 'capture', name: '17-reflection', note: 'Action-first Reflection' },
+
+    { kind: 'navigate', hash: '#/goals/' + goal.id, selector: '[data-testid="goal-room"]' },
+    { kind: 'click', selector: '[data-testid="go-live"]' },
+    { kind: 'wait', selector: '[data-testid="preflight"]', timeout_ms: 10000 },
+    { kind: 'capture', name: '18-preflight', note: 'Preflight 3.0 origins and policies' },
+    { kind: 'click', selector: '[data-testid="preflight-start"]' },
+    { kind: 'wait', selector: '[data-testid="live-status-line"]', timeout_ms: 15000 },
+    { kind: 'capture', name: '19-live-idle', note: 'Live Cockpit one-status-line idle state' },
+    { kind: 'ask', text: 'RAG 和微调怎么选？' },
+    { kind: 'wait', selector: '[data-testid="fast-cue"]', timeout_ms: 30000 },
+    { kind: 'capture', name: '20-live-fast-cue', note: 'Question → Fast Cue before Deep' },
+    { kind: 'sleep', ms: 1800 },
+    { kind: 'capture', name: '21-live-deep', note: 'Deep answer as second layer' },
+    { kind: 'key', key: 'P', modifiers: ['control'] },
+    { kind: 'wait', selector: '[data-testid="pin-dialog"]', timeout_ms: 5000 },
+    { kind: 'capture', name: '22-pin-moment', note: 'Pin Moment' },
+    { kind: 'key', key: 'Escape', modifiers: [] },
+    { kind: 'click', selector: '[data-testid="live-quick-notes"]' },
+    { kind: 'wait', selector: '[data-testid="quick-notes-drawer"]', timeout_ms: 5000 },
+    { kind: 'capture', name: '23-live-quick-notes', note: 'Live read-only Quick Notes drawer' },
+    { kind: 'key', key: 'Escape', modifiers: [] },
+    { kind: 'ask', text: '你还有什么想问我们的吗？' },
+    { kind: 'wait', selector: '[data-testid="closing-panel"]', timeout_ms: 15000 },
+    { kind: 'capture', name: '24-closing-mode', note: 'Contextual Closing Mode' },
+
+    { kind: 'navigate', hash: '#/settings/live', selector: '[data-testid="settings-page"]' },
+    { kind: 'capture', name: '25-settings-overlay', note: 'Settings 3.0 + Overlay 3.0' },
+    { kind: 'navigate', hash: '#/settings/diagnostics', selector: '[data-testid="settings-page"]' },
+    { kind: 'capture', name: '26-validation', note: 'v1.4 product-loop validation UI' },
+
+    { kind: 'storage', key: 'ia-color-scheme', value: 'vscode-dark-plus' },
+    { kind: 'reload', selector: '[data-testid="settings-page"]', timeout_ms: 30000 },
+    { kind: 'navigate', hash: '#/home', selector: '[data-testid="action-home"]' },
+    { kind: 'capture', name: '27-dark-home', note: 'Dark theme' },
+
+    { kind: 'storage', key: 'ia-color-scheme', value: 'vscode-light-plus' },
+    { kind: 'resize', width: 390, height: 844 },
+    { kind: 'reload', selector: '[data-testid="action-home"]', timeout_ms: 30000 },
+    { kind: 'navigate', hash: '#/goals/' + goal.id + '/prepare', selector: '[data-testid="goal-room"]' },
+    { kind: 'capture', name: '28-mobile-390-goal-prepare', note: '390px Goal Prepare' },
+    { kind: 'navigate', hash: '#/history', selector: '[data-testid="history-page"]' },
+    { kind: 'capture', name: '29-history', note: 'Unified History' },
+  ]
+
+  const second = await runPlan({ name: 'product-loop', userData, backendBase, nonce, token, steps })
+  const manifest = {
     captured_at: new Date().toISOString(),
-    evidence_type: 'PACKAGED_BROWSERWINDOW_CAPTURE_WITH_PACKAGED_SIDECAR',
+    evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN_WITH_PACKAGED_SIDECAR',
     executable: EXE,
+    backend_executable: BACKEND_EXE,
     goal_id: goal.id,
     practice_id: practice.practice_id,
-    live_session_id: live.session_id,
-    entries: manifest,
-  }, null, 2))
-  console.log('done', OUT)
+    entries: [...(first.entries || []), ...(second.entries || [])],
+  }
+  fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
+  if (manifest.entries.length < 29) throw new Error('expected at least 29 packaged UI captures, got ' + manifest.entries.length)
+  console.log('done', OUT, 'captures=' + manifest.entries.length)
 } catch (error) {
   console.error(error)
-  console.error('app stdout tail:', stdout.slice(-4000))
-  console.error('app stderr tail:', stderr.slice(-4000))
-  console.error('sidecar output tail:', sidecarOut.slice(-4000))
+  console.error('sidecar output tail:', sidecarOut.slice(-5000))
   throw error
 } finally {
-  if (proc && proc.exitCode == null) {
-    if (process.platform === 'win32' && proc.pid) {
-      spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' })
-    } else {
-      proc.kill('SIGKILL')
-    }
-  }
   if (sidecar && sidecar.exitCode == null) {
-    if (process.platform === 'win32' && sidecar.pid) {
-      spawnSync('taskkill', ['/PID', String(sidecar.pid), '/T', '/F'], { stdio: 'ignore' })
-    } else {
-      sidecar.kill('SIGKILL')
-    }
+    if (process.platform === 'win32' && sidecar.pid) spawnSync('taskkill', ['/PID', String(sidecar.pid), '/T', '/F'], { stdio: 'ignore' })
+    else sidecar.kill('SIGKILL')
   }
   provider.close()
 }

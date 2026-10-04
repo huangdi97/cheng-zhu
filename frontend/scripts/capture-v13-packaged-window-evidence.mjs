@@ -12,6 +12,9 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const EXE = path.join(ROOT, 'dist', 'desktop', 'win-unpacked', 'Chengzhu.exe')
+const RESOURCES = path.join(ROOT, 'dist', 'desktop', 'win-unpacked', 'resources')
+const BACKEND_EXE = path.join(RESOURCES, 'backend', 'chengzhu-backend.exe')
+const FRONTEND_DIST = path.join(RESOURCES, 'frontend-dist')
 const OUT = path.join(ROOT, 'artifacts', 'release-evidence', 'v1.3')
 fs.mkdirSync(OUT, { recursive: true })
 const manifest = []
@@ -86,6 +89,23 @@ async function formRequest(base, pathname, fields) {
   return JSON.parse(text)
 }
 
+async function waitForBackend(base, proc, nonce) {
+  const deadline = Date.now() + 120000
+  let last = ''
+  while (Date.now() < deadline) {
+    if (proc.exitCode != null) throw new Error('packaged sidecar exited before it was ready')
+    try {
+      const status = await request(base, 'GET', '/api/instance')
+      if (status.app === 'chengzhu' && status.nonce === nonce) return status
+      last = 'instance nonce mismatch'
+    } catch (error) {
+      last = error instanceof Error ? error.message : String(error)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  throw new Error('packaged sidecar timeout: ' + last)
+}
+
 async function waitForBridge(bridge, proc) {
   const deadline = Date.now() + 210000
   let last = ''
@@ -103,6 +123,9 @@ async function waitForBridge(bridge, proc) {
 }
 
 const provider = await fakeProvider()
+const backendPort = await freePort()
+const backendBase = 'http://127.0.0.1:' + backendPort
+const instanceNonce = crypto.randomBytes(18).toString('hex')
 const evidencePort = await freePort()
 const token = crypto.randomBytes(18).toString('hex')
 const evidenceBase = 'http://127.0.0.1:' + evidencePort
@@ -132,14 +155,46 @@ fs.writeFileSync(path.join(userData, 'config', 'config.json'), JSON.stringify({
 }))
 
 let proc
+let sidecar
 let stdout = ''
 let stderr = ''
+let sidecarOut = ''
 try {
+  // Start the actual packaged sidecar explicitly. The production app still
+  // owns its sidecar normally; this evidence-only orchestration avoids a
+  // Windows GitHub runner deadlock caused by a GUI process spawning another
+  // long-lived child while also being driven by a localhost capture bridge.
+  sidecar = spawn(BACKEND_EXE, ['--port', String(backendPort), '--host', '127.0.0.1'], {
+    cwd: path.dirname(BACKEND_EXE),
+    env: {
+      ...process.env,
+      CHENGZHU_HOME: userData,
+      CHENGZHU_FRONTEND_DIST: FRONTEND_DIST,
+      CHENGZHU_INSTANCE_NONCE: instanceNonce,
+      PYTHONIOENCODING: 'utf-8',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  })
+  sidecar.stdout?.on('data', (chunk) => {
+    const text = chunk.toString('utf8')
+    sidecarOut = (sidecarOut + text).slice(-12000)
+    process.stdout.write('[sidecar] ' + text)
+  })
+  sidecar.stderr?.on('data', (chunk) => {
+    const text = chunk.toString('utf8')
+    sidecarOut = (sidecarOut + text).slice(-12000)
+    process.stderr.write('[sidecar] ' + text)
+  })
+  await waitForBackend(backendBase, sidecar, instanceNonce)
+
   proc = spawn(EXE, [], {
     env: {
       ...process.env,
       CHENGZHU_USER_DATA_DIR: userData,
       CHENGZHU_RUNTIME_EVIDENCE: '1',
+      CHENGZHU_EVIDENCE_BACKEND_URL: backendBase,
+      CHENGZHU_INSTANCE_NONCE: instanceNonce,
       CHENGZHU_RUNTIME_EVIDENCE_PORT: String(evidencePort),
       CHENGZHU_RUNTIME_EVIDENCE_TOKEN: token,
       CHENGZHU_RUNTIME_EVIDENCE_DIR: OUT,
@@ -163,7 +218,7 @@ try {
   manifest.push({
     name: '_runtime',
     note: 'packaged=' + status.packaged + ' version=' + status.version + ' backend=' + backend
-      + ' transport=BrowserWindow.capturePage',
+      + ' transport=BrowserWindow.capturePage orchestration=external-packaged-sidecar',
   })
 
   async function capture(name, note, target = 'main') {
@@ -371,7 +426,7 @@ try {
 
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({
     captured_at: new Date().toISOString(),
-    evidence_type: 'PACKAGED_BROWSERWINDOW_CAPTURE',
+    evidence_type: 'PACKAGED_BROWSERWINDOW_CAPTURE_WITH_PACKAGED_SIDECAR',
     executable: EXE,
     goal_id: goal.id,
     practice_id: practice.practice_id,
@@ -383,6 +438,7 @@ try {
   console.error(error)
   console.error('app stdout tail:', stdout.slice(-4000))
   console.error('app stderr tail:', stderr.slice(-4000))
+  console.error('sidecar output tail:', sidecarOut.slice(-4000))
   throw error
 } finally {
   if (proc && proc.exitCode == null) {
@@ -390,6 +446,13 @@ try {
       spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' })
     } else {
       proc.kill('SIGKILL')
+    }
+  }
+  if (sidecar && sidecar.exitCode == null) {
+    if (process.platform === 'win32' && sidecar.pid) {
+      spawnSync('taskkill', ['/PID', String(sidecar.pid), '/T', '/F'], { stdio: 'ignore' })
+    } else {
+      sidecar.kill('SIGKILL')
     }
   }
   provider.close()

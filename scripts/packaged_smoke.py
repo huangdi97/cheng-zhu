@@ -6,7 +6,7 @@ dir and a local fake OpenAI-compatible provider, so no real key is needed.
 Checks:
   1. sidecar starts without a system Python assumption (CHENGZHU_HOME set)
   2. /api/options, /api/config respond; version string
-  3. DB migrations applied under CHENGZHU_HOME/data (intelligence schema v3)
+  3. DB migrations applied under CHENGZHU_HOME/data (latest intelligence schema)
   4. prebuilt frontend served (CHENGZHU_FRONTEND_DIST)
   5. Fast Cue E2E with the fake provider: guidance_fast before the first
      answer_chunk, answer_done carries latency
@@ -212,7 +212,12 @@ def main() -> int:
         db = home / "data" / "intelligence.db"
         user_version = sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] if db.exists() else None
         checks["intelligence_schema_version"] = user_version
-        ok &= user_version == 3
+        migrations_source = (Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "intelligence_migrations.py").read_text(encoding="utf-8")
+        import re
+        version_match = re.search(r"^LATEST_SCHEMA_VERSION\\s*=\\s*(\\d+)", migrations_source, re.MULTILINE)
+        expected_schema = int(version_match.group(1)) if version_match else None
+        checks["intelligence_schema_expected"] = expected_schema
+        ok &= expected_schema is not None and user_version == expected_schema
 
         if args.frontend_dist:
             with urllib.request.urlopen(f"{base}/", timeout=10) as resp:

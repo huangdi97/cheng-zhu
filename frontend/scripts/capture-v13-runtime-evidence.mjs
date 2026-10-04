@@ -166,7 +166,11 @@ try {
   // the flag satisfies Chromium's security rule, while the env guarantees the
   // packaged backend and Electron main process resolve the very same isolated
   // evidence profile before app.whenReady().
-  appProc = spawn(EXE, [`--user-data-dir=${userData}`], {
+  appProc = spawn(EXE, [
+    `--user-data-dir=${userData}`,
+    '--remote-debugging-address=127.0.0.1',
+    `--remote-debugging-port=${debugPort}`,
+  ], {
     env: {
       ...process.env,
       CHENGZHU_USER_DATA_DIR: userData,

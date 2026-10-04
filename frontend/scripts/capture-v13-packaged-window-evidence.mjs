@@ -297,6 +297,7 @@ try {
   await request(backendBase, 'POST', '/api/product/practice/' + practice.practice_id + '/answer', {
     answer: '先给结论，我会同时看离线回归集、线上成功率和失败分桶。',
   })
+  await request(backendBase, 'POST', '/api/product/practice/' + practice.practice_id + '/finish', {})
 
   // Launch 2: real packaged BrowserWindow, real routes and real UI interactions.
   const steps = [

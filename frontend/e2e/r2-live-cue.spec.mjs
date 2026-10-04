@@ -194,7 +194,7 @@ test.describe('v1.3 first-run onboarding', () => {
     await wizard.getByLabel('目标岗位').fill('AIDD Agent Engineer')
     await wizard.getByRole('button', { name: '下一步' }).click()
 
-    await expect(wizard.getByText('第一次演练')).toBeVisible()
+    await expect(wizard.getByRole('heading', { name: '第一次演练' })).toBeVisible()
     await expect(wizard.getByRole('button', { name: '先完成这次演练' })).toBeDisabled()
     await wizard.getByRole('button', { name: '开始第一次演练' }).click()
     await expect(wizard.getByTestId('guided-question')).toContainText('为什么在这个项目里选择 RAG？')

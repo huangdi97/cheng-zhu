@@ -160,10 +160,49 @@ function evidenceSafeName(name) {
 }
 
 function runtimeEvidencePlanPath() {
-  if (!runtimeEvidenceEnabled()) return '';
+  // File-plan mode is local process orchestration: it never opens an evidence
+  // HTTP listener, so it does not need the bridge bearer token. Requiring the
+  // token here made plan startup depend on an unrelated transport concern.
+  if (process.env.CHENGZHU_RUNTIME_EVIDENCE !== '1') return '';
   const raw = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_PLAN || '').trim();
   if (!raw) return '';
   return path.resolve(raw);
+}
+
+function waitForMainWindowLoad(timeoutMs = 45000) {
+  return new Promise((resolve, reject) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      reject(new Error('main window unavailable before evidence plan'));
+      return;
+    }
+    if (!mainWindow.webContents.isLoadingMainFrame()) {
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      mainWindow?.webContents.removeListener('did-finish-load', onFinish);
+      mainWindow?.webContents.removeListener('did-fail-load', onFail);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onFinish = () => finish();
+    const onFail = (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (isMainFrame === false) return;
+      finish(new Error(`main window failed to load (${errorCode}): ${errorDescription} ${validatedURL || ''}`));
+    };
+    const timer = setTimeout(
+      () => finish(new Error(`main window load timeout after ${timeoutMs}ms`)),
+      Math.max(1000, Number(timeoutMs) || 45000),
+    );
+
+    mainWindow.webContents.once('did-finish-load', onFinish);
+    mainWindow.webContents.on('did-fail-load', onFail);
+  });
 }
 
 async function evidenceCaptureToFile(outputDir, name, targetName = 'main') {
@@ -1803,12 +1842,32 @@ app.whenReady().then(async () => {
   syncSharePrivacyFromConfig();
   createWindow();
   if (runtimeEvidencePlanPath()) {
-    // File-plan mode avoids a localhost listener entirely. This matters on
-    // hosted Windows runners where Defender can block a newly packaged GUI
-    // executable from opening a server socket even though capturePage works.
-    void runRuntimeEvidencePlan().catch((error) => {
-      console.error('Runtime evidence plan failed:', error?.message || error);
-    });
+    // File-plan mode avoids a localhost listener entirely. Wait until the real
+    // packaged renderer has completed its first navigation before sending DOM
+    // queries. executeJavaScript() issued during the initial load can otherwise
+    // remain pending indefinitely on hosted Windows runners, leaving neither a
+    // success nor a failure result file.
+    void waitForMainWindowLoad()
+      .then(() => runRuntimeEvidencePlan())
+      .catch((error) => {
+        console.error('Runtime evidence plan failed:', error?.message || error);
+        const resultPath = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_RESULT || '').trim();
+        if (resultPath) {
+          try {
+            fs.writeFileSync(path.resolve(resultPath), JSON.stringify({
+              ok: false,
+              evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN',
+              error: error?.message || String(error),
+              packaged: app.isPackaged,
+              version: app.getVersion(),
+              completed_at: new Date().toISOString(),
+              entries: [],
+            }, null, 2));
+          } catch (writeError) {
+            console.error('Failed to write runtime evidence startup failure:', writeError?.message || writeError);
+          }
+        }
+      });
   } else {
     startRuntimeEvidenceBridge();
   }

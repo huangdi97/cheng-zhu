@@ -336,7 +336,7 @@ def apply_action(
                                            tags=payload.get("tags"))
     row = {"id": store.new_id("ra_"), "goal_id": goal_id, "session_kind": session_kind, "session_ref": str(session_ref),
            "finding_id": str(finding.get("id") or ""), "finding_kind": kind, "action": action,
-           "payload": {k: v for k, v in payload.items() if k in ("tags", "source_ids")}, "result": _brief(result),
+           "payload": {k: v for k, v in payload.items() if k in ("tags", "source_ids", "skill_ids")}, "result": _brief(result),
            "created_at": store.now()}
     store.insert("reflection_action", row)
     events.record("reflection_action", goal_id=goal_id or "", session_id=str(session_ref), action=action, kind=kind)
@@ -370,7 +370,10 @@ def _create_story_draft(finding: dict[str, Any], payload: dict[str, Any]) -> dic
     category = str(payload.get("category") or "")
     intel_storage.save_story(story_id, candidate_id, {
         "title": title, "situation": speech[:2000], "challenge": "", "action": "", "result": "",
-        "reflection": "", "truth_status": "UNKNOWN"}, tags=[t for t in [category, "draft"] if t])
+        "reflection": "", "truth_status": "UNKNOWN",
+        "source_ids": payload.get("source_ids") or finding.get("source_ids") or [],
+        "skill_ids": payload.get("skill_ids") or finding.get("skill_ids") or [],
+    }, tags=[t for t in [category, "draft"] if t])
     return {"id": story_id, "title": title, "draft": True}
 
 

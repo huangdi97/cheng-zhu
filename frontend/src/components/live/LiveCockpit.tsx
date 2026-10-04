@@ -51,7 +51,7 @@ function LiveStatusLine() {
       </span>
       {live?.goalTitle ? <span className="truncate text-xs text-text-muted">· {live.goalTitle}</span> : <span className="text-xs text-text-muted">· 未关联目标</span>}
       <span className="ml-auto flex items-center gap-1">
-        <button type="button" onClick={() => { setQuickNotes(true); track('quick_note_opened_in_live', {}, { goal_id: live?.goalId ?? '' }) }}
+        <button type="button" data-testid="live-quick-notes" onClick={() => { setQuickNotes(true); track('quick_note_opened_in_live', {}, { goal_id: live?.goalId ?? '' }) }}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-text-secondary hover:bg-bg-hover" title="速记（只读）">
           <NotebookPen className="h-3.5 w-3.5" aria-hidden /> 速记
         </button>

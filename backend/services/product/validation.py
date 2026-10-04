@@ -139,16 +139,25 @@ def practice_transfer(goal_id: str = "") -> dict[str, Any]:
         if not before or not after:
             continue
         later_kinds = {o["session_kind"] for o in after}
+        synthetic = store.meta_get(SYNTHETIC_MARKER) == "1"
+        evidence_type = "SYNTHETIC_TRANSFER" if synthetic else (
+            "REAL_INTERVIEW_TRANSFER" if "REAL" in later_kinds else "MOCK_TO_MOCK"
+        )
         links.append({
             "next_focus_id": f["id"], "goal_id": f["goal_id"], "dimensions": dims, "type": f["type"],
             "before_level": round(sum(o["level"] for o in before) / len(before), 2),
             "after_level": round(sum(o["level"] for o in after) / len(after), 2),
             "after_sessions": len({o["session_ref"] for o in after}),
-            "evidence_type": "REAL_INTERVIEW_TRANSFER" if "REAL" in later_kinds else "MOCK_TO_MOCK",
+            "evidence_type": evidence_type,
         })
     improved = [l for l in links if l["after_level"] - l["before_level"] >= 0.5]
+    synthetic = store.meta_get(SYNTHETIC_MARKER) == "1"
     return {"links": links, "improved": len(improved), "measured": len(links),
-            "note": "MOCK_TO_MOCK 只是工程证据，不代表真实面试中的迁移。"}
+            "note": (
+                "SYNTHETIC_TRANSFER 只是工程证据，不代表真实面试中的迁移。"
+                if synthetic else
+                "MOCK_TO_MOCK 只是工程证据；只有真实场次才会标记 REAL_INTERVIEW_TRANSFER。"
+            )}
 
 
 def fact_inbox_burden() -> dict[str, Any]:

@@ -175,33 +175,58 @@ function waitForMainWindowLoad(timeoutMs = 45000) {
       reject(new Error('main window unavailable before evidence plan'));
       return;
     }
-    if (!mainWindow.webContents.isLoadingMainFrame()) {
-      resolve();
-      return;
-    }
+
+    // createWindow() intentionally clears Chromium cache before calling
+    // loadURL(). During that small gap isLoadingMainFrame() is false even
+    // though the renderer is still on the initial blank document. Treating
+    // that as "loaded" lets executeJavaScript() race the first navigation and
+    // can leave the packaged evidence plan pending forever on hosted Windows.
+    // A ready renderer therefore means: the real Chengzhu HTTP document has
+    // committed, it belongs to this sidecar, and the main frame is idle.
+    const isAppDocumentReady = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return false;
+      const url = String(mainWindow.webContents.getURL() || '');
+      if (!/^https?:\/\//i.test(url)) return false;
+      if (SERVER_URL && !url.startsWith(SERVER_URL)) return false;
+      return !mainWindow.webContents.isLoadingMainFrame();
+    };
 
     let settled = false;
+    let poll = null;
     const finish = (error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (poll) clearInterval(poll);
       mainWindow?.webContents.removeListener('did-finish-load', onFinish);
       mainWindow?.webContents.removeListener('did-fail-load', onFail);
+      mainWindow?.webContents.removeListener('did-start-navigation', onNavigation);
       if (error) reject(error);
       else resolve();
     };
-    const onFinish = () => finish();
+    const check = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        finish(new Error('main window destroyed before evidence plan'));
+        return;
+      }
+      if (isAppDocumentReady()) finish();
+    };
+    const onFinish = () => check();
+    const onNavigation = () => check();
     const onFail = (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (isMainFrame === false) return;
       finish(new Error(`main window failed to load (${errorCode}): ${errorDescription} ${validatedURL || ''}`));
     };
     const timer = setTimeout(
-      () => finish(new Error(`main window load timeout after ${timeoutMs}ms`)),
+      () => finish(new Error(`main window load timeout after ${timeoutMs}ms; url=${mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : 'destroyed'}`)),
       Math.max(1000, Number(timeoutMs) || 45000),
     );
 
-    mainWindow.webContents.once('did-finish-load', onFinish);
+    mainWindow.webContents.on('did-finish-load', onFinish);
     mainWindow.webContents.on('did-fail-load', onFail);
+    mainWindow.webContents.on('did-start-navigation', onNavigation);
+    poll = setInterval(check, 100);
+    check();
   });
 }
 

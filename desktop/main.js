@@ -81,7 +81,12 @@ const overlayLayout = require('./overlayLayout');
 // R2 Stage T: Share Privacy is OFF by default; one state drives both windows.
 const sharePrivacyState = sharePrivacy.createSharePrivacyState(sharePrivacy.DEFAULT_MODE);
 let backendStderrTail = '';
-const INSTANCE_NONCE = backendLauncher.newInstanceNonce();
+const evidenceNonce = String(process.env.CHENGZHU_INSTANCE_NONCE || '').trim();
+const INSTANCE_NONCE = (
+  process.env.CHENGZHU_RUNTIME_EVIDENCE === '1' && evidenceNonce.length >= 24
+)
+  ? evidenceNonce
+  : backendLauncher.newInstanceNonce();
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -546,6 +551,45 @@ function waitForServer(timeout = 40000) {
     };
     const retry = () => {
       if (Date.now() - start > timeout) return reject(new Error('Server start timeout'));
+      setTimeout(check, 300);
+    };
+    check();
+  });
+}
+
+function evidenceExternalBackendUrl() {
+  if (!runtimeEvidenceEnabled()) return '';
+  const raw = String(process.env.CHENGZHU_EVIDENCE_BACKEND_URL || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname)) return '';
+    return url.origin;
+  } catch {
+    return '';
+  }
+}
+
+function waitForOwnedExternalServer(timeout = 90000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const req = http.get(`${SERVER_URL}/api/instance`, { timeout: 1000 }, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode === 200 && backendLauncher.isOwnInstance(JSON.parse(body), INSTANCE_NONCE)) return resolve();
+          } catch { /* retry below */ }
+          retry();
+        });
+      });
+      req.on('error', retry);
+      req.on('timeout', () => { req.destroy(); retry(); });
+    };
+    const retry = () => {
+      if (Date.now() - start > timeout) return reject(new Error('Evidence backend start timeout'));
       setTimeout(check, 300);
     };
     check();
@@ -1530,32 +1574,55 @@ app.whenReady().then(async () => {
     /* 个别平台/版本可能不支持 */
   }
   createAppMenu();
-  const picked = await backendLauncher.pickPort(PREFERRED_PORT);
-  if (picked == null) {
-    const { dialog } = require('electron');
-    dialog.showErrorBox('成竹无法启动', `端口 ${PREFERRED_PORT}–${PREFERRED_PORT + 19} 都被占用。请关闭占用端口的程序后重试。`);
-    app.quit();
-    return;
-  }
-  PORT = picked;
-  SERVER_URL = `http://127.0.0.1:${PORT}`;
-  console.log(`Starting backend on ${SERVER_URL} (packaged=${app.isPackaged})...`);
-  startPythonBackend();
 
-  try {
-    // First launch of the packaged sidecar unpacks and imports more modules.
-    await waitForServer(app.isPackaged ? 90000 : 40000);
-    console.log('Backend ready, creating window...');
-  } catch (err) {
-    console.error('Failed to start backend:', err.message);
-    const { dialog } = require('electron');
-    dialog.showErrorBox(
-      '成竹后端启动超时',
-      backendLauncher.describeStartupFailure({ code: 'timeout', stderrTail: backendStderrTail, port: PORT, packaged: app.isPackaged }),
-    );
-    isQuitting = true;
-    app.quit();
-    return;
+  // CI runtime-evidence mode may orchestrate the *packaged* sidecar explicitly
+  // before launching the GUI. This avoids Windows runner deadlocks caused by a
+  // GUI process recursively owning another long-lived child, while still
+  // exercising the real Chengzhu.exe, real packaged backend and installed
+  // frontend resources. Normal production launches never take this branch.
+  const externalEvidenceBackend = evidenceExternalBackendUrl();
+  if (externalEvidenceBackend) {
+    SERVER_URL = externalEvidenceBackend;
+    try {
+      const parsed = new URL(SERVER_URL);
+      PORT = Number(parsed.port || 80);
+      console.log(`Using evidence sidecar on ${SERVER_URL} (packaged=${app.isPackaged})...`);
+      await waitForOwnedExternalServer(app.isPackaged ? 90000 : 40000);
+      console.log('Evidence sidecar ready, creating window...');
+    } catch (err) {
+      console.error('Failed to connect to evidence sidecar:', err.message);
+      isQuitting = true;
+      app.quit();
+      return;
+    }
+  } else {
+    const picked = await backendLauncher.pickPort(PREFERRED_PORT);
+    if (picked == null) {
+      const { dialog } = require('electron');
+      dialog.showErrorBox('成竹无法启动', `端口 ${PREFERRED_PORT}–${PREFERRED_PORT + 19} 都被占用。请关闭占用端口的程序后重试。`);
+      app.quit();
+      return;
+    }
+    PORT = picked;
+    SERVER_URL = `http://127.0.0.1:${PORT}`;
+    console.log(`Starting backend on ${SERVER_URL} (packaged=${app.isPackaged})...`);
+    startPythonBackend();
+
+    try {
+      // First launch of the packaged sidecar unpacks and imports more modules.
+      await waitForServer(app.isPackaged ? 90000 : 40000);
+      console.log('Backend ready, creating window...');
+    } catch (err) {
+      console.error('Failed to start backend:', err.message);
+      const { dialog } = require('electron');
+      dialog.showErrorBox(
+        '成竹后端启动超时',
+        backendLauncher.describeStartupFailure({ code: 'timeout', stderrTail: backendStderrTail, port: PORT, packaged: app.isPackaged }),
+      );
+      isQuitting = true;
+      app.quit();
+      return;
+    }
   }
 
   syncSharePrivacyFromConfig();

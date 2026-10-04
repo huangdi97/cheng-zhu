@@ -12,10 +12,11 @@ on:
   pull_request:
     paths:
       - ".github/workflows/release.yml"
-      - "desktop/package.json"
+      - "desktop/**"
       - "packaging/**"
       - "scripts/build_sidecar.py"
       - "scripts/packaged_smoke.py"
+      - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "backend/requirements.txt"
   workflow_dispatch:
     inputs:
@@ -90,7 +91,7 @@ jobs:
 
       - name: Capture v1.3 packaged runtime UI evidence
         working-directory: frontend
-        run: node scripts/capture-v13-runtime-evidence.mjs
+        run: node scripts/capture-v13-packaged-window-evidence.mjs
 
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4

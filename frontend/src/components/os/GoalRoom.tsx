@@ -9,7 +9,7 @@ import { useOsStore } from '@/stores/osStore'
 import { Dialog, fromLocalInput, toLocalInput } from './CreateGoalDialog'
 import { NextFocusList } from './NextFocusList'
 import { goLive, startPractice } from './actions'
-import { ActionMenu, ErrorState, Field, formatWhen, inputCls, Loading, Page, PrimaryButton, SecondaryButton, Section, Tabs, useAsync } from './ui'
+import { ActionMenu, ErrorState, Field, formatWhen, inputCls, Loading, Page, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, useAsync } from './ui'
 import GoalPrepare from './GoalPrepare'
 import { SessionList } from './SessionList'
 
@@ -87,6 +87,7 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
         <Section title="最近场次" action={<SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>全部</SecondaryButton>}>
           <SessionList items={goal.sessions.slice(0, 4)} emptyText="还没有练习或面试记录。" />
         </Section>
+        <ProgressTrends goalId={goal.id} />
       </div>
       <div>
         <Section title="下一场">
@@ -116,6 +117,65 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
         </Section>
       </div>
     </div>
+  )
+}
+
+function ProgressTrends({ goalId }: { goalId: string }) {
+  const { data, error, loading, reload } = useAsync(() => productApi.trends(goalId), [goalId])
+  const direction = {
+    IMPROVING: ['在改善', 'ok'],
+    DECLINING: ['需要注意', 'risk'],
+    REPEATING: ['反复出现', 'warn'],
+    STABLE: ['保持稳定', 'muted'],
+    INSUFFICIENT: ['数据不足', 'muted'],
+  } as const
+
+  return (
+    <Section title="进展趋势" action={data?.sessions ? <span className="text-[11px] text-text-muted">最近 {data.sessions} 场</span> : null}>
+      {loading && !data ? <Loading label="整理最近练习与面试…" /> : null}
+      {error ? <ErrorState message={error} onRetry={reload} /> : null}
+      {data && !data.dimensions.length ? (
+        <p className="text-xs text-text-muted">完成至少两次带复盘的练习或面试后，这里会显示具体能力的变化，而不是一个综合“面试分”。</p>
+      ) : null}
+      {data?.dimensions.length ? (
+        <ul className="space-y-2" data-testid="goal-progress-trends">
+          {data.dimensions.slice(0, 6).map((d) => {
+            const [label, tone] = direction[d.direction]
+            const latest = d.series[d.series.length - 1]
+            const first = d.series[0]
+            return (
+              <li key={d.dimension} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 flex-1 text-xs font-medium text-text-primary">{d.label}</span>
+                  <StatusBadge tone={tone}>{label}</StatusBadge>
+                </div>
+                <p className="mt-1 text-[11px] text-text-secondary">{d.text}</p>
+                {d.series.length >= 2 ? (
+                  <div className="mt-1 flex items-center gap-1.5 text-[10px] text-text-muted" aria-label={`${d.label} 趋势，从 ${first} 到 ${latest}`}>
+                    <span>{first}</span>
+                    <span aria-hidden>→</span>
+                    <span className="font-medium text-text-primary">{latest}</span>
+                    <span>· {d.series.length} 次观察</span>
+                  </div>
+                ) : null}
+              </li>
+            )
+          })}
+          {data.delivery ? (
+            <li className="rounded-xl border border-bg-hover/50 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 flex-1 text-xs font-medium text-text-primary">表达</span>
+                <StatusBadge tone={direction[data.delivery.direction as keyof typeof direction]?.[1] ?? 'muted'}>
+                  {direction[data.delivery.direction as keyof typeof direction]?.[0] ?? data.delivery.direction}
+                </StatusBadge>
+              </div>
+              <p className="mt-1 text-[11px] text-text-secondary">{data.delivery.text}</p>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+      <p className="mt-2 text-[10px] text-text-muted">这些是同一 Goal 内的练习/复盘观察，不是录用概率，也不和其他候选人比较。</p>
+    </Section>
   )
 }
 

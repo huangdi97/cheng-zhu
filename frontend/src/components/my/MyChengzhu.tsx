@@ -93,6 +93,7 @@ export function Stories() {
   const [items, setItems] = useState<StoryItem[]>([])
   const [draft, setDraft] = useState(EMPTY_STORY)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingRelations, setEditingRelations] = useState<{ source_ids: string[]; skill_ids: string[]; last_used_session: string }>({ source_ids: [], skill_ids: [], last_used_session: '' })
   const [category, setCategory] = useState('')
   const load = useCallback(() => { api.intelStories().then(setItems).catch(() => setItems([])) }, [])
   useEffect(() => { load() }, [load])
@@ -100,10 +101,11 @@ export function Stories() {
   const save = async () => {
     if (!draft.title.trim()) return
     try {
-      const body = { ...draft, tags: category ? [category] : [] }
+      const body = { ...draft, ...editingRelations, tags: category ? [category] : [] }
       if (editingId) await api.intelUpdateStory(editingId, body)
       else await api.intelCreateStory(body)
       setDraft(EMPTY_STORY)
+      setEditingRelations({ source_ids: [], skill_ids: [], last_used_session: '' })
       setCategory('')
       setEditingId(null)
       load()
@@ -141,7 +143,7 @@ export function Stories() {
           <button type="button" onClick={() => void save()} disabled={!draft.title.trim()}
             className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">保存</button>
           {editingId && (
-            <button type="button" onClick={() => { setEditingId(null); setDraft(EMPTY_STORY) }}
+            <button type="button" onClick={() => { setEditingId(null); setDraft(EMPTY_STORY); setEditingRelations({ source_ids: [], skill_ids: [], last_used_session: '' }) }}
               className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs text-text-muted">取消</button>
           )}
         </div>
@@ -153,11 +155,23 @@ export function Stories() {
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold text-text-primary">{story.title}</span>
               <span className="flex gap-2 text-[11px]">
-                <button type="button" className="text-accent-blue" onClick={() => { setEditingId(story.id); setCategory((story.tags ?? [])[0] ?? ''); setDraft({ title: story.title, situation: story.situation, challenge: story.challenge, action: story.action, result: story.result, reflection: story.reflection }) }}>编辑</button>
+                <button type="button" className="text-accent-blue" onClick={() => {
+                  setEditingId(story.id)
+                  setCategory((story.tags ?? [])[0] ?? '')
+                  setEditingRelations({ source_ids: story.source_ids ?? [], skill_ids: story.skill_ids ?? [], last_used_session: story.last_used_session ?? '' })
+                  setDraft({ title: story.title, situation: story.situation, challenge: story.challenge, action: story.action, result: story.result, reflection: story.reflection })
+                }}>编辑</button>
                 <button type="button" className="text-text-muted hover:text-status-risk" onClick={() => api.intelDeleteStory(story.id).then(load)}>删除</button>
               </span>
             </div>
             <p className="mt-1 text-xs text-text-secondary">{[story.situation, story.action, story.result].filter(Boolean).join(' → ')}</p>
+            {(story.source_ids?.length || story.skill_ids?.length || story.last_used_session) ? (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-text-muted" aria-label="Story 关联">
+                {story.source_ids?.length ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">来源 {story.source_ids.length}</span> : null}
+                {story.skill_ids?.length ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">技能 {story.skill_ids.length}</span> : null}
+                {story.last_used_session ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">最近用于场次 {story.last_used_session.slice(0, 12)}</span> : null}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>

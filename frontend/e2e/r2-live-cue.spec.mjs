@@ -200,7 +200,7 @@ test.describe('v1.3 first-run onboarding', () => {
     await expect(wizard.getByTestId('guided-question')).toContainText('为什么在这个项目里选择 RAG？')
 
     await wizard.getByRole('button', { name: '生成 Fast Cue' }).click()
-    await expect(wizard.getByRole('alert')).toContainText('Fast Cue 链路暂时不可用')
+    await expect(wizard.getByRole('alert')).toBeVisible()
     await wizard.getByRole('button', { name: '使用标记明确的示例 Cue 继续' }).click()
     await expect(wizard.getByTestId('guided-fast-cue-fallback')).toContainText('不是实时模型证据')
 

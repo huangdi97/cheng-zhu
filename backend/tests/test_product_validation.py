@@ -86,6 +86,8 @@ def test_seven_day_synthetic_continuity(product_env, monkeypatch):
     failed = [k for k, v in out["checks"].items() if not v]
     assert not failed, failed
     assert validation.evidence_level() == "SYNTHETIC_DOGFOOD"
+    assert out["transfer"]["measured"] >= 1
+    assert {link["evidence_type"] for link in out["transfer"]["links"]} == {"SYNTHETIC_TRANSFER"}
 
 
 def test_thirty_session_synthetic_continuity(product_env, monkeypatch):

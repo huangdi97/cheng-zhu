@@ -176,7 +176,7 @@ export default function OnboardingWizard() {
   const createGoal = async () => {
     if (!goalCompany.trim() && !goalRole.trim()) return true
     if (!goalRole.trim()) {
-      pushToast('请填写目标岗位；公司可以暂时留空', 'warning')
+      pushToast('请填写目标岗位；公司可以暂时留空', 'warn')
       return false
     }
     try {

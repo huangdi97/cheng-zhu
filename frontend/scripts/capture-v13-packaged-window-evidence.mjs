@@ -262,9 +262,11 @@ try {
       { kind: 'wait', selector: '[data-testid="guided-fast-cue"]', timeout_ms: 30000 },
       { kind: 'capture', name: '01d-guided-fast-cue', note: 'real Fast Cue in packaged Guided First Practice' },
 
-      { kind: 'click', selector: '[data-testid="guided-overlay-open"]' },
+      { kind: 'click', selector: '[data-testid="guided-overlay-toggle"]' },
       { kind: 'sleep', ms: 800 },
       { kind: 'capture', target: 'overlay', name: '01e-guided-overlay', note: 'Compact Overlay opened from onboarding' },
+      { kind: 'click', selector: '[data-testid="guided-overlay-toggle"]' },
+      { kind: 'sleep', ms: 350 },
 
       { kind: 'fill', selector: '[data-testid="guided-note"]', value: 'Redis 没做过 Cluster；只讲 session state。' },
       { kind: 'click', selector: '[data-testid="guided-note-save"]' },

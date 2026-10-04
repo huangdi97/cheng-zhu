@@ -161,8 +161,12 @@ try {
   const debugPort = await freePort()
   let appStdout = ''
   let appStderr = ''
-  appProc = spawn(EXE, [`--remote-debugging-port=${debugPort}`], {
-    env: { ...process.env, CHENGZHU_USER_DATA_DIR: userData },
+  appProc = spawn(EXE, [], {
+    env: {
+      ...process.env,
+      CHENGZHU_USER_DATA_DIR: userData,
+      CHENGZHU_REMOTE_DEBUGGING_PORT: String(debugPort),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   })

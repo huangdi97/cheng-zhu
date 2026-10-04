@@ -41,7 +41,9 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
   )
   const cue = useMemo(() => buildFastCueViewModel(cueQa?.fastCue), [cueQa])
   const cueReady = Boolean(cue || fixtureCue)
-  const complete = Boolean(feedback && cueReady)
+  // Onboarding is not complete until the user has seen the demo Reflection.
+  // Cue + answer feedback alone would skip the final loop-closing experience.
+  const complete = Boolean(feedback && cueReady && report)
 
   useEffect(() => {
     if (complete) onCompleted()
@@ -187,7 +189,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
       <div className="space-y-3" data-testid="guided-first-practice">
         <p>最后跑一次 5 分钟内的完整小演练：真实 Practice 问题 → Fast Cue → 你的回答 → 内容/表达反馈。</p>
         <p className="text-xs text-text-muted">前面的麦克风、系统音频和 STT 检查负责硬件链路；这里验证成竹的产品闭环。没有音频硬件时可以用测试语音/文本继续，但会明确标成 fallback。</p>
-        <button type="button" onClick={() => void start()} disabled={busy}
+        <button type="button" data-testid="guided-start" onClick={() => void start()} disabled={busy}
           className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
           {busy ? '正在准备…' : '开始第一次演练'}
         </button>
@@ -205,7 +207,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
           <button type="button" onClick={playQuestion} className="inline-flex items-center gap-1 rounded-lg border border-bg-hover px-2.5 py-1 text-xs text-text-secondary hover:bg-bg-hover/60">
             <Play className="h-3.5 w-3.5" aria-hidden /> 播放测试问题
           </button>
-          <button type="button" onClick={() => void requestCue()} disabled={cueBusy}
+          <button type="button" data-testid="guided-cue" onClick={() => void requestCue()} disabled={cueBusy}
             className="inline-flex items-center gap-1 rounded-lg bg-accent-blue px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50">
             <Sparkles className="h-3.5 w-3.5" aria-hidden /> {cueBusy ? '请求中…' : '生成 Fast Cue'}
           </button>
@@ -248,9 +250,9 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
 
       <div>
         <label className="text-xs font-medium text-text-secondary" htmlFor="guided-answer">你的回答</label>
-        <textarea id="guided-answer" aria-label="第一次演练回答" value={answer} onChange={(e) => setAnswer(e.target.value)}
+        <textarea id="guided-answer" data-testid="guided-answer" aria-label="第一次演练回答" value={answer} onChange={(e) => setAnswer(e.target.value)}
           placeholder="按刚才的 Cue，用自己的话回答…" className="mt-1 min-h-[88px] w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
-        <button type="button" onClick={() => void submit()} disabled={busy || !answer.trim()}
+        <button type="button" data-testid="guided-submit" onClick={() => void submit()} disabled={busy || !answer.trim()}
           className="mt-2 rounded-lg bg-container-primary px-3 py-1.5 text-xs font-semibold text-container-on-primary disabled:opacity-50">
           {busy ? '分析中…' : '提交演练'}
         </button>
@@ -279,7 +281,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
           <p className="mt-0.5 text-[11px] text-text-muted">Overlay、速记和截图不是完成演练的硬门槛；不可用时会明确标记，不会伪装成功。</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <div className="rounded-lg border border-bg-hover/50 p-2">
-              <button type="button" onClick={() => void tryOverlay()} className="inline-flex items-center gap-1 text-xs font-medium text-accent-blue">
+              <button type="button" data-testid="guided-overlay-open" onClick={() => void tryOverlay()} className="inline-flex items-center gap-1 text-xs font-medium text-accent-blue">
                 <MonitorUp className="h-3.5 w-3.5" aria-hidden /> 打开 Compact Overlay
               </button>
               <p className="mt-1 text-[10px] text-text-muted" data-testid="guided-overlay-state">
@@ -292,17 +294,17 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
             <div className="rounded-lg border border-bg-hover/50 p-2">
               <label className="text-[11px] font-medium text-text-secondary" htmlFor="guided-note">速记一条容易忘的点</label>
               <div className="mt-1 flex gap-1.5">
-                <input id="guided-note" aria-label="第一次演练速记" value={quickNote} disabled={quickNoteSaved}
+                <input id="guided-note" data-testid="guided-note" aria-label="第一次演练速记" value={quickNote} disabled={quickNoteSaved}
                   onChange={(e) => setQuickNote(e.target.value)} placeholder="例如：Redis 没做过 Cluster"
                   className="min-w-0 flex-1 rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-xs text-text-primary" />
-                <button type="button" disabled={!quickNote.trim() || quickNoteSaved || busy} onClick={() => void saveQuickNote()}
+                <button type="button" data-testid="guided-note-save" disabled={!quickNote.trim() || quickNoteSaved || busy} onClick={() => void saveQuickNote()}
                   className="inline-flex items-center gap-1 rounded-lg border border-bg-hover px-2 py-1 text-[11px] text-text-secondary disabled:opacity-40">
                   <NotebookPen className="h-3 w-3" aria-hidden /> {quickNoteSaved ? '已保存' : '存入速记'}
                 </button>
               </div>
             </div>
           </div>
-          <button type="button" onClick={() => void tryScreenshot()} className="mt-2 text-[11px] text-text-muted underline decoration-dotted">
+          <button type="button" data-testid="guided-screenshot" onClick={() => void tryScreenshot()} className="mt-2 text-[11px] text-text-muted underline decoration-dotted">
             测试截图区域（可选，会让你选择一个区域）
           </button>
           {screenshotState !== 'IDLE' ? <span className="ml-2 text-[10px] text-text-muted">

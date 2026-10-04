@@ -49,7 +49,34 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
   return (
     <Page testId="reflection-page" wide>
       <PageHeader title={data.title} eyebrow={data.session_kind === 'PRACTICE' ? '练习复盘' : '面试复盘'}
-        actions={data.goal_id ? <SecondaryButton onClick={() => navigate(paths.goal(data.goal_id!))}>回到目标</SecondaryButton> : null} />
+        actions={
+          <div className="flex items-center gap-2">
+            {data.goal_id ? <SecondaryButton onClick={() => navigate(paths.goal(data.goal_id!))}>回到目标</SecondaryButton> : null}
+            <ActionMenu label="复盘操作" actions={[
+              {
+                key: 'export-session',
+                label: '导出场次',
+                onSelect: () => void productApi.exportData({ kind: 'session', session_kind: data.session_kind, session_ref: data.session_ref })
+                  .then((r) => window.alert(`已导出到 ${r.path}`)),
+              },
+              {
+                key: 'export-reflection',
+                label: '导出复盘',
+                onSelect: () => void productApi.exportData({ kind: 'reflection', session_kind: data.session_kind, session_ref: data.session_ref })
+                  .then((r) => window.alert(`已导出到 ${r.path}`)),
+              },
+              {
+                key: 'delete-session',
+                label: '删除这场记录',
+                danger: true,
+                onSelect: () => {
+                  if (!window.confirm('删除这场记录及其复盘关联？这个操作不能撤销。')) return
+                  void productApi.deleteSession(data.session_kind, data.session_ref).then(() => navigate(paths.history()))
+                },
+              },
+            ]} />
+          </div>
+        } />
 
       <Section title="下一步">
         {fs.next_step ? (

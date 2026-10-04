@@ -95,7 +95,7 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await page.getByRole('radio', { name: '重要' }).click()
     await page.getByLabel('备注（可选）').fill(PIN.note)
     await page.getByTestId('pin-dialog').getByRole('button', { name: '标记', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText('已标记')
+    await expect(page.getByText('已标记，复盘时会优先显示')).toBeVisible()
 
     await page.goto('/#/reflection/review/902')
     await expect(page.getByTestId('reflection-page')).toBeVisible()

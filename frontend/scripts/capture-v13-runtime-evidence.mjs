@@ -7,9 +7,11 @@
 //
 // Usage (from frontend/):
 //   node scripts/capture-v13-runtime-evidence.mjs
-import { _electron as electron } from 'playwright'
+import { chromium } from 'playwright'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -95,6 +97,39 @@ async function route(page, hash, ready) {
   await page.waitForTimeout(350)
 }
 
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      const port = typeof address === 'object' && address ? address.port : 0
+      server.close(() => resolve(port))
+    })
+  })
+}
+
+async function waitForCdp(port, proc, timeoutMs = 210000) {
+  const deadline = Date.now() + timeoutMs
+  let lastError = ''
+  while (Date.now() < deadline) {
+    if (proc.exitCode != null) {
+      throw new Error(`packaged app exited before DevTools became ready (code=${proc.exitCode})`)
+    }
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/json/version`)
+      if (res.ok) {
+        const payload = await res.json()
+        if (payload.webSocketDebuggerUrl) return payload.webSocketDebuggerUrl
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  throw new Error(`DevTools endpoint did not become ready on ${port}: ${lastError}`)
+}
+
 const provider = await fakeProvider()
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'chengzhu-v13-evidence-'))
 fs.mkdirSync(path.join(userData, 'config'), { recursive: true })
@@ -114,25 +149,53 @@ fs.writeFileSync(path.join(userData, 'config', 'config.json'), JSON.stringify({
   practice_delivery_analytics_enabled: true,
 }))
 
-let app
+let appProc
+let browser
+let context
 try {
-  app = await electron.launch({ executablePath: EXE, args: [`--user-data-dir=${userData}`], timeout: 120000 })
+  // Playwright's ElectronApplication launcher is intended for the Electron
+  // development binary. With an electron-builder packaged .exe it can attach
+  // to the Node inspector yet still wait forever for the app handshake.
+  // Launch the *real packaged executable* directly and drive its renderer over
+  // Chromium DevTools Protocol instead.
+  const debugPort = await freePort()
+  let appStdout = ''
+  let appStderr = ''
+  appProc = spawn(EXE, [`--remote-debugging-port=${debugPort}`], {
+    env: { ...process.env, CHENGZHU_USER_DATA_DIR: userData },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  })
+  appProc.stdout?.on('data', (chunk) => {
+    const text = chunk.toString('utf8')
+    appStdout = (appStdout + text).slice(-12000)
+    process.stdout.write(`[app] ${text}`)
+  })
+  appProc.stderr?.on('data', (chunk) => {
+    const text = chunk.toString('utf8')
+    appStderr = (appStderr + text).slice(-12000)
+    process.stderr.write(`[app] ${text}`)
+  })
+
+  const endpoint = await waitForCdp(debugPort, appProc)
+  browser = await chromium.connectOverCDP(endpoint)
+  context = browser.contexts()[0]
+  if (!context) throw new Error('packaged Electron exposed no Chromium context')
 
   async function mainWindow() {
-    for (let i = 0; i < 120; i++) {
-      const found = app.windows().find((w) => !w.url().includes('overlay=1') && w.url().startsWith('http'))
+    for (let i = 0; i < 180; i++) {
+      const found = context.pages().find((w) => !w.url().includes('overlay=1') && /^https?:/.test(w.url()))
       if (found) return found
       await new Promise((r) => setTimeout(r, 1000))
     }
-    throw new Error('main window not found')
+    throw new Error(`main window not found; stdout=${appStdout.slice(-1200)} stderr=${appStderr.slice(-1200)}`)
   }
 
   const page = await mainWindow()
   await page.waitForLoadState('domcontentloaded')
   await page.getByRole('heading', { name: '成竹', exact: true }).waitFor({ timeout: 120000 })
   const base = await page.evaluate(() => location.origin)
-  const realUserData = await app.evaluate(({ app: a }) => a.getPath('userData'))
-  manifest.push({ name: '_runtime', note: `origin=${base} userData=${realUserData} exe=${EXE}` })
+  manifest.push({ name: '_runtime', note: `origin=${base} userData=${userData} exe=${EXE} transport=CDP` })
 
   // Fresh-install evidence: run the canonical 11-step onboarding instead
   // of taking one screenshot and bypassing the product loop.
@@ -328,7 +391,7 @@ try {
   }
 
   // Overlay renderer evidence after a real cue.
-  const overlay = app.windows().find((w) => w.url().includes('overlay=1'))
+  const overlay = context.pages().find((w) => w.url().includes('overlay=1'))
   if (overlay) {
     await overlay.waitForLoadState('domcontentloaded')
     await overlay.waitForTimeout(800)
@@ -348,11 +411,9 @@ try {
 
   // 390px packaged-window evidence.
   await page.evaluate(() => localStorage.setItem('ia-color-scheme', 'vscode-light-plus'))
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x.isVisible() && !x.webContents.getURL().includes('overlay=1'))
-    w?.setMinimumSize(360, 500)
-    w?.setSize(390, 844)
-  })
+  // CDP viewport emulation exercises the real packaged renderer at 390px
+  // without relying on Electron main-process evaluation.
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await route(page, `#/goals/${goal.id}/prepare`, '[data-testid="goal-room"]')
@@ -372,6 +433,13 @@ try {
   }, null, 2))
   console.log('done', OUT)
 } finally {
-  if (app) await app.close().catch(() => undefined)
+  if (browser) await browser.close().catch(() => undefined)
+  if (appProc && appProc.exitCode == null) {
+    if (process.platform === 'win32' && appProc.pid) {
+      spawnSync('taskkill', ['/PID', String(appProc.pid), '/T', '/F'], { stdio: 'ignore' })
+    } else {
+      appProc.kill('SIGKILL')
+    }
+  }
   provider.close()
 }

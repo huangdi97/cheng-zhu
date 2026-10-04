@@ -13,6 +13,20 @@ if (process.env.CHENGZHU_USER_DATA_DIR) {
   app.setPath('userData', path.resolve(process.env.CHENGZHU_USER_DATA_DIR));
 }
 
+// Packaged-runtime evidence drives the *real* electron-builder executable over
+// CDP. Passing --remote-debugging-port to a packaged executable is not
+// consistent across Electron/Chromium startup paths on Windows, so CI uses an
+// explicit opt-in environment variable that is translated into a Chromium
+// switch before app.whenReady(). Normal users never set this variable.
+const runtimeEvidenceDebugPort = String(process.env.CHENGZHU_REMOTE_DEBUGGING_PORT || '').trim();
+if (/^\d{2,5}$/.test(runtimeEvidenceDebugPort)) {
+  const port = Number(runtimeEvidenceDebugPort);
+  if (port >= 1024 && port <= 65535) {
+    app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
+    app.commandLine.appendSwitch('remote-debugging-port', String(port));
+  }
+}
+
 // Windows: 透明 BrowserWindow 需要 DWM 硬件加速。
 // 保留硬件加速可以让成竹的窗口隐私保护标记按系统能力工作；
 // 这只是尽量减少本机录屏/截图的意外捕获，不承诺对第三方会议软件或系统策略隐身。

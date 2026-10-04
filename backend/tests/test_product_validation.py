@@ -2,6 +2,8 @@
 longitudinal synthetic dogfood, future-profile boundary."""
 import json
 
+import pytest
+
 from services.product import data_export, dogfood, events, future_profile, goals, practice, quick_notes, validation
 from services.storage import product as store
 
@@ -110,3 +112,12 @@ def test_shared_product_layer_does_not_hard_code_job():
     shared = [t for t in _V1_TABLES if any(name in t for name in ("quick_note", "pin_moment", "next_focus",
                                                                     "product_event", "reflection_action"))]
     assert shared and all("job_id" not in t for t in shared)
+
+
+def test_product_store_rejects_missing_text_primary_key(product_env):
+    with pytest.raises(ValueError, match="goal.id is required"):
+        store.insert("goal", {"company": "orphan", "role": "invalid"})
+    # INTEGER AUTOINCREMENT tables remain valid without an explicit id.
+    assert events.record("goal_created", goal_id="g-safe")
+    row = events.list_events("goal_created")[0]
+    assert isinstance(row["id"], int)

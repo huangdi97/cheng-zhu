@@ -124,6 +124,207 @@ let lastOverlayState = {
   maxLines: 0,
 };
 
+let runtimeEvidenceServer = null;
+
+function runtimeEvidenceEnabled() {
+  return process.env.CHENGZHU_RUNTIME_EVIDENCE === '1';
+}
+
+function evidenceJson(res, status, payload) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function evidenceReadJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 256 * 1024) {
+        reject(new Error('runtime evidence request too large'));
+        try { req.destroy(); } catch { /* ignore */ }
+      }
+    });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function evidenceSafeName(name) {
+  const raw = String(name || 'capture').trim();
+  const safe = raw.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  return (safe || 'capture').slice(0, 120);
+}
+
+async function evidenceWaitForSelector(selector, timeoutMs = 20000) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+  const deadline = Date.now() + Math.max(250, Math.min(120000, Number(timeoutMs) || 20000));
+  const encoded = JSON.stringify(String(selector || ''));
+  while (Date.now() < deadline) {
+    const found = await mainWindow.webContents.executeJavaScript(
+      `Boolean(document.querySelector(${encoded}))`,
+      true,
+    ).catch(() => false);
+    if (found) return true;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  return false;
+}
+
+function startRuntimeEvidenceBridge() {
+  if (!runtimeEvidenceEnabled() || runtimeEvidenceServer) return;
+  const requestedPort = Number(process.env.CHENGZHU_RUNTIME_EVIDENCE_PORT || 0);
+  const token = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_TOKEN || '');
+  const outputDir = path.resolve(
+    process.env.CHENGZHU_RUNTIME_EVIDENCE_DIR
+      || path.join(app.getPath('userData'), 'runtime-evidence'),
+  );
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  runtimeEvidenceServer = http.createServer(async (req, res) => {
+    try {
+      if (token && req.headers['x-chengzhu-evidence-token'] !== token) {
+        evidenceJson(res, 403, { ok: false, error: 'forbidden' });
+        return;
+      }
+      const url = new URL(req.url || '/', 'http://127.0.0.1');
+      if (req.method === 'GET' && url.pathname === '/status') {
+        evidenceJson(res, 200, {
+          ok: true,
+          ready: Boolean(mainWindow && !mainWindow.isDestroyed()),
+          backend_url: SERVER_URL,
+          window_url: mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : '',
+          user_data: app.getPath('userData'),
+          output_dir: outputDir,
+          packaged: app.isPackaged,
+          version: app.getVersion(),
+        });
+        return;
+      }
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        evidenceJson(res, 409, { ok: false, error: 'main window unavailable' });
+        return;
+      }
+
+      const body = req.method === 'POST' ? await evidenceReadJson(req) : {};
+      if (req.method === 'POST' && url.pathname === '/navigate') {
+        const hash = String(body.hash || '#/home');
+        await mainWindow.webContents.executeJavaScript(
+          `location.hash = ${JSON.stringify(hash)}`,
+          true,
+        );
+        const found = body.selector
+          ? await evidenceWaitForSelector(body.selector, body.timeout_ms)
+          : true;
+        evidenceJson(res, found ? 200 : 408, { ok: found, hash, selector: body.selector || null });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/reload') {
+        mainWindow.webContents.reload();
+        const found = body.selector
+          ? await evidenceWaitForSelector(body.selector, body.timeout_ms)
+          : true;
+        evidenceJson(res, found ? 200 : 408, { ok: found });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/wait') {
+        const found = await evidenceWaitForSelector(body.selector, body.timeout_ms);
+        evidenceJson(res, found ? 200 : 408, { ok: found, selector: body.selector || null });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/storage') {
+        const key = String(body.key || '');
+        if (!key) throw new Error('storage key required');
+        await mainWindow.webContents.executeJavaScript(
+          `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(body.value ?? ''))})`,
+          true,
+        );
+        evidenceJson(res, 200, { ok: true, key });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/resize') {
+        const width = Math.max(360, Math.min(2400, Number(body.width) || 1200));
+        const height = Math.max(500, Math.min(1800, Number(body.height) || 800));
+        mainWindow.setMinimumSize(360, 500);
+        mainWindow.setSize(Math.round(width), Math.round(height));
+        evidenceJson(res, 200, { ok: true, width, height });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/key') {
+        const modifiers = Array.isArray(body.modifiers) ? body.modifiers.map(String) : [];
+        const keyCode = String(body.key || '');
+        if (!keyCode) throw new Error('key required');
+        mainWindow.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+        mainWindow.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+        evidenceJson(res, 200, { ok: true });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/click') {
+        const selector = String(body.selector || '');
+        if (!selector) throw new Error('selector required');
+        const clicked = await mainWindow.webContents.executeJavaScript(
+          `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true })()`,
+          true,
+        );
+        evidenceJson(res, clicked ? 200 : 404, { ok: Boolean(clicked), selector });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/fill') {
+        const selector = String(body.selector || '');
+        if (!selector) throw new Error('selector required');
+        const filled = await mainWindow.webContents.executeJavaScript(
+          `(() => {
+            const el = document.querySelector(${JSON.stringify(selector)});
+            if (!el) return false;
+            const setter = Object.getOwnPropertyDescriptor(el.__proto__, 'value')?.set;
+            if (setter) setter.call(el, ${JSON.stringify(String(body.value ?? ''))});
+            else el.value = ${JSON.stringify(String(body.value ?? ''))};
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          })()`,
+          true,
+        );
+        evidenceJson(res, filled ? 200 : 404, { ok: Boolean(filled), selector });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/capture') {
+        const name = evidenceSafeName(body.name);
+        const image = await mainWindow.capturePage();
+        const file = path.join(outputDir, name.endsWith('.png') ? name : `${name}.png`);
+        fs.writeFileSync(file, image.toPNG());
+        evidenceJson(res, 200, {
+          ok: true,
+          file,
+          width: image.getSize().width,
+          height: image.getSize().height,
+          url: mainWindow.webContents.getURL(),
+        });
+        return;
+      }
+      evidenceJson(res, 404, { ok: false, error: 'not found' });
+    } catch (error) {
+      evidenceJson(res, 500, { ok: false, error: error?.message || String(error) });
+    }
+  });
+
+  runtimeEvidenceServer.listen(
+    Number.isFinite(requestedPort) ? requestedPort : 0,
+    '127.0.0.1',
+    () => {
+      const address = runtimeEvidenceServer.address();
+      console.log(`[runtime-evidence] bridge ready on 127.0.0.1:${address && typeof address === 'object' ? address.port : requestedPort}`);
+    },
+  );
+}
+
 const OVERLAY_PRESET = { width: 480, height: 320, minWidth: 300, minHeight: 100, resizable: true };
 
 const REGION_OVERLAY_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -1317,6 +1518,10 @@ function gracefulStopPython(timeoutMs = 20000) {
 
 app.on('before-quit', (event) => {
   isQuitting = true;
+  if (runtimeEvidenceServer) {
+    try { runtimeEvidenceServer.close(); } catch { /* ignore */ }
+    runtimeEvidenceServer = null;
+  }
   if (!pythonProcess || pythonStopPromise) return;
   event.preventDefault();
   gracefulStopPython().then(() => {
@@ -1362,6 +1567,7 @@ app.whenReady().then(async () => {
 
   syncSharePrivacyFromConfig();
   createWindow();
+  startRuntimeEvidenceBridge();
   createTray();
   registerShortcuts();
 

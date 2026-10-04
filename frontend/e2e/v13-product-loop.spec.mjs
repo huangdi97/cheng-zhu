@@ -175,7 +175,7 @@ test.describe('v1.3 Goal-centered product loop', () => {
       localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
       apiOverrides: {
         'GET /api/product/goals/goal-v13': GOAL_DETAIL,
-        'GET /api/product/trends?goal_id=goal-v13': {
+        'GET /api/product/trends': {
           goal_id: GOAL.id,
           sessions: 4,
           dimensions: [

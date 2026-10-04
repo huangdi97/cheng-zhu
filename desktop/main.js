@@ -159,6 +159,172 @@ function evidenceSafeName(name) {
   return (safe || 'capture').slice(0, 120);
 }
 
+function runtimeEvidencePlanPath() {
+  if (!runtimeEvidenceEnabled()) return '';
+  const raw = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_PLAN || '').trim();
+  if (!raw) return '';
+  return path.resolve(raw);
+}
+
+async function evidenceCaptureToFile(outputDir, name, targetName = 'main') {
+  const target = targetName === 'overlay' ? overlayWindow : mainWindow;
+  if (!target || target.isDestroyed()) throw new Error(`${targetName} window unavailable`);
+  const image = await target.capturePage();
+  const safe = evidenceSafeName(name);
+  const file = path.join(outputDir, safe.endsWith('.png') ? safe : `${safe}.png`);
+  fs.writeFileSync(file, image.toPNG());
+  return { file, target: targetName, width: image.getSize().width, height: image.getSize().height, url: target.webContents.getURL() };
+}
+
+function evidenceFillSelector(selector, value) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+  return mainWindow.webContents.executeJavaScript(
+    `(() => {
+      const el = document.querySelector(${JSON.stringify(String(selector || ''))});
+      if (!el) return false;
+      const proto = Object.getPrototypeOf(el);
+      const setter = proto && Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (setter) setter.call(el, ${JSON.stringify(String(value ?? ''))});
+      else el.value = ${JSON.stringify(String(value ?? ''))};
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`,
+    true,
+  );
+}
+
+async function runRuntimeEvidencePlan() {
+  const planPath = runtimeEvidencePlanPath();
+  if (!planPath) return;
+  const outputDir = path.resolve(
+    process.env.CHENGZHU_RUNTIME_EVIDENCE_DIR || path.join(app.getPath('userData'), 'runtime-evidence'),
+  );
+  fs.mkdirSync(outputDir, { recursive: true });
+  const resultPath = path.resolve(
+    process.env.CHENGZHU_RUNTIME_EVIDENCE_RESULT || path.join(outputDir, 'plan-result.json'),
+  );
+  const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+  const entries = [];
+  const startedAt = new Date().toISOString();
+  try {
+    for (const [index, rawStep] of (Array.isArray(plan.steps) ? plan.steps : []).entries()) {
+      const step = rawStep && typeof rawStep === 'object' ? rawStep : {};
+      const kind = String(step.kind || '');
+      if (kind === 'sleep') {
+        await new Promise((resolve) => setTimeout(resolve, Math.max(0, Math.min(30000, Number(step.ms) || 0))));
+        continue;
+      }
+      if (kind === 'wait') {
+        const found = await evidenceWaitForSelector(step.selector, step.timeout_ms);
+        if (!found) throw new Error(`step ${index}: selector timeout ${step.selector}`);
+        continue;
+      }
+      if (kind === 'navigate') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const hash = String(step.hash || '#/home');
+        await mainWindow.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`, true);
+        if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
+          throw new Error(`step ${index}: navigation selector timeout ${step.selector}`);
+        }
+        continue;
+      }
+      if (kind === 'reload') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        mainWindow.webContents.reload();
+        if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
+          throw new Error(`step ${index}: reload selector timeout ${step.selector}`);
+        }
+        continue;
+      }
+      if (kind === 'click') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const selector = String(step.selector || '');
+        const clicked = await mainWindow.webContents.executeJavaScript(
+          `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true })()`,
+          true,
+        );
+        if (!clicked) throw new Error(`step ${index}: click target missing ${selector}`);
+        continue;
+      }
+      if (kind === 'fill') {
+        const filled = await evidenceFillSelector(step.selector, step.value);
+        if (!filled) throw new Error(`step ${index}: fill target missing ${step.selector}`);
+        continue;
+      }
+      if (kind === 'key') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const keyCode = String(step.key || '');
+        const modifiers = Array.isArray(step.modifiers) ? step.modifiers.map(String) : [];
+        if (!keyCode) throw new Error(`step ${index}: key required`);
+        mainWindow.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+        mainWindow.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+        continue;
+      }
+      if (kind === 'storage') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const key = String(step.key || '');
+        if (!key) throw new Error(`step ${index}: storage key required`);
+        await mainWindow.webContents.executeJavaScript(
+          `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(step.value ?? ''))})`,
+          true,
+        );
+        continue;
+      }
+      if (kind === 'resize') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const width = Math.max(360, Math.min(2400, Number(step.width) || 1200));
+        const height = Math.max(500, Math.min(1800, Number(step.height) || 800));
+        mainWindow.setMinimumSize(360, 500);
+        mainWindow.setSize(Math.round(width), Math.round(height));
+        continue;
+      }
+      if (kind === 'ask') {
+        await postBackend('/api/ask', JSON.stringify({ text: String(step.text || '') }));
+        continue;
+      }
+      if (kind === 'capture') {
+        if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
+          throw new Error(`step ${index}: capture selector timeout ${step.selector}`);
+        }
+        if (step.delay_ms) await new Promise((resolve) => setTimeout(resolve, Math.min(10000, Number(step.delay_ms) || 0)));
+        const captured = await evidenceCaptureToFile(outputDir, step.name || `capture-${index + 1}`, step.target || 'main');
+        entries.push({ name: step.name || `capture-${index + 1}`, note: String(step.note || ''), ...captured });
+        continue;
+      }
+      throw new Error(`step ${index}: unsupported evidence plan kind ${kind}`);
+    }
+    const result = {
+      ok: true,
+      evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN',
+      packaged: app.isPackaged,
+      version: app.getVersion(),
+      backend_url: SERVER_URL,
+      user_data: app.getPath('userData'),
+      started_at: startedAt,
+      completed_at: new Date().toISOString(),
+      entries,
+    };
+    fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'manifest.json'), JSON.stringify(result, null, 2));
+  } catch (error) {
+    const result = {
+      ok: false,
+      evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN',
+      error: error?.message || String(error),
+      packaged: app.isPackaged,
+      version: app.getVersion(),
+      started_at: startedAt,
+      completed_at: new Date().toISOString(),
+      entries,
+    };
+    fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
+    throw error;
+  } finally {
+    if (plan.auto_quit !== false) setTimeout(() => { isQuitting = true; app.quit(); }, 250);
+  }
+}
+
 async function evidenceWaitForSelector(selector, timeoutMs = 20000) {
   if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
   const deadline = Date.now() + Math.max(250, Math.min(120000, Number(timeoutMs) || 20000));
@@ -1637,6 +1803,11 @@ app.whenReady().then(async () => {
   syncSharePrivacyFromConfig();
   createWindow();
   startRuntimeEvidenceBridge();
+  if (runtimeEvidencePlanPath()) {
+    void runRuntimeEvidencePlan().catch((error) => {
+      console.error('Runtime evidence plan failed:', error?.message || error);
+    });
+  }
   createTray();
   registerShortcuts();
 

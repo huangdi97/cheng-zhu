@@ -94,7 +94,7 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await expect(page.getByTestId('pin-dialog')).toBeVisible()
     await page.getByRole('radio', { name: '重要' }).click()
     await page.getByLabel('备注（可选）').fill(PIN.note)
-    await page.getByRole('button', { name: '标记', exact: true }).click()
+    await page.getByTestId('pin-dialog').getByRole('button', { name: '标记', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('已标记')
 
     await page.goto('/#/reflection/review/902')
@@ -194,7 +194,9 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await expect(trends).toContainText('在改善')
     await expect(trends).toContainText('Ownership')
     await expect(page.getByText('这些是同一 Goal 内的练习/复盘观察')).toBeVisible()
-    await expect(page.getByText(/录用概率/)).toHaveCount(0)
+    // A disclaimer may contain the words “录用概率”; what must never exist is
+    // a pseudo-precise probability value presented as a product metric.
+    await expect(page.getByText(/录用概率\s*[:：]?\s*\d+\s*%/)).toHaveCount(0)
   })
 
   test('v1.4 diagnostics renders six product-loop questions without claiming PMF', async ({ context, page }) => {

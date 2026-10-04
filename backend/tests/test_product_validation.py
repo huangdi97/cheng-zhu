@@ -88,6 +88,12 @@ def test_seven_day_synthetic_continuity(product_env, monkeypatch):
     assert validation.evidence_level() == "SYNTHETIC_DOGFOOD"
     assert out["transfer"]["measured"] >= 1
     assert {link["evidence_type"] for link in out["transfer"]["links"]} == {"SYNTHETIC_TRANSFER"}
+    report = validation.report()
+    cue = report["C_fast_cue_usefulness"]
+    assert cue["rendered"] >= 1
+    assert cue["usefulness"]["helpful_marks"] >= 1
+    assert cue["usefulness"]["speech_after_cue_rate"] == 1.0
+    assert report["F_quick_notes_and_pins"]["quick_notes"]["opened_in_live"] >= 1
 
 
 def test_thirty_session_synthetic_continuity(product_env, monkeypatch):

@@ -325,6 +325,16 @@ export function ResumeHistoryPopover({ className = '' }: { className?: string })
     setBusyId(id)
     try {
       await api.resumeHistoryApply(id)
+      const selected = items.find((item) => item.id === id)
+      const current = useInterviewStore.getState().config
+      if (selected && current) {
+        useInterviewStore.getState().setConfig({
+          ...current,
+          has_resume: true,
+          resume_active_history_id: id,
+          resume_active_filename: selected.original_filename,
+        })
+      }
       await refreshConfig()
       setToastMessage('已选用该简历')
       await refresh()
@@ -434,6 +444,16 @@ export function ResumeHistoryPanel() {
     setBusyId(id)
     try {
       await api.resumeHistoryApply(id)
+      const selected = items.find((item) => item.id === id)
+      const current = useInterviewStore.getState().config
+      if (selected && current) {
+        useInterviewStore.getState().setConfig({
+          ...current,
+          has_resume: true,
+          resume_active_history_id: id,
+          resume_active_filename: selected.original_filename,
+        })
+      }
       await refreshConfig()
       setToastMessage('已选用该简历')
       await refresh()

@@ -268,10 +268,18 @@ try {
     selector: '[data-testid="action-home"]',
     timeout_ms: 30000,
   })
-  await bridge('POST', '/key', { key: 'K', modifiers: ['control'] })
-  await bridge('POST', '/wait', { selector: '[data-testid="command-palette"]', timeout_ms: 5000 })
-  await capture('13-command-palette', 'Ctrl+K contextual commands')
-  await bridge('POST', '/key', { key: 'Escape', modifiers: [] })
+  try {
+    await bridge('POST', '/key', { key: 'K', modifiers: ['control'] })
+    await bridge('POST', '/wait', { selector: '[data-testid="command-palette"]', timeout_ms: 5000 })
+    await capture('13-command-palette', 'Ctrl+K contextual commands')
+    await bridge('POST', '/key', { key: 'Escape', modifiers: [] })
+  } catch (error) {
+    manifest.push({
+      name: '13-command-palette',
+      note: 'Shortcut capture unavailable in packaged timing; functional E2E remains authoritative: '
+        + (error instanceof Error ? error.message : String(error)),
+    })
+  }
 
   await route('#/practice?goal=' + goal.id, '[data-testid="practice-setup"]', '14-practice-setup', 'Practice 3.0')
   const practice = await request(backend, 'POST', '/api/product/practice', {

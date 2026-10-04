@@ -68,12 +68,12 @@ def _run_week() -> dict[str, Any]:
             config_module.clear_session_overlay()
 
 
-def _run_thirty() -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="chengzhu-v14-30-") as td:
+def _run_sessions(count: int) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix=f"chengzhu-v14-{count}-") as td:
         _configure(Path(td))
         original_now = product.now
         try:
-            run = dogfood.run_sessions(30, lambda clock: setattr(product, "now", clock))
+            run = dogfood.run_sessions(count, lambda clock: setattr(product, "now", clock))
             return {
                 "dogfood": run,
                 "validation": validation.report(),
@@ -87,6 +87,7 @@ def _run_thirty() -> dict[str, Any]:
 def _markdown(payload: dict[str, Any]) -> str:
     week = payload["seven_day"]
     thirty = payload["thirty_session"]
+    hundred = payload["hundred_session"]
     v = week["validation"]
     lines = [
         "# Chengzhu v1.4 Engineering Validation Evidence",
@@ -99,6 +100,8 @@ def _markdown(payload: dict[str, Any]) -> str:
         f"- 30-session continuity: {'PASS' if thirty['dogfood']['passed'] else 'FAIL'}",
         f"- 7-day integrity: {'PASS' if week['integrity']['ok'] else 'FAIL'}",
         f"- 30-session integrity: {'PASS' if thirty['integrity']['ok'] else 'FAIL'}",
+        f"- 100-session continuity: {'PASS' if hundred['dogfood']['passed'] else 'FAIL'}",
+        f"- 100-session integrity: {'PASS' if hundred['integrity']['ok'] else 'FAIL'}",
         f"- real_user_validation: {v['real_user_validation']}",
         "",
         "## Seven-day continuity checks",
@@ -107,6 +110,8 @@ def _markdown(payload: dict[str, Any]) -> str:
     lines += [f"- {'PASS' if ok else 'FAIL'}: {key}" for key, ok in week["dogfood"]["checks"].items()]
     lines += ["", "## Thirty-session continuity checks", ""]
     lines += [f"- {'PASS' if ok else 'FAIL'}: {key}" for key, ok in thirty["dogfood"]["checks"].items()]
+    lines += ["", "## Hundred-session reliability checks", ""]
+    lines += [f"- {'PASS' if ok else 'FAIL'}: {key}" for key, ok in hundred["dogfood"]["checks"].items()]
     for title, key in [
         ("A · Goal reuse", "A_goal_reuse"),
         ("B · Reflection → Prepare", "B_reflection_to_prepare"),
@@ -141,7 +146,8 @@ def main() -> int:
         "evidence_type": "SYNTHETIC_DOGFOOD",
         "real_user_evidence": "REAL_USER_EVIDENCE_PENDING",
         "seven_day": _run_week(),
-        "thirty_session": _run_thirty(),
+        "thirty_session": _run_sessions(30),
+        "hundred_session": _run_sessions(100),
     }
     (out / "v1.4-engineering-evidence.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -151,14 +157,17 @@ def main() -> int:
     ok = (
         payload["seven_day"]["dogfood"]["passed"]
         and payload["thirty_session"]["dogfood"]["passed"]
+        and payload["hundred_session"]["dogfood"]["passed"]
         and payload["seven_day"]["integrity"]["ok"]
         and payload["thirty_session"]["integrity"]["ok"]
+        and payload["hundred_session"]["integrity"]["ok"]
     )
     print(json.dumps({
         "ok": ok,
         "evidence_type": payload["evidence_type"],
         "seven_day": payload["seven_day"]["dogfood"]["passed"],
         "thirty_session": payload["thirty_session"]["dogfood"]["passed"],
+        "hundred_session": payload["hundred_session"]["dogfood"]["passed"],
         "real_user_evidence": payload["real_user_evidence"],
         "out_dir": str(out),
     }, ensure_ascii=False))

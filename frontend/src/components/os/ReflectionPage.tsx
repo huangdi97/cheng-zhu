@@ -26,6 +26,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
   const [done, setDone] = useState<Record<string, string>>({})
   const [feedbackSent, setFeedbackSent] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [sourceFor, setSourceFor] = useState<{ id: string; text: string } | null>(null)
 
   if (loading && !data) return <Page><Loading /></Page>
   if (error) return <Page><ErrorState message={error} onRetry={reload} extra={<SecondaryButton onClick={() => navigate(paths.history())}>返回历史</SecondaryButton>} /></Page>
@@ -134,7 +135,27 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
                     {(['CONFIRM_FACT', 'MARK_MISTAKE', 'DONT_REMEMBER'] as const).map((a) => (
                       <SecondaryButton key={a} onClick={() => void act(a, f as unknown as Record<string, unknown>)}>{status(f, a) ?? ACTION_LABEL[a]}</SecondaryButton>
                     ))}
+                    {f.claim_id ? (
+                      <SecondaryButton onClick={() => setSourceFor(sourceFor?.id === f.id ? null : { id: f.id, text: '' })}>
+                        {status(f, 'ADD_SOURCE') ?? '补来源'}
+                      </SecondaryButton>
+                    ) : null}
                   </div>
+                  {f.claim_id && sourceFor?.id === f.id ? (
+                    <div className="mt-2 rounded-lg border border-bg-hover/60 bg-bg-tertiary/20 p-2">
+                      <label className="text-[11px] font-medium text-text-secondary" htmlFor={`reflection-source-${f.id}`}>粘贴能支持这条说法的原始来源</label>
+                      <textarea id={`reflection-source-${f.id}`} value={sourceFor.text}
+                        onChange={(e) => setSourceFor({ id: f.id, text: e.target.value })}
+                        placeholder="例如：设计文档、周报、PR 描述中的原文。成竹只把你提供的内容记为 supporting evidence。"
+                        className="mt-1 min-h-[64px] w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-xs text-text-primary" />
+                      <div className="mt-1.5 flex gap-2">
+                        <PrimaryButton disabled={!sourceFor.text.trim()} onClick={() => void act('ADD_SOURCE', f as unknown as Record<string, unknown>, { source_text: sourceFor.text })}>
+                          保存来源
+                        </PrimaryButton>
+                        <SecondaryButton onClick={() => setSourceFor(null)}>取消</SecondaryButton>
+                      </div>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>

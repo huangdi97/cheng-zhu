@@ -46,7 +46,7 @@ export function NextFocusList({ goalId, items, onChanged, compact = false }: {
               <p className="mt-0.5 text-xs text-text-secondary">原因：{item.reason}</p>
               {!compact ? (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {item.actions.slice(0, 3).map((a, i) => (
+                  {(item.actions ?? []).slice(0, 3).map((a, i) => (
                     <button key={a.key} type="button" onClick={() => act(item, a.key)}
                       className={i === 0 && idx === 0
                         ? 'btn-primary rounded-full px-3 py-1 text-xs font-semibold'

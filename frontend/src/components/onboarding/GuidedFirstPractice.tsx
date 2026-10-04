@@ -125,13 +125,18 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
     }
   }
 
-  const tryOverlay = async () => {
+  const toggleOverlay = async () => {
     const electron = window.electronAPI
     if (!electron?.syncOverlayWindow) {
       setOverlayState('UNAVAILABLE')
       return
     }
     try {
+      if (overlayState === 'OPENED') {
+        await electron.syncOverlayWindow({ enabled: false, visible: false })
+        setOverlayState('IDLE')
+        return
+      }
       await electron.setOverlayLayout?.({ dock: 'TOP', interaction: 'INTERACTIVE', size: 'COMPACT' })
       await electron.syncOverlayWindow({
         enabled: true,
@@ -281,8 +286,8 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
           <p className="mt-0.5 text-[11px] text-text-muted">Overlay、速记和截图不是完成演练的硬门槛；不可用时会明确标记，不会伪装成功。</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <div className="rounded-lg border border-bg-hover/50 p-2">
-              <button type="button" data-testid="guided-overlay-open" onClick={() => void tryOverlay()} className="inline-flex items-center gap-1 text-xs font-medium text-accent-blue">
-                <MonitorUp className="h-3.5 w-3.5" aria-hidden /> 打开 Compact Overlay
+              <button type="button" data-testid="guided-overlay-toggle" onClick={() => void toggleOverlay()} className="inline-flex items-center gap-1 text-xs font-medium text-accent-blue">
+                <MonitorUp className="h-3.5 w-3.5" aria-hidden /> {overlayState === 'OPENED' ? '关闭 Compact Overlay' : '打开 Compact Overlay'}
               </button>
               <p className="mt-1 text-[10px] text-text-muted" data-testid="guided-overlay-state">
                 {overlayState === 'OPENED' ? 'Overlay 已打开；上场时 Cue 会出现在这里。'

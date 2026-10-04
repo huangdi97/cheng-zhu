@@ -125,7 +125,7 @@ test.describe('shared resume mount', () => {
     await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
     await expect(page.getByTestId('resume-mount-filename')).toHaveText('张三_后端开发.pdf')
 
-    await page.getByRole('button', { name: '选用' }).first().click()
+    await page.getByRole('button', { name: '选用', exact: true }).first().click()
     await expect(page.getByTestId('resume-mount-filename')).toHaveText('李四_后端.pdf')
 
     // The mount is shared product state, not a page-local copy: a full reload

@@ -81,6 +81,18 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run dist:win
 
+      - name: Capture v1.3 packaged runtime UI evidence
+        working-directory: frontend
+        run: node scripts/capture-v13-runtime-evidence.mjs
+
+      - name: Upload packaged runtime UI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chengzhu-v1.3-runtime-ui-evidence
+          path: artifacts/release-evidence/v1.3
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Installed-layout smoke (unpacked app resources)
         run: python scripts/packaged_smoke.py --exe dist/desktop/win-unpacked/resources/backend/chengzhu-backend.exe --frontend-dist dist/desktop/win-unpacked/resources/frontend-dist --resources dist/desktop/win-unpacked/resources --report dist/release/installed-layout-smoke.json
 

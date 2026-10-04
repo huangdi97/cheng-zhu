@@ -161,7 +161,12 @@ try {
   const debugPort = await freePort()
   let appStdout = ''
   let appStderr = ''
-  appProc = spawn(EXE, [], {
+  // Chromium 136+ only honors remote-debugging switches with a
+  // non-default --user-data-dir. Keep the explicit Chengzhu env override too:
+  // the flag satisfies Chromium's security rule, while the env guarantees the
+  // packaged backend and Electron main process resolve the very same isolated
+  // evidence profile before app.whenReady().
+  appProc = spawn(EXE, [`--user-data-dir=${userData}`], {
     env: {
       ...process.env,
       CHENGZHU_USER_DATA_DIR: userData,

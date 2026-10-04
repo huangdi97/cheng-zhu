@@ -145,7 +145,7 @@ try {
   await api(base, 'POST', '/api/intelligence/candidate/rebuild', { resume_text: resume, interview_notes: '' })
   await api(base, 'POST', '/api/config', { resume_text: resume })
 
-  const goal = await api(base, 'POST', '/api/v3/goals', {
+  const goal = await api(base, 'POST', '/api/product/goals', {
     company: 'MindRank',
     role: 'AIDD Agent Engineer',
     jd: '负责 Agent / RAG / CADD 产品与工程落地；要求系统设计、评估与高可用。',
@@ -153,31 +153,31 @@ try {
     interview_round: 'TECHNICAL',
     next_interview_at: Math.floor(Date.now() / 1000) + 86400,
   })
-  await api(base, 'POST', `/api/v3/goals/${goal.id}/interviews`, {
+  await api(base, 'POST', `/api/product/goals/${goal.id}/interviews`, {
     round: '技术二面',
     scheduled_at: Math.floor(Date.now() / 1000) + 86400,
     kind: 'REAL',
     notes: 'v1.3 runtime evidence',
   })
-  const material = await formApi(base, '/api/v3/materials', {
+  const material = await formApi(base, '/api/product/materials', {
     title: 'WenNian 架构说明',
     kind: 'PROJECT',
     usage: 'FACTS',
     text: '我负责 RAG 检索链路；Redis 只用于 session state，没有 Redis Cluster 生产经历。',
     background: 'false',
   })
-  const note = await api(base, 'POST', '/api/v3/quick-notes', {
+  const note = await api(base, 'POST', '/api/product/quick-notes', {
     title: 'MindRank 二面速记',
     content: 'Redis：只讲 session state，不说 Cluster 生产经历。\n反问：Agent eval 的上线门槛是什么？',
     scope: 'GOAL', goal_id: goal.id, pinned: true, tags: ['想问'],
   })
-  const bank = await api(base, 'POST', '/api/v3/question-banks', {
+  const bank = await api(base, 'POST', '/api/product/question-banks', {
     name: 'AIDD Agent 深挖', scope: 'GOAL', role: 'AI_ML_ENGINEER', goal_id: goal.id,
   })
-  await api(base, 'POST', `/api/v3/question-banks/${bank.id}/items`, {
+  await api(base, 'POST', `/api/product/question-banks/${bank.id}/items`, {
     text: '如果 Agent 线上效果下降，你怎么定位？', category: 'SYSTEM_DESIGN', difficulty: 'STANDARD', origin: 'USER_ADDED', rounds: ['TECHNICAL'],
   })
-  await api(base, 'PATCH', `/api/v3/goals/${goal.id}`, {
+  await api(base, 'PATCH', `/api/product/goals/${goal.id}`, {
     selected_material_ids: [material.id],
     selected_quick_note_ids: [note.id],
     active_question_bank_ids: [bank.id],
@@ -237,7 +237,7 @@ try {
   await route(page, `#/practice?goal=${goal.id}`, '[data-testid="practice-setup"]')
   await shot(page, '15-practice-setup', 'Practice 3.0: Goal, round, persona, demeanor, difficulty, sources')
 
-  const practice = await api(base, 'POST', '/api/v3/practice', {
+  const practice = await api(base, 'POST', '/api/product/practice', {
     goal_id: goal.id, round: 'TECHNICAL', personas: ['TECH_LEAD', 'HIRING_MANAGER'],
     demeanor: 'SKEPTICAL', difficulty: 'PRESSURE', sources: ['GOAL_GRAPH', 'ROLE_BANK'],
     questions: 2, language: 'zh', human_coach: false, delivery_analytics: true,
@@ -251,7 +251,7 @@ try {
   await shot(page, '17-content-delivery-coach', 'Content Coach and Delivery Coach stay separate')
 
   // Reflection for the practice session.
-  await api(base, 'POST', `/api/v3/practice/${practice.practice_id}/finish`, {})
+  await api(base, 'POST', `/api/product/practice/${practice.practice_id}/finish`, {})
   await route(page, `#/reflection/practice/${practice.practice_id}`, '[data-testid="reflection-page"]')
   await shot(page, '18-reflection', 'Reflection first screen: next step, strengths, improvements, pins, fact checks')
 

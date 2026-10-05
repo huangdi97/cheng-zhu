@@ -262,7 +262,7 @@ try {
     scope: 'GOAL', goal_id: goal.id, pinned: true, tags: ['想问'],
   })
   const bank = await request(base, 'POST', '/api/product/question-banks', {
-    name: 'AIDD Agent 深挖', scope: 'GOAL', role: 'AI_ML_ENGINEER', goal_id: goal.id,
+    name: 'AIDD Agent 深挖', scope: 'GOAL', role: 'AI_ML', goal_id: goal.id,
   })
   await request(base, 'POST', '/api/product/question-banks/' + bank.id + '/items', {
     text: '如果 Agent 线上效果下降，你怎么定位？',
@@ -272,7 +272,7 @@ try {
     selected_material_ids: [material.id],
     selected_quick_note_ids: [note.id],
     active_question_bank_ids: [bank.id],
-    role_family: 'AI_ML_ENGINEER',
+    role_family: 'AI_ML',
   })
 
   const practice = await request(base, 'POST', '/api/product/practice', {

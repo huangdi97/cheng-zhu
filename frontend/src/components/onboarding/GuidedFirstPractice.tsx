@@ -103,7 +103,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
     try {
       await api.ask(question)
     } catch (e) {
-      setCueError(getErrorMessage(e, 'Fast Cue 链路暂时不可用'))
+      setCueError(getErrorMessage(e, '快速提示链路暂时不可用'))
     } finally {
       setCueBusy(false)
     }
@@ -192,7 +192,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
   if (!practiceId) {
     return (
       <div className="space-y-3" data-testid="guided-first-practice">
-        <p>最后跑一次 5 分钟内的完整小演练：真实 Practice 问题 → Fast Cue → 你的回答 → 内容/表达反馈。</p>
+        <p>最后跑一次 5 分钟内的完整小演练：真实演练问题 → 快速提示 → 你的回答 → 内容/表达反馈。</p>
         <p className="text-xs text-text-muted">前面的麦克风、系统音频和 STT 检查负责硬件链路；这里验证成竹的产品闭环。没有音频硬件时可以用测试语音/文本继续，但会明确标成 fallback。</p>
         <button type="button" data-testid="guided-start" onClick={() => void start()} disabled={busy}
           className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
@@ -214,7 +214,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
           </button>
           <button type="button" data-testid="guided-cue" onClick={() => void requestCue()} disabled={cueBusy}
             className="inline-flex items-center gap-1 rounded-lg bg-accent-blue px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden /> {cueBusy ? '请求中…' : '生成 Fast Cue'}
+            <Sparkles className="h-3.5 w-3.5" aria-hidden /> {cueBusy ? '请求中…' : '生成快速提示'}
           </button>
         </div>
         {audioState === 'PLAYED' ? <p className="mt-1 text-[11px] text-status-direct">测试问题已通过系统语音播放。</p> : null}
@@ -224,7 +224,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
       {cue ? (
         <div className="rounded-xl border border-status-direct/30 bg-status-direct/5 p-3" data-testid="guided-fast-cue">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
-            <CheckCircle2 className="h-3.5 w-3.5 text-status-direct" aria-hidden /> Fast Cue 已就绪
+            <CheckCircle2 className="h-3.5 w-3.5 text-status-direct" aria-hidden /> 快速提示已就绪
             {cue.ttfugUserMs != null ? <span className="font-normal text-text-muted">· {cue.ttfugUserMs}ms</span> : null}
           </div>
           {cue.direction ? <p className="mt-1 text-xs text-text-secondary">{cue.direction}</p> : null}
@@ -238,7 +238,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
         </div>
       ) : fixtureCue ? (
         <div className="rounded-xl border border-status-inferred/30 bg-status-inferred/5 p-3" data-testid="guided-fast-cue-fallback">
-          <p className="text-xs font-semibold text-text-primary">Fixture fallback（不是实时模型证据）</p>
+          <p className="text-xs font-semibold text-text-primary">示例提示（不是实时模型证据）</p>
           <ul className="mt-1 text-xs text-text-secondary">
             <li>• 先给结论，再讲 2–3 个依据</li>
             <li>• 只引用你真正做过的经历</li>
@@ -324,7 +324,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
           <p className="mt-1 text-[11px] text-text-muted">这不是综合分；只告诉你下一轮具体该保留和改什么。</p>
           {report.went_well?.slice(0, 2).map((x) => <p key={x} className="mt-1 text-[11px] text-status-direct">✓ {x}</p>)}
           {report.to_improve?.slice(0, 2).map((x) => <p key={x} className="mt-1 text-[11px] text-status-inferred">→ {x}</p>)}
-          {!report.went_well?.length && !report.to_improve?.length ? <p className="mt-1 text-[11px] text-text-secondary">本场已保存；以后每场都会进入 Reflection，再回写到 Goal 的 Next Focus。</p> : null}
+          {!report.went_well?.length && !report.to_improve?.length ? <p className="mt-1 text-[11px] text-text-secondary">本场已保存；以后每场都会进入复盘，再回写到求职目标的下一步重点。</p> : null}
         </section>
       ) : null}
 
@@ -333,7 +333,7 @@ export default function GuidedFirstPractice({ goalId, onCompleted }: Props) {
           <CheckCircle2 className="h-4 w-4" aria-hidden /> 第一次演练已跑通，可以进入成竹。
         </p>
       ) : !cueReady ? (
-        <p className="flex items-center gap-1.5 text-[11px] text-text-muted"><CircleAlert className="h-3.5 w-3.5" aria-hidden /> 先生成 Fast Cue，再提交回答。</p>
+        <p className="flex items-center gap-1.5 text-[11px] text-text-muted"><CircleAlert className="h-3.5 w-3.5" aria-hidden /> 先生成快速提示，再提交回答。</p>
       ) : null}
 
       {error ? <p role="alert" className="text-xs text-status-risk">{error}</p> : null}

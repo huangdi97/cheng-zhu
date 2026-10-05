@@ -17,6 +17,7 @@ on:
       - "scripts/build_sidecar.py"
       - "scripts/packaged_smoke.py"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
+      - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
       - "backend/requirements.txt"
   workflow_dispatch:
     inputs:

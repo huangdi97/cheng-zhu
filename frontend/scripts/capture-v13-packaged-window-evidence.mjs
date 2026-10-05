@@ -333,7 +333,7 @@ try {
   const bank = await request(backendBase, 'POST', '/api/product/question-banks', {
     name: 'AIDD Agent 深挖',
     scope: 'GOAL',
-    role: 'AI_ML_ENGINEER',
+    role: 'AI_ML',
     goal_id: goal.id,
   })
   await request(backendBase, 'POST', '/api/product/question-banks/' + bank.id + '/items', {
@@ -347,7 +347,7 @@ try {
     selected_material_ids: [material.id],
     selected_quick_note_ids: [note.id],
     active_question_bank_ids: [bank.id],
-    role_family: 'AI_ML_ENGINEER',
+    role_family: 'AI_ML',
   })
   const practice = await request(backendBase, 'POST', '/api/product/practice', {
     goal_id: goal.id,

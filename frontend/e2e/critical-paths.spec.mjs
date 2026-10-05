@@ -201,6 +201,8 @@ test.describe('Live focus mode', () => {
             timestamp: now,
             source: 'manual_text',
             model_name: 'GPT-4.1 Mini',
+            first_token_ms: 37,
+            total_ms: 812,
             fast_cue: {
               direction: '先讲更新频率和可追溯性',
               cues: [{ text: '知识更新频繁', source: 'WORLD_KNOWLEDGE' }],
@@ -219,7 +221,10 @@ test.describe('Live focus mode', () => {
     await expect(page.getByTestId('live-tools-summary')).toBeVisible()
     await expect(page.getByTestId('live-advanced-tools')).toHaveCount(0)
     await expect(page.getByTestId('live-secondary-tools')).toBeHidden()
+    await expect(page.getByTestId('resume-mount-inline')).toHaveCount(0)
     await expect(page.getByText('先讲更新频率和可追溯性')).toBeVisible()
+    await expect(page.getByText(/首字\s*37ms/)).toHaveCount(0)
+    await expect(page.getByText(/总\s*812ms/)).toHaveCount(0)
 
     await page.getByRole('button', { name: '现场工具' }).click()
     await expect(page.getByTestId('live-advanced-tools')).toBeVisible()

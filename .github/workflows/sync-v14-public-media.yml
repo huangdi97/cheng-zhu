@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   sync:
-    if: \${{ !contains(github.event.head_commit.message, '[skip media]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[skip media]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,12 +22,12 @@ jobs:
 
       - name: Download released v1.4.0 packaged runtime evidence
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           rm -rf /tmp/chengzhu-v14-media
           mkdir -p /tmp/chengzhu-v14-media
           gh run download 37316020206 \
-            --repo "\${{ github.repository }}" \
+            --repo "${{ github.repository }}" \
             --name chengzhu-runtime-ui-evidence \
             --dir /tmp/chengzhu-v14-media
           find /tmp/chengzhu-v14-media -maxdepth 4 -type f | sort | head -100

@@ -52,8 +52,22 @@ def goal_reuse() -> dict[str, Any]:
         last = max([float(g["updated_at"] or 0), *opens.get(g["id"], [0.0])])
         lifespans.append(max(0.0, last - float(g["created_at"])))
     focus = store.select("next_focus")
-    acted = [f for f in focus if f["status"] == "DONE"]
-    practice_with_focus = sum(1 for p in store.select("practice_session") if (p.get("config") or {}).get("focus"))
+    # A rate is about unique focus items acted on, not the number of actions.
+    # Re-practising the same focus ten times must still count as one acted item.
+    # The old implementation added every practice session to DONE rows and could
+    # therefore report impossible values such as 10.889.
+    acted_ids = {str(f["id"]) for f in focus if f["status"] == "DONE"}
+    known_ids = {str(f["id"]) for f in focus}
+    for practice in store.select("practice_session"):
+        focus_cfg = (practice.get("config") or {}).get("focus")
+        if isinstance(focus_cfg, dict):
+            focus_id = str(focus_cfg.get("id") or "")
+        elif isinstance(focus_cfg, str):
+            focus_id = focus_cfg
+        else:
+            focus_id = ""
+        if focus_id in known_ids:
+            acted_ids.add(focus_id)
     return {
         "goals": created,
         "goal_reopen_rate": round(len(reopened_ids) / created, 3) if created else None,
@@ -61,7 +75,7 @@ def goal_reuse() -> dict[str, Any]:
         "median_goal_lifespan_days": _median([l / 86400 for l in lifespans]),
         "median_return_interval_hours": _median([i / 3600 for i in intervals]),
         "next_focus_items": len(focus),
-        "next_focus_action_rate": round((len(acted) + practice_with_focus) / len(focus), 3) if focus else None,
+        "next_focus_action_rate": round(len(acted_ids) / len(focus), 3) if focus else None,
     }
 
 

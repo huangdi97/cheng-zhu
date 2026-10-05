@@ -122,7 +122,7 @@ Synthetic evidence is marked so it cannot silently become “real-user” eviden
 
 This branch deepens the previously shallow E/F synthetic checks:
 
-1. Reflection explicitly creates a Goal-scoped Quick Note with `origin = REFLECTION`.
+1. Reflection explicitly creates a Goal-scoped Quick Note, while local ProductEvent provenance records `quick_note_from_reflection`.
 2. Fact Inbox is opened and the deliberately over-strong “lead” claim is resolved to participation.
 3. The user-created bad-answer Pin is explicitly promoted to Next Focus only after a Reflection action.
 4. Validation metrics assert those actions are present rather than merely asserting that the event names exist.

@@ -61,7 +61,7 @@ function LayeredRow({ k, layer, goalId, onChanged }: { k: string; layer: Setting
           {options.map(([v, l]) => <option key={String(v)} value={encode(v)}>{l}</option>)}
         </select>
       </Field>
-      <Field label={goalId ? 'Goal 默认' : 'Goal 默认（先在上方选择目标）'}>
+      <Field label={goalId ? '目标默认' : '目标默认（先在上方选择目标）'}>
         <select className={inputCls} disabled={!goalId} value={layer.goal_value === null || layer.goal_value === undefined ? '' : encode(layer.goal_value)} onChange={(e) => setGoal(e.target.value)}>
           <option value="">沿用全局</option>
           {options.map(([v, l]) => <option key={String(v)} value={encode(v)}>{l}</option>)}
@@ -184,11 +184,11 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
 
   const cards = [
     {
-      key: 'A', title: 'Goal 是否持续复用', value: rate(goal.goal_reopen_rate),
+      key: 'A', title: '求职目标是否持续复用', value: rate(goal.goal_reopen_rate),
       detail: `${metric(goal.goals, '0')} 个 Goal · 平均 ${metric(goal.sessions_per_goal, '0')} 场/Goal`,
     },
     {
-      key: 'B', title: 'Reflection 是否改变下一步', value: rate(reflection.follow_through_rate),
+      key: 'B', title: '复盘是否改变下一步', value: rate(reflection.follow_through_rate),
       detail: `${metric(reflection.next_focus_from_reflection, '0')} 个 Next Focus 来自复盘`,
     },
     {
@@ -196,15 +196,15 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
       detail: `已显示 Cue · 说话跟随率 ${rate(usefulness.speech_after_cue_rate)}`,
     },
     {
-      key: 'D', title: 'Practice 是否迁移', value: metric(transfer.measured, '0'),
+      key: 'D', title: '练习是否带来后续改善', value: metric(transfer.measured, '0'),
       detail: `${metric(transfer.improved, '0')} 个可测链路改善；Mock 不能冒充真实面试`,
     },
     {
-      key: 'E', title: 'Fact Inbox 是否成负担', value: metric(inbox.backlog_size, '0'),
+      key: 'E', title: '待确认事实是否成负担', value: metric(inbox.backlog_size, '0'),
       detail: `当前 backlog · 解决率 ${rate(inbox.resolution_rate)}`,
     },
     {
-      key: 'F', title: 'Quick Notes / Pin 是否有价值', value: metric(notes.selected_into_pack, '0'),
+      key: 'F', title: '速记 / 标记是否有价值', value: metric(notes.selected_into_pack, '0'),
       detail: `速记进 Pack · Pin→Next Focus ${metric(pins.next_focus_from_pin, '0')}`,
     },
   ]
@@ -278,7 +278,7 @@ function DiagnosticsGroup() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-text-primary">产品循环验证（v1.4）</h3>
-            <p className="text-[11px] text-text-muted">Goal → Practice → Live → Reflection → Next Focus 的本地证据。</p>
+            <p className="text-[11px] text-text-muted">求职目标 → 练习 → 上场 → 复盘 → 下一步的本地证据。</p>
           </div>
           {validation.loading ? <StatusBadge tone="busy">整理中</StatusBadge> : null}
         </div>
@@ -309,14 +309,14 @@ export default function SettingsPage({ group, query }: { group: string; query: R
     <Field label="编辑范围">
       <select className={inputCls} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
         <option value="">只改全局默认</option>
-        {(goals.data?.items ?? []).map((g) => <option key={g.id} value={g.id}>Goal 默认：{g.title}</option>)}
+        {(goals.data?.items ?? []).map((g) => <option key={g.id} value={g.id}>目标默认：{g.title}</option>)}
       </select>
     </Field>
   )
 
   return (
     <Page testId="settings-page" wide>
-      <PageHeader title="设置" subtitle="每个值都标明来源：全局默认 / Goal 默认 / 本场覆盖。" />
+      <PageHeader title="设置" subtitle="每个值都标明来源：全局默认 / 目标默认 / 本场覆盖。" />
       <div className="relative mb-3">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" aria-hidden />
         <input type="search" aria-label="搜索设置" placeholder="搜索设置，例如：回答语言、浮窗、共享、快捷键" value={search} onChange={(e) => setSearch(e.target.value)}

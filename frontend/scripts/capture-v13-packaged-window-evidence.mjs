@@ -118,7 +118,9 @@ async function waitForFile(file, proc, timeoutMs = 180000) {
 async function runPlan({ name, userData, backendBase, nonce, token, steps }) {
   const planPath = path.join(userData, name + '-plan.json')
   const resultPath = path.join(userData, name + '-result.json')
+  const statusPath = path.join(userData, name + '-status.json')
   try { fs.unlinkSync(resultPath) } catch {}
+  try { fs.unlinkSync(statusPath) } catch {}
   fs.writeFileSync(planPath, JSON.stringify({ auto_quit: true, steps }, null, 2))
 
   let stdout = ''
@@ -134,6 +136,7 @@ async function runPlan({ name, userData, backendBase, nonce, token, steps }) {
       CHENGZHU_RUNTIME_EVIDENCE_DIR: OUT,
       CHENGZHU_RUNTIME_EVIDENCE_PLAN: planPath,
       CHENGZHU_RUNTIME_EVIDENCE_RESULT: resultPath,
+      CHENGZHU_RUNTIME_EVIDENCE_STATUS: statusPath,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -156,6 +159,11 @@ async function runPlan({ name, userData, backendBase, nonce, token, steps }) {
   } catch (error) {
     console.error('app stdout tail:', stdout.slice(-5000))
     console.error('app stderr tail:', stderr.slice(-5000))
+    if (fs.existsSync(statusPath)) {
+      console.error('app evidence stage:', fs.readFileSync(statusPath, 'utf8'))
+    } else {
+      console.error('app evidence stage: no status file; packaged main entry did not reach evidence instrumentation')
+    }
     throw error
   } finally {
     if (proc.exitCode == null) {

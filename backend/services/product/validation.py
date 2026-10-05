@@ -218,6 +218,56 @@ def nudge_metrics() -> dict[str, Any]:
     return {k: c.get(f"nudge_{k}", 0) for k in ("shown", "dismissed", "actioned", "disabled")}
 
 
+def friction_audit() -> dict[str, Any]:
+    """Canonical interaction budgets plus local completion signals.
+
+    designed_steps is the shortest supported path after the screen is already
+    open. It is a UX contract, not clickstream-derived telemetry. completed
+    uses local ProductEvent signals only and never implies real-user usability.
+    """
+    c = events.counts()
+    journeys = [
+        {
+            "key": "home_to_practice", "label": "Home → Practice",
+            "designed_steps": 2, "budget": 3, "path": ["开始练习", "开始演练"],
+            "completed": c.get("practice_started", 0),
+        },
+        {
+            "key": "goal_to_live", "label": "Goal → Go Live",
+            "designed_steps": 2, "budget": 2, "path": ["上场", "冻结并开始"],
+            "completed": c.get("live_started", 0),
+        },
+        {
+            "key": "live_to_quick_note", "label": "Live → Quick Notes",
+            "designed_steps": 1, "budget": 1, "path": ["打开速记"],
+            "completed": c.get("quick_note_opened_in_live", 0),
+        },
+        {
+            "key": "live_to_pin", "label": "Live → Pin",
+            "designed_steps": 2, "budget": 2, "path": ["Ctrl+P", "保存标记"],
+            "completed": c.get("pin_created", 0),
+        },
+        {
+            "key": "session_to_reflection", "label": "End Session → Reflection",
+            "designed_steps": 0, "budget": 1, "path": ["自动进入 Reflection"],
+            "completed": c.get("reflection_opened", 0),
+        },
+        {
+            "key": "reflection_to_next_practice", "label": "Reflection → Next Focus → Practice",
+            "designed_steps": 2, "budget": 3, "path": ["练这个/设为 Next Focus", "开始演练"],
+            "completed": sum(
+                1 for a in store.select("reflection_action")
+                if a.get("action") in ("PRACTICE_THIS", "SET_NEXT_FOCUS")
+            ),
+        },
+    ]
+    return {
+        "journeys": journeys,
+        "all_within_budget": all(j["designed_steps"] <= j["budget"] for j in journeys),
+        "evidence_type": "DESIGN_PATH_PLUS_LOCAL_COMPLETION_SIGNAL",
+        "note": "步数是产品交互预算；completed 只是本机完成信号，不是用户研究结论。",
+    }
+
 def evidence_level() -> str:
     if store.meta_get(SYNTHETIC_MARKER) == "1":
         return "SYNTHETIC_DOGFOOD"
@@ -236,8 +286,9 @@ def report() -> dict[str, Any]:
         "D_practice_transfer": practice_transfer(),
         "E_fact_inbox_burden": fact_inbox_burden(),
         "F_quick_notes_and_pins": notes_and_pins(),
+        "friction_audit": friction_audit(),
         "nudges": nudge_metrics(),
-        "note": "本地产品分析，只在本机；远程遥测需用户主动开启。自动化测试或合成数据不能证明 PMF。",
+        "note": "本地产品分析，只在本机；当前版本没有远程上传器。自动化测试或合成数据不能证明 PMF。",
     }
 
 

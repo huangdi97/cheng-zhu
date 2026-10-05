@@ -79,11 +79,11 @@ async function openPrepare(context, page) {
   await page.goto('/#/goals/goal-1/prepare')
   await expect(page.getByTestId('goal-room')).toBeVisible()
   await expect(page.getByRole('tab', { name: '准备' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('heading', { name: 'Gap Map' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '准备缺口' })).toBeVisible()
 }
 
 test.describe('Goal Prepare workspace', () => {
-  test('shows gap map, attack surface, story gap and the question graph', async ({ context, page }) => {
+  test('shows preparation gaps, likely deep-dives, story gaps and follow-up questions', async ({ context, page }) => {
     await openPrepare(context, page)
 
     await expect(page.getByText('RAG 评估')).toBeVisible()

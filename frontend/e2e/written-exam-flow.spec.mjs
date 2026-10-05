@@ -100,8 +100,8 @@ test.describe('written exam flow', () => {
     await expect(page.getByText('代码题：给定整数数组 nums 和目标值 target，返回两数之和的下标。').first()).toBeVisible({
       timeout: 5000,
     })
-    await expect(page.getByText('哈希表一次遍历 O(n)')).toBeVisible()
-    await expect(page.getByText('def two_sum(nums, target):')).toBeVisible()
+    await expect(page.getByText('哈希表一次遍历 O(n)').first()).toBeVisible()
+    await expect(page.getByText('def two_sum(nums, target):').first()).toBeVisible()
 
     expect(requests).toEqual([
       { pathname: '/api/exam-preflight/run', method: 'POST', body: {} },

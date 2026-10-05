@@ -11,10 +11,12 @@
 - v1.3 PR CI: `37285890890` — SUCCESS
 - v1.3 PR Release preflight: `37285890873` — SUCCESS
 - post-merge main CI: `37287635769` — SUCCESS
-- current public stable release at the time this report was written: `v1.2.2`
-- current v1.4 branch: `feat/chengzhu-v1.4-validation-hardening`
+- current public stable release: `v1.3.0` — published 2026-10-05
+- current v1.4 branch: `feat/chengzhu-v1.4-final-hardening`
+- current v1.4 PR: #11
+- former PR #9 product/UI hardening: merged into #11 and closed to keep one authoritative v1.4 line
 
-v1.3 code is therefore merged and CI-proven. A public v1.3 tag / GitHub Release remains a release-operation gate until it exists in the repository's public Releases list.
+v1.3 is therefore merged, CI-proven, packaged and publicly released. v1.4 now combines the product-craft changes from the earlier validation branch with version/release/canonical hardening in one PR.
 
 ## 2. v1.3 product status
 
@@ -120,14 +122,20 @@ Synthetic evidence is marked so it cannot silently become “real-user” eviden
 
 ## 7. Current v1.4 hardening delta
 
-This branch deepens the previously shallow E/F synthetic checks:
+The unified v1.4 PR now contains both product craft and validation/release hardening:
 
 1. Reflection explicitly creates a Goal-scoped Quick Note, while local ProductEvent provenance records `quick_note_from_reflection`.
 2. Fact Inbox is opened and the deliberately over-strong “lead” claim is resolved to participation.
 3. The user-created bad-answer Pin is explicitly promoted to Next Focus only after a Reflection action.
 4. Validation metrics assert those actions are present rather than merely asserting that the event names exist.
+5. Live keeps the current Question / Fast Cue authoritative while previous turns remain secondary.
+6. Action Home / Goal Room / Prepare / Reflection use user-facing Chinese rather than exposing internal labels such as raw `Question Graph`, `InterviewPack` or validation status codes.
+7. Goal Room hierarchy and Prepare copy are tightened around the user's next action.
+8. Diagnostics renders A–F as product-readable cards while retaining raw metrics one level deeper.
+9. Version/release gates require frontend, desktop and packaged backend sidecar to agree on `1.4.0`.
+10. The v1.4 release workflow remains blocked until packaged smoke, runtime evidence and version consistency are green.
 
-This closes the gap between “instrumentation exists” and “the product loop was actually exercised.”
+This closes both kinds of gap: “instrumentation exists but the loop was not exercised” and “the capability exists but the user still sees internal-system language.”
 
 ## 8. External / unresolved evidence
 

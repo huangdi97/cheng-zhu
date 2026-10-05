@@ -35,6 +35,18 @@ test.describe('R2 live cue-first', () => {
           ttfug_internal_ms: 310,
         },
         {
+          type: 'answer_chunk',
+          delay: 120,
+          id: 'qa-r2-1',
+          content: '完整回答正文：我没有 Redis Cluster 的生产经历，但可以说明它的槽位分片与高可用设计。',
+        },
+        {
+          type: 'answer_done',
+          delay: 150,
+          id: 'qa-r2-1',
+          total_ms: 150,
+        },
+        {
           type: 'session_claim_warning',
           delay: 60,
           id: 'sc-1',
@@ -60,6 +72,14 @@ test.describe('R2 live cue-first', () => {
     await expect(cue.getByText('资料')).toBeVisible()
     await expect(cue.getByText('没有来源支持，不要说成“我做过/我负责”')).toBeVisible()
     await expect(cue.getByText('提示 920ms（自说完）')).toBeVisible()
+
+    // v1.3 hierarchy: the Fast Cue remains the first useful layer even after
+    // the Deep Answer exists. Deep is opt-in, never dumped under the cue.
+    const deepToggle = page.getByRole('button', { name: '展开完整回答' }).first()
+    await expect(deepToggle).toBeVisible()
+    await expect(page.getByText(/完整回答正文：/)).toHaveCount(0)
+    await deepToggle.click()
+    await expect(page.getByText(/完整回答正文：我没有 Redis Cluster/)).toBeVisible()
 
     const warning = page.getByTestId('session-claim-warning')
     await expect(warning).toBeVisible()

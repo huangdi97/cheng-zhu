@@ -18,10 +18,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'desktop', 'package.json'), 'utf8')).version
+const EVIDENCE_VERSION = 'v' + APP_VERSION
 const RESOURCES = path.join(ROOT, 'dist', 'desktop', 'win-unpacked', 'resources')
 const BACKEND_EXE = path.join(RESOURCES, 'backend', 'chengzhu-backend.exe')
 const FRONTEND_DIST = path.join(RESOURCES, 'frontend-dist')
-const OUT = path.join(ROOT, 'artifacts', 'release-evidence', 'v1.3')
+const OUT = path.join(ROOT, 'artifacts', 'release-evidence', EVIDENCE_VERSION)
 fs.mkdirSync(OUT, { recursive: true })
 
 function freePort() {
@@ -111,11 +113,11 @@ const provider = await fakeProvider()
 const backendPort = await freePort()
 const base = 'http://127.0.0.1:' + backendPort
 const nonce = crypto.randomBytes(18).toString('hex')
-const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'chengzhu-v13-web-evidence-'))
+const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'chengzhu-runtime-web-evidence-'))
 fs.mkdirSync(path.join(userData, 'config'), { recursive: true })
 fs.writeFileSync(path.join(userData, 'config', 'config.json'), JSON.stringify({
   models: [{
-    name: 'Fake v1.3 evidence',
+    name: 'Fake runtime evidence',
     api_base_url: 'http://127.0.0.1:' + provider.address().port + '/v1',
     api_key: 'not-a-real-key',
     model: 'fake-model',

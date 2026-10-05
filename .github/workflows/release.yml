@@ -119,13 +119,46 @@ jobs:
       - name: Clean installer replay on fresh Windows runner
         shell: pwsh
         run: |
-          $installDir = Join-Path $env:RUNNER_TEMP "Chengzhu-CleanInstall"
-          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
-          New-Item -ItemType Directory -Force $installDir | Out-Null
-
+          $ErrorActionPreference = 'Stop'
           $installer = (Resolve-Path "dist/desktop/Chengzhu-Setup-x64.exe").Path
-          $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
-          if ($proc.ExitCode -ne 0) { throw "NSIS clean install failed with exit code $($proc.ExitCode)" }
+          New-Item -ItemType Directory -Force dist/release | Out-Null
+
+          # NSIS occasionally exits with 0xC0000005 on hosted Windows runners
+          # before writing the target directory (Defender/runner timing). Do
+          # not weaken the gate: retry into a fresh directory, then still
+          # require the installed resources and packaged smoke to pass.
+          $attempts = @()
+          $installDir = $null
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Get-Process Chengzhu, chengzhu-backend -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds ([Math]::Min(2 * $attempt, 5))
+
+            $candidate = Join-Path $env:RUNNER_TEMP "Chengzhu-CleanInstall-$attempt"
+            if (Test-Path $candidate) { Remove-Item -Recurse -Force $candidate -ErrorAction SilentlyContinue }
+            New-Item -ItemType Directory -Force $candidate | Out-Null
+
+            $started = Get-Date
+            $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$candidate") -Wait -PassThru
+            $attempts += [pscustomobject]@{
+              attempt = $attempt
+              install_dir = $candidate
+              exit_code = $proc.ExitCode
+              duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
+            }
+
+            if ($proc.ExitCode -eq 0) {
+              $installDir = $candidate
+              break
+            }
+
+            Write-Warning "NSIS attempt $attempt failed with exit code $($proc.ExitCode); retrying with a fresh target."
+          }
+
+          $attempts | ConvertTo-Json -Depth 4 | Set-Content dist/release/nsis-clean-install-attempts.json -Encoding utf8
+          if (-not $installDir) {
+            Get-Content dist/release/nsis-clean-install-attempts.json
+            throw "NSIS clean install failed after 3 isolated attempts"
+          }
 
           $appExe = Join-Path $installDir "Chengzhu.exe"
           $resources = Join-Path $installDir "resources"

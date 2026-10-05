@@ -194,7 +194,7 @@ test.describe('assist mode with WebSocket-driven Q/A', () => {
       timeout: 5000,
     })
     await expect(
-      page.getByText('核心要点是先讲背景与目标、再讲关键决策、最后讲量化结果。'),
+      page.getByText('核心要点是先讲背景与目标、再讲关键决策、最后讲量化结果。').first(),
     ).toBeVisible({ timeout: 5000 })
   })
 })

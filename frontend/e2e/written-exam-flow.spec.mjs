@@ -85,8 +85,8 @@ test.describe('written exam flow', () => {
 
     await page.goto('/')
 
-    await expect(page.getByText('AI 笔试助手')).toBeVisible({ timeout: 5000 })
-    await expect(page.getByText('点击「开始笔试」进入答题模式，可通过截图或手动输入提问')).toBeVisible()
+    await expect(page.getByText('AI 笔试助手').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('点击「开始笔试」进入答题模式，可通过截图或手动输入提问').first()).toBeVisible()
     await expect(page.getByText('固定截图代码题').first()).toBeVisible()
     await page.getByRole('button', { name: '开始检测' }).dispatchEvent('click')
 
@@ -97,7 +97,7 @@ test.describe('written exam flow', () => {
     await input.fill('代码题：给定整数数组 nums 和目标值 target，返回两数之和的下标。')
     await page.getByRole('button', { name: '发送问题' }).click()
 
-    await expect(page.getByText('代码题：给定整数数组 nums 和目标值 target，返回两数之和的下标。')).toBeVisible({
+    await expect(page.getByText('代码题：给定整数数组 nums 和目标值 target，返回两数之和的下标。').first()).toBeVisible({
       timeout: 5000,
     })
     await expect(page.getByText('哈希表一次遍历 O(n)')).toBeVisible()

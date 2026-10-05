@@ -259,10 +259,17 @@ function readAssistSplitPct(): number {
 }
 
 function readAssistTranscriptCollapsed(): boolean {
+  // v1.3 Live Cockpit is cue-first: Question / Fast Cue / Source-Warning are
+  // the glanceable first layer, while the transcript is explicitly secondary.
+  // Preserve any user's stored choice; only a brand-new profile defaults to
+  // the transcript panel collapsed.
   try {
-    return localStorage.getItem(ASSIST_TRANSCRIPT_COLLAPSED_KEY) === '1'
+    const stored = localStorage.getItem(ASSIST_TRANSCRIPT_COLLAPSED_KEY)
+    if (stored === '0') return false
+    if (stored === '1') return true
+    return true
   } catch {
-    return false
+    return true
   }
 }
 

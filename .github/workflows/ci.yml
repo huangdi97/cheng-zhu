@@ -67,6 +67,10 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Release version consistency
+        working-directory: .
+        run: python scripts/check_release_version.py
+
       - name: License gate (MIT root + generated third-party notices)
         working-directory: .
         run: python scripts/generate_third_party_notices.py --check

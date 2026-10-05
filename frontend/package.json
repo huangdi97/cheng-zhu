@@ -13,8 +13,8 @@
     "test:e2e:install": "playwright install --with-deps chromium",
     "test:e2e:update-snapshots": "playwright test --config=playwright.config.mjs --grep @visual --update-snapshots",
     "preview": "vite preview",
-    "screenshots:readme": "node ./scripts/generate-readme-screenshots.mjs",
-    "demo:readme": "node ./scripts/generate-readme-demo.mjs"
+    "screenshots:readme": "node ./scripts/promote-readme-product-media.mjs",
+    "demo:readme": "node ./scripts/promote-readme-product-media.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

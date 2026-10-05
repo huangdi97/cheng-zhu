@@ -125,7 +125,7 @@ export default function LiveCockpit() {
   const setAssistMode = useUiPrefsStore((s) => s.setAssistMode)
   const assistTranscriptCollapsed = useUiPrefsStore((s) => s.assistTranscriptCollapsed)
   const memoVisible = useOsStore((s) => s.memoVisible)
-  const [mobileTab, setMobileTab] = useState<'transcript' | 'answer'>('transcript')
+  const [mobileTab, setMobileTab] = useState<'transcript' | 'answer'>('answer')
   const lastMobileStreamingIdRef = useRef<string | null>(null)
   const [serverScreenLoading, setServerScreenLoading] = useState(false)
   const serverScreenAskRef = useRef(false)
@@ -133,12 +133,10 @@ export default function LiveCockpit() {
   useCueSignals()
   useSessionEnd()
 
-  // 笔试题提交后优先展示答案流，避免手机端仍停留在「答题记录」而看不到正在生成的结果。
+  // v1.3 is cue-first on every viewport. A new question/answer stream should
+  // bring the mobile user to the glanceable Cue/Answer layer instead of
+  // leaving them on transcript. The user can always switch back explicitly.
   useEffect(() => {
-    if (!isExamMode) {
-      lastMobileStreamingIdRef.current = currentStreamingId
-      return
-    }
     // During the very first layout pass some surfaces report width 0: treat as unknown, not mobile.
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0
     const isMobileViewport = viewportWidth > 0 && viewportWidth < 768
@@ -146,7 +144,7 @@ export default function LiveCockpit() {
       setMobileTab('answer')
     }
     lastMobileStreamingIdRef.current = currentStreamingId
-  }, [currentStreamingId, isExamMode])
+  }, [currentStreamingId])
 
   const handleServerScreenAsk = useCallback(async () => {
     if (serverScreenAskRef.current) return
@@ -190,7 +188,7 @@ export default function LiveCockpit() {
             </button>
             <button role="tab" aria-selected={mobileTab === 'answer'} onClick={() => setMobileTab('answer')}
               className={`flex-1 py-2 text-xs font-medium text-center transition-colors ${mobileTab === 'answer' ? 'text-accent-blue border-b-2 border-accent-blue' : 'text-text-muted'}`}>
-              AI 答案
+              提示与回答
             </button>
           </div>
 
@@ -264,7 +262,7 @@ export default function LiveCockpit() {
                 {serverScreenLoading ? '截图审题提交中…' : '服务端截图审题'}
               </button>
               <p className="text-[10px] text-text-muted text-center mt-1.5 leading-snug px-0.5">
-                在后台子进程截主屏左半幅，该请求不写访问日志以减少终端抢焦点。若仍被终端打断，可用 <code className="text-[10px] bg-bg-tertiary px-0.5 rounded">IA_ACCESS_LOG=0</code> 启动后端关闭全部 HTTP 访问日志。须配置识图模型与屏幕录制权限。
+                仅在当前会话允许 AI 辅助、且你有权处理屏幕内容时使用。截图按当前区域设置发送给你配置的视觉模型；本地访问日志开关只影响日志噪声，不改变会话政策或隐私边界。
               </p>
             </div>
           )}

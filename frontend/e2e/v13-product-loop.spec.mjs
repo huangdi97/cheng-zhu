@@ -245,6 +245,47 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await expect(summary).toContainText('PMF')
   })
 
+
+  test('Fact Inbox can choose a Goal and continue directly into Practice', async ({ context, page }) => {
+    const GOAL_B = { ...GOAL, id: 'goal-b', title: '德睿智药 · AI 产品经理', company: '德睿智药', role: 'AI 产品经理' }
+    let actionBody = null
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/goals' && method === 'GET') return { items: [GOAL, GOAL_B] }
+        if (pathname === '/api/product/fact-inbox' && method === 'GET') {
+          return {
+            count: 1,
+            items: [{
+              id: 'claim-rag', text: '我负责完整 RAG 架构设计', project: 'WenNian', source: 'resume',
+              provenance_status: 'SUPPORTING_EVIDENCE', risk: 'HIGH', supported_label: '参与设计',
+              lead_language: true, primary_actions: ['LEAD', 'PARTICIPATE'], more_actions: ['PRACTICE'],
+            }],
+            batch: null, merge_suggestions: [], policy: { mode: 'STANDARD', reasons: [] },
+          }
+        }
+        if (pathname === '/api/product/fact-inbox/claim-rag' && method === 'POST') {
+          actionBody = request.postDataJSON()
+          return { ok: true }
+        }
+        if (pathname === '/api/product/practice/options' && method === 'GET') return OPTIONS
+        return undefined
+      },
+    })
+
+    await page.goto('/#/me/inbox')
+    await expect(page.getByTestId('fact-inbox')).toContainText('我负责完整 RAG 架构设计')
+    await page.getByRole('button', { name: '更多事实操作' }).click()
+    await page.getByRole('menuitem', { name: '练这个说法' }).click()
+    await expect(page.getByLabel('选择练习目标')).toBeVisible()
+    await page.getByLabel('选择练习目标').selectOption(GOAL.id)
+    await page.getByRole('button', { name: '设为重点并去练习' }).click()
+
+    await expect(page).toHaveURL(/#\/practice\?goal=goal-v13/)
+    expect(actionBody).toMatchObject({ action: 'PRACTICE', payload: { goal_id: GOAL.id } })
+  })
+
   test('Overlay 3.0 persists Dock × Interaction × Size and stays usable at 390px', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,

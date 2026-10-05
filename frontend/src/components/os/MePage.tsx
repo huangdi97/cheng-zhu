@@ -35,7 +35,7 @@ export default function MePage({ tab }: { tab: string }) {
   const jump = (t: TabKey) => go(t === 'facts' ? 'inbox' : (t as MeTab))
   return (
     <Page testId="me-page" wide>
-      <PageHeader title="我的成竹" subtitle="你的简历、项目、事实、故事和表达习惯。成竹只用你确认过的内容来帮你。" />
+      <PageHeader title="我的成竹" subtitle="你的简历、项目、事实、故事和表达习惯。个人经历受事实与来源约束；通用知识、设计和假设问题不会被误当成你的经历。" />
       <Tabs<MeTab> label="我的成竹" value={current} onChange={go}
         tabs={[['overview', '概览'], ['resume', '简历'], ['projects', '项目'], ['inbox', '待确认', inbox.data?.count ?? 0], ['stories', 'Stories'], ['skills', 'Skills'], ['voice', '我的表达']]} />
       <div className="pt-2">

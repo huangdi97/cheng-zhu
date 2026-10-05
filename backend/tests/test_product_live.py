@@ -135,6 +135,12 @@ def test_preflight_lists_every_input_with_origin(product_env):
     by_key = {i["key"]: i for i in out["items"]}
     assert by_key["answer_language"]["origin_label"] == "本场覆盖"
     assert by_key["share_privacy_mode"]["origin_label"] == "Goal 默认"
+    assert by_key["skill_cards"]["label"] == "技能卡"
+    assert by_key["stories"]["label"] == "故事"
+    assert isinstance(by_key["active_model"]["value"], str) and by_key["active_model"]["value"]
+    assert by_key["active_model"]["value"] != "0"
+    assert by_key["technical_term_policy"]["value"] != "AUTO"
+    assert by_key["stt"]["value"] != "whisper"
     assert "不是安全或不可检测保证" in out["share_privacy_note"]
     assert "pack_hash" not in repr(out) and "candidate_version" not in repr(out)
 

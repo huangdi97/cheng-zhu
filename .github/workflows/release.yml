@@ -94,7 +94,7 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium
 
-      - name: Capture v1.3 packaged runtime UI evidence
+      - name: Capture packaged runtime UI evidence
         working-directory: frontend
         shell: pwsh
         run: |
@@ -108,8 +108,8 @@ jobs:
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4
         with:
-          name: chengzhu-v1.3-runtime-ui-evidence
-          path: artifacts/release-evidence/v1.3
+          name: chengzhu-runtime-ui-evidence
+          path: artifacts/release-evidence
           retention-days: 30
           if-no-files-found: error
 

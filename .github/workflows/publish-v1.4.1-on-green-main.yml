@@ -1,0 +1,43 @@
+name: publish-v1.4.1-on-green-main
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-release:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Dispatch v1.4.1 exactly once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./desktop/package.json').version")"
+          if [ "$version" != "1.4.1" ]; then
+            echo "Refusing to publish anything except v1.4.1; current version=$version"
+            exit 0
+          fi
+          if gh release view "v$version" >/dev/null 2>&1; then
+            is_draft="$(gh release view "v$version" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" = "false" ]; then
+              echo "v$version is already published; nothing to do"
+              exit 0
+            fi
+            echo "v$version exists only as a draft from an earlier verification attempt; release.yml will replace that draft."
+          fi
+          gh workflow run release.yml --ref main -f publish=true
+          echo "Dispatched verified-release workflow for v$version"

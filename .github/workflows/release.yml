@@ -25,6 +25,10 @@ on:
         description: "Publish a GitHub Release (false = build artifacts only)"
         required: false
         default: "false"
+      source_sha:
+        description: "Exact CI-proven commit SHA to build and tag. Empty = workflow event SHA."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -42,6 +46,20 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_sha || github.sha }}
+
+      - name: Pin release source SHA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $actual = (git rev-parse HEAD).Trim()
+          $requested = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_sha || github.sha }}"
+          if ($requested -and $actual -ne $requested) {
+            throw "checked out $actual but release source requested $requested"
+          }
+          "CHENGZHU_RELEASE_SOURCE_SHA=$actual" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "release source SHA: $actual"
 
       - uses: actions/setup-python@v5
         with:
@@ -229,6 +247,8 @@ jobs:
             if ($isDraft -ne 'true') { throw "release $tag is already published; refusing to replace it" }
             gh release delete $tag --yes --cleanup-tag
           }
+          $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
+          if (-not $sourceSha) { throw "CHENGZHU_RELEASE_SOURCE_SHA is empty" }
           gh release create $tag `
             dist/release/Chengzhu-Setup-x64.exe `
             dist/release/Chengzhu-Portable-x64.zip `
@@ -236,9 +256,15 @@ jobs:
             dist/release/LICENSE.txt `
             dist/release/THIRD_PARTY_NOTICES.md `
             "dist/release/RELEASE_NOTES_v$version.md" `
+            --target $sourceSha `
             --draft `
             --title "成竹 Chengzhu $tag" `
             --notes-file "dist/release/RELEASE_NOTES_v$version.md"
+          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
+          if ($tagSha -ne $sourceSha) {
+            throw "release tag $tag points to $tagSha but binaries were built from $sourceSha"
+          }
+          Write-Host "release tag/source invariant: $tag -> $tagSha"
 
       - name: Download-back verification from published GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
@@ -250,6 +276,11 @@ jobs:
           $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           $tag = "${{ github.ref_name }}"
           if (-not $tag.StartsWith('v')) { $tag = "v$version" }
+          $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
+          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
+          if ($tagSha -ne $sourceSha) {
+            throw "download-back refused: tag $tag points to $tagSha but release build source is $sourceSha"
+          }
           $download = Join-Path $env:RUNNER_TEMP "chengzhu-download-back-$version"
           if (Test-Path $download) { Remove-Item -Recurse -Force $download }
           New-Item -ItemType Directory -Force $download | Out-Null
@@ -299,6 +330,8 @@ jobs:
           @{
             tag = $tag
             source = "GitHub Release download"
+            source_sha = $sourceSha
+            tag_sha = $tagSha
             installer_sha256 = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
             portable_sha256 = (Get-FileHash (Join-Path $download "Chengzhu-Portable-x64.zip") -Algorithm SHA256).Hash.ToLower()
             smoke_passed = $smoke.passed
@@ -324,6 +357,12 @@ jobs:
           $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           $tag = "${{ github.ref_name }}"
           if (-not $tag.StartsWith('v')) { $tag = "v$version" }
+          $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
+          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
+          if ($tagSha -ne $sourceSha) {
+            throw "refusing to publish: tag $tag points to $tagSha but binaries were built from $sourceSha"
+          }
           gh release edit $tag --draft=false --latest
           $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
           if ($isDraft -ne 'false') { throw "verified release $tag did not publish" }
+          Write-Host "published $tag from exact source $sourceSha"

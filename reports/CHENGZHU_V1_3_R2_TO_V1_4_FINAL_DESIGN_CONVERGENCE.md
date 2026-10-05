@@ -10,7 +10,7 @@ Evidence labels: IMPLEMENTED / INTEGRATED / CI-PROVEN / PACKAGED-PROVEN / REAL-U
 - v1.2-R2 Verified Interview Core: frozen and authoritative.
 - v1.3 Goal-centered Interview OS: implemented and publicly released.
 - v1.4 Product Validation Hardening: implemented and publicly released.
-- v1.4.1 Live → Reflection closure: merged, full Windows release/download-back passed, and v1.4.1 is publicly released.
+- v1.4.1 Live → Reflection closure: merged and publicly released, but final provenance audit found that the Windows binaries were built from `2355a1c` while the public tag resolved to later `df286e7`; therefore v1.4.1 is not the final reproducible release baseline.
 - Personal Conversation Intelligence: canonical future profile, deliberately not productized in v1.4.
 
 Top-level IA stays: 首页 / 求职目标 / 我的成竹 / 练习 / 资料库 / 历史 / 设置, with 上场 as a global action.
@@ -58,6 +58,7 @@ Still authoritative: Candidate/Person factual boundary; Provenance; User Asserti
 | Windows package | Setup EXE + Portable ZIP | PACKAGED-PROVEN |
 | clean-install replay | release workflow on fresh Windows hosted runner | PACKAGED-PROVEN |
 | version consistency + SHA256 + GitHub Release | frontend/desktop/locks/backend APP_VERSION/tag/release assets | RELEASE-PROVEN |
+| exact release provenance | main-CI `head_sha` → release `source_sha` → checkout → `gh release create --target` → tag SHA re-check before download-back/publish | REQUIRED FOR v1.4.2; prevents moving-main binary/tag drift |
 
 ## 5. Product-validation truth boundary
 
@@ -87,8 +88,8 @@ Current v1.4 intentionally does not add Meeting / Presentation / 1:1 top-level p
 - v1.2-R2 Verified Interview Core: FROZEN / AUTHORITATIVE.
 - v1.3-R2 Goal-centered Interview OS: IMPLEMENTED / RELEASED.
 - v1.4-R1 Validation Hardening: IMPLEMENTED / RELEASED.
-- v1.4.1 Live→Reflection closure: RELEASED / DOWNLOAD-BACK-PROVEN.
-- v1.4.2 Final Design Convergence: current release candidate; packages the post-v1.4.1 product-craft/public-surface closure already present on main.
+- v1.4.1 Live→Reflection closure: PRODUCT FIX RELEASED, but superseded as reproducible baseline because tag SHA and binary source SHA diverged during a moving-main release race.
+- v1.4.2 Final Design Convergence: current release candidate; packages the post-v1.4.1 product-craft/public-surface closure and closes release provenance so CI SHA = binary source SHA = public tag SHA.
 - Personal Conversation Intelligence: CANONICAL / FUTURE PROFILE.
 
 Remaining non-design evidence: real-user longitudinal Goal reuse; perceived Fact Inbox burden; real-interview transfer; real paid-provider quality/latency/cost; interactive multi-monitor overlay proof; code signing; macOS signing/notarization; public Human Coach relay; real multi-hour sessions.

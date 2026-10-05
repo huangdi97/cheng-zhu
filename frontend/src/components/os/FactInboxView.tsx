@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { productApi, type FactInboxCard } from '@/lib/productApi'
+import { navigate, paths } from '@/lib/router'
 import { useOsStore } from '@/stores/osStore'
 import { ActionMenu, EmptyState, ErrorState, inputCls, Loading, PrimaryButton, SecondaryButton, StatusBadge, useAsync } from './ui'
 
@@ -18,8 +19,11 @@ const RISK: Record<string, ['risk' | 'warn' | 'muted', string]> = {
 export default function FactInboxView({ onShowAll }: { onShowAll?: () => void }) {
   const { data, error, loading, reload } = useAsync(() => productApi.factInbox(true), [])
   const contextGoal = useOsStore((s) => s.contextGoalId)
+  const goals = useAsync(() => productApi.goals('ACTIVE'), [])
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const [sourceFor, setSourceFor] = useState<{ id: string; text: string } | null>(null)
+  const [practiceFor, setPracticeFor] = useState<string | null>(null)
+  const [practiceGoalId, setPracticeGoalId] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   useEffect(() => {
@@ -32,7 +36,16 @@ export default function FactInboxView({ onShowAll }: { onShowAll?: () => void })
     setBusy(card.id)
     try {
       await productApi.factAction(card.id, action, payload)
-      setMessage(action === 'PRACTICE' ? '已设为这个目标的 Next Focus' : '已更新')
+      if (action === 'PRACTICE') {
+        const goalId = String(payload.goal_id || '')
+        setMessage('已设为这个目标的 Next Focus，进入练习')
+        setPracticeFor(null)
+        setPracticeGoalId('')
+        await reload()
+        if (goalId) navigate(paths.practice(undefined, { goal: goalId }))
+        return
+      }
+      setMessage('已更新')
       await reload()
     } catch (e) {
       setMessage(e instanceof Error ? e.message : '操作失败')
@@ -41,6 +54,22 @@ export default function FactInboxView({ onShowAll }: { onShowAll?: () => void })
       setEditing(null)
       setSourceFor(null)
     }
+  }
+
+  const startPractice = (card: FactInboxCard) => {
+    const activeGoals = goals.data?.items ?? []
+    const goalId = contextGoal || (activeGoals.length === 1 ? activeGoals[0].id : '')
+    if (goalId) {
+      void act(card, 'PRACTICE', { goal_id: goalId })
+      return
+    }
+    if (!activeGoals.length) {
+      setMessage('先创建一个求职目标，再把这条事实变成练习重点')
+      navigate(paths.goals())
+      return
+    }
+    setPracticeFor(card.id)
+    setPracticeGoalId('')
   }
 
   if (loading && !data) return <Loading />
@@ -104,7 +133,7 @@ export default function FactInboxView({ onShowAll }: { onShowAll?: () => void })
                   <SecondaryButton onClick={() => setEditing({ id: card.id, text: card.text })}>修改</SecondaryButton>
                   <ActionMenu label="更多事实操作" actions={[
                     { key: 'source', label: '查看来源 / 补来源', onSelect: () => setSourceFor({ id: card.id, text: '' }) },
-                    { key: 'practice', label: '练这个说法', disabled: !contextGoal, onSelect: () => void act(card, 'PRACTICE', { goal_id: contextGoal }) },
+                    { key: 'practice', label: '练这个说法', onSelect: () => startPractice(card) },
                     { key: 'note', label: '记成速记', onSelect: () => void act(card, 'QUICK_NOTE', { goal_id: contextGoal }) },
                     ...(data.merge_suggestions.find((g) => g[0] === card.id)
                       ? [{ key: 'merge', label: '合并相似说法', onSelect: () => void act(card, 'MERGE', { merge_ids: data.merge_suggestions.find((g) => g[0] === card.id)!.slice(1) }) }]
@@ -112,6 +141,21 @@ export default function FactInboxView({ onShowAll }: { onShowAll?: () => void })
                     { key: 'dismiss', label: '暂不处理', onSelect: () => void act(card, 'DISMISS') },
                     { key: 'delete', label: '删除草稿', danger: true, onSelect: () => void act(card, 'DELETE_DRAFT') },
                   ]} />
+                </div>
+              ) : null}
+              {practiceFor === card.id ? (
+                <div className="mt-2 rounded-lg border border-accent-blue/25 bg-accent-blue/5 p-2">
+                  <label className="text-[11px] font-medium text-text-secondary" htmlFor={`fact-practice-goal-${card.id}`}>把这条事实放进哪个求职目标练？</label>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    <select id={`fact-practice-goal-${card.id}`} aria-label="选择练习目标" value={practiceGoalId}
+                      onChange={(e) => setPracticeGoalId(e.target.value)} className={`${inputCls} min-w-[180px] flex-1`}>
+                      <option value="">选择求职目标</option>
+                      {(goals.data?.items ?? []).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+                    </select>
+                    <PrimaryButton disabled={!practiceGoalId || busy === card.id}
+                      onClick={() => void act(card, 'PRACTICE', { goal_id: practiceGoalId })}>设为重点并去练习</PrimaryButton>
+                    <SecondaryButton onClick={() => { setPracticeFor(null); setPracticeGoalId('') }}>取消</SecondaryButton>
+                  </div>
                 </div>
               ) : null}
             </li>

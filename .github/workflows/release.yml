@@ -178,7 +178,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Publish GitHub Release
+      - name: Create draft GitHub Release for verification
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -188,6 +188,14 @@ jobs:
           $tag = "${{ github.ref_name }}"
           if (-not $tag.StartsWith('v')) { $tag = "v$version" }
           if ($tag -ne "v$version") { throw "tag $tag does not match app version $version" }
+          # A previous failed verification may have left a draft. Replace only
+          # drafts; never overwrite an already-published release.
+          gh release view $tag --json isDraft --jq '.isDraft' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
+            if ($isDraft -ne 'true') { throw "release $tag is already published; refusing to replace it" }
+            gh release delete $tag --yes --cleanup-tag
+          }
           gh release create $tag `
             dist/release/Chengzhu-Setup-x64.exe `
             dist/release/Chengzhu-Portable-x64.zip `
@@ -195,6 +203,7 @@ jobs:
             dist/release/LICENSE.txt `
             dist/release/THIRD_PARTY_NOTICES.md `
             "dist/release/RELEASE_NOTES_v$version.md" `
+            --draft `
             --title "成竹 Chengzhu $tag" `
             --notes-file "dist/release/RELEASE_NOTES_v$version.md"
 
@@ -272,3 +281,16 @@ jobs:
             dist/release/download-back-verification.json
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish verified GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag.StartsWith('v')) { $tag = "v$version" }
+          gh release edit $tag --draft=false --latest
+          $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
+          if ($isDraft -ne 'false') { throw "verified release $tag did not publish" }

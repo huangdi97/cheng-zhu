@@ -59,6 +59,9 @@ jobs:
           ruff check .
           python -m pytest -q
 
+      - name: Release version consistency
+        run: python scripts/check_release_version.py
+
       - name: License gate
         run: python scripts/generate_third_party_notices.py --check
 

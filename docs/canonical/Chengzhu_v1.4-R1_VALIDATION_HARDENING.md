@@ -1,7 +1,7 @@
 # Chengzhu v1.4-R1 Canonical Addendum
 ## Product Validation Hardening
 
-**Status:** RELEASE CANDIDATE DESIGN  
+**Status:** IMPLEMENTED · v1.4.0 RELEASED · FROZEN FOR v1.4.x HARDENING  
 **Base Canonical:** `Chengzhu_v1.3-R2_CANONICAL.md`  
 **Frozen Verified Core:** `Chengzhu_v1.2-R2_CANONICAL.md`
 
@@ -431,6 +431,8 @@ No Meeting top-level navigation is added in v1.4.
 ---
 
 # 14. Definition of Done
+
+> v1.4.0 已满足工程 Definition of Done 并公开发布。v1.4.x 仅允许修复摩擦、可靠性、文档/公开产品面漂移与真实 bug；不得借 hardening 名义重新扩一级产品。
 
 `V1_4_ENGINEERING_COMPLETE` requires all of:
 

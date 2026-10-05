@@ -30,10 +30,29 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/assist-demo.gif" alt="面试主流程演示 GIF：实时听题、自动作答、悬浮提示、知识库引用" width="100%" />
+  <img src="docs/screenshots/action-home.png" alt="成竹 v1.4 Action Home：围绕当前求职目标展示下一场、下一步重点与待处理事项" width="100%" />
   <br />
-  <sub>演示素材全部来自本仓库的成竹界面；GIF 用于兼容 GitHub 预览，原始视频保留在 <code>docs/screenshots/assist-demo.webm</code>。</sub>
+  <sub>截图来自 v1.4.0 正式 Windows packaged release 的 runtime evidence。当前产品从 Goal 开始，而不是从“打开实时辅助”开始。</sub>
 </p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/goal-room.png" alt="Goal Room：围绕一个公司与岗位持续准备" /></td>
+    <td width="50%"><img src="docs/screenshots/practice.png" alt="Practice 3.0：轮次、面试官、难度与题目来源" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Goal Room · Next Focus / 下一场 / 进展趋势</sub></td>
+    <td align="center"><sub>Practice 3.0 · Persona / Difficulty / Question Source</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/live-fast-cue.png" alt="Live：Question → Fast Cue → Source/Warning" /></td>
+    <td width="50%"><img src="docs/screenshots/reflection.png" alt="Reflection：把本场转成下一步行动" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Live · 当前问题与 Fast Cue 保持视觉权威</sub></td>
+    <td align="center"><sub>Reflection · 下一步 / Pin / 待确认事实 / Story 机会</sub></td>
+  </tr>
+</table>
 
 ## 为什么值得试
 
@@ -242,21 +261,30 @@ canonical（当前最高优先级设计）：[v1.3-R2](docs/canonical/Chengzhu_v
 | 隐私 | [Privacy 与 Policy](docs/privacy/PRIVACY_AND_POLICY.md) |
 ## README 素材更新
 
-```bash
-cd frontend
-npx playwright install chromium   # 首次执行需要
-npm run screenshots:readme
-npm run demo:readme
+README 主视觉必须和当前 Goal-centered 产品一致。当前公开截图来自 v1.4.0 正式 packaged runtime evidence：
+
+- `action-home.png`
+- `goal-room.png`
+- `practice.png`
+- `preflight.png`
+- `live-fast-cue.png`
+- `reflection.png`
+- `command-palette.png`
+- `goal-prepare-390.png`
+
+旧 `assist-demo.* / assist-mode.png / knowledge-map.png / resume-optimizer.png` 只作为历史素材保留，不再代表当前主产品。
+
+自动生成脚本后续也必须遵循：
+
+```text
+Action Home
+→ Goal Room
+→ Practice
+→ Preflight
+→ Live Fast Cue
+→ Reflection
+→ Next Focus
 ```
-
-生成结果会输出到 `docs/screenshots/`：
-
-- `assist-demo.webm`：主流程原始视频素材
-- `assist-demo-poster.png`：视频封面
-- `assist-demo.gif`：README 顶部实际使用的 GIF 演示
-- `assist-mode.png`：实时辅助界面
-- `knowledge-map.png`：能力分析
-- `resume-optimizer.png`：简历优化
 
 更多说明见 [docs/screenshots/README.md](docs/screenshots/README.md)。
 

@@ -223,3 +223,19 @@ def test_progress_trends_describe_direction_without_scores(product_env):
 def test_store_rows_survive_without_goal(product_env):
     s = _start(None, round="BEHAVIORAL")
     assert store.get("practice_session", s["practice_id"])["goal_id"] is None
+
+
+def test_next_focus_reason_is_product_language_not_rubric_debug_output(product_env):
+    from services.product import next_focus
+
+    goal = goals.create_goal("MindRank", "AIDD Agent Engineer")
+    for answer in ("我们做了。", "我们做了。"):
+        s = _start(goal["id"], demeanor="FRIENDLY", difficulty="WARMUP", questions=1, closing=False)
+        practice.answer(s["practice_id"], answer)
+    rows = next_focus._practice_candidates(goals.require_goal(goal["id"]))  # noqa: SLF001
+    assert rows
+    reason = rows[0]["reason"]
+    assert "最近" in reason and "练习" in reason
+    assert "满级 4" not in reason
+    assert "岗位权重" not in reason
+    assert "第 1.0 级" not in reason

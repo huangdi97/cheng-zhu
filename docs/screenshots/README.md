@@ -1,57 +1,107 @@
-# README 素材维护
+# README / Public Demo 素材维护
 
-本目录存放 README 使用的截图、GIF、封面图和演示视频。
+README 使用的截图、GIF、封面图必须代表**当前 Goal-centered 产品**，不能继续用旧模块式 Assist / Knowledge Map / Resume Optimizer 当主产品故事。
 
-当前推荐用自动脚本生成，而不是手动逐张截图。脚本会启动前端预览页，在浏览器里注入样例数据并输出统一尺寸的 PNG / GIF / WebM，因此不依赖后端服务、数据库或真实 API Key。
+## 当前公开故事
 
-注意：GitHub 对仓库内视频文件的内联播放支持并不稳定，因此 README 使用仓库内的 `assist-demo.gif` 做兼容预览；`assist-demo.webm` 作为原始高清素材保留。所有素材都应从当前成竹前端重新生成，避免把旧界面截图带入发布包。
+README 的主展示顺序应当是：
+
+```text
+Action Home
+→ Goal Room
+→ Practice
+→ Preflight
+→ Live Fast Cue
+→ Reflection
+→ Next Focus
+```
+
+这才是当前 v1.4 产品，而不是“打开应用直接进入实时辅助”。
+
+## 推荐素材
+
+建议公开素材至少覆盖：
+
+| 文件 | 内容 |
+|---|---|
+| `product-demo.webm` | Goal-centered 完整主循环 |
+| `product-demo-poster.png` | 主循环封面 |
+| `product-demo.gif` | GitHub README 兼容预览 |
+| `action-home.png` | Action Home |
+| `goal-room.png` | Goal Overview / Next Focus |
+| `practice.png` | Practice 3.0 |
+| `preflight.png` | Preflight 3.0 |
+| `live-fast-cue.png` | Question → Fast Cue → Source/Warning |
+| `reflection.png` | Reflection → Next Focus |
+
+辅助素材可以继续保留：
+
+- Fact Inbox；
+- Quick Notes；
+- Question Banks；
+- Panel Practice；
+- Command Palette；
+- Overlay；
+- 390px；
+- Light / Dark；
+- Diagnostics A–F。
+
+## Runtime evidence 优先
+
+发布证据优先来自：
+
+```text
+GitHub Actions
+→ Windows packaged app
+→ runtime UI evidence artifact
+```
+
+README 演示可以使用 deterministic demo data，但必须来自当前前端组件和当前 IA。
+
+禁止：
+
+- 用设计稿冒充 runtime；
+- 用旧 v1.2 模块截图冒充 v1.4；
+- 在演示中把 synthetic 数据说成真实用户结果。
 
 ## 自动生成
 
+当前脚本应维护为 Goal-centered：
+
 ```bash
 cd frontend
-npx playwright install chromium   # 首次执行需要
+npx playwright install chromium
 npm run screenshots:readme
 npm run demo:readme
 ```
 
-## 生成结果
+如果脚本仍以旧 Assist route 为中心，应先更新脚本，再更新二进制素材。
 
-| 文件名 | 对应内容 |
-| --- | --- |
-| `assist-demo.webm` | 主流程原始视频素材（当前约 `44s`） |
-| `assist-demo-poster.png` | 视频封面图 |
-| `assist-demo.gif` | README 顶部实际使用的 GIF 演示 |
-| `assist-mode.png` | 实时辅助 |
-| `knowledge-map.png` | 能力分析 |
-| `resume-optimizer.png` | 简历优化 |
+## Demo 内容约定
 
-默认输出目录就是当前 `docs/screenshots/`，README 会直接引用这些文件。
+公开 demo 优先在 45–75 秒内表达：
 
-## 视频内容约定
+1. 首页告诉用户下一步；
+2. 进入一个具体 Goal；
+3. 看 Next Focus；
+4. 启动针对性 Practice；
+5. Go Live → Preflight；
+6. Question → Fast Cue；
+7. 结束后 Reflection；
+8. Reflection 改变下一步。
 
-README 顶部视频建议控制在 `50s-70s`，优先展示这些内容：
+实时技术细节（ASR / KB / Deep / Overlay）可以出现，但不应重新成为整个产品故事。
 
-1. 进入实时辅助主流程
-2. 实时转写与自动回答
-3. 收起转录面板聚焦答案
-4. 简单带一下知识库引用
-5. 桌面模式下的悬浮提示窗与快捷操作
-6. 模型管理里的 temperature / max tokens / 并行路数
+## 隐私
 
-## 手动更新
+所有公开素材必须使用 synthetic/demo data。
 
-如果你想截取真实运行中的界面，也可以手动更新：
+不要把：
 
-1. 启动应用：
-   - `python start.py --mode network`
-   - 或 `python start.py`
-2. 打开浏览器：
+- API Key；
+- 真实简历；
+- 真实面试录音；
+- 真实用户 transcript；
+- 用户私人材料
 
-   ```bash
-   python scripts/open-for-screenshots.py
-   ```
-
-3. 覆盖对应素材文件。
-
-建议保持统一的桌面尺寸和缩放比例，避免 README 中的媒体风格不一致。
+提交到仓库。

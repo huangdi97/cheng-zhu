@@ -94,10 +94,19 @@ def _practice_candidates(goal: dict[str, Any]) -> list[dict[str, Any]]:
     out = []
     for gap in priority_gaps(goal.get("role_family") or "SWE", avg)[:2]:
         type_ = _DIMENSION_TYPE.get(gap["dimension"], "RUBRIC")
+        level = float(gap["level"])
+        if level < 1.5:
+            observation = "多次明显缺失"
+        elif level < 2.5:
+            observation = "经常不够完整"
+        elif level < 3.5:
+            observation = "还不够稳定"
+        else:
+            observation = "已经比较稳定，但仍值得保持"
+        role_note = "这个岗位会重点追问这一项。" if int(gap["weight"]) >= 15 else "继续补齐会让回答更稳。"
         out.append(_item(
             type_, DIMENSIONS[gap["dimension"]],
-            f"最近 {len(recent)} 场练习里「{gap['label']}」平均停在第 {gap['level']:.1f} 级（满级 4），"
-            f"该岗位权重 {gap['weight']}。",
+            f"最近 {len(recent)} 场练习里，「{gap['label']}」{observation}；{role_note}",
             "PRACTICE", gap["dimension"],
             priority=_PRIORITY["PRACTICE"] + min(9, int(gap["rank_value"] / 10)),
         ))

@@ -79,12 +79,30 @@ def preflight(goal_id: str, session_overrides: Optional[dict[str, Any]] = None) 
     from core.config import get_config
 
     cfg = get_config()
+    model_index = int(resolved["active_model"]["value"])
+    model_cfg = cfg.models[model_index] if 0 <= model_index < len(cfg.models) else None
+    model_name = str(
+        getattr(model_cfg, "name", "")
+        or getattr(model_cfg, "model", "")
+        or f"模型 {model_index + 1}"
+    )
+    technical_term_labels = {
+        "AUTO": "自动",
+        "KEEP_ENGLISH": "保留英文",
+        "TRANSLATE": "译为回答语言",
+        "BILINGUAL": "中英并列",
+    }
+    stt_labels = {
+        "whisper": "本地 Whisper",
+        "doubao": "豆包语音识别",
+        "generic": "通用 STT",
+    }
     items = [
         item("goal", "求职目标", goal["title"], "GOAL"),
         item("resume", "简历", "已选择" if resume else "未导入", resume_origin, bool(resume),
              "" if resume else "在「我的成竹 · 简历」导入"),
-        item("skill_cards", "Skill Cards", cards, "GOAL"),
-        item("stories", "Stories", len(stories), "PERSON"),
+        item("skill_cards", "技能卡", cards, "GOAL"),
+        item("stories", "故事", len(stories), "PERSON"),
         item("knowledge", "知识库", "开启" if resolved["kb_enabled"]["value"] else "关闭", resolved["kb_enabled"]["origin"]),
         item("materials", "项目资料", f"{len(mats['included'])} 份就绪", "GOAL", not mats["skipped"],
              f"{len(mats['skipped'])} 份未就绪，不会进入本场" if mats["skipped"] else ""),
@@ -92,9 +110,21 @@ def preflight(goal_id: str, session_overrides: Optional[dict[str, Any]] = None) 
         layered("answer_language", "回答语言"),
         layered("whisper_language", "面试语言"),
         layered("language", "编程语言"),
-        layered("technical_term_policy", "技术术语"),
-        layered("active_model", "回答模型"),
-        item("stt", "语音识别", str(getattr(cfg, "stt_provider", "whisper")), "GLOBAL"),
+        item(
+            "technical_term_policy",
+            "技术术语",
+            technical_term_labels.get(str(resolved["technical_term_policy"]["value"]),
+                                      str(resolved["technical_term_policy"]["value"])),
+            resolved["technical_term_policy"]["origin"],
+        ),
+        item("active_model", "回答模型", model_name, resolved["active_model"]["origin"]),
+        item(
+            "stt",
+            "语音识别",
+            stt_labels.get(str(getattr(cfg, "stt_provider", "whisper")),
+                           str(getattr(cfg, "stt_provider", "whisper"))),
+            "GLOBAL",
+        ),
         item("audio", "音频", "开播前检测", "SYSTEM"),
         layered("ai_policy_mode", "AI 辅助"),
         layered("human_assistance_policy", "真人辅助"),

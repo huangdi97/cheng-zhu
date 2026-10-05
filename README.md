@@ -4,7 +4,7 @@
 
 成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
 
-> 当前 Canonical：[docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)（Current Canonical = v1.3-R2 · Goal-centered Interview OS · 2026-10-01）；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.2.2](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.2.2)。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
+> 当前 Canonical：[docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)（Current Canonical = v1.3-R2 · Goal-centered Interview OS · 2026-10-01）；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.3.0](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.3.0)。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
 v1.3 将成竹组织成一个 **Goal-centered Interview OS**：用户不是在“简历 / 题库 / 实时辅助 / 复盘”几个模块之间来回切换，而是围绕一个具体的公司 × 岗位持续推进。
 
@@ -15,6 +15,8 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 当前产品仍然 Interview-first。它把已经验证过的实时核心——系统音频 / 麦克风转写、Fast Cue、Deep Answer、截图上下文、来源与事实边界——放进这条 Goal 循环；同时通过 Fact Inbox、Stories、Quick Notes、Question Banks、Practice 3.0 和 Reflection write-back，让“下一次打开成竹”能够延续上一场真实发生的事情。
 
 长期方向是 Personal Conversation Intelligence，但 Meeting / Presentation / 1:1 等 Conversation Profile 仍属于未来版本，不在当前 v1.3 一级导航里提前产品化。
+
+> v1.4.0 正在做 **Product Validation Hardening**：不新增一级产品，而是把 Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值做成 local-first 的可验证闭环。自动化与 synthetic dogfood 只属于工程证据，不能冒充真实用户 PMF。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 

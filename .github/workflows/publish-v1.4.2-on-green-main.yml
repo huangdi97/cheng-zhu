@@ -18,14 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Dispatch v1.4.2 exactly once
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          if [ "$actual" != "$SOURCE_SHA" ]; then
+            echo "checkout drift: expected $SOURCE_SHA, got $actual" >&2
+            exit 1
+          fi
           version="$(node -p "require('./desktop/package.json').version")"
           if [ "$version" != "1.4.2" ]; then
             echo "Refusing to publish anything except v1.4.2; current version=$version"
@@ -39,5 +45,5 @@ jobs:
             fi
             echo "v$version exists only as a draft from an earlier verification attempt; release.yml will replace that draft."
           fi
-          gh workflow run release.yml --ref main -f publish=true
-          echo "Dispatched verified-release workflow for v$version"
+          gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"
+          echo "Dispatched verified-release workflow for v$version from CI-proven SHA $SOURCE_SHA"

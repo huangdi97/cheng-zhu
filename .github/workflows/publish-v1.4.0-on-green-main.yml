@@ -32,8 +32,12 @@ jobs:
             exit 0
           fi
           if gh release view "v$version" >/dev/null 2>&1; then
-            echo "v$version already exists; nothing to do"
-            exit 0
+            is_draft="$(gh release view "v$version" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" = "false" ]; then
+              echo "v$version is already published; nothing to do"
+              exit 0
+            fi
+            echo "v$version exists only as a draft from an earlier verification attempt; release.yml will replace that draft."
           fi
           gh workflow run release.yml --ref main -f publish=true
-          echo "Dispatched Release workflow for v$version"
+          echo "Dispatched verified-release workflow for v$version"

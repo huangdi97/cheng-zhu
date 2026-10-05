@@ -17,6 +17,16 @@ from enum import Enum
 from typing import Any
 
 
+class ConversationProfileKind(str, Enum):
+    INTERVIEW = "INTERVIEW"
+    MEETING = "MEETING"
+    PRESENTATION_QA = "PRESENTATION_QA"
+    ONE_ON_ONE = "ONE_ON_ONE"
+    DESIGN_REVIEW = "DESIGN_REVIEW"
+    CLIENT_CALL = "CLIENT_CALL"
+    NEGOTIATION = "NEGOTIATION"
+
+
 class GuidanceKind(str, Enum):
     RECALL = "RECALL"
     TALKING_POINT = "TALKING_POINT"
@@ -52,9 +62,9 @@ class ConversationItemState(str, Enum):
 
 @dataclass
 class ConversationProfile:
-    """A kind of conversation the core can serve (``interview`` today)."""
+    """A kind of conversation the core can serve (Interview only today)."""
 
-    key: str
+    key: ConversationProfileKind
     label: str
     guidance_kinds: tuple[GuidanceKind, ...]
     productized: bool
@@ -65,7 +75,7 @@ class ConversationGoal:
     """General form of a Goal: what the person wants from a series of conversations."""
 
     id: str
-    profile: str
+    profile: ConversationProfileKind
     title: str
     counterparty: str = ""
     attributes: dict[str, Any] = field(default_factory=dict)
@@ -95,14 +105,43 @@ class ExpressionIntent:
 
 
 PROFILES: tuple[ConversationProfile, ...] = (
-    ConversationProfile("interview", "面试", (GuidanceKind.ANSWER_CUE, GuidanceKind.QUESTION, GuidanceKind.RISK,
-                                              GuidanceKind.DELIVERY), productized=True),
-    ConversationProfile("conversation", "通用对话（未来）", tuple(GuidanceKind), productized=False),
+    ConversationProfile(
+        ConversationProfileKind.INTERVIEW,
+        "面试",
+        (GuidanceKind.ANSWER_CUE, GuidanceKind.QUESTION, GuidanceKind.RISK, GuidanceKind.DELIVERY),
+        productized=True,
+    ),
+    ConversationProfile(ConversationProfileKind.MEETING, "会议（未来）", tuple(GuidanceKind), productized=False),
+    ConversationProfile(
+        ConversationProfileKind.PRESENTATION_QA, "演示 / Q&A（未来）", tuple(GuidanceKind), productized=False
+    ),
+    ConversationProfile(ConversationProfileKind.ONE_ON_ONE, "1:1（未来）", tuple(GuidanceKind), productized=False),
+    ConversationProfile(
+        ConversationProfileKind.DESIGN_REVIEW, "设计评审（未来）", tuple(GuidanceKind), productized=False
+    ),
+    ConversationProfile(
+        ConversationProfileKind.CLIENT_CALL, "客户会（未来）", tuple(GuidanceKind), productized=False
+    ),
+    ConversationProfile(
+        ConversationProfileKind.NEGOTIATION, "谈判（未来）", tuple(GuidanceKind), productized=False
+    ),
 )
 
 
+def profile(kind: ConversationProfileKind) -> ConversationProfile:
+    """Return the canonical contract for one conversation profile."""
+    for item in PROFILES:
+        if item.key is kind:
+            return item
+    raise KeyError(kind)
+
+
 def interview_goal_as_conversation_goal(goal: dict[str, Any]) -> ConversationGoal:
-    """Proves the v1.3 Goal maps onto the general contract without job-only fields."""
-    return ConversationGoal(id=str(goal["id"]), profile="interview", title=str(goal.get("title") or ""),
-                            counterparty=str(goal.get("company") or ""),
-                            attributes={"role": goal.get("role", ""), "stage": goal.get("stage", "")})
+    """Proves the current Goal maps onto the future-general contract without job-only fields."""
+    return ConversationGoal(
+        id=str(goal["id"]),
+        profile=ConversationProfileKind.INTERVIEW,
+        title=str(goal.get("title") or ""),
+        counterparty=str(goal.get("company") or ""),
+        attributes={"role": goal.get("role", ""), "stage": goal.get("stage", "")},
+    )

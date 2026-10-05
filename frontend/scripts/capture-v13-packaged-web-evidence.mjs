@@ -134,7 +134,23 @@ let browser
 let sidecarOut = ''
 const entries = []
 
+async function settle(page, timeoutMs = 12000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const busy = await page.locator('[role="status"]').evaluateAll((nodes) =>
+      nodes.some((node) => /加载|读取|整理中/.test(node.textContent || ''))
+    ).catch(() => false)
+    if (!busy) {
+      await page.waitForTimeout(300)
+      return
+    }
+    await page.waitForTimeout(150)
+  }
+  throw new Error('UI did not settle before evidence capture: ' + await page.url())
+}
+
 async function shot(page, name, note) {
+  await settle(page)
   const file = path.join(OUT, name + '.png')
   await page.screenshot({ path: file, fullPage: false })
   entries.push({ name, file: path.relative(ROOT, file), note })
@@ -144,7 +160,7 @@ async function shot(page, name, note) {
 async function go(page, hash, selector) {
   await page.evaluate((h) => { window.location.hash = h }, hash)
   if (selector) await page.locator(selector).waitFor({ timeout: 30000 })
-  await page.waitForTimeout(350)
+  await settle(page)
 }
 
 async function completeOnboarding(page) {

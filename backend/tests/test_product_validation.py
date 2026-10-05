@@ -134,10 +134,16 @@ def test_future_profile_is_retained_but_not_productized():
     assert keys == {"RECALL", "TALKING_POINT", "ANSWER_CUE", "QUESTION", "RISK", "DELIVERY", "CONTRIBUTION_OPPORTUNITY"}
     states = {s.value for s in future_profile.ConversationItemState}
     assert states == {"PROPOSED", "AGREED", "COMMITTED", "DONE", "SUPERSEDED", "UNKNOWN"}
-    conversation = next(p for p in future_profile.PROFILES if p.key == "conversation")
-    assert conversation.productized is False
+    expected_profiles = set(future_profile.ConversationProfileKind)
+    assert {p.key for p in future_profile.PROFILES} == expected_profiles
+    assert [p.key for p in future_profile.PROFILES if p.productized] == [future_profile.ConversationProfileKind.INTERVIEW]
+    assert all(
+        not p.productized
+        for p in future_profile.PROFILES
+        if p.key is not future_profile.ConversationProfileKind.INTERVIEW
+    )
     goal = future_profile.interview_goal_as_conversation_goal({"id": "g", "title": "MindRank · AIDD", "company": "MindRank"})
-    assert goal.profile == "interview" and "job" not in goal.attributes
+    assert goal.profile is future_profile.ConversationProfileKind.INTERVIEW and "job" not in goal.attributes
 
 
 def test_shared_product_layer_does_not_hard_code_job():

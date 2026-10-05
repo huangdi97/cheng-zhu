@@ -41,6 +41,7 @@ export const __UI_PREFS_TEST_KEYS = {
   overlayPromptMaxWidth: INTERVIEW_OVERLAY_STORAGE_KEYS.promptMaxWidth,
   overlayPromptAutoFollow: INTERVIEW_OVERLAY_STORAGE_KEYS.promptAutoFollow,
   overlayMaxLines: INTERVIEW_OVERLAY_STORAGE_KEYS.maxLines,
+  assistTranscriptCollapsed: ASSIST_TRANSCRIPT_COLLAPSED_KEY,
 }
 
 const APP_MODE_VALUES: ReadonlySet<AppMode> = new Set([

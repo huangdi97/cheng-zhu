@@ -300,6 +300,7 @@ try {
 
   // Goal-centered studio.
   await route(page, '#/home', '[data-testid="action-home"]')
+  await page.getByText(/Next Focus|从一个具体的求职目标开始/).first().waitFor({ timeout: 20000 })
   await shot(page, '02-action-home', 'Action Home: next interview, Next Focus, needs-attention, recent session')
 
   await route(page, '#/goals', '[data-testid="goals-page"]')
@@ -379,7 +380,10 @@ try {
   await page.getByTestId('fast-cue').first().waitFor({ timeout: 30000 })
   await shot(page, '21-live-fast-cue', 'Question → Fast Cue → source/warning before Deep')
   await page.waitForTimeout(2200)
-  await shot(page, '22-live-deep', 'Deep answer is the second layer')
+  const deepToggle = page.getByRole('button', { name: '展开完整回答' }).last()
+  await deepToggle.waitFor({ timeout: 10000 })
+  await deepToggle.click()
+  await shot(page, '22-live-deep', 'Deep Answer is deliberately secondary and expands on demand')
 
   await page.keyboard.press('Control+P')
   await page.getByTestId('pin-dialog').waitFor()
@@ -420,6 +424,7 @@ try {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await route(page, '#/home', '[data-testid="action-home"]')
+  await page.getByText(/Next Focus|从一个具体的求职目标开始/).first().waitFor({ timeout: 20000 })
   await shot(page, '28-dark-home', 'dark theme')
 
   // 390px packaged-window evidence.

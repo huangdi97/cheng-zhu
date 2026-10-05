@@ -224,7 +224,7 @@ test.describe('v1.3 first-run onboarding', () => {
     await wizard.getByRole('button', { name: '开始第一次演练' }).click()
     await expect(wizard.getByTestId('guided-question')).toContainText('为什么在这个项目里选择 RAG？')
 
-    await wizard.getByRole('button', { name: '生成 Fast Cue' }).click()
+    await wizard.getByRole('button', { name: '生成快速提示' }).click()
     await expect(wizard.getByRole('alert')).toBeVisible()
     await wizard.getByRole('button', { name: '使用标记明确的示例 Cue 继续' }).click()
     await expect(wizard.getByTestId('guided-fast-cue-fallback')).toContainText('不是实时模型证据')

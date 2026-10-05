@@ -44,6 +44,11 @@ test.describe('R2 live cue-first', () => {
           type: 'answer_done',
           delay: 150,
           id: 'qa-r2-1',
+          question: '你实际用过 Redis Cluster 吗？',
+          answer: '完整回答正文：我没有 Redis Cluster 的生产经历，但可以说明它的槽位分片与高可用设计。',
+          think: '',
+          model_name: 'GPT-4.1 Mini',
+          first_token_ms: 120,
           total_ms: 150,
         },
         {

@@ -181,15 +181,17 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
   const evidence = String(data.evidence_level || 'NO_DATA')
   const real = String(data.real_user_validation || 'REAL_USER_VALIDATION_PENDING')
   const evidenceTone = evidence === 'LOCAL_DEVICE_USAGE' ? 'info' : evidence === 'SYNTHETIC_DOGFOOD' ? 'warn' : 'muted'
+  const evidenceLabel = evidence === 'LOCAL_DEVICE_USAGE' ? '本机真实使用' : evidence === 'SYNTHETIC_DOGFOOD' ? '模拟连续使用' : '暂无使用数据'
+  const realLabel = real === 'REAL_USER_VALIDATION_PENDING' ? '真实用户验证待补' : '已有真实用户验证记录'
 
   const cards = [
     {
       key: 'A', title: '求职目标是否持续复用', value: rate(goal.goal_reopen_rate),
-      detail: `${metric(goal.goals, '0')} 个 Goal · 平均 ${metric(goal.sessions_per_goal, '0')} 场/Goal`,
+      detail: `${metric(goal.goals, '0')} 个求职目标 · 平均 ${metric(goal.sessions_per_goal, '0')} 场/目标`,
     },
     {
       key: 'B', title: '复盘是否改变下一步', value: rate(reflection.follow_through_rate),
-      detail: `${metric(reflection.next_focus_from_reflection, '0')} 个 Next Focus 来自复盘`,
+      detail: `${metric(reflection.next_focus_from_reflection, '0')} 个下一步重点来自复盘`,
     },
     {
       key: 'C', title: 'Fast Cue 是否有帮助', value: metric(cue.rendered, '0'),
@@ -205,15 +207,15 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
     },
     {
       key: 'F', title: '速记 / 标记是否有价值', value: metric(notes.selected_into_pack, '0'),
-      detail: `速记进 Pack · Pin→Next Focus ${metric(pins.next_focus_from_pin, '0')}`,
+      detail: `速记带入上场 ${metric(notes.selected_into_pack, '0')} 次 · 标记形成下一步 ${metric(pins.next_focus_from_pin, '0')} 次`,
     },
   ]
 
   return (
     <div className="mt-2 space-y-3" data-testid="validation-summary">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone={evidenceTone}>证据：{evidence}</StatusBadge>
-        <StatusBadge tone={real === 'REAL_USER_VALIDATION_PENDING' ? 'warn' : 'ok'}>{real}</StatusBadge>
+        <StatusBadge tone={evidenceTone}>证据：{evidenceLabel}</StatusBadge>
+        <StatusBadge tone={real === 'REAL_USER_VALIDATION_PENDING' ? 'warn' : 'ok'}>{realLabel}</StatusBadge>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
@@ -250,7 +252,7 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
       ) : null}
       <p className="text-[11px] leading-relaxed text-text-muted">
         这里只显示这台电脑上的本地使用信号。Synthetic / automated evidence 只能证明工程闭环；
-        没有真实用户证据时，成竹不会把它写成 PMF 或“面试成功率”。
+        没有真实用户证据时，成竹不会把这些本地指标解释成“产品已验证”或“面试成功率”。
       </p>
     </div>
   )

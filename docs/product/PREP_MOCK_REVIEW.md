@@ -1,92 +1,511 @@
-# Prepare / Mock / Review（Stage L）
+# Goal Prepare / Practice / Reflection
 
-> CURRENT · 对应 canonical 第 25、26、30、31 节。落点：`backend/services/prep_service.py`、`practice_service.py`、`backend/services/intelligence/job_representation.py`、`job_workspace.py`、`review_writeback.py`、`backend/api/prep/`、`backend/api/review/router.py`。
+> **CURRENT · v1.4.x**
+>
+> v1.2 的 PrepSpace / Job Workspace 仍作为兼容数据与底层能力存在，但不再是当前产品信息架构。
+> 当前产品围绕 **Goal** 组织。
 
-## 1. 定位
+## 1. 产品闭环
 
-准备、模拟与复盘纳入同一条学习闭环。围绕 **Job Workspace** 组织，不把"题库"做成产品中心（canonical 第 25 节）。
+```text
+Goal
+→ Next Focus
+→ Prepare
+→ Practice
+→ Preflight
+→ Live
+→ Reflection
+→ Next Focus
+```
 
-## 2. Prepare：Job Workspace
+核心原则：
 
-一场目标岗位包括（canonical 第 25 节）：JD / 公司 / Candidate × Job Alignment / 简历攻击面 / Gap Map / Question Graph / Story Bank / Quick Mock / Deep Mock。
+> 用户不需要理解系统有多少模块，只需要知道这个岗位下一步最值得做什么。
 
-当前实现：
+---
 
-| 能力 | 实现 | 落点 |
-| --- | --- | --- |
-| JD 结构化 | `build_job_representation(jd_text, company, title, role)` → company/title/level/requirements（must-have / nice-to-have / technology / competency） | `intelligence/job_representation.py` |
-| Candidate × Job Alignment | `compute_alignment(job, resume_text, claim_texts, claim_ids)` → 每条 requirement 一个可解释状态，claim 关联带 evidence_ids | 同上 + `api/intelligence/router.py:228-245` |
-| Alignment 状态 | `STRONG_MATCH / PARTIAL_MATCH / KNOWLEDGE_MATCH / GAP / UNKNOWN`——**不出"93% match"**（`AlignmentStatus` docstring） | `intelligence/types.py:57` |
-| 岗位洞察 | `generate_insight(role, company, jd_text, resume_text)` → focus_points / strengths / gaps（各 3-6 条，每条 20 字以内） | `services/prep_service.py:96` |
-| 技能卡 | `generate_skill_cards(role, jd_text, resume_text)`——Candidate enrichment + Gap discovery（canonical 第 33.7 节，不再是"技能卡即边界"） | `services/prep_service.py:150` |
-| 启动包 | `build_launch_pack(space)` 聚合 JD/洞察/技能卡/问题 | `services/prep_service.py:175` |
-| 题目生成 | `generate_questions(role, jd_text, resume_text)` → Question Graph 初始节点 | `services/prep_service.py:284` |
+## 2. Goal
 
-### Job Workspace（`POST /api/intelligence/workspace`，确定性、无 LLM）
+一个 Goal = 一个具体的公司 × 岗位长期工作空间。
 
-`intelligence/job_workspace.py` 在 JD 结构化 + Alignment 之上组合四块，前端 `JobWorkspacePanel` 展示在准备空间详情页：
+包含：
 
-| 区块 | 来源与规则 |
-| --- | --- |
-| Gap Map | alignment 的 `GAP`（must-have → 优先）/ `KNOWLEDGE_MATCH`（可用知识回答，但无证据不能说做过）/ `PARTIAL_MATCH`（补充）+ 复盘写回的 `knowledge_weakness`（≥2 次确认 → 优先）与 `repeated_topic`；按主题去重，无百分比 |
-| 简历攻击面 | 仅 `VERIFIED/SUPPORTED` 的 fact claim；与岗位对齐、带指标的经历排前，附风险提示与追问维度（`extract_experience_expansion`） |
-| Question Graph | 追问**树**（`parent_id`）：经历深挖链 + 每个 Gap 的「知识 → 事实边界 → 开放设计」链 |
-| Stories | 已存真实故事 + 缺失胜任力的找故事提示（只指向候选人自己的材料，**从不生成事件**） |
+- company；
+- role；
+- JD；
+- stage；
+- interview round / next interview；
+- materials；
+- Quick Notes；
+- Question Banks；
+- sessions；
+- Reflection；
+- Offer；
+- Next Focus。
 
-`POST /api/intelligence/job/rebuild` 契约不变（不含 `workspace`）。
+Goal 不是 PrepSpace 的 UI 别名。旧 PrepSpace 只作为兼容 / legacy link 保留。
 
-## 3. Mock：基于 gap 动态追问
+---
 
-`backend/services/practice_service.py`：
+## 3. Goal Room
 
-- `start_session(space_id, rounds=5)`：从 PrepSpace 的题目集开一场模拟（`_ensure_questions` 保证题目存在）。
-- Gap 焦点（`_gap_focus` → `job_workspace.mock_gap_focus`）：用**本准备空间自己的 JD** × 候选人证据 + 复盘写回弱项算 Gap（不读全局"最近岗位"、不落库）；Intelligence 层失败时降级为普通练习。响应带 `gap_focus`，前端在"本场优先补弱项"中展示。
-- 题池顺序：先按薄弱点排序（`_order_by_weak_points`，关键词 = 复盘画像弱项 ∪ Gap 主题），再由 `_merge_gap_questions` 在第一题热身后穿插 Gap 题（`type: gap`，去重）。
-- `_pick_next` 选题：`pending_followups` 优先——基于你上一题回答的**动态追问**（`type: follow_up`）；其余按上述题池顺序。
-- `_feedback_payload(turn)`：每轮反馈带 `follow_up_questions`（来自逐题分析 `review_analysis.analyze_turn`）。
-- `_build_report(session)`（`:166`）：整场报告（`_avg_score` 汇总）。
-- 无真实故事的 BEHAVIORAL 题：不编事件，提供找故事的方向（canonical 第 26 节；planner BEHAVIORAL 模式同样约束）。
+Goal Room 四个主视图：
 
-Mock 与 Live 共享同一 Intelligence core：题型判定 / claim 边界 / 追问维度一致（canonical 第 26 节）。
+```text
+概览
+准备
+面试
+Offer
+```
 
-## 4. Review 闭环
+### 概览
 
-- **真实问答录制**：面试复盘录制真实问答 + ASR 纠错（`services/review_analysis.py` / `review_async_analysis.py`）。
-- **Question Tree / coverage**：整场复盘总结逐题分析；Session Memory 的 topic / claims / open threads 支撑覆盖统计（canonical 第 30 节 Post-interview Debrief）。
-- **导出**：`GET /api/review/sessions/{session_id}/export?format=md`（`api/review/router.py:490`）。
-- **受控写回**（canonical 第 31 节 Cross-session Learning）：复盘完成后 `write_back_after_review(session_id, summary_result, analyzed_turns)`（`intelligence/review_writeback.py:28`）把 learning 结果写回长期记忆——只有白名单 kind 通过。
+优先显示：
+
+- Next Focus；
+- 下一场；
+- What We Know；
+- Recent Sessions；
+- Progress Trends。
+
+禁止虚假：
+
+- readiness score；
+- offer probability；
+- candidate percentile。
+
+### 准备
+
+面向用户呈现：
+
+- 准备缺口；
+- 最可能被深挖的经历；
+- 可能追问；
+- Stories；
+- 本场带入内容；
+- Pack preview。
+
+底层可以复用 Alignment / Gap Map / Question Graph，但 UI 不要求用户理解这些内部术语。
+
+---
+
+## 4. Next Focus
+
+Next Focus 每个 Goal 只保持少量高优先级动作。
+
+来源：
+
+1. 用户显式选择；
+2. Reflection；
+3. Practice weakness；
+4. Fact boundary；
+5. JD gap；
+6. Story gap。
+
+每一项必须有：
+
+- title；
+- 人话原因；
+- source；
+- action。
+
+排序可以使用 rubric 权重，但**不得把“第 1.0 级 / 满级 4 / 岗位权重 18”这类评测器调试语言直接展示给用户**。
+
+---
+
+## 5. Materials
+
+资料角色必须分开：
+
+```text
+Resume
+Project Material
+Knowledge Base
+Quick Notes
+Question Bank
+Skill Card
+Story
+```
+
+重要边界：
+
+```text
+KB knowledge != personal evidence
+Quick Note != evidence
+generated question != real interview question
+```
+
+Material lifecycle：
+
+```text
+PROCESSING
+READY
+FAILED
+REPLACING
+```
+
+替换文件时，旧 READY 版本继续可用，直到新版本 READY。
+
+---
+
+## 6. Fact Inbox
+
+Evidence Graph 不直接暴露为数据库界面。
+
+产品入口：
+
+```text
+我的成竹
+→ 待确认
+```
+
+例如：
+
+```text
+“我负责完整 RAG 架构设计”
+
+材料目前支持：
+参与设计
+
+[我主导]
+[我参与]
+[修改]
+[查看来源]
+```
+
+用户确认不会凭空提高 Provenance。
+
+v1.4 还观察：
+
+- backlog；
+- resolution；
+- dismiss；
+- reopen；
+- resolve time。
+
+如果 burden 变高，应减少生成 / 合并，而不是增加提醒。
+
+---
+
+## 7. Story
+
+Story Bank 按能力组织：
+
+- Ownership / 个人职责；
+- Conflict；
+- Failure；
+- Leadership；
+- Ambiguity；
+- Collaboration；
+- Difficult Problem；
+- Influence；
+- Trade-off；
+- Learning。
+
+没有真实故事时：
+
+- 给找故事方向；
+- 可以启动 Story Builder；
+- 不生成虚构经历。
+
+---
+
+## 8. Practice 3.0
+
+Practice Setup：
+
+```text
+Goal
+Round
+Persona
+Demeanor
+Difficulty
+Question Sources
+Language
+Human Coach
+```
+
+Round：
+
+- Technical；
+- Project Deep Dive；
+- System Design；
+- Hiring Manager；
+- HR；
+- Behavioral；
+- Product / Case。
+
+Demeanor：
+
+- Neutral；
+- Friendly；
+- Skeptical；
+- Strong Follow-up；
+- Fast-paced。
+
+Difficulty：
+
+- Warmup；
+- Standard；
+- Pressure。
+
+Sources：
+
+- Goal Question Graph；
+- Recent Weakness；
+- My Question Bank；
+- Role Bank。
+
+---
+
+## 9. Adaptive Follow-up
+
+下一问受：
+
+```text
+Goal
+Round
+Persona
+Demeanor
+Difficulty
+current answer
+Question Graph
+Recent Weakness
+open threads
+```
+
+共同影响。
+
+支持：
+
+- follow-up；
+- challenge；
+- constraint change；
+- ownership probe；
+- quantify；
+- clarify；
+- contradiction probe；
+- closing question。
+
+不是固定题单播放器。
+
+---
+
+## 10. Question Banks
+
+题目 origin 必须明确：
+
+```text
+CURATED
+IMPORTED
+GENERATED
+PREVIOUS_SESSION
+USER_ADDED
+```
+
+模型生成题不能伪装成“真实面经”。
+
+---
+
+## 11. Panel / Multi-persona
+
+Practice 支持 2–3 个 personas。
+
+示例：
+
+```text
+Tech Lead
+Hiring Manager
+Product Partner
+```
+
+每轮只有一个 current speaker。
+
+Follow-up 保持 persona concern / style 连续，不允许三个人同时抢话。
+
+---
+
+## 12. Content Coach × Delivery Coach
+
+### Content Coach
+
+看：
+
+- 是否回答问题；
+- truth boundary；
+- technical depth；
+- structure；
+- trade-off；
+- ownership；
+- evidence；
+- follow-up resilience。
+
+Finding 必须引用用户真实口述，而不是 AI answer。
+
+### Delivery Coach
+
+看：
+
+- time to conclusion；
+- duration；
+- pace；
+- pause；
+- repetition；
+- fillers；
+- possible scripted delivery。
+
+不输出单一综合分。
+
+---
+
+## 13. Progress Trends
+
+只在同一个 Goal 内展示解释性趋势。
+
+例如：
+
+```text
+技术深度      在改善
+个人职责      反复出现
+结论时间      在改善
+```
+
+不做：
+
+- candidate ranking；
+- offer probability；
+- composite readiness score。
+
+---
+
+## 14. Reflection
+
+Reflection 第一屏：
+
+```text
+下一步
+做得好的
+需要改进
+待确认事实
+Story 机会
+用户 Pin
+```
+
+完整逐轮 timeline 第二层。
+
+每个 finding 必须能回到：
+
+- question；
+- actual speech；
+- source。
+
+---
+
+## 15. Reflection write-back
+
+Reflection 不是只显示报告。
+
+支持真实动作：
+
+- Practice this；
+- Set as Next Focus；
+- Confirm fact；
+- Mark mistake；
+- Add source；
+- Create Story；
+- Add Quick Note；
+- Don't remember。
 
 闭环：
 
 ```text
-Prepare（JD → Alignment/Gap Map）
-    ↓ Mock（gap 驱动动态追问 → 反馈 → 薄弱点暴露）
-    ↓ Live（真实面试，Intelligence core 同一套边界）
-    ↓ Review（Question Tree / coverage / 整场总结）
-    ↓ 写回白名单（knowledge_weakness / repeated_topic / communication_profile）
-    ↓ 下一次 Prepare 的 Gap Map 与 Mock 追问更准
+Reflection
+→ ReflectionAction
+→ Next Focus
+→ Goal Overview
+→ next Practice
 ```
 
-## 5. 写回白名单（详见 MEMORY.md 第 3 节）
+Pin 只有用户显式动作后才能升为 Next Focus。
 
-| kind | 自动管道 | 需用户确认 |
-| --- | --- | --- |
-| `knowledge_weakness` | ✅（cap 8 条） | — |
-| `repeated_topic` | ✅ | — |
-| `communication_profile` | ✅ | — |
-| `user_confirmed_fact` | ❌ 无自动路径 | ✅ 显式确认（PATCH claims） |
+---
 
-LLM 的 interviewer inference（possible_focus / possible_concerns / planner hints）**绝不**进入写回路径（`memory_policy.py` SAFETY 注释）。
+## 16. History
 
-## 6. 拒绝的写回路径
+History 统一：
 
-- Review / Mock 分析产出的其他结论（LLM 总结文本）不自动落 `memory_item`；
-- 用户确认的新事实走 `PATCH /api/intelligence/claims/{claim_id}`（手动 truth_status 修正），不由自动管道代表用户设置；
-- 写回失败（kind 不在白名单 / 未确认）记 warning 并拒绝，永不 raise、不静默丢失（denied 有日志可追溯）。
+- Real Interviews；
+- Practice Sessions；
+- Reflections。
 
-## 7. 与 Intelligence core 的关系
+Goal 内和 History 打开的 Session 是同一份数据，不复制。
 
-- Prepare 的 Alignment 使用 `compute_alignment`（Job Representation，Stage C）；
-- Mock 的追问维度使用 `extract_experience_expansion`（Candidate Representation，Stage A）；
-- Mock 的题型/边界与 Live 共用 Question Understanding / Truth Boundary（Stage D/B）；
-- Review 的写回经 `memory_policy`（Stage L）白名单守卫。
+---
+
+## 17. v1.4 validation
+
+本地产品验证回答六个问题：
+
+A. Goal 是否持续复用？  
+B. Reflection 是否改变下一轮？  
+C. Fast Cue 是否真的有帮助？  
+D. Practice 是否迁移？  
+E. Fact Inbox 是否成为负担？  
+F. Quick Notes / Pin 是否真的创造价值？
+
+证据等级：
+
+```text
+NO_DATA
+SYNTHETIC_DOGFOOD
+LOCAL_DEVICE_USAGE
+REAL_USER_EVIDENCE
+```
+
+自动化 / synthetic 只证明工程闭环。
+
+```text
+REAL_USER_EVIDENCE_PENDING
+```
+
+必须保持真实。
+
+---
+
+## 18. 兼容底层
+
+当前产品层仍复用已经验证的：
+
+- Job Representation；
+- Candidate × Job alignment；
+- Question Graph；
+- Story / Skill；
+- Review；
+- memory policy；
+- InterviewPack；
+- Context Compiler。
+
+不要为了 Goal-centered UI 重写 Verified Core。
+
+---
+
+## 19. Done
+
+当前 v1.4.x 工程状态：
+
+- Goal Room — PRODUCT_COMPLETE
+- Next Focus — PRODUCT_COMPLETE
+- Prepare — PRODUCT_COMPLETE
+- Practice 3.0 — PRODUCT_COMPLETE
+- Panel — PRODUCT_COMPLETE
+- Question Banks — PRODUCT_COMPLETE
+- Content/Delivery Coach — PRODUCT_COMPLETE
+- Reflection write-back — AUTHORITATIVE
+- Progress Trends — PRODUCT_COMPLETE
+- local validation — ENGINEERING_COMPLETE
+
+真实用户效果仍保持：
+
+```text
+REAL_USER_EVIDENCE_PENDING
+```

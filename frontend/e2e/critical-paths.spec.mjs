@@ -156,10 +156,10 @@ test.describe('Live cue-first hierarchy', () => {
               timestamp: now - 2,
               source: 'manual_text',
               model_name: 'GPT-4.1 Mini',
-              fast_cue: {
+              fastCue: {
                 direction: '先讲更新频率和可追溯性',
                 cues: [{ text: '知识更新频繁，不需要重新训练', source: 'WORLD_KNOWLEDGE' }],
-                warnings: [],
+                cautions: [],
               },
             },
           ],
@@ -172,14 +172,17 @@ test.describe('Live cue-first hierarchy', () => {
     })
 
     await page.goto('/#/live/demo')
-    await expect(page.getByTestId('prior-turn')).toHaveCount(1)
-    await expect(page.getByTestId('prior-turn')).toContainText('上一问：请介绍一下你的项目。')
+    // AnswerPanel exists in both desktop and mobile responsive containers;
+    // only one is visible at a time. Assert the visible product surface rather
+    // than counting the hidden responsive twin.
+    const prior = page.locator('[data-testid="prior-turn"]:visible').filter({ hasText: '上一问：请介绍一下你的项目。' })
+    await expect(prior).toHaveCount(1)
     await expect(page.getByText('这是上一轮的完整回答，不应该继续占据第一视野。')).toHaveCount(0)
-    await expect(page.getByText('最新问题：为什么这里选择 RAG？')).toBeVisible()
-    await expect(page.getByText('先讲更新频率和可追溯性')).toBeVisible()
+    await expect(page.getByText('最新问题：为什么这里选择 RAG？').filter({ visible: true })).toBeVisible()
+    await expect(page.locator('[data-testid="fast-cue"]:visible')).toContainText('先讲更新频率和可追溯性')
 
-    await page.getByTestId('prior-turn').locator('summary').click()
-    await expect(page.getByText('这是上一轮的完整回答，不应该继续占据第一视野。')).toBeVisible()
+    await prior.locator('summary').click()
+    await expect(page.getByText('这是上一轮的完整回答，不应该继续占据第一视野。').filter({ visible: true })).toBeVisible()
   })
 })
 
@@ -203,10 +206,10 @@ test.describe('Live focus mode', () => {
             model_name: 'GPT-4.1 Mini',
             first_token_ms: 37,
             total_ms: 812,
-            fast_cue: {
+            fastCue: {
               direction: '先讲更新频率和可追溯性',
               cues: [{ text: '知识更新频繁', source: 'WORLD_KNOWLEDGE' }],
-              warnings: [],
+              cautions: [],
             },
           }],
           is_recording: true,
@@ -222,7 +225,7 @@ test.describe('Live focus mode', () => {
     await expect(page.getByTestId('live-advanced-tools')).toHaveCount(0)
     await expect(page.getByTestId('live-secondary-tools')).toBeHidden()
     await expect(page.getByTestId('resume-mount-inline')).toHaveCount(0)
-    await expect(page.getByText('先讲更新频率和可追溯性')).toBeVisible()
+    await expect(page.locator('[data-testid="fast-cue"]:visible')).toContainText('先讲更新频率和可追溯性')
     await expect(page.getByText(/首字\s*37ms/)).toHaveCount(0)
     await expect(page.getByText(/总\s*812ms/)).toHaveCount(0)
 

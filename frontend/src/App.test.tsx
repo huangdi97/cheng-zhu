@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
+import { parsePath, useRouter } from '@/lib/router'
 
 
 const apiMock = vi.hoisted(() => ({
@@ -70,7 +71,9 @@ describe('App bootstrap', () => {
       isPaused: false,
       wsConnected: true,
     } as any)
-    useUiPrefsStore.setState({ appMode: 'assist' })
+    useUiPrefsStore.setState({ appMode: 'assist', assistMode: 'voice' })
+    window.history.replaceState(null, '', '#/home')
+    useRouter.setState({ route: parsePath('/home') })
     apiMock.getConfig.mockResolvedValue({
       models: [{ name: 'demo', supports_vision: false }],
       active_model: 0,
@@ -207,34 +210,43 @@ describe('App bootstrap', () => {
   })
 
   it('prevents duplicate mobile server screen asks while one is in flight', async () => {
+    const originalInnerWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+    window.history.replaceState(null, '', '#/live/test')
+    useRouter.setState({ route: parsePath('/live/test') })
+
     let resolveAsk: ((value: unknown) => void) | null = null
     const pendingAsk = new Promise((resolve) => {
       resolveAsk = resolve
     })
     apiMock.askFromServerScreen.mockReturnValueOnce(pendingAsk)
 
-    render(<App />)
+    try {
+      render(<App />)
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'AI 答案' }))
-    const screenAsk = screen.getByRole('button', { name: '服务端截图审题' })
+      await screen.findByRole('tab', { name: '提示与回答' })
+      const screenAsk = screen.getByRole('button', { name: '服务端截图审题' })
 
-    act(() => {
-      screenAsk.click()
-      screenAsk.click()
-    })
+      act(() => {
+        screenAsk.click()
+        screenAsk.click()
+      })
 
-    expect(apiMock.askFromServerScreen).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: '截图审题提交中…' })).toBeDisabled()
+      expect(apiMock.askFromServerScreen).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: '截图审题提交中…' })).toBeDisabled()
 
-    await act(async () => {
-      if (!resolveAsk) throw new Error('server screen ask resolver was not captured')
-      resolveAsk({ ok: true })
-      await pendingAsk
-    })
+      await act(async () => {
+        if (!resolveAsk) throw new Error('server screen ask resolver was not captured')
+        resolveAsk({ ok: true })
+        await pendingAsk
+      })
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '服务端截图审题' })).not.toBeDisabled()
-    })
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: '服务端截图审题' })).not.toBeDisabled()
+      })
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
+    }
   })
 
   it('switches mobile written-exam view to the answer tab when a question starts', async () => {
@@ -251,14 +263,17 @@ describe('App bootstrap', () => {
     })
 
     try {
+      window.history.replaceState(null, '', '#/live/test')
+      useRouter.setState({ route: parsePath('/live/test') })
       render(<App />)
 
-      await waitFor(() => {
-        expect(screen.getByRole('tab', { name: '答题记录' })).toBeInTheDocument()
-        expect(screen.getByRole('tab', { name: 'AI 答案' })).toBeInTheDocument()
-      })
-      expect(screen.getByRole('tab', { name: '答题记录' })).toHaveClass('border-accent-blue')
-      expect(screen.getByRole('tab', { name: 'AI 答案' })).not.toHaveClass('border-accent-blue')
+      const transcriptTab = await screen.findByRole('tab', { name: '答题记录' })
+      const answerTab = screen.getByRole('tab', { name: '提示与回答' })
+      // v1.3 is cue-first by default. Move to transcript explicitly, then
+      // prove a new answer stream returns the mobile user to the Cue/Answer layer.
+      fireEvent.click(transcriptTab)
+      expect(transcriptTab).toHaveClass('border-accent-blue')
+      expect(answerTab).not.toHaveClass('border-accent-blue')
 
       act(() => {
         useInterviewStore.getState().startAnswer('qa-exam-1', '截图题', {
@@ -268,8 +283,8 @@ describe('App bootstrap', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByRole('tab', { name: 'AI 答案' })).toHaveClass('border-accent-blue')
-        expect(screen.getByRole('tab', { name: '答题记录' })).not.toHaveClass('border-accent-blue')
+        expect(answerTab).toHaveClass('border-accent-blue')
+        expect(transcriptTab).not.toHaveClass('border-accent-blue')
       })
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })

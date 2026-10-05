@@ -101,7 +101,24 @@ def test_seven_day_synthetic_continuity(product_env, monkeypatch):
     assert cue["rendered"] >= 1
     assert cue["usefulness"]["helpful_marks"] >= 1
     assert cue["usefulness"]["speech_after_cue_rate"] == 1.0
-    assert report["F_quick_notes_and_pins"]["quick_notes"]["opened_in_live"] >= 1
+
+    # v1.4 E/F must prove the actual write-back / burden loops, not merely
+    # that the event names or UI surfaces exist.
+    inbox = report["E_fact_inbox_burden"]
+    assert inbox["opened"] >= 1
+    assert inbox["resolved"] >= 1
+    assert inbox["resolution_rate"] > 0
+
+    value = report["F_quick_notes_and_pins"]
+    assert value["quick_notes"]["opened_in_live"] >= 1
+    assert value["quick_notes"]["converted_from_reflection"] >= 1
+    assert value["pins"]["used_in_reflection"] >= 1
+    assert value["pins"]["next_focus_from_pin"] >= 1
+
+    assert out["checks"]["day5_reflection_can_create_quick_note"] is True
+    assert out["checks"]["day6_fact_inbox_resolution_recorded"] is True
+    assert out["checks"]["day7_pin_can_become_next_focus"] is True
+    assert out["checks"]["day7_value_metrics_cover_reflection_note_and_pin"] is True
 
 
 def test_thirty_session_synthetic_continuity(product_env, monkeypatch):
@@ -117,10 +134,16 @@ def test_future_profile_is_retained_but_not_productized():
     assert keys == {"RECALL", "TALKING_POINT", "ANSWER_CUE", "QUESTION", "RISK", "DELIVERY", "CONTRIBUTION_OPPORTUNITY"}
     states = {s.value for s in future_profile.ConversationItemState}
     assert states == {"PROPOSED", "AGREED", "COMMITTED", "DONE", "SUPERSEDED", "UNKNOWN"}
-    conversation = next(p for p in future_profile.PROFILES if p.key == "conversation")
-    assert conversation.productized is False
+    expected_profiles = set(future_profile.ConversationProfileKind)
+    assert {p.key for p in future_profile.PROFILES} == expected_profiles
+    assert [p.key for p in future_profile.PROFILES if p.productized] == [future_profile.ConversationProfileKind.INTERVIEW]
+    assert all(
+        not p.productized
+        for p in future_profile.PROFILES
+        if p.key is not future_profile.ConversationProfileKind.INTERVIEW
+    )
     goal = future_profile.interview_goal_as_conversation_goal({"id": "g", "title": "MindRank · AIDD", "company": "MindRank"})
-    assert goal.profile == "interview" and "job" not in goal.attributes
+    assert goal.profile is future_profile.ConversationProfileKind.INTERVIEW and "job" not in goal.attributes
 
 
 def test_shared_product_layer_does_not_hard_code_job():

@@ -19,6 +19,28 @@ const OFFER_STATES: Array<[string, string]> = [
   ['NONE', '暂无'], ['PENDING', '等待结果'], ['RECEIVED', '已收到'], ['NEGOTIATING', '谈判中'], ['ACCEPTED', '已接受'], ['DECLINED', '已拒绝'],
 ]
 
+const GOAL_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: '进行中',
+  PAUSED: '已暂停',
+  COMPLETED: '已结束',
+  ARCHIVED: '已归档',
+}
+
+const ROUND_LABELS: Record<string, string> = {
+  TECHNICAL: '技术面',
+  PROJECT_DEEP_DIVE: '项目深挖',
+  SYSTEM_DESIGN: '系统设计',
+  HIRING_MANAGER: 'Hiring Manager',
+  HR: 'HR',
+  BEHAVIORAL: '行为面',
+  PRODUCT_CASE: '产品 / Case',
+}
+
+function roundLabel(value?: string | null) {
+  if (!value) return ''
+  return ROUND_LABELS[value] ?? value
+}
+
 export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab }) {
   const { data: goal, error, loading, reload } = useAsync(() => productApi.goal(goalId, true), [goalId])
   const setContextGoal = useOsStore((s) => s.setContextGoal)
@@ -32,7 +54,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
   if (error) return <Page><ErrorState message={error} onRetry={reload} extra={<SecondaryButton onClick={() => navigate(paths.goals())}>返回目标列表</SecondaryButton>} /></Page>
   if (!goal) return null
 
-  const nextLine = goal.next_interview_at ? `${goal.interview_round || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '还没有安排下一轮')
+  const nextLine = goal.next_interview_at ? `${roundLabel(goal.interview_round) || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '还没有安排下一轮')
   const setStatus = (status: string) => void productApi.patchGoal(goal.id, { status } as never).then(reload)
 
   return (
@@ -40,7 +62,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
       <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-text-primary break-words">{goal.title}</h1>
-          <p className="text-xs text-text-muted">{nextLine}{goal.status !== 'ACTIVE' ? ` · ${goal.status}` : ''}</p>
+          <p className="text-xs text-text-muted">{nextLine}{goal.status !== 'ACTIVE' ? ` · ${GOAL_STATUS_LABELS[goal.status] ?? goal.status}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PrimaryButton testId="goal-start-practice" onClick={() => startPractice(goal.id)}>开始练习</PrimaryButton>
@@ -54,7 +76,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
               : { key: 'resume', label: '恢复为进行中', onSelect: () => setStatus('ACTIVE') },
             { key: 'complete', label: '标记已结束', onSelect: () => setStatus('COMPLETED') },
             { key: 'delete', label: '删除目标', danger: true, onSelect: () => {
-              if (window.confirm(`删除「${goal.title}」？目标内的速记、面试轮次和 Next Focus 会一起删除；练习与复盘记录保留在历史里。`)) {
+              if (window.confirm(`删除「${goal.title}」？目标内的速记、面试轮次和下一步建议会一起删除；练习与复盘记录保留在历史里。`)) {
                 void productApi.deleteGoal(goal.id).then(() => navigate(paths.goals()))
               }
             } },
@@ -62,7 +84,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
         </div>
       </header>
       <Tabs<GoalTab> label="目标视图" value={tab} onChange={(t) => navigate(paths.goal(goal.id, t), { replace: true })}
-        tabs={[['overview', '概览'], ['prepare', '准备'], ['interviews', '面试', goal.interviews.filter((i) => i.status === 'UPCOMING').length], ['offer', 'Offer']]} />
+        tabs={[['overview', '概览'], ['prepare', '准备'], ['interviews', '面试', goal.interviews.filter((i) => i.status === 'UPCOMING').length], ['offer', '录用']]} />
       <div className="pt-3">
         {tab === 'overview' ? <Overview goal={goal} reload={reload} /> : null}
         {tab === 'prepare' ? <GoalPrepare goal={goal} reload={reload} /> : null}
@@ -76,12 +98,13 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
 
 function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
   const [notes, setNotes] = useState(goal.goal_notes)
+  const [notesEditing, setNotesEditing] = useState(Boolean(goal.goal_notes))
   const jdLines = goal.jd.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 4)
   const upcoming = goal.interviews.filter((i) => i.status === 'UPCOMING')
   return (
     <div className="grid gap-x-6 md:grid-cols-[1.4fr_1fr]">
       <div>
-        <Section title="Next Focus">
+        <Section title="下一步重点">
           <NextFocusList goalId={goal.id} items={goal.next_focus} onChanged={reload} />
         </Section>
         <Section title="最近场次" action={<SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>全部</SecondaryButton>}>
@@ -93,13 +116,13 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
         <Section title="下一场">
           {upcoming.length ? (
             <ul className="space-y-1 text-sm">
-              {upcoming.slice(0, 2).map((i) => <li key={i.id} className="text-text-primary">{i.round || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></li>)}
+              {upcoming.slice(0, 2).map((i) => <li key={i.id} className="text-text-primary">{roundLabel(i.round) || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></li>)}
             </ul>
           ) : (
             <SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>安排下一轮</SecondaryButton>
           )}
         </Section>
-        <Section title="What We Know">
+        <Section title="已知信息">
           <dl className="space-y-1.5 text-xs">
             <div><dt className="inline text-text-muted">岗位：</dt><dd className="inline text-text-primary">{goal.role || '未填写'}</dd></div>
             <div><dt className="inline text-text-muted">阶段：</dt><dd className="inline text-text-primary">{goal.stage || '未记录'}</dd></div>
@@ -108,11 +131,21 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
               <dd className="text-text-secondary">{jdLines.length ? jdLines.map((l) => <div key={l} className="truncate">{l}</div>) : <button type="button" className="text-accent-blue underline" onClick={() => navigate(paths.goal(goal.id, 'prepare'))}>补充 JD</button>}</dd>
             </div>
           </dl>
-          <div className="mt-2">
-            <Field label="目标备注（面试官信息、对方透露的情况…）">
-              <textarea className={`${inputCls} min-h-[64px]`} value={notes} onChange={(e) => setNotes(e.target.value)}
-                onBlur={() => { if (notes !== goal.goal_notes) void productApi.patchGoal(goal.id, { goal_notes: notes }).then(reload) }} />
-            </Field>
+          <div className="mt-3">
+            {notesEditing || notes ? (
+              <Field label="目标备注（面试官信息、对方透露的情况…）">
+                <textarea className={`${inputCls} min-h-[64px]`} value={notes} onChange={(e) => setNotes(e.target.value)}
+                  onBlur={() => {
+                    if (notes !== goal.goal_notes) void productApi.patchGoal(goal.id, { goal_notes: notes }).then(reload)
+                    if (!notes.trim()) setNotesEditing(false)
+                  }} />
+              </Field>
+            ) : (
+              <button type="button" onClick={() => setNotesEditing(true)}
+                className="text-xs text-accent-blue underline underline-offset-2 hover:text-accent-blue/80">
+                + 补充面试官信息或目标备注
+              </button>
+            )}
           </div>
         </Section>
       </div>
@@ -174,7 +207,7 @@ function ProgressTrends({ goalId }: { goalId: string }) {
           ) : null}
         </ul>
       ) : null}
-      <p className="mt-2 text-[10px] text-text-muted">这些是同一 Goal 内的练习/复盘观察，不是录用概率，也不和其他候选人比较。</p>
+      <p className="mt-2 text-[10px] text-text-muted">这些只反映同一求职目标下的练习和复盘变化，不是录用概率，也不和其他候选人比较。</p>
     </Section>
   )
 }
@@ -192,9 +225,9 @@ function Interviews({ goal, reload }: { goal: GoalDetail; reload: () => void }) 
         <ul className="space-y-1.5">
           {goal.interviews.filter((i) => i.status === 'UPCOMING').map((i) => (
             <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-hover/50 px-3 py-2">
-              <span className="text-sm text-text-primary">{i.round || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></span>
+              <span className="text-sm text-text-primary">{roundLabel(i.round) || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></span>
               <span className="flex items-center gap-1">
-                <SecondaryButton onClick={() => goLive(goal.id)}>Preflight</SecondaryButton>
+                <SecondaryButton onClick={() => goLive(goal.id)}>上场检查</SecondaryButton>
                 <ActionMenu label="轮次操作" actions={[
                   { key: 'done', label: '标记已面完', onSelect: () => void productApi.patchInterview(i.id, { status: 'DONE' }).then(reload) },
                   { key: 'cancel', label: '取消这一轮', onSelect: () => void productApi.patchInterview(i.id, { status: 'CANCELLED' }).then(reload) },

@@ -139,7 +139,7 @@ export default function QuickNotesPanel({ goalId, readOnly = false, selectedIds,
             ) : (
               <div className="flex items-start gap-2">
                 {onSelectionChange ? (
-                  <input type="checkbox" className="mt-1" aria-label={`选入本目标的 Interview Pack：${note.title || note.content.slice(0, 20)}`}
+                  <input type="checkbox" className="mt-1" aria-label={`带入本目标的上场内容：${note.title || note.content.slice(0, 20)}`}
                     checked={(selectedIds ?? []).includes(note.id)} onChange={() => toggleSelected(note.id)} />
                 ) : null}
                 <div className="min-w-0 flex-1">

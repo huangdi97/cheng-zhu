@@ -17,6 +17,7 @@ import {
   Mic,
   Volume2,
   MessageSquarePlus,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useInterviewStore } from '@/stores/configStore'
@@ -122,6 +123,7 @@ export default function ControlBar() {
   const [inputLevel, setInputLevel] = useState<{ level_pct: number; rms: number; peak: number; has_signal: boolean; error?: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [liveToolsOpen, setLiveToolsOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
   const enabledModelEntries = useMemo(
@@ -142,6 +144,15 @@ export default function ControlBar() {
     qaPairs.length === 0 &&
     (devices.length === 0 || selectedDevice === null)
   const showExamStartHint = isExamMode && !isRecording && qaPairs.length === 0
+  const showAdvancedLiveTools = isExamMode || !isRecording || isPaused || liveToolsOpen
+
+  // Entering active Live collapses secondary setup/manual tools so the current
+  // Question → Fast Cue hierarchy owns the first screen. Pausing deliberately
+  // reveals recovery controls again.
+  useEffect(() => {
+    if (isRecording && !isPaused) setLiveToolsOpen(false)
+  }, [isRecording, isPaused])
+
   const autoAnswerMode = config?.assist_auto_answer_mode ?? (config?.auto_detect ? 'smart' : 'off')
   const handleSetAutoAnswerMode = async (mode: 'off' | 'smart' | 'always') => {
     try {
@@ -780,8 +791,8 @@ export default function ControlBar() {
 
       {/* 主控制行 */}
       <div className="grid gap-2 rounded-xl bg-bg-secondary p-2.5 lg:grid-cols-[minmax(0,38rem)_auto] lg:items-stretch">
-        {!isExamMode && (
-          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:max-w-[38rem]">
+        {!isExamMode && showAdvancedLiveTools ? (
+          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:max-w-[38rem]" data-testid="live-advanced-tools">
             <div className="flex min-w-0 flex-col gap-1 lg:max-w-[19rem]">
               <span className="text-[10px] font-medium text-text-muted leading-none">会议音频 · 听面试官</span>
               <p className="text-[10px] text-text-muted leading-snug truncate">电脑会议选 ★系统音频；电话会议选麦克风（手机开免提放电脑旁）</p>
@@ -859,7 +870,28 @@ export default function ControlBar() {
               </div>
             )}
           </div>
-        )}
+        ) : !isExamMode && isRecording ? (
+          <div className="flex min-h-[56px] min-w-0 items-center justify-between gap-3 rounded-lg border border-bg-hover/40 bg-bg-primary/35 px-3" data-testid="live-tools-summary">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium text-text-muted">现场工具已收起</p>
+              <p className="truncate text-xs text-text-secondary">
+                {selectedDevice !== null ? '会议音频已选择' : '会议音频未选择'}
+                {' · '}
+                {candidateCaptureEnabled && selectedCandidateMic !== null ? '正在记录我的回答' : '我的回答记录未开启'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLiveToolsOpen(true)}
+              aria-expanded={false}
+              aria-controls="live-secondary-tools"
+              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-bg-hover/60 px-2.5 py-1.5 text-xs text-text-secondary hover:bg-bg-hover/50 hover:text-text-primary"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+              现场工具
+            </button>
+          </div>
+        ) : null}
 
         <div className="flex h-full min-h-[56px] w-full min-w-0 flex-wrap items-center gap-1.5 lg:w-auto lg:max-w-[34rem] lg:border-l lg:border-bg-hover/40 lg:pl-2.5">
         {isRecording ? (
@@ -905,7 +937,7 @@ export default function ControlBar() {
           </button>
         )}
 
-        {!isExamMode && <ResumeMountInline className="bg-bg-primary/45" />}
+        {!isExamMode && !isRecording && <ResumeMountInline className="bg-bg-primary/45" />}
 
         {streamingIds.length > 0 && (
           <button onClick={handleCancelAsk} disabled={cancellingAsk}
@@ -921,7 +953,8 @@ export default function ControlBar() {
         </div>
       </div>
 
-      {/* 快捷提示词 */}
+      <div id="live-secondary-tools" className={showAdvancedLiveTools ? 'space-y-1.5' : 'hidden'} data-testid="live-secondary-tools">
+      {/* 快捷提示词：录制中默认收起，避免和当前 Cue 抢第一视野。 */}
       {quickPrompts.length > 0 && (
         <QuickPromptsRow
           prompts={orderedQuickPrompts}
@@ -930,7 +963,7 @@ export default function ControlBar() {
         />
       )}
 
-      {/* 手动提问输入行 */}
+      {/* 手动提问 / 截图 / 更多操作：始终可恢复，但不永久占据 Live 首屏。 */}
       <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
           <input ref={inputRef} type="text" value={manualQuestion}
@@ -1106,6 +1139,8 @@ export default function ControlBar() {
             </div>
           )}
         </div>
+      </div>
+
       </div>
 
       {inputMeterOpen && (

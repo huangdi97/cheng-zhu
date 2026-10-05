@@ -55,7 +55,9 @@ jobs:
 
       - name: v1.4 product-loop engineering evidence
         working-directory: .
-        run: python scripts/v14_validation_evidence.py --out-dir artifacts/validation
+        run: |
+          python scripts/v14_validation_evidence.py --out-dir artifacts/validation
+          python scripts/soak_sim.py --hours 3 --out artifacts/validation/v1.4-soak-3h.json
 
       - name: Upload v1.4 validation evidence
         uses: actions/upload-artifact@v4
@@ -64,6 +66,10 @@ jobs:
           path: artifacts/validation
           retention-days: 14
           if-no-files-found: error
+
+      - name: Release version consistency
+        working-directory: .
+        run: python scripts/check_release_version.py
 
       - name: License gate (MIT root + generated third-party notices)
         working-directory: .

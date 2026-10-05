@@ -4,7 +4,7 @@
 
 成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
 
-> 当前 Canonical：[docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)（Current Canonical = v1.3-R2 · Goal-centered Interview OS · 2026-10-01）；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.2.2](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.2.2)。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
+> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.3.0](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.3.0)。v1.4.0 只有在完整 CI、Windows packaged replay、download-back 与发布门禁全绿后才成为新的 stable。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
 v1.3 将成竹组织成一个 **Goal-centered Interview OS**：用户不是在“简历 / 题库 / 实时辅助 / 复盘”几个模块之间来回切换，而是围绕一个具体的公司 × 岗位持续推进。
 
@@ -15,6 +15,8 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 当前产品仍然 Interview-first。它把已经验证过的实时核心——系统音频 / 麦克风转写、Fast Cue、Deep Answer、截图上下文、来源与事实边界——放进这条 Goal 循环；同时通过 Fact Inbox、Stories、Quick Notes、Question Banks、Practice 3.0 和 Reflection write-back，让“下一次打开成竹”能够延续上一场真实发生的事情。
 
 长期方向是 Personal Conversation Intelligence，但 Meeting / Presentation / 1:1 等 Conversation Profile 仍属于未来版本，不在当前 v1.3 一级导航里提前产品化。
+
+> v1.4.0 正在做 **Product Validation Hardening**：不新增一级产品，而是把 Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值做成 local-first 的可验证闭环。自动化与 synthetic dogfood 只属于工程证据，不能冒充真实用户 PMF。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 
@@ -48,72 +50,60 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 | **复盘与延续** | Reflection 优先给 Next Step / strengths / improvements / fact checks / story opportunities，并可写回 Goal 的 Next Focus |
 | **桌面体验** | Ctrl+K Command Palette、Compact/Standard/Focus Overlay、Light/Dark、390px、键盘与可访问性支持 |
 
-## 面试主流程
+## 产品主流程
 
-1. 选择系统音频或麦克风，点击开始。
-2. 左侧实时转写持续落字，系统自动识别“值得回答”的问题。
-3. 右侧答案区按当前模型配置流式生成正式回答。
-   普通定义题默认短答；“你怎么看/如何评价/怎么设计/如何验证”等开放题会自动切换为深度回答，并在相关时承接上一轮面试官和候选人的上下文。
-4. 需要审图时，可粘贴截图，把题目、代码片段或页面内容交给模型分析。
-5. 开启知识库后，答案上方会显示引用角标，关联你的本地笔记或资料。
-6. 空间紧张时，可用 `⌘⇧J / Ctrl+Shift+J` 折叠左侧实时转录面板，让回答区铺满。
-7. 使用桌面模式时，还可以配合 Boss Key 和悬浮提示窗，在本机练习时减少窗口切换。
+成竹现在不是从「打开实时辅助」开始，而是从一个具体的公司 × 岗位 Goal 开始：
 
-## 主界面速览
+1. **创建求职目标**：保存公司、岗位、JD、轮次和下一场时间。
+2. **看下一步重点**：Goal Room 根据材料缺口、练习弱点、事实边界和上一场 Reflection 给出 1–3 个可执行动作，不生成虚假“准备度”。
+3. **准备**：整理 Stories / Skills、项目材料、知识库、Quick Notes 与 Question Banks；只有 Ready 材料才能进入本场上下文。
+4. **练习**：选择轮次、面试官风格、难度和题目来源；支持 adaptive follow-up、Panel、多维 Content / Delivery feedback。
+5. **上场检查**：Preflight 明确本场继承了哪些 Resume / Stories / Skills / Knowledge / Quick Notes，以及 AI / Human / Share Privacy policy。
+6. **Live**：默认优先显示当前 Question → Fast Cue → Source / Warning；完整回答、历史轮次、转录和辅助工具降到第二层。
+7. **复盘**：优先展示下一步、做得好的、需要改进、待确认事实、Story 机会和用户自己标记的 Pin；动作可以真实写回 Next Focus。
+8. **继续同一个 Goal**：下一次打开成竹时，从上一次真实发生的事情继续，而不是重新从模块首页找入口。
 
-<p align="center">
-  <img src="docs/screenshots/assist-mode.png" alt="实时辅助主界面" width="100%" />
-</p>
+## 当前产品地图
 
-## 关键能力雷达
+| 区域 | 用户任务 | 当前能力 |
+| --- | --- | --- |
+| **首页** | 我下一步该做什么 | 下一场、下一步重点、待处理事项、最近 Session |
+| **求职目标** | 拿下一个具体公司 × 岗位 | Goal Room · Prepare · Interviews · Offer · Progress Trends |
+| **我的成竹** | 管理“我是谁”和哪些话能安全说 | Resume · Projects · Fact Inbox · Stories · Skills · Expression |
+| **练习** | 有针对性地练薄弱点 | Round / Persona / Demeanor / Difficulty / Sources · Panel · Adaptive Follow-up |
+| **资料库** | 管理不同角色的材料 | Project Materials · Knowledge Bases · Quick Notes · Question Banks |
+| **上场** | 在正式 Session 中获得低干扰辅助 | Preflight · Fast Cue · Deep · Pin · Nudge · Closing · Overlay |
+| **历史 / 复盘** | 把这场变成下一次行动 | Session History · Reflection · Next Focus write-back |
+| **设置 / 诊断** | 控制模型、语言、隐私和本地证据 | 五层语言 · Overlay · Privacy · Export/Delete · v1.4 local validation |
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>实时辅助</h3>
-      <p>ASR 转写、自动识别问题、流式回答、截图审题、知识库引用、模型健康与 Token 统计。</p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>桌面协同</h3>
-      <p>Electron 端提供 Boss Key、托盘、悬浮问答框和快捷键，减少练习过程中的窗口切换。</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>训练与复盘</h3>
-      <p>面试复盘、问答记录、能力分析和薄弱点沉淀，方便把“答过的问题”变成“会讲的话题”。</p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>求职材料</h3>
-      <p>简历上传与摘要、JD 对照优化、求职看板、Offer 对比，把面试前后动作收在一个工具里。</p>
-    </td>
-  </tr>
-</table>
+### 当前 Live 层级
 
-## 模块画廊
+```text
+第一层：Question
+       ↓
+       Fast Cue
+       ↓
+       Source / Warning
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/knowledge-map.png" alt="能力分析" /></td>
-    <td width="50%"><img src="docs/screenshots/resume-optimizer.png" alt="简历优化" /></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>能力分析</strong><br /><sub>知识点趋势、问答沉淀、薄弱项复盘</sub></td>
-    <td align="center"><strong>简历优化</strong><br /><sub>把简历和 JD 放到一起，输出更像“能投出去”的版本</sub></td>
-  </tr>
-</table>
+第二层：Deep Answer · Transcript · Quick Notes · Screen · References · Coach
+```
 
-## 功能总览
+历史轮次默认折叠，新的实时问题和 Cue 保持视觉权威。共享隐私默认关闭；它只是受支持窗口路径上的内容保护，不是“不可检测”承诺。
 
-| 模块 | 现在能做什么 |
-| --- | --- |
-| **实时辅助** | ASR 转写 → 问题识别 → 多模型回答 → 截图审题 / 知识库引用 |
-| **知识库** | 上传 `.md` / `.txt` / `.log` / `.docx` / `.pdf`，支持检索测试、最近命中和回答引用 |
-| **面试复盘** | 录制真实问答、ASR 纠错、逐题分析、整场总结 |
-| **能力分析** | 知识点标签、历史问答记录、薄弱点趋势 |
-| **简历优化** | 上传简历，对照 JD 给出优化建议和改写方向 |
-| **求职看板** | 表格 / Kanban、状态标签、拖拽排序、Offer 对比 |
-| **设置中心** | 模型管理、STT 引擎、主题、偏好、快捷键、截图区域等配置 |
+### 当前验证边界
+
+v1.4 的本地产品分析回答六个问题：
+
+```text
+Goal 是否持续复用？
+Reflection 是否改变下一步？
+Fast Cue 是否真的有帮助？
+Practice 是否带来后续改善？
+Fact Inbox 是否成为负担？
+Quick Notes / Pin 是否真的创造价值？
+```
+
+这些信号默认只保存在本机。自动化、synthetic dogfood 和 mock-to-mock transfer 只能证明工程闭环，不能冒充真实用户 PMF 或真实面试提升。
 
 ## 技术结构
 

@@ -59,6 +59,9 @@ jobs:
           ruff check .
           python -m pytest -q
 
+      - name: Release version consistency
+        run: python scripts/check_release_version.py
+
       - name: License gate
         run: python scripts/generate_third_party_notices.py --check
 
@@ -94,7 +97,7 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium
 
-      - name: Capture v1.3 packaged runtime UI evidence
+      - name: Capture packaged runtime UI evidence
         working-directory: frontend
         shell: pwsh
         run: |
@@ -108,8 +111,8 @@ jobs:
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4
         with:
-          name: chengzhu-v1.3-runtime-ui-evidence
-          path: artifacts/release-evidence/v1.3
+          name: chengzhu-runtime-ui-evidence
+          path: artifacts/release-evidence
           retention-days: 30
           if-no-files-found: error
 
@@ -175,7 +178,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Publish GitHub Release
+      - name: Create draft GitHub Release for verification
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -185,6 +188,14 @@ jobs:
           $tag = "${{ github.ref_name }}"
           if (-not $tag.StartsWith('v')) { $tag = "v$version" }
           if ($tag -ne "v$version") { throw "tag $tag does not match app version $version" }
+          # A previous failed verification may have left a draft. Replace only
+          # drafts; never overwrite an already-published release.
+          gh release view $tag --json isDraft --jq '.isDraft' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
+            if ($isDraft -ne 'true') { throw "release $tag is already published; refusing to replace it" }
+            gh release delete $tag --yes --cleanup-tag
+          }
           gh release create $tag `
             dist/release/Chengzhu-Setup-x64.exe `
             dist/release/Chengzhu-Portable-x64.zip `
@@ -192,5 +203,94 @@ jobs:
             dist/release/LICENSE.txt `
             dist/release/THIRD_PARTY_NOTICES.md `
             "dist/release/RELEASE_NOTES_v$version.md" `
+            --draft `
             --title "成竹 Chengzhu $tag" `
             --notes-file "dist/release/RELEASE_NOTES_v$version.md"
+
+      - name: Download-back verification from published GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag.StartsWith('v')) { $tag = "v$version" }
+          $download = Join-Path $env:RUNNER_TEMP "chengzhu-download-back-$version"
+          if (Test-Path $download) { Remove-Item -Recurse -Force $download }
+          New-Item -ItemType Directory -Force $download | Out-Null
+
+          $downloaded = $false
+          for ($i = 1; $i -le 5; $i++) {
+            try {
+              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt"
+              $downloaded = $true
+              break
+            } catch {
+              if ($i -eq 5) { throw }
+              Start-Sleep -Seconds (3 * $i)
+            }
+          }
+          if (-not $downloaded) { throw "release assets were not downloadable" }
+
+          $sums = Get-Content (Join-Path $download "SHA256SUMS.txt")
+          foreach ($line in $sums) {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s+(.+)$') { continue }
+            $expected = $Matches[1].ToLower()
+            $name = $Matches[2].Trim()
+            $file = Join-Path $download $name
+            if (-not (Test-Path $file)) { throw "download-back missing asset: $name" }
+            $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            if ($actual -ne $expected) { throw "SHA256 mismatch for $name" }
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP "Chengzhu-DownloadBackInstall"
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
+          New-Item -ItemType Directory -Force $installDir | Out-Null
+          $installer = Join-Path $download "Chengzhu-Setup-x64.exe"
+          $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "download-back installer failed: $($proc.ExitCode)" }
+
+          $resources = Join-Path $installDir "resources"
+          $backendExe = Join-Path $resources "backend/chengzhu-backend.exe"
+          $frontendDist = Join-Path $resources "frontend-dist"
+          foreach ($required in @((Join-Path $installDir "Chengzhu.exe"), $backendExe, $frontendDist)) {
+            if (-not (Test-Path $required)) { throw "download-back install missing: $required" }
+          }
+
+          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report dist/release/download-back-smoke.json
+          $smoke = Get-Content dist/release/download-back-smoke.json -Raw | ConvertFrom-Json
+          if (-not $smoke.passed) { throw "download-back packaged smoke did not pass" }
+
+          @{
+            tag = $tag
+            source = "GitHub Release download"
+            installer_sha256 = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+            portable_sha256 = (Get-FileHash (Join-Path $download "Chengzhu-Portable-x64.zip") -Algorithm SHA256).Hash.ToLower()
+            smoke_passed = $smoke.passed
+          } | ConvertTo-Json -Depth 4 | Set-Content dist/release/download-back-verification.json -Encoding utf8
+
+      - name: Upload download-back verification
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chengzhu-download-back-verification
+          path: |
+            dist/release/download-back-smoke.json
+            dist/release/download-back-verification.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish verified GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag.StartsWith('v')) { $tag = "v$version" }
+          gh release edit $tag --draft=false --latest
+          $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
+          if ($isDraft -ne 'false') { throw "verified release $tag did not publish" }

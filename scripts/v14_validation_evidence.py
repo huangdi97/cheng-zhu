@@ -168,6 +168,7 @@ def main() -> int:
         and payload["thirty_session"]["integrity"]["ok"]
         and payload["hundred_session"]["integrity"]["ok"]
     )
+    validation_summary = payload["seven_day"]["validation"]
     print(json.dumps({
         "ok": ok,
         "evidence_type": payload["evidence_type"],
@@ -175,6 +176,13 @@ def main() -> int:
         "thirty_session": payload["thirty_session"]["dogfood"]["passed"],
         "hundred_session": payload["hundred_session"]["dogfood"]["passed"],
         "real_user_evidence": payload["real_user_evidence"],
+        "A_goal_reuse": validation_summary.get("A_goal_reuse"),
+        "B_reflection_to_prepare": validation_summary.get("B_reflection_to_prepare"),
+        "C_fast_cue_usefulness": validation_summary.get("C_fast_cue_usefulness"),
+        "D_practice_transfer": validation_summary.get("D_practice_transfer"),
+        "E_fact_inbox_burden": validation_summary.get("E_fact_inbox_burden"),
+        "F_quick_notes_and_pins": validation_summary.get("F_quick_notes_and_pins"),
+        "friction_audit": validation_summary.get("friction_audit"),
         "out_dir": str(out),
     }, ensure_ascii=False))
     return 0 if ok else 1

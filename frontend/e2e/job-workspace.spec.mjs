@@ -79,17 +79,17 @@ async function openPrepare(context, page) {
   await page.goto('/#/goals/goal-1/prepare')
   await expect(page.getByTestId('goal-room')).toBeVisible()
   await expect(page.getByRole('tab', { name: '准备' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('heading', { name: 'Gap Map' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '准备缺口' })).toBeVisible()
 }
 
 test.describe('Goal Prepare workspace', () => {
-  test('shows gap map, attack surface, story gap and the question graph', async ({ context, page }) => {
+  test('shows preparation gaps, likely deep-dives, story gaps and follow-up questions', async ({ context, page }) => {
     await openPrepare(context, page)
 
     await expect(page.getByText('RAG 评估')).toBeVisible()
     await expect(page.getByText('指标会被追问口径与来源 · 与岗位要求直接相关')).toBeVisible()
     await expect(page.getByText(/还没有「团队协作」故事/)).toBeVisible()
-    await expect(page.getByRole('tree', { name: 'Question Graph' })).toBeVisible()
+    await expect(page.getByRole('tree', { name: '可能追问' })).toBeVisible()
     await expect(page.getByText('如果让你来落地「Kubernetes」，你会怎么做？')).toBeVisible()
   })
 

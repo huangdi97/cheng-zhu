@@ -280,23 +280,6 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
         <div className="flex items-start gap-2 sm:gap-3 pl-1 sm:pl-2">
           <span className="w-7 sm:w-8 flex-shrink-0 text-center text-accent-green text-xs font-bold pt-1">A</span>
           <div className="flex-1 min-w-0 pb-4 border-l-2 border-accent-green/25 pl-3 sm:pl-4 -ml-1">
-            <div className="flex items-center gap-1.5 mb-1">
-              {qa.modelLabel && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-tertiary text-text-muted border border-bg-hover/60 font-medium">
-                  {qa.modelLabel}
-                </span>
-              )}
-              {qa.firstTokenMs != null && (
-                <span className="text-[10px] font-mono text-text-muted tabular-nums">
-                  首字 {qa.firstTokenMs}ms
-                </span>
-              )}
-              {qa.totalMs != null && (
-                <span className="text-[10px] font-mono text-text-muted tabular-nums">
-                  总 {qa.totalMs}ms
-                </span>
-              )}
-            </div>
             <KbReferenceBanner qaId={qa.id} />
             {cue && <GuidanceFirstScreen cue={cue} qaId={qa.id} />}
             {cue && cueFirst
@@ -346,23 +329,6 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
           <span className="text-accent-green text-xs font-bold">A</span>
         </div>
         <div className="flex-1 min-w-0 max-h-[280px] overflow-y-auto rounded-xl bg-bg-tertiary/15 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            {qa.modelLabel && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-bg-tertiary text-text-muted border border-bg-hover/60 font-medium">
-                {qa.modelLabel}
-              </span>
-            )}
-            {qa.firstTokenMs != null && (
-              <span className="text-[10px] font-mono text-text-muted tabular-nums">
-                首字 {qa.firstTokenMs}ms
-              </span>
-            )}
-            {qa.totalMs != null && (
-              <span className="text-[10px] font-mono text-text-muted tabular-nums">
-                总 {qa.totalMs}ms
-              </span>
-            )}
-          </div>
           <KbReferenceBanner qaId={qa.id} />
           {cue && <GuidanceFirstScreen cue={cue} qaId={qa.id} />}
           {cue && cueFirst
@@ -382,6 +348,24 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
     </div>
   )
 })
+
+function PriorTurnDisclosure({ qa, colorScheme, stream }: { qa: QAPair; colorScheme: ColorSchemeId; stream: boolean }) {
+  const { cue } = buildLiveGuidance(qa)
+  const headline = cue?.direction || cue?.cues?.[0]?.text || ''
+  return (
+    <details className="group rounded-xl border border-bg-hover/45 bg-bg-secondary/25 px-3 py-2" data-testid="prior-turn">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-left marker:content-none">
+        <span className="rounded-full bg-bg-tertiary px-2 py-0.5 text-[10px] font-medium text-text-muted">上一问</span>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-secondary">{qa.question}</span>
+        {headline ? <span className="hidden max-w-[38%] truncate text-[10px] text-text-muted lg:block">{headline}</span> : null}
+        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-text-muted transition-transform group-open:rotate-90" aria-hidden />
+      </summary>
+      <div className="mt-3 border-t border-bg-hover/40 pt-3">
+        <QACard qa={qa} isStreaming={false} stream={stream} colorScheme={colorScheme} animate={false} animateDelayMs={0} cueFirst />
+      </div>
+    </details>
+  )
+}
 
 export default function AnswerPanel() {
   const qaPairs = useInterviewStore((s) => s.qaPairs)
@@ -553,8 +537,11 @@ export default function AnswerPanel() {
       {qaPairs.map((qa, idx) => {
         const isStreaming = streamingIds.includes(qa.id)
         const isLatest = idx === qaPairs.length - 1
-        // 只给最新一项播入场动画,避免历史项在 store 更新时反复重播
-        const animate = isLatest
+        // Live first screen belongs to the current question. Previous turns
+        // remain one click away as history instead of competing with Fast Cue.
+        if (!isExamMode && !isLatest) {
+          return <PriorTurnDisclosure key={qa.id} qa={qa} colorScheme={colorScheme} stream={stream} />
+        }
         return (
           <QACard
             key={qa.id}
@@ -562,7 +549,7 @@ export default function AnswerPanel() {
             isStreaming={isStreaming}
             stream={stream}
             colorScheme={colorScheme}
-            animate={animate}
+            animate={isLatest}
             animateDelayMs={0}
             cueFirst={!isExamMode}
           />

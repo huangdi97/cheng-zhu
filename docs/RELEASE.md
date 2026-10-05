@@ -25,7 +25,7 @@ Target machines do not require Python, Node, npm or pip.
 
 Required path:
 
-1. checkout;
+1. pin the exact CI-proven source SHA and checkout that SHA;
 2. Python / Node setup;
 3. backend tests + strict eval;
 4. version consistency;
@@ -39,14 +39,14 @@ Required path:
 12. clean installer replay on a fresh Windows runner;
 13. installed-layout smoke;
 14. collect assets + SHA256;
-15. create draft GitHub Release when publishing;
-16. download assets back from GitHub;
+15. create draft GitHub Release with the tag explicitly targeted at the same source SHA used for the binaries;
+16. verify public tag SHA = binary source SHA, then download assets back from GitHub;
 17. verify SHA256 on downloaded assets;
 18. reinstall the downloaded installer;
 19. rerun packaged smoke from downloaded/installed files;
-20. publish the verified Release.
+20. re-check tag SHA = binary source SHA and publish the verified Release.
 
-A failing clean-install or download-back gate is a release failure.
+A failing clean-install, download-back or source/tag provenance gate is a release failure.
 
 ## NSIS hosted-runner reliability
 
@@ -77,6 +77,24 @@ docs/RELEASE_NOTES_vX.Y.Z.md
 
 Never hardcode the release checklist to an old version number.
 
+## Exact source / tag provenance
+
+The release must be reproducible from one immutable commit:
+
+```text
+main CI head SHA
+==
+Release checkout SHA
+==
+installer / portable source SHA
+==
+public tag SHA
+```
+
+For automated publishing, the `workflow_run.head_sha` that just passed main CI is passed to `release.yml` as `source_sha`. The Release workflow checks out that SHA, exports it as `CHENGZHU_RELEASE_SOURCE_SHA`, creates the tag using an explicit `--target`, and checks the tag again before download-back and before final publish.
+
+Do not create a release tag from a moving `main` branch after a long package build. A release where the tag points to newer source than the binary build is not a valid reproducible release, even if both commits individually pass CI.
+
 ## Before merge
 
 Required:
@@ -96,7 +114,8 @@ Required:
 Required:
 
 - main CI green;
-- version-specific publish dispatcher / tag points at the intended main SHA;
+- auto-publisher uses the exact green main CI `head_sha`, not a later moving `main`;
+- public tag resolves to the exact SHA used to build the release binaries;
 - GitHub Release exists;
 - expected assets exist;
 - release download-back verification succeeds.

@@ -23,7 +23,10 @@ import { useShallow } from 'zustand/react/shallow'
 import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import { api, getErrorMessage } from '@/lib/api'
+import { productApi } from '@/lib/productApi'
+import { navigate, paths } from '@/lib/router'
 import { updateConfigAndRefresh } from '@/lib/configSync'
+import { useOsStore } from '@/stores/osStore'
 import { showExamOverlayPrompt } from '@/lib/examOverlay'
 import { ResumeMountInline } from '@/components/resume/ResumeMount'
 import { AudioDevicePicker } from './control-bar/AudioDevicePicker'
@@ -50,6 +53,8 @@ function getEnabledVisionModels(config: { models?: Array<{ name?: string; suppor
 }
 
 export default function ControlBar() {
+  const live = useOsStore((s) => s.live)
+  const setLive = useOsStore((s) => s.setLive)
   // 精确订阅字段, 避免 store 任意字段(LLM token / audioLevel 等)变化触发 ControlBar 重渲染
   const {
     isRecording,
@@ -381,19 +386,47 @@ export default function ControlBar() {
   }, [selectedDevice, effectiveCandidateMic, isExamMode])
   const handleStop = useCallback(async () => {
     if (lifecycleActionRef.current) return
-    if (isRecording && !window.confirm(isExamMode ? '结束本次笔试？当前答案会保留在页面上。' : '结束本次面试？将停止录音，当前转录与答案会保留在页面上。')) return
+    if (isRecording && !window.confirm(isExamMode ? '结束本次笔试？当前答案会保留在页面上。' : '结束本次面试？将停止录音并进入复盘。')) return
     lifecycleActionRef.current = true
     setLoading(true)
     try {
       await api.stop()
       window.electronAPI?.syncOverlayWindow?.({ visible: false }).catch(() => {})
+
+      // v1.3+ Go Live is a product session, not only an audio lifecycle.
+      // /api/stop closes the verified realtime core and its review row;
+      // product.liveEnd then links that review back to the frozen Goal session,
+      // clears session-level overrides, records live_completed, and gives the
+      // one-step Reflection destination required by the v1.4 friction budget.
+      if (!isExamMode && live?.sessionId) {
+        try {
+          const ended = await productApi.liveEnd(live.sessionId)
+          setLive(null)
+          if (ended.reflection_ref?.session_ref) {
+            navigate(paths.reflection(ended.reflection_ref.session_kind, ended.reflection_ref.session_ref))
+          } else if (ended.goal_id) {
+            navigate(paths.goal(ended.goal_id, 'interviews'))
+            setToastMessage('面试已结束；复盘正在生成，可稍后从「面试」或「历史」打开。')
+          } else {
+            navigate(paths.history())
+            setToastMessage('面试已结束；复盘正在生成。')
+          }
+        } catch (productError) {
+          // Recording has already stopped successfully. Do not turn a product
+          // linkage failure into a false "stop failed" state; clear stale live
+          // UI and send the user to History with an actionable warning.
+          setLive(null)
+          navigate(paths.history())
+          setError(`面试已结束，但复盘关联失败：${getErrorMessage(productError, '请从历史中重试')}`)
+        }
+      }
     } catch (e: unknown) {
       setError(`结束${isExamMode ? '笔试' : '面试'}失败：${getErrorMessage(e)}`)
     } finally {
       lifecycleActionRef.current = false
       setLoading(false)
     }
-  }, [isExamMode, isRecording])
+  }, [isExamMode, isRecording, live, setLive, setToastMessage])
   const handlePause = useCallback(async () => {
     if (lifecycleActionRef.current) return
     lifecycleActionRef.current = true

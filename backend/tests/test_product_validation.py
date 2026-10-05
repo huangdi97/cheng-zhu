@@ -100,6 +100,8 @@ def test_thirty_session_synthetic_continuity(product_env, monkeypatch):
     out = dogfood.run_sessions(30, lambda clock: monkeypatch.setattr(store, "now", clock))
     failed = [k for k, v in out["checks"].items() if not v]
     assert not failed, failed
+    rate = validation.report()["A_goal_reuse"]["next_focus_action_rate"]
+    assert rate is None or 0.0 <= rate <= 1.0
 
 
 def test_future_profile_is_retained_but_not_productized():

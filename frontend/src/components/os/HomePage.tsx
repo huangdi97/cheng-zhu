@@ -50,7 +50,7 @@ export default function HomePage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <PrimaryButton onClick={() => runActionKey('continue_prepare', { goalId: data.next_interview!.goal_id })}>继续准备</PrimaryButton>
             <SecondaryButton onClick={() => runActionKey('start_practice', { goalId: data.next_interview!.goal_id })}>开始练习</SecondaryButton>
-            <SecondaryButton onClick={() => runActionKey('preflight', { goalId: data.next_interview!.goal_id })}>Preflight</SecondaryButton>
+            <SecondaryButton onClick={() => runActionKey('preflight', { goalId: data.next_interview!.goal_id })}>上场检查</SecondaryButton>
           </div>
         </section>
       ) : data.focus_goal ? (
@@ -66,7 +66,7 @@ export default function HomePage() {
       ) : null}
 
       {goalId ? (
-        <Section title={`Next Focus · ${data.focus_goal?.title ?? ''}`}>
+        <Section title={`下一步重点 · ${data.focus_goal?.title ?? ''}`}>
           <NextFocusList goalId={goalId} items={data.next_focus} onChanged={reload} />
         </Section>
       ) : null}

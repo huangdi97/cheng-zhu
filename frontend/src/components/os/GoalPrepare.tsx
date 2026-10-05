@@ -69,16 +69,16 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
   return (
     <div className="grid gap-x-6 lg:grid-cols-[1.3fr_1fr]">
       <div>
-        <Section title="Next Focus"><NextFocusList goalId={goal.id} items={data.next_focus} onChanged={reload} /></Section>
+        <Section title="下一步重点"><NextFocusList goalId={goal.id} items={data.next_focus} onChanged={reload} /></Section>
         {!data.has_jd ? (
           <Section title="补充 JD">
-            <Field label="JD 只属于这个目标；补充后会生成 Gap Map 和 Question Graph。">
+            <Field label="JD 只属于这个目标；补充后会生成准备缺口和可能追问。">
               <textarea className={`${inputCls} min-h-[120px]`} value={jd} onChange={(e) => setJd(e.target.value)} />
             </Field>
             <div className="mt-2"><PrimaryButton disabled={!jd.trim()} onClick={() => void productApi.patchGoal(goal.id, { jd }).then(reload)}>保存 JD</PrimaryButton></div>
           </Section>
         ) : null}
-        <Section title="Gap Map">
+        <Section title="准备缺口">
           {data.gap_map.length ? (
             <ul className="space-y-1.5">
               {data.gap_map.map((g) => {
@@ -93,7 +93,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
             </ul>
           ) : <EmptyState title={data.has_jd ? '没有发现明显缺口' : '补充 JD 后显示'} />}
         </Section>
-        <Section title="Attack Surface（面试官最可能深挖的经历）">
+        <Section title="最可能被深挖的经历">
           {data.attack_surface.length ? (
             <ul className="space-y-2">
               {data.attack_surface.map((a) => (
@@ -106,12 +106,12 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
             </ul>
           ) : <EmptyState title="导入简历并确认事实后显示" action={<SecondaryButton onClick={() => navigate(paths.me('resume'))}>去导入简历</SecondaryButton>} />}
         </Section>
-        <Section title="Question Graph">
+        <Section title="可能追问">
           {data.question_graph.length ? <QuestionTree nodes={data.question_graph} /> : <EmptyState title="暂无问题图" />}
         </Section>
       </div>
       <div>
-        <Section title="Skills / Stories">
+        <Section title="技能与故事">
           <div className="flex flex-wrap gap-1.5">
             {data.stories.coverage.categories.map((c) => (
               <StatusBadge key={c.key} tone={c.story_ids.length ? 'ok' : 'muted'}>{c.label}</StatusBadge>
@@ -119,7 +119,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
           </div>
           {data.stories.coverage.missing.length ? (
             <p className="mt-2 text-xs text-text-secondary">还没有「{data.stories.coverage.missing[0].label}」故事。
-              <button type="button" className="ml-1 text-accent-blue underline" onClick={() => navigate(paths.me('stories'))}>开始 5 分钟 Story Builder</button></p>
+              <button type="button" className="ml-1 text-accent-blue underline" onClick={() => navigate(paths.me('stories'))}>开始 5 分钟故事整理</button></p>
           ) : null}
           {goal.legacy_prep_space_id ? (
             <div className="mt-2">
@@ -146,12 +146,12 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
             </ul>
           ) : <EmptyState title="还没有项目资料" action={<SecondaryButton onClick={() => navigate(paths.library('materials'))}>添加资料</SecondaryButton>} />}
         </Section>
-        <Section title="速记（选入本目标的 Pack）">
+        <Section title="速记（带入本场）">
           <QuickNotesPanel goalId={goal.id} context="goal" compact selectedIds={noteIds}
             onSelectionChange={(ids) => { setNoteIds(ids); void productApi.patchGoal(goal.id, { selected_quick_note_ids: ids }).then(() => void reloadPrep()) }} />
         </Section>
-        <Section title="InterviewPack 预览">
-          <p className="text-[11px] text-text-muted">上场时在 Preflight 冻结。只有「就绪」的资料会进入；速记以「你的提醒」身份进入，不是证据。</p>
+        <Section title="本场上下文预览（InterviewPack）">
+          <p className="text-[11px] text-text-muted">点击「上场」后会在上场检查中冻结。只有「就绪」的资料会进入；速记以「你的提醒」身份进入，不是证据。</p>
           <ul className="mt-1.5 space-y-1 text-xs">
             <li>速记：{data.pack_preview.quick_notes.length ? data.pack_preview.quick_notes.map((n) => n.title || n.content.slice(0, 12)).join('、') : '未选择（默认带上置顶速记）'}</li>
             <li>资料：{data.pack_preview.materials.length ? data.pack_preview.materials.map((m) => m.title).join('、') : '未选择'}</li>

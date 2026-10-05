@@ -4,7 +4,7 @@
 
 成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
 
-> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.3.0](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.3.0)。v1.4.0 只有在完整 CI、Windows packaged replay、download-back 与发布门禁全绿后才成为新的 stable。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
+> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [GitHub Latest](https://github.com/huangdi97/cheng-zhu/releases/latest)。v1.4.0 已完成完整 CI、Windows packaged replay、SHA256、download-back 并正式发布；v1.4.x 只接受验证/摩擦/可靠性类收口，不再扩一级产品。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
 v1.3 将成竹组织成一个 **Goal-centered Interview OS**：用户不是在“简历 / 题库 / 实时辅助 / 复盘”几个模块之间来回切换，而是围绕一个具体的公司 × 岗位持续推进。
 
@@ -16,7 +16,7 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 
 长期方向是 Personal Conversation Intelligence，但 Meeting / Presentation / 1:1 等 Conversation Profile 仍属于未来版本，不在当前 v1.3 一级导航里提前产品化。
 
-> v1.4.0 正在做 **Product Validation Hardening**：不新增一级产品，而是把 Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值做成 local-first 的可验证闭环。自动化与 synthetic dogfood 只属于工程证据，不能冒充真实用户 PMF。
+> v1.4 已完成 **Product Validation Hardening** 的工程闭环：Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值都进入 local-first 可验证链路；7-day / 30-session / 100-session synthetic continuity 与 packaged release gate 已落地。自动化和 synthetic dogfood 仍然只是工程证据，`REAL_USER_EVIDENCE_PENDING` 不变。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 
@@ -30,10 +30,29 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/assist-demo.gif" alt="面试主流程演示 GIF：实时听题、自动作答、悬浮提示、知识库引用" width="100%" />
+  <img src="docs/screenshots/action-home.png" alt="成竹 v1.4 Action Home：围绕当前求职目标展示下一场、下一步重点与待处理事项" width="100%" />
   <br />
-  <sub>演示素材全部来自本仓库的成竹界面；GIF 用于兼容 GitHub 预览，原始视频保留在 <code>docs/screenshots/assist-demo.webm</code>。</sub>
+  <sub>截图来自 v1.4.0 正式 Windows packaged release 的 runtime evidence。当前产品从 Goal 开始，而不是从“打开实时辅助”开始。</sub>
 </p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/goal-room.png" alt="Goal Room：围绕一个公司与岗位持续准备" /></td>
+    <td width="50%"><img src="docs/screenshots/practice.png" alt="Practice 3.0：轮次、面试官、难度与题目来源" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Goal Room · Next Focus / 下一场 / 进展趋势</sub></td>
+    <td align="center"><sub>Practice 3.0 · Persona / Difficulty / Question Source</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/live-fast-cue.png" alt="Live：Question → Fast Cue → Source/Warning" /></td>
+    <td width="50%"><img src="docs/screenshots/reflection.png" alt="Reflection：把本场转成下一步行动" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Live · 当前问题与 Fast Cue 保持视觉权威</sub></td>
+    <td align="center"><sub>Reflection · 下一步 / Pin / 待确认事实 / Story 机会</sub></td>
+  </tr>
+</table>
 
 ## 为什么值得试
 
@@ -242,21 +261,30 @@ canonical（当前最高优先级设计）：[v1.3-R2](docs/canonical/Chengzhu_v
 | 隐私 | [Privacy 与 Policy](docs/privacy/PRIVACY_AND_POLICY.md) |
 ## README 素材更新
 
-```bash
-cd frontend
-npx playwright install chromium   # 首次执行需要
-npm run screenshots:readme
-npm run demo:readme
+README 主视觉必须和当前 Goal-centered 产品一致。当前公开截图来自 v1.4.0 正式 packaged runtime evidence：
+
+- `action-home.png`
+- `goal-room.png`
+- `practice.png`
+- `preflight.png`
+- `live-fast-cue.png`
+- `reflection.png`
+- `command-palette.png`
+- `goal-prepare-390.png`
+
+旧 `assist-demo.* / assist-mode.png / knowledge-map.png / resume-optimizer.png` 只作为历史素材保留，不再代表当前主产品。
+
+自动生成脚本后续也必须遵循：
+
+```text
+Action Home
+→ Goal Room
+→ Practice
+→ Preflight
+→ Live Fast Cue
+→ Reflection
+→ Next Focus
 ```
-
-生成结果会输出到 `docs/screenshots/`：
-
-- `assist-demo.webm`：主流程原始视频素材
-- `assist-demo-poster.png`：视频封面
-- `assist-demo.gif`：README 顶部实际使用的 GIF 演示
-- `assist-mode.png`：实时辅助界面
-- `knowledge-map.png`：能力分析
-- `resume-optimizer.png`：简历优化
 
 更多说明见 [docs/screenshots/README.md](docs/screenshots/README.md)。
 

@@ -1,0 +1,57 @@
+name: publish-current-on-green-main
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+# Publish exactly the commit whose main-branch CI just passed. The release
+# workflow itself re-checks this SHA and creates the release tag on that SHA,
+# so a later main commit cannot silently change the tag/source relationship.
+jobs:
+  dispatch-release:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Dispatch current version exactly once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          if [ "$actual" != "$SOURCE_SHA" ]; then
+            echo "checkout drift: expected $SOURCE_SHA, got $actual" >&2
+            exit 1
+          fi
+
+          version="$(node -p "require('./desktop/package.json').version")"
+          tag="v$version"
+          notes="docs/RELEASE_NOTES_v$version.md"
+          if [ ! -f "$notes" ]; then
+            echo "Refusing auto-publish: missing $notes" >&2
+            exit 1
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$tag" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" = "false" ]; then
+              echo "$tag is already published; nothing to do"
+              exit 0
+            fi
+            echo "$tag exists only as a draft; release.yml will replace it from $SOURCE_SHA"
+          fi
+
+          gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"
+          echo "Dispatched verified release for $tag from CI-proven SHA $SOURCE_SHA"

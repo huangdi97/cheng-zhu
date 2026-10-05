@@ -285,7 +285,7 @@ export default function OnboardingWizard() {
           )}
           {step === 8 && (
             <>
-              <p>建第一个求职目标。之后的准备、练习、上场和复盘都会围绕这个 Goal 连起来。</p>
+              <p>建第一个求职目标。之后的准备、练习、上场和复盘都会围绕这个求职目标连起来。</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <input data-testid="onboarding-goal-company" aria-label="目标公司" value={goalCompany} onChange={(e) => setGoalCompany(e.target.value)} placeholder="例如：MindRank"
                   className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
@@ -302,7 +302,7 @@ export default function OnboardingWizard() {
           )}
           {step === 10 && (
             <div data-testid="onboarding-complete-step">
-              <p>准备好了。之后只记住一条路径：打开 Goal → 看 Next Focus → 准备或练习 → 上场 → Reflection → 下一步。</p>
+              <p>准备好了。之后只记住一条路径：打开求职目标 → 看下一步重点 → 准备或练习 → 上场 → 复盘 → 下一步。</p>
               <p className="text-xs text-text-muted">系统的复杂度留在后台；你下一步该做什么应该始终很清楚。所有默认值都可以在「设置」里调整。</p>
             </div>
           )}

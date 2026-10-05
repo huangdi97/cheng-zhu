@@ -193,10 +193,11 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await expect(trends).toContainText('技术深度')
     await expect(trends).toContainText('在改善')
     await expect(trends).toContainText('Ownership')
-    await expect(page.getByText('这些是同一 Goal 内的练习/复盘观察')).toBeVisible()
-    // A disclaimer may contain the words “录用概率”; what must never exist is
-    // a pseudo-precise probability value presented as a product metric.
+    await expect(page.getByText('这些只反映同一求职目标下的练习和复盘变化，不是录用概率，也不和其他候选人比较。')).toBeVisible()
+    // The explanatory disclaimer may contain “录用概率”. What must never
+    // appear is a fabricated numeric probability, percentile or readiness score.
     await expect(page.getByText(/录用概率\s*[:：]?\s*\d+\s*%/)).toHaveCount(0)
+    await expect(page.getByText(/候选人百分位|准备度\s*[:：]?\s*\d+/)).toHaveCount(0)
   })
 
   test('v1.4 diagnostics renders six product-loop questions without claiming PMF', async ({ context, page }) => {

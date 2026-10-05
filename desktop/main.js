@@ -240,37 +240,93 @@ async function evidenceCaptureToFile(outputDir, name, targetName = 'main') {
   return { file, target: targetName, width: image.getSize().width, height: image.getSize().height, url: target.webContents.getURL() };
 }
 
-// On hosted Windows runners Electron's executeJavaScript() can remain pending
-// forever even after did-finish-load. DevTools Protocol talks to the same real
-// packaged renderer without opening another localhost listener, and every call
-// has a hard timeout so the release gate always produces a failure artifact
-// instead of hanging for minutes.
+// Runtime evidence must never deadlock the release runner. Hosted Windows has
+// exhibited both failure modes at different times:
+//   1) webContents.executeJavaScript() never settles after first navigation;
+//   2) DevTools Runtime.enable itself never settles on an offscreen renderer.
+// Use CDP as the primary transport, but put *every* stage behind a hard timeout
+// and fall back to executeJavaScript. A hung transport therefore becomes a
+// normal plan error that is written to the result file instead of a 3-minute
+// outer watchdog timeout.
 let evidenceDebuggerAttached = false;
+let evidenceDebuggerReady = false;
 
-async function evidenceEvaluate(expression, timeoutMs = 8000) {
+function evidenceWithTimeout(promise, timeoutMs, label) {
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label} timeout after ${timeoutMs}ms`)),
+        Math.max(250, Number(timeoutMs) || 8000),
+      );
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+async function evidenceEvaluateViaDebugger(expression, timeoutMs) {
   if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
   const debuggerApi = mainWindow.webContents.debugger;
   if (!evidenceDebuggerAttached) {
     if (!debuggerApi.isAttached()) debuggerApi.attach('1.3');
     evidenceDebuggerAttached = true;
-    await debuggerApi.sendCommand('Runtime.enable');
   }
-  const timeout = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(`runtime evidence evaluate timeout after ${timeoutMs}ms`)), timeoutMs);
-  });
-  const run = debuggerApi.sendCommand('Runtime.evaluate', {
-    expression: String(expression),
-    returnByValue: true,
-    awaitPromise: true,
-    userGesture: true,
-  }).then((result) => {
-    if (result?.exceptionDetails) {
-      const description = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'renderer evaluation failed';
-      throw new Error(description);
+  if (!evidenceDebuggerReady) {
+    await evidenceWithTimeout(
+      debuggerApi.sendCommand('Runtime.enable'),
+      Math.min(timeoutMs, 5000),
+      'runtime evidence Runtime.enable',
+    );
+    evidenceDebuggerReady = true;
+  }
+  const result = await evidenceWithTimeout(
+    debuggerApi.sendCommand('Runtime.evaluate', {
+      expression: String(expression),
+      returnByValue: true,
+      awaitPromise: true,
+      userGesture: true,
+    }),
+    timeoutMs,
+    'runtime evidence CDP evaluate',
+  );
+  if (result?.exceptionDetails) {
+    const description = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'renderer evaluation failed';
+    throw new Error(description);
+  }
+  return result?.result?.value;
+}
+
+async function evidenceEvaluateViaWebContents(expression, timeoutMs) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+  return evidenceWithTimeout(
+    mainWindow.webContents.executeJavaScript(String(expression), true),
+    timeoutMs,
+    'runtime evidence executeJavaScript',
+  );
+}
+
+async function evidenceEvaluate(expression, timeoutMs = 8000) {
+  try {
+    return await evidenceEvaluateViaDebugger(expression, timeoutMs);
+  } catch (debuggerError) {
+    // A half-attached debugger can poison later CDP calls. Detach best-effort
+    // before trying the independent webContents transport.
+    try {
+      const debuggerApi = mainWindow?.webContents?.debugger;
+      if (debuggerApi?.isAttached()) debuggerApi.detach();
+    } catch { /* best effort */ }
+    evidenceDebuggerAttached = false;
+    evidenceDebuggerReady = false;
+    try {
+      return await evidenceEvaluateViaWebContents(expression, timeoutMs);
+    } catch (webContentsError) {
+      const d = debuggerError?.message || String(debuggerError);
+      const w = webContentsError?.message || String(webContentsError);
+      throw new Error(`runtime evidence renderer unavailable; CDP: ${d}; executeJavaScript: ${w}`);
     }
-    return result?.result?.value;
-  });
-  return Promise.race([run, timeout]);
+  }
 }
 
 function evidenceFillSelector(selector, value) {

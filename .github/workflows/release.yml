@@ -101,6 +101,40 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Clean installer replay on fresh Windows runner
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP "Chengzhu-CleanInstall"
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
+          New-Item -ItemType Directory -Force $installDir | Out-Null
+
+          $installer = (Resolve-Path "dist/desktop/Chengzhu-Setup-x64.exe").Path
+          $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "NSIS clean install failed with exit code $($proc.ExitCode)" }
+
+          $appExe = Join-Path $installDir "Chengzhu.exe"
+          $resources = Join-Path $installDir "resources"
+          $backendExe = Join-Path $resources "backend/chengzhu-backend.exe"
+          $frontendDist = Join-Path $resources "frontend-dist"
+          foreach ($required in @($appExe, $backendExe, $frontendDist)) {
+            if (-not (Test-Path $required)) { throw "clean install missing: $required" }
+          }
+
+          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report dist/release/clean-install-smoke.json
+
+          $smoke = Get-Content dist/release/clean-install-smoke.json -Raw | ConvertFrom-Json
+          if (-not $smoke.passed) { throw "clean-install packaged smoke did not pass" }
+
+          @{
+            installer = $installer
+            install_dir = $installDir
+            app_exe = $appExe
+            backend_exe = $backendExe
+            frontend_dist = $frontendDist
+            app_version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+            smoke_passed = $smoke.passed
+          } | ConvertTo-Json -Depth 4 | Set-Content dist/release/clean-install-replay.json -Encoding utf8
+
       - name: Installed-layout smoke (unpacked app resources)
         run: python scripts/packaged_smoke.py --exe dist/desktop/win-unpacked/resources/backend/chengzhu-backend.exe --frontend-dist dist/desktop/win-unpacked/resources/frontend-dist --resources dist/desktop/win-unpacked/resources --report dist/release/installed-layout-smoke.json
 

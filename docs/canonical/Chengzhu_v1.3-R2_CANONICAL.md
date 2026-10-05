@@ -997,7 +997,8 @@ Candidate
 ├── Education
 ├── Experience
 ├── Project
-├── Skill├── Claim
+├── Skill
+├── Claim
 ├── Provenance / Source
 ├── Story
 ├── Voice Profile
@@ -3995,6 +3996,7 @@ THIRD_PARTY_NOTICES.md
 Git 历史中的旧 CC BY-NC 不需要改写历史；从当前版本开始新的仓库根许可证和 Release 采用 MIT。
 
 ## 66.2 开源不等于不能商业化
+
 MIT 允许：
 
 - 使用；
@@ -4993,7 +4995,8 @@ Question
 
 ### After / Continue
 
-```text这场之后
+```text
+这场之后
 
 Decisions
 • Android offline sync v2 进入 implementation

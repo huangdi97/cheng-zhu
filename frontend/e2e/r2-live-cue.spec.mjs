@@ -38,7 +38,7 @@ test.describe('R2 live cue-first', () => {
           type: 'answer_chunk',
           delay: 120,
           id: 'qa-r2-1',
-          content: '完整回答正文：我没有 Redis Cluster 的生产经历，但可以说明它的槽位分片与高可用设计。',
+          chunk: '完整回答正文：我没有 Redis Cluster 的生产经历，但可以说明它的槽位分片与高可用设计。',
         },
         {
           type: 'answer_done',

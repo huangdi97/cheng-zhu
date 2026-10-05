@@ -6,10 +6,12 @@
 
 ```text
 repository  huangdi97/cheng-zhu
-main        48d06ffcdc5769332cba48e04577e6d787ad4f2d
+main        a8e83c68ebf51bfd26d5fda74aef02fd02f4c448
 v1.3 PR     #5 MERGED
-v1.4 branch feat/chengzhu-v1.4-validation-hardening
-v1.4 PR     #9 OPEN
+stable      v1.3.0 PUBLISHED
+v1.4 branch feat/chengzhu-v1.4-final-hardening
+v1.4 PR     #11 OPEN
+former PR9 product hardening merged into #11 and CLOSED
 ```
 
 ## v1.3 merge proof
@@ -22,7 +24,7 @@ merge commit            48d06ffcdc5769332cba48e04577e6d787ad4f2d
 main CI                  37287635769 SUCCESS
 ```
 
-The public Releases page must still be checked separately. Code merged to main is not equivalent to a published GitHub Release.
+Public v1.3.0 is now published and is the current stable release. The next release-operation gate is v1.4.0 after PR #11, main CI, packaged replay, SHA256 and download-back verification.
 
 ## v1.3 implemented product surface
 
@@ -119,18 +121,21 @@ Current v1.4 hardening additionally exercises:
 
 ## Current exact next gate
 
-PR #9 must go green with the new E/F write-back assertions.
+PR #11 is the single authoritative v1.4 line. It contains both the earlier product/UI hardening and the v1.4 release/canonical/version work.
 
-After PR #9 CI:
+The exact sequence is:
 
 ```text
-green
-→ merge #9
-→ main CI
-→ final v1.4 engineering report
+PR #11 CI green
+→ PR #11 Release preflight green
+→ merge #11
+→ main CI green
+→ publish v1.4.0
+→ download-back + clean-install replay
+→ final v1.4 Reality Report
 ```
 
-Separately, public v1.3 Release/tag remains a release-operation gate if the Releases page still only shows v1.2.2.
+The packaged backend sidecar must report `1.4.0`; frontend/desktop package versions alone are not sufficient.
 
 ## External evidence that automation cannot fabricate
 

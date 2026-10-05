@@ -78,7 +78,7 @@ function LayerGroup({ keys, goalId, extra }: { keys: string[]; goalId: string; e
   return (
     <div>
       {keys.map((k) => data.items[k] ? <LayeredRow key={k} k={k} layer={data.items[k]} goalId={goalId} onChanged={reload} /> : null)}
-      <p className="pt-2 text-[11px] text-text-muted">「本场覆盖」在上场前的 Preflight 里设置，只对那一场生效，不会改变这里的默认值。</p>
+      <p className="pt-2 text-[11px] text-text-muted">「本场覆盖」在上场检查里设置，只对那一场生效，不会改变这里的默认值。</p>
       {extra}
     </div>
   )
@@ -199,11 +199,11 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
     },
     {
       key: 'D', title: '练习是否带来后续改善', value: metric(transfer.measured, '0'),
-      detail: `${metric(transfer.improved, '0')} 个可测链路改善；Mock 不能冒充真实面试`,
+      detail: `${metric(transfer.improved, '0')} 个可测链路改善；模拟练习不能冒充真实面试`,
     },
     {
       key: 'E', title: '待确认事实是否成负担', value: metric(inbox.backlog_size, '0'),
-      detail: `当前 backlog · 解决率 ${rate(inbox.resolution_rate)}`,
+      detail: `当前待处理 · 解决率 ${rate(inbox.resolution_rate)}`,
     },
     {
       key: 'F', title: '速记 / 标记是否有价值', value: metric(notes.selected_into_pack, '0'),
@@ -251,7 +251,7 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
         </section>
       ) : null}
       <p className="text-[11px] leading-relaxed text-text-muted">
-        这里只显示这台电脑上的本地使用信号。Synthetic / automated evidence 只能证明工程闭环；
+        这里只显示这台电脑上的本地使用信号。模拟数据和自动化测试只能证明工程闭环；
         没有真实用户证据时，成竹不会把这些本地指标解释成“产品已验证”或“面试成功率”。
       </p>
     </div>

@@ -34,6 +34,14 @@ def test_validation_report_covers_the_six_questions_and_never_claims_pmf(product
     cue = report["C_fast_cue_usefulness"]
     assert {"usefulness", "accuracy", "personal_fact_safety", "latency", "readability", "over_specificity"} <= set(cue)
     assert "score" not in json.dumps(cue).lower()
+    friction = report["friction_audit"]
+    assert friction["all_within_budget"] is True
+    assert friction["evidence_type"] == "DESIGN_PATH_PLUS_LOCAL_COMPLETION_SIGNAL"
+    assert {j["key"] for j in friction["journeys"]} == {
+        "home_to_practice", "goal_to_live", "live_to_quick_note", "live_to_pin",
+        "session_to_reflection", "reflection_to_next_practice",
+    }
+    assert all(j["designed_steps"] <= j["budget"] for j in friction["journeys"])
 
 
 def test_export_and_delete_keep_integrity(product_env):

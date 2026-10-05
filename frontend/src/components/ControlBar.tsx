@@ -24,7 +24,7 @@ import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import { api, getErrorMessage } from '@/lib/api'
 import { productApi } from '@/lib/productApi'
-import { navigate, paths } from '@/lib/router'
+import { navigate, paths, useRouter } from '@/lib/router'
 import { updateConfigAndRefresh } from '@/lib/configSync'
 import { useOsStore } from '@/stores/osStore'
 import { showExamOverlayPrompt } from '@/lib/examOverlay'
@@ -55,6 +55,8 @@ function getEnabledVisionModels(config: { models?: Array<{ name?: string; suppor
 export default function ControlBar() {
   const live = useOsStore((s) => s.live)
   const setLive = useOsStore((s) => s.setLive)
+  const route = useRouter((s) => s.route)
+  const liveSessionId = live?.sessionId || (route.name === 'live' ? (route.params.sessionId ?? '') : '')
   // 精确订阅字段, 避免 store 任意字段(LLM token / audioLevel 等)变化触发 ControlBar 重渲染
   const {
     isRecording,
@@ -398,9 +400,9 @@ export default function ControlBar() {
       // product.liveEnd then links that review back to the frozen Goal session,
       // clears session-level overrides, records live_completed, and gives the
       // one-step Reflection destination required by the v1.4 friction budget.
-      if (!isExamMode && live?.sessionId) {
+      if (!isExamMode && liveSessionId) {
         try {
-          const ended = await productApi.liveEnd(live.sessionId)
+          const ended = await productApi.liveEnd(liveSessionId)
           setLive(null)
           if (ended.reflection_ref?.session_ref) {
             navigate(paths.reflection(ended.reflection_ref.session_kind, ended.reflection_ref.session_ref))
@@ -426,7 +428,7 @@ export default function ControlBar() {
       lifecycleActionRef.current = false
       setLoading(false)
     }
-  }, [isExamMode, isRecording, live, setLive, setToastMessage])
+  }, [isExamMode, isRecording, liveSessionId, setLive, setToastMessage])
   const handlePause = useCallback(async () => {
     if (lifecycleActionRef.current) return
     lifecycleActionRef.current = true

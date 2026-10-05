@@ -133,6 +133,24 @@ def run_week(set_clock: Callable[[Callable[[], float]], None]) -> dict[str, Any]
     checks["day5_pin_first"] = bool(r3["first_screen"]["pinned_moments"]) and \
         r3["first_screen"]["pinned_moments"][0]["id"] == pin["id"]
 
+    # v1.4 question F: prove Reflection can deliberately create a Quick Note
+    # without silently turning it into Evidence / Memory.
+    reflected_note = None
+    if own:
+        reflected_note = reflection.apply_action(
+            "ADD_QUICK_NOTE",
+            session_kind="REVIEW",
+            session_ref=str(rid),
+            finding=own,
+            goal_id=goal["id"],
+            payload={"content": "下一场先明确个人职责与决策边界", "tags": ["NEXT_FOCUS"]},
+        ).get("quick_note")
+    checks["day5_reflection_can_create_quick_note"] = bool(
+        reflected_note
+        and quick_notes.get_note(str(reflected_note["id"]))
+        and quick_notes.get_note(str(reflected_note["id"])).get("origin") == "REFLECTION"
+    )
+
     # Day 6 — reopen (fresh process)
     clock.advance(DAY)
     store._READY_PATHS.clear()  # noqa: SLF001
@@ -143,6 +161,14 @@ def run_week(set_clock: Callable[[Callable[[], float]], None]) -> dict[str, Any]
     checks["day6_material_still_ready"] = materials.require_material(mat["id"])["lifecycle"]["state"] == "READY"
     checks["day6_quick_note_kept"] = quick_notes.get_note(note["id"]) is not None
     checks["day6_fact_inbox_has_lead_claim"] = any(i["id"] == "df-lead" for i in fact_inbox.inbox()["items"])
+
+    # v1.4 question E: exercise the actual burden-resolution loop, not just
+    # backlog creation. Resolve the intentionally over-strong "lead" wording
+    # to participation, matching the resume evidence.
+    fact_inbox.mark_opened()
+    fact_inbox.resolve("df-lead", "PARTICIPATE")
+    burden = fact_inbox.metrics()
+    checks["day6_fact_inbox_resolution_recorded"] = burden["opened"] >= 1 and burden["resolved"] >= 1
 
     # Day 7 — practice the same weakness from defaults, now answered well
     clock.advance(DAY)
@@ -157,6 +183,33 @@ def run_week(set_clock: Callable[[Callable[[], float]], None]) -> dict[str, Any]
     checks["no_cross_goal_focus"] = all(f["source_ref"] != str(rid) for f in other_focus)
     transfer = validation.practice_transfer(goal["id"])
     checks["transfer_measured"] = transfer["measured"] >= 1
+
+    # A user pin is only promoted through an explicit reflection action. This
+    # proves the F-path without changing the earlier Next Focus continuity
+    # assertions that intentionally verify Reflection-origin ownership.
+    pin_focus = reflection.apply_action(
+        "SET_NEXT_FOCUS",
+        session_kind="PRACTICE",
+        session_ref=s3["practice_id"],
+        finding={
+            "id": f"pin:{pin['id']}",
+            "kind": "USER_PIN",
+            "pin_id": pin["id"],
+            "title": "复盘这次没答好的地方",
+            "goal_id": goal["id"],
+            "source": "PIN",
+        },
+        goal_id=goal["id"],
+    ).get("next_focus")
+    checks["day7_pin_can_become_next_focus"] = bool(
+        pin_focus and pin_focus.get("source_kind") == "PIN" and pin_focus.get("source_ref") == pin["id"]
+    )
+
+    value = validation.report()["F_quick_notes_and_pins"]
+    checks["day7_value_metrics_cover_reflection_note_and_pin"] = (
+        value["quick_notes"]["converted_from_reflection"] >= 1
+        and value["pins"]["next_focus_from_pin"] >= 1
+    )
     return {"checks": checks, "passed": all(checks.values()), "evidence": "SYNTHETIC_DOGFOOD",
             "transfer": transfer, "trend": tr}
 

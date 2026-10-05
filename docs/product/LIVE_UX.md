@@ -1,86 +1,396 @@
-# Live UX（Stage K）
+# Live UX — Goal-centered Live Cockpit
 
-> CURRENT · 对应 canonical 第 20、43 节。落点：`backend/api/assist/answer_worker.py:1584-1598`（guidance payload）、`frontend/src/hooks/useInterviewWS.ts`、`frontend/src/components/AnswerPanel.tsx` 等。
-> 落地状态：cue-first 的**数据契约已实现**（后端 guidance payload）；前端 GuidanceViewModel 组件为当前落地边界（见第 4 节）。
+> **CURRENT · v1.4.x**
+>
+> Product Canonical: `docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md`  
+> Validation addendum: `docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md`  
+> Frozen realtime core: `docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md`
 
 ## 1. 定位
 
-不是所有问题都展示完整答案。目标（canonical 第 20 节）：**用户扫一眼就能继续说，而不是低头照稿念**。
-
-## 2. cue-first 默认第一屏
-
-canonical 第 20 节定义的第一屏结构：
+Live 不是“答案生成器页面”，而是 Goal-centered Interview OS 的实时阶段：
 
 ```text
-当前问题
-为什么不用 fine-tuning？
-
-核心思路
-• 数据持续更新
-• 可追溯
-• 成本与迭代速度
-
-我的证据
-WenNian · RAG 决策
-
-[展开]
+Goal
+→ Preflight
+→ Live
+→ Reflection
+→ Next Focus
 ```
 
-| 区块 | 数据来源 | 说明 |
-| --- | --- | --- |
-| 当前问题 | `answer_done.question`（display_question） | 已识别/清洗后的问题 |
-| 核心思路 | `guidance.core_ideas` ← `plan.structure`（前 6 项） | 该模式回答骨架的分段名（结论/项目事实/trade-off…） |
-| 我的证据 | `guidance.evidence` ← `experience_grounding.evidence_excerpt[:160]` | 支撑个人事实的证据摘录 |
-| [展开] | 渐进披露入口 | 展开完整答案与更多内容 |
+Live 的第一原则：
 
-cue-first 由 `AnswerPlan.surface = "cue_first"`（Stage H）声明；第一屏内容全部来自 Intelligence 层 payload，组件**不再**消费 raw prompt 响应（`answer_worker.py:1584-1585` 注释）。
+> **Cue before essay. 用户扫一眼就能继续说，而不是低头照稿。**
 
-## 3. GuidanceViewModel 数据流
+Verified Core 负责实时正确性；v1.3/v1.4 产品层负责让用户只看到当前真正需要的东西。
 
-后端已实现（`answer_worker.py:1584-1598`）：
+---
+
+## 2. 第一层信息层级
+
+正式 Live 的视觉优先级固定为：
 
 ```text
-answer_worker 提交 commit
-    ↓ _broadcast({"type": "answer_done", id, question, answer, think, model_name,
-    ↓              first_token_ms, total_ms, guidance: {...}})
-    ↓ guidance = {
-    ↓     core_ideas:        plan.structure[:6]        # 核心思路（骨架分段名）
-    ↓     evidence:          grounding.evidence_excerpt[:160]  # 我的证据
-    ↓     mode:              plan.mode                 # 响应模式
-    ↓     intent:            plan.intent[:3]           # 当前意图
-    ↓     resolved_question: understanding.resolved_question  # 消解后问题
-    ↓     state_context:     compact_state_context     # 面试状态承接块
-    ↓ }
+1. 当前 Question
+2. Fast Cue
+3. Source / Warning
 ```
 
-前端当前状态（`frontend/src/hooks/useInterviewWS.ts:180-196`）：
+Deep Answer、Transcript、Quick Notes、Screen、References、Human Coach 和历史轮次全部属于第二层。
 
-- `answer_done` → `finalizeAnswer(...)`（落答案区 + TTS 播报）已实现；
-- `msg.guidance` 的消费（`buildGuidanceViewModel` → cue-first 组件）**尚未接线**——payload 已发出，前端读取为下一步落地项。
+禁止重新把完整长答案变成默认视觉中心。
 
-## 4. 展开内容（canonical 第 20 节 Guidance Surface）
+### Fast Cue
 
-支持的面（实现状态见标注）：
+Fast Cue 在 Deep Answer 之前由 realtime pipeline 产生并广播。
 
-| Surface | 内容 | 状态 |
-| --- | --- | --- |
-| QUICK CUE | 一句话结论 + 关键词 | payload 已有（core_ideas/mode）；组件待接 |
-| STRUCTURE | 回答骨架（分段名序列） | 同上 |
-| EVIDENCE | 证据摘录 | 同上（evidence 字段） |
-| FULL ANSWER | 完整流式回答 | ✅ AnswerPanel + answer_chunk 流式 |
-| INTENT | 当前问题意图（面试官可能在验证什么，概率性措辞） | payload 已有（intent/state_context） |
-| TRADEOFF / CAUTION / FOLLOW-UP | 取舍/边界提示/追问预测 | Deep Path 规划项；逐步落地 |
+用户可看到：
 
-第一屏以外的完整答案由现有 `AnswerPanel` 流式渲染（`answer_chunk` → `appendAnswerChunk` → `finalizeAnswer`）。
+- 一句话方向；
+- 2–5 条可扫读 cue；
+- cue 的来源；
+- 必要的事实边界 / caution；
+- 本场 Goal 上下文。
 
-## 5. 兼容性（canonical 第 43、44 节 UI 迁移原则）
+来源 taxonomy：
 
-- **Overlay（悬浮窗）**：现有 `InterviewOverlay` + 桌面端悬浮问答框保留；cue-first 组件落地后在同区域渲染第一屏，不新增独立窗口。
-- **截图/识图**：`ScreenshotModePanel` + `WrittenExamTest` 链路保留；written exam 场景只注入 `state_context`（不注入 plan_prompt），第一屏兼容截图审题流程。
-- **快捷键**：现有 `⌘⇧J / Ctrl+Shift+J` 折叠转录面板、Boss Key、托盘保留（canonical 第 43 节桌面策略）；UI 迁移不破坏既有快捷键契约。
-- **视觉回归**：frontend 视觉基线（linux/darwin）继续覆盖；cue-first 组件接入时同步更新基线（canonical 第 44 节）。
-- **Feature flag**：`intelligence_live_cue_v1`（默认 `True`）gate 后端 payload 与 TTFUG telemetry；关闭时前端走纯 `answer_done` 既有路径，功能不中断。
+```text
+PERSONAL_EVIDENCE
+KB_KNOWLEDGE
+WORLD_KNOWLEDGE
+HUMAN_COACH
+```
 
-## 6. 现有第一屏（未接 payload 时的降级）
+只有 `PERSONAL_EVIDENCE` 可以支持“我做过 / 我负责”。
 
-当前线上行为（README"面试主流程"）：左侧实时转写落字 + 自动识别问题，右侧答案区按模型配置流式生成；普通定义题默认短答，开放题自动切深度回答并承接上下文。cue-first 数据契约就绪后，第一屏切换为第 2 节结构，用户行为不变（听题 + 扫一眼继续说）。
+---
+
+## 3. 单一 Live 状态
+
+Live 不同时向用户暴露 ASR / Retrieval / Compiler / LLM 四套 loading。
+
+产品状态收敛为：
+
+```text
+Listening
+Question detected
+Preparing
+Cue ready
+Answering
+Reconnecting
+```
+
+Diagnostics 可以显示内部阶段，但主 Live UI 不显示工程流水线。
+
+---
+
+## 4. GuidanceViewModel
+
+主窗口和 Overlay 必须消费同一份 `GuidanceViewModel`。
+
+核心字段覆盖：
+
+- resolved question；
+- Fast Cue；
+- source；
+- warning / truth boundary；
+- Deep Answer availability；
+- timing metadata；
+- current Goal/session context。
+
+禁止主窗口和 Overlay 各自重新解析 raw answer，避免展示语义漂移。
+
+---
+
+## 5. Deep Answer
+
+Deep Answer 是第二层渐进披露：
+
+```text
+Fast Cue
+   ↓
+[展开完整回答]
+   ↓
+Deep Answer
+```
+
+Deep 适用于：
+
+- 用户需要更多结构；
+- System Design / Case 等复杂问题；
+- 想查看完整 trade-off；
+- 复盘或练习时继续深入。
+
+Deep 不能阻塞 Fast Cue。
+
+---
+
+## 6. 当前轮与历史轮
+
+当前问题拥有视觉权威。
+
+过去轮次：
+
+- 默认折叠 / 降低视觉层级；
+- 可以回看；
+- 不与当前 Cue 抢视觉注意力。
+
+新问题到来时：
+
+- 旧 Deep 不应继续占据主视野；
+- 当前 Question / Cue 必须成为主焦点。
+
+---
+
+## 7. Quick Notes
+
+Quick Notes 是用户自己写给自己的现场短笔记：
+
+```text
+Quick Note
+!= Evidence
+!= KB
+!= Memory
+!= confirmed Claim
+```
+
+Live 中：
+
+- Goal-scoped notes 一键打开；
+- 默认只读；
+- 不自动改写；
+- 不自动升级为个人事实；
+- 可以承载“想问”“边界提醒”“技术词”等短信息。
+
+---
+
+## 8. Pin Moment
+
+用户可以用按钮或 `Ctrl+P` 标记当前时刻：
+
+- 重要；
+- 我答崩了；
+- 对方透露关键信息；
+- 下一场要准备；
+- 事实需要确认。
+
+Pin 是用户判断，不是 AI 自动评分。
+
+Pin 在 Reflection 第一屏优先于通用 AI 总结，并且只有用户动作才可以进一步转成：
+
+- Next Focus；
+- Story；
+- Fact Check。
+
+---
+
+## 9. Nudge / Open Thread
+
+Nudge 是 Fast Cue 之后的低优先级提示。
+
+类型：
+
+```text
+MISSING_DIMENSION
+LIKELY_FOLLOWUP
+FACT_BOUNDARY
+ASK_BACK_OPPORTUNITY
+```
+
+必须满足：
+
+- 没有新问题；
+- 用户没有正在说话；
+- 置信度达到阈值；
+- proactive guidance 开启；
+- 一次只显示一个。
+
+优先级永远：
+
+```text
+Fast Cue > Warning > Nudge
+```
+
+Nudge 必须支持 cooldown、duplicate suppression、already-mentioned suppression、新问题取消。
+
+---
+
+## 10. Closing Mode
+
+当 Question Understanding 识别到：
+
+```text
+“你还有什么想问我们的吗？”
+```
+
+进入 Closing Mode。
+
+建议来源：
+
+- Goal；
+- 公司 / 岗位上下文；
+- 本场真实 transcript；
+- 面试官本场透露的信息；
+- Quick Notes 中的“想问”；
+- 尚未解决的 open threads。
+
+优先生成上下文化追问，而不是默认“公司文化怎么样”这种 generic 问题。
+
+---
+
+## 11. Overlay 3.0
+
+Overlay 由三个独立维度控制：
+
+### Dock
+
+```text
+Top
+Left
+Right
+Free
+```
+
+### Interaction
+
+```text
+Passive
+Interactive
+```
+
+### Size
+
+```text
+Compact
+Standard
+Focus
+```
+
+Idle 时应尽量收敛，例如：
+
+```text
+● Listening · MindRank
+```
+
+Cue 到来时自动展开；空闲后可以回到 Compact。
+
+Overlay 只是显示层，不重新实现 Intelligence。
+
+---
+
+## 12. Human Coach
+
+Human Coach 是独立 Guidance Source，不是“秘密答案来源”。
+
+默认：
+
+```text
+HUMAN_PRACTICE_ONLY
+```
+
+正式 Live 只有 `HUMAN_ALLOWED` 时才能显示。
+
+Coach suggestion：
+
+- 必须明确标为教练；
+- 永远不能成为 Evidence；
+- 不允许远程键鼠控制；
+- 不做 anti-proctoring / detection evasion。
+
+---
+
+## 13. Share Privacy
+
+默认：
+
+```text
+OFF
+```
+
+含义：
+
+> 尽量减少成竹私人内容在受支持的屏幕共享/录屏路径中意外出现。
+
+不代表：
+
+- undetectable；
+- 绕过会议软件；
+- 绕过监考；
+- 绕过反作弊。
+
+---
+
+## 14. Live → Reflection
+
+正式结束动作必须闭合完整产品链：
+
+```text
+结束面试
+→ stop Verified realtime core
+→ product live/end
+→ close Goal session link
+→ clear session overrides
+→ record live_completed
+→ obtain reflection_ref
+→ Reflection
+```
+
+如果 review 尚未生成：
+
+- 不伪造 Reflection；
+- 返回 Goal Interviews；
+- 明确告诉用户“复盘正在生成”。
+
+如果 product linkage 失败但 realtime 已经停止：
+
+- 不错误说“结束面试失败”；
+- 清除 stale Live UI；
+- 进入 History；
+- 给出可行动的关联错误提示。
+
+---
+
+## 15. Performance boundary
+
+必须持续证明：
+
+```text
+Fast Cue before Deep
+InterviewPack frozen
+Context Compiler authoritative
+no latest-job drift
+truth boundary preserved
+```
+
+Goal / Library / analytics 渲染不能进入 realtime critical path。
+
+---
+
+## 16. 当前 Done
+
+v1.4.x 当前产品状态：
+
+- Preflight 3.0 — PRODUCT_COMPLETE
+- cue-first hierarchy — PRODUCT_COMPLETE
+- Deep secondary disclosure — PRODUCT_COMPLETE
+- Quick Notes — PRODUCT_COMPLETE
+- Pin — PRODUCT_COMPLETE
+- Nudge — PRODUCT_COMPLETE
+- Closing Mode — PRODUCT_COMPLETE
+- Overlay 3.0 — PRODUCT_COMPLETE
+- Human Coach policy — PRODUCT_COMPLETE
+- Share Privacy — PRODUCT_COMPLETE
+- Live → Reflection closure — v1.4.1 closure path
+
+真正还需要真实用户验证的是：
+
+- Cue 是否在压力环境下真的好扫；
+- Overlay 是否干扰会议；
+- Nudge 是否足够安静；
+- Live → Reflection 是否符合真实使用习惯。
+
+这些保持：
+
+```text
+REAL_USER_EVIDENCE_PENDING
+```

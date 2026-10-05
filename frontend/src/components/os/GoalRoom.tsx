@@ -54,7 +54,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
               : { key: 'resume', label: '恢复为进行中', onSelect: () => setStatus('ACTIVE') },
             { key: 'complete', label: '标记已结束', onSelect: () => setStatus('COMPLETED') },
             { key: 'delete', label: '删除目标', danger: true, onSelect: () => {
-              if (window.confirm(`删除「${goal.title}」？目标内的速记、面试轮次和 Next Focus 会一起删除；练习与复盘记录保留在历史里。`)) {
+              if (window.confirm(`删除「${goal.title}」？目标内的速记、面试轮次和下一步建议会一起删除；练习与复盘记录保留在历史里。`)) {
                 void productApi.deleteGoal(goal.id).then(() => navigate(paths.goals()))
               }
             } },
@@ -81,7 +81,7 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
   return (
     <div className="grid gap-x-6 md:grid-cols-[1.4fr_1fr]">
       <div>
-        <Section title="Next Focus">
+        <Section title="下一步">
           <NextFocusList goalId={goal.id} items={goal.next_focus} onChanged={reload} />
         </Section>
         <Section title="最近场次" action={<SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>全部</SecondaryButton>}>
@@ -174,7 +174,7 @@ function ProgressTrends({ goalId }: { goalId: string }) {
           ) : null}
         </ul>
       ) : null}
-      <p className="mt-2 text-[10px] text-text-muted">这些是同一 Goal 内的练习/复盘观察，不是录用概率，也不和其他候选人比较。</p>
+      <p className="mt-2 text-[10px] text-text-muted">这些是同一求职目标内的练习/复盘观察，不是录用概率，也不和其他候选人比较。</p>
     </Section>
   )
 }
@@ -194,7 +194,7 @@ function Interviews({ goal, reload }: { goal: GoalDetail; reload: () => void }) 
             <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-hover/50 px-3 py-2">
               <span className="text-sm text-text-primary">{i.round || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></span>
               <span className="flex items-center gap-1">
-                <SecondaryButton onClick={() => goLive(goal.id)}>Preflight</SecondaryButton>
+                <SecondaryButton onClick={() => goLive(goal.id)}>上场检查</SecondaryButton>
                 <ActionMenu label="轮次操作" actions={[
                   { key: 'done', label: '标记已面完', onSelect: () => void productApi.patchInterview(i.id, { status: 'DONE' }).then(reload) },
                   { key: 'cancel', label: '取消这一轮', onSelect: () => void productApi.patchInterview(i.id, { status: 'CANCELLED' }).then(reload) },

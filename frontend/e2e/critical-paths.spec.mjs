@@ -177,7 +177,10 @@ test.describe('Live cue-first hierarchy', () => {
     // than counting the hidden responsive twin.
     const prior = page.locator('[data-testid="prior-turn"]:visible').filter({ hasText: '上一问：请介绍一下你的项目。' })
     await expect(prior).toHaveCount(1)
-    await expect(page.getByText('这是上一轮的完整回答，不应该继续占据第一视野。')).toHaveCount(0)
+    // Closed <details> intentionally retains the historical answer in the DOM
+    // for instant review. The product contract is visual hierarchy: previous
+    // Deep content must be absent from the first screen until the user expands it.
+    await expect(prior.getByText('这是上一轮的完整回答，不应该继续占据第一视野。')).toBeHidden()
     await expect(page.getByText('最新问题：为什么这里选择 RAG？').filter({ visible: true })).toBeVisible()
     await expect(page.locator('[data-testid="fast-cue"]:visible')).toContainText('先讲更新频率和可追溯性')
 

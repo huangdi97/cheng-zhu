@@ -19,6 +19,13 @@ const OFFER_STATES: Array<[string, string]> = [
   ['NONE', '暂无'], ['PENDING', '等待结果'], ['RECEIVED', '已收到'], ['NEGOTIATING', '谈判中'], ['ACCEPTED', '已接受'], ['DECLINED', '已拒绝'],
 ]
 
+const GOAL_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: '进行中',
+  PAUSED: '已暂停',
+  COMPLETED: '已结束',
+  ARCHIVED: '已归档',
+}
+
 const ROUND_LABELS: Record<string, string> = {
   TECHNICAL: '技术面',
   PROJECT_DEEP_DIVE: '项目深挖',
@@ -55,7 +62,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
       <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-text-primary break-words">{goal.title}</h1>
-          <p className="text-xs text-text-muted">{nextLine}{goal.status !== 'ACTIVE' ? ` · ${goal.status}` : ''}</p>
+          <p className="text-xs text-text-muted">{nextLine}{goal.status !== 'ACTIVE' ? ` · ${GOAL_STATUS_LABELS[goal.status] ?? goal.status}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PrimaryButton testId="goal-start-practice" onClick={() => startPractice(goal.id)}>开始练习</PrimaryButton>

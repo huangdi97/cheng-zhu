@@ -240,9 +240,41 @@ async function evidenceCaptureToFile(outputDir, name, targetName = 'main') {
   return { file, target: targetName, width: image.getSize().width, height: image.getSize().height, url: target.webContents.getURL() };
 }
 
-function evidenceFillSelector(selector, value) {
+// On hosted Windows runners Electron's executeJavaScript() can remain pending
+// forever even after did-finish-load. DevTools Protocol talks to the same real
+// packaged renderer without opening another localhost listener, and every call
+// has a hard timeout so the release gate always produces a failure artifact
+// instead of hanging for minutes.
+let evidenceDebuggerAttached = false;
+
+async function evidenceEvaluate(expression, timeoutMs = 8000) {
   if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
-  return mainWindow.webContents.executeJavaScript(
+  const debuggerApi = mainWindow.webContents.debugger;
+  if (!evidenceDebuggerAttached) {
+    if (!debuggerApi.isAttached()) debuggerApi.attach('1.3');
+    evidenceDebuggerAttached = true;
+    await debuggerApi.sendCommand('Runtime.enable');
+  }
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`runtime evidence evaluate timeout after ${timeoutMs}ms`)), timeoutMs);
+  });
+  const run = debuggerApi.sendCommand('Runtime.evaluate', {
+    expression: String(expression),
+    returnByValue: true,
+    awaitPromise: true,
+    userGesture: true,
+  }).then((result) => {
+    if (result?.exceptionDetails) {
+      const description = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'renderer evaluation failed';
+      throw new Error(description);
+    }
+    return result?.result?.value;
+  });
+  return Promise.race([run, timeout]);
+}
+
+function evidenceFillSelector(selector, value) {
+  return evidenceEvaluate(
     `(() => {
       const el = document.querySelector(${JSON.stringify(String(selector || ''))});
       if (!el) return false;
@@ -254,7 +286,6 @@ function evidenceFillSelector(selector, value) {
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     })()`,
-    true,
   );
 }
 
@@ -287,7 +318,7 @@ async function runRuntimeEvidencePlan() {
       if (kind === 'navigate') {
         if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
         const hash = String(step.hash || '#/home');
-        await mainWindow.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`, true);
+        await evidenceEvaluate(`location.hash = ${JSON.stringify(hash)}`);
         if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
           throw new Error(`step ${index}: navigation selector timeout ${step.selector}`);
         }
@@ -304,9 +335,8 @@ async function runRuntimeEvidencePlan() {
       if (kind === 'click') {
         if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
         const selector = String(step.selector || '');
-        const clicked = await mainWindow.webContents.executeJavaScript(
+        const clicked = await evidenceEvaluate(
           `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true })()`,
-          true,
         );
         if (!clicked) throw new Error(`step ${index}: click target missing ${selector}`);
         continue;
@@ -329,9 +359,8 @@ async function runRuntimeEvidencePlan() {
         if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
         const key = String(step.key || '');
         if (!key) throw new Error(`step ${index}: storage key required`);
-        await mainWindow.webContents.executeJavaScript(
+        await evidenceEvaluate(
           `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(step.value ?? ''))})`,
-          true,
         );
         continue;
       }
@@ -394,9 +423,9 @@ async function evidenceWaitForSelector(selector, timeoutMs = 20000) {
   const deadline = Date.now() + Math.max(250, Math.min(120000, Number(timeoutMs) || 20000));
   const encoded = JSON.stringify(String(selector || ''));
   while (Date.now() < deadline) {
-    const found = await mainWindow.webContents.executeJavaScript(
+    const found = await evidenceEvaluate(
       `Boolean(document.querySelector(${encoded}))`,
-      true,
+      5000,
     ).catch(() => false);
     if (found) return true;
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -442,9 +471,8 @@ function startRuntimeEvidenceBridge() {
       const body = req.method === 'POST' ? await evidenceReadJson(req) : {};
       if (req.method === 'POST' && url.pathname === '/navigate') {
         const hash = String(body.hash || '#/home');
-        await mainWindow.webContents.executeJavaScript(
+        await evidenceEvaluate(
           `location.hash = ${JSON.stringify(hash)}`,
-          true,
         );
         const found = body.selector
           ? await evidenceWaitForSelector(body.selector, body.timeout_ms)
@@ -468,9 +496,8 @@ function startRuntimeEvidenceBridge() {
       if (req.method === 'POST' && url.pathname === '/storage') {
         const key = String(body.key || '');
         if (!key) throw new Error('storage key required');
-        await mainWindow.webContents.executeJavaScript(
+        await evidenceEvaluate(
           `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(body.value ?? ''))})`,
-          true,
         );
         evidenceJson(res, 200, { ok: true, key });
         return;

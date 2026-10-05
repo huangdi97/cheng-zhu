@@ -101,7 +101,24 @@ def test_seven_day_synthetic_continuity(product_env, monkeypatch):
     assert cue["rendered"] >= 1
     assert cue["usefulness"]["helpful_marks"] >= 1
     assert cue["usefulness"]["speech_after_cue_rate"] == 1.0
-    assert report["F_quick_notes_and_pins"]["quick_notes"]["opened_in_live"] >= 1
+
+    # v1.4 E/F must prove the actual write-back / burden loops, not merely
+    # that the event names or UI surfaces exist.
+    inbox = report["E_fact_inbox_burden"]
+    assert inbox["opened"] >= 1
+    assert inbox["resolved"] >= 1
+    assert inbox["resolution_rate"] > 0
+
+    value = report["F_quick_notes_and_pins"]
+    assert value["quick_notes"]["opened_in_live"] >= 1
+    assert value["quick_notes"]["converted_from_reflection"] >= 1
+    assert value["pins"]["used_in_reflection"] >= 1
+    assert value["pins"]["next_focus_from_pin"] >= 1
+
+    assert out["checks"]["day5_reflection_can_create_quick_note"] is True
+    assert out["checks"]["day6_fact_inbox_resolution_recorded"] is True
+    assert out["checks"]["day7_pin_can_become_next_focus"] is True
+    assert out["checks"]["day7_value_metrics_cover_reflection_note_and_pin"] is True
 
 
 def test_thirty_session_synthetic_continuity(product_env, monkeypatch):

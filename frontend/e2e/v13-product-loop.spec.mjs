@@ -234,15 +234,15 @@ test.describe('v1.3 Goal-centered product loop', () => {
     await page.goto('/#/settings/diagnostics')
     const summary = page.getByTestId('validation-summary')
     await expect(summary).toBeVisible()
-    for (const title of ['Goal 是否持续复用', 'Reflection 是否改变下一步', 'Fast Cue 是否有帮助', 'Practice 是否迁移', 'Fact Inbox 是否成负担', 'Quick Notes / Pin 是否有价值']) {
+    for (const title of ['求职目标是否持续复用', '复盘是否改变下一步', 'Fast Cue 是否有帮助', '练习是否带来后续改善', '待确认事实是否成负担', '速记 / 标记是否有价值']) {
       await expect(summary.getByText(title)).toBeVisible()
     }
-    await expect(summary).toContainText('REAL_USER_VALIDATION_PENDING')
+    await expect(summary).toContainText('真实用户验证待补')
     await expect(summary.getByRole('heading', { name: '关键路径摩擦' })).toBeVisible()
     await expect(summary).toContainText('Home → Practice')
     await expect(summary).toContainText('2 步 / 预算 3')
     await expect(summary).toContainText('不能')
-    await expect(summary).toContainText('PMF')
+    await expect(summary).toContainText('产品已验证')
   })
 
 

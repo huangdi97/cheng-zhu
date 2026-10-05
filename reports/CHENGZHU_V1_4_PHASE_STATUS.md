@@ -1,85 +1,166 @@
-# 成竹 Chengzhu — v1.4 Phase Status Report
+# Chengzhu v1.4 Validation Hardening — Current Reality
 
-Status recorded 2026-10-02 at branch `feat/chengzhu-v1.3-goal-centered-experience` HEAD `b98dbd8`.
+> Updated after v1.3 Goal-centered Interview OS merged to main.
+>
+> This report distinguishes engineering proof, packaged/runtime proof, synthetic product-loop evidence, and evidence that still requires real users. It must not be read as a PMF claim.
 
-> This is **not** the final v1.4 Reality Report. The gates it would summarise (v1.3 release,
-> v1.4 release, download-back, clean-install) are not reached, so writing it in final form would
-> mean either inventing CI/release evidence or filling it with open gates. This file records what
-> is actually true today, with the evidence for each claim. Operational detail and exact next
-> commands live in `reports/V1_3_V1_4_EXECUTION_CHECKPOINT.md`.
+## 1. Git / release baseline
 
----
+- v1.3 merge commit on `main`: `48d06ffcdc5769332cba48e04577e6d787ad4f2d`
+- v1.3 PR: #5 — merged
+- v1.3 PR CI: `37285890890` — SUCCESS
+- v1.3 PR Release preflight: `37285890873` — SUCCESS
+- post-merge main CI: `37287635769` — SUCCESS
+- current public stable release at the time this report was written: `v1.2.2`
+- current v1.4 branch: `feat/chengzhu-v1.4-validation-hardening`
 
-## Git
+v1.3 code is therefore merged and CI-proven. A public v1.3 tag / GitHub Release remains a release-operation gate until it exists in the repository's public Releases list.
 
-```text
-main HEAD              a660f86 (unchanged this session)
-branch HEAD            b98dbd8
-worktree               clean
-tags                   v1.2.0, v1.2.1, v1.2.2
-releases               成竹 Chengzhu v1.2.2 (2026-09-30) — latest
-PRs                    0 open
-latest main CI         run 36727600400, success
-branch CI              never run (branch never pushed)
-```
+## 2. v1.3 product status
 
-## Test evidence
+The Goal-centered product implementation is integrated:
 
-```text
-backend  pytest -q        1063 passed        (baseline 994)
-backend  ruff check .     clean
-frontend npm test         405 passed / 55 files (baseline 390)
-frontend tsc -b --noEmit  clean
-frontend npm run build    ok
-playwright (non-visual)   21 passed / 3 skipped / 6 failed  (baseline 3 passed / 20 failed)
-desktop  node --test      29 passed          (baseline 23)
-playwright (@visual)      not re-run; baseline 3 win32 snapshot diffs (CI gates on linux)
-```
+- Action Home
+- Goal list / Goal Room / Prepare / Interviews / Offer
+- Person Workspace / Fact Inbox / Stories / Skills / Expression
+- Material taxonomy + Processing / Ready / Failed / Replacing
+- Quick Notes
+- Question Banks
+- Command Palette
+- Guided First Practice
+- Practice 3.0
+- Panel / Multi-persona practice
+- Role-specific rubrics
+- Content Coach × Delivery Coach
+- Goal progress trends
+- Preflight 3.0
+- Live Cue-first hierarchy
+- Pin Moment
+- Nudge / Open Thread
+- Closing Mode
+- Overlay 3.0
+- Reflection → Next Focus
+- History
+- Settings 3.0
+- Data export/delete
+- Accessibility / Light-Dark / 390px
 
-## Product capability status
+Runtime UI evidence is recorded in `reports/CHENGZHU_V1_3_RUNTIME_UI_AUDIT.md`.
 
-| Capability | Status | Evidence |
+Hosted Windows evidence proves packaged frontend resources + packaged backend sidecar + real product API routes. Native interactive Electron window placement / multi-monitor overlay geometry remains honestly limited by the hosted runner's lack of an interactive desktop.
+
+## 3. v1.3 core non-regression
+
+The frozen v1.2-R2 Verified Interview Core remains authoritative:
+
+- Frozen InterviewPack
+- Context Compiler
+- Provenance / User Assertion / Session Statement separation
+- Question routing
+- Fast Cue before Deep
+- Stream Truth Guard
+- Share Privacy boundary
+- Human Coach policy boundary
+- Windows sidecar/package path
+
+Latest merged-main CI is green. Real-provider model evaluation is still external because CI has no user/provider credential.
+
+## 4. v1.4 six validation questions
+
+v1.4 does not add another large product area. It asks whether the v1.3 loop creates durable value.
+
+| Question | Current engineering evidence | Truth status |
 |---|---|---|
-| v1.2 Verified Core (Context Compiler, InterviewPack, Provenance, Truth, Session policy) | AUTHORITATIVE — **no regression** | 1063 backend tests green, including the existing intelligence/R2 suites |
-| v1.2.2 → v1.3 → v1.4 migration compatibility | CI-PROVEN | `backend/tests/test_product_migration_compat.py` (3 tests): every row of every v1.2.2 table unchanged, pre-upgrade snapshot asserted, deletion = full rollback |
-| Goal-centered IA (nav rail, 上场 as global action, object-centric routes, appMode adapter) | INTEGRATED | `frontend/e2e/critical-paths.spec.mjs` + `e2e/a11y.spec.mjs` assert the seven destinations, `aria-current="page"`, absence of 准备/复盘/上场 from the rail, and the legacy-mode landing route |
-| Action Home / Goal Room / Person Workspace / Fact Inbox / Materials / Quick Notes / Command Palette / Practice 3.0 / Panel / Rubrics / Question Banks / Content+Delivery Coach / Pin / Nudge / Closing / Language layers / Preflight / Live Cockpit / Overlay layout / Reflection write-back / Settings 3.0 / History | INTEGRATED, backend CI-PROVEN | 66 tests in `backend/tests/test_product_*.py` cover the backend contract of each; frontend screens exist and render. **Not runtime-verified end-to-end yet** for Goal Room tabs, Panel practice, Preflight→Live→Pin→Reflection in one session, Overlay dock/interaction/size matrix, 390px, Light/Dark |
-| Accessibility (keyboard, ARIA, contrast, reduced motion, 390px) | INTEGRATED, partially CI-PROVEN | a11y axe suite green in the last full non-visual run; two real defect classes found and fixed (missing heading landmark, Settings contrast). The suite is load-flaky, so it is not yet reliable evidence |
-| v1.4 local ProductEvent analytics + six-question validation report | CI-PROVEN (backend) | `test_events_are_local_and_never_carry_free_text`, `test_validation_report_covers_the_six_questions_and_never_claims_pmf`, `test_seven_day_synthetic_continuity`, `test_thirty_session_synthetic_continuity`, `test_practice_transfer_is_labelled_mock_to_mock` |
-| Future Profile boundary (Conversation\*, CounterpartyState, ExpressionIntent, GuidanceKind) | Canonical retained, **not productized** | `test_future_profile_is_retained_but_not_productized`, `test_shared_product_layer_does_not_hard_code_job`; no Meeting UI, no Meeting top-level nav |
-| Windows installer / portable / release | **NOT REACHED** | no tag, no release; pipeline ready in `.github/workflows/release.yml` |
-| download-back / clean-install replay | **NOT REACHED** | — |
-| Runtime UI screenshots (32 states, Light/Dark, 390px) | **NOT REACHED** | `docs/screenshots/` still v1.2-era; harness exists in `frontend/scripts/capture-runtime-evidence.mjs` |
-| Real-user product validation | `REAL_USER_EVIDENCE_PENDING` | no real participants; nothing here is evidence of product-market fit |
+| A. Goal reuse | local ProductEvent metrics + deterministic 7-day / 30 / 100-session continuity | ENGINEERING-PROVEN |
+| B. Reflection → Prepare | real ReflectionAction → NextFocus → practice-default write-back is exercised | ENGINEERING-PROVEN |
+| C. Fast Cue usefulness | render / expand / speech-after-cue / Deep / user feedback signals separated | ENGINEERING-PROVEN, REAL USER PENDING |
+| D. Practice transfer | before/after rubric linkage implemented; synthetic/mock evidence explicitly labelled | ENGINEERING-PROVEN, REAL INTERVIEW PENDING |
+| E. Fact Inbox burden | backlog/open/resolve/dismiss/reopen/time-to-resolve metrics; dogfood now opens and resolves a real inbox item | ENGINEERING-PROVEN, REAL USER PENDING |
+| F. Quick Notes / Pin value | live note usage + Reflection→Quick Note + Pin→Reflection + explicit Pin→NextFocus write-back | ENGINEERING-PROVEN, REAL USER PENDING |
 
-## Defects found and fixed (all in product code, none asserted away)
+No aggregate “hire score”, offer probability, percentile, or PMF badge is permitted.
 
-1. A partial API payload could blank the **entire** app: `HomePage`/`MePage` assumed complete
-   payloads and, with no error boundary, React unmounted the root. Fixed by normalising payloads
-   at the API boundary plus a page-level `PageErrorBoundary`.
-2. The brand heading had been downgraded `<h1>` → `<span>`, removing the document's only heading landmark.
-3. Active Settings group dimmed its English hint with `opacity-70` → WCAG AA contrast failure.
-4. Ten product-layer handlers degraded silently (one bare `except: pass`), hiding real failures.
+## 5. Synthetic longitudinal evidence
 
-Recorded but **not** changed: `services/storage/product.py::insert` silently allows a NULL primary
-key when no `id` is supplied (no production caller does this).
+CI runs an isolated local store and produces a `v1.4-engineering-validation` artifact.
 
-## Honest status words
+Required synthetic gates:
+
+- 7-day continuity
+- 30-session continuity
+- 100-session continuity
+- export/delete integrity
+- no cross-Goal contamination
+- Reflection write-back
+- Fact Inbox burden loop
+- Reflection-created Quick Note
+- Pin promoted to Next Focus
+- Practice transfer remains labelled synthetic/mock
+
+Evidence classification:
 
 ```text
-V1_3_PRODUCT_COMPLETE      NOT CLAIMED
-V1_4_ENGINEERING_COMPLETE  NOT CLAIMED
-PRODUCT_VALIDATION_INFRA_COMPLETE  backend instrumentation only; evidence reports not written
-REAL_USER_EVIDENCE_PENDING         yes
-PMF PROVEN                         never — no real participants
+PRODUCT_VALIDATION_INFRA_COMPLETE
+REAL_USER_EVIDENCE_PENDING
+PMF_PROVEN = false
 ```
 
-## Blockers
+## 6. Privacy
 
-- **Engineering (in scope, not external):** 6 Playwright specs still drive the retired v1.2 module
-  routes (`job-review-linkage` ×2, `job-workspace` ×2, `r2-live-cue` ×1, `resume-linkage` ×1); the
-  a11y suite is load-flaky; screenshots, release and clean-install replay not started.
-- **`BLOCKED_EXTERNAL` (cannot be resolved from this machine):** real-user recruitment, a truly
-  clean Windows VM (a portable + isolated `--user-data-dir` replay is available instead), paid real
-  provider key, code-signing certificate, macOS signing/notarization, public Coach relay, real
-  long-duration human sessions.
+Product analytics remain local-first.
+
+The event layer rejects raw or high-risk free text such as:
+
+- resume text
+- API keys
+- raw transcript
+- answer text
+
+Synthetic evidence is marked so it cannot silently become “real-user” evidence.
+
+## 7. Current v1.4 hardening delta
+
+This branch deepens the previously shallow E/F synthetic checks:
+
+1. Reflection explicitly creates a Goal-scoped Quick Note, while local ProductEvent provenance records `quick_note_from_reflection`.
+2. Fact Inbox is opened and the deliberately over-strong “lead” claim is resolved to participation.
+3. The user-created bad-answer Pin is explicitly promoted to Next Focus only after a Reflection action.
+4. Validation metrics assert those actions are present rather than merely asserting that the event names exist.
+
+This closes the gap between “instrumentation exists” and “the product loop was actually exercised.”
+
+## 8. External / unresolved evidence
+
+Still not proven by automation:
+
+- real-user Goal reuse over time
+- whether users perceive Fact Inbox as useful rather than annoying
+- whether Fast Cue improves real interview performance
+- real Interview-to-Interview transfer
+- native overlay geometry and multi-monitor behavior on an interactive Windows desktop
+- real paid-provider model quality / latency / cost
+- code signing
+- macOS signing/notarization
+- public Human Coach relay
+
+These remain `BLOCKED_EXTERNAL` or `REAL_USER_EVIDENCE_PENDING`, not failures of the implemented Windows/local product.
+
+## 9. Release truth
+
+Do not call v1.4 a new product feature release merely because these gates are green.
+
+The valid engineering claim after CI is:
+
+```text
+V1_4_ENGINEERING_HARDENING = COMPLETE
+PRODUCT_VALIDATION_INFRA_COMPLETE
+REAL_USER_EVIDENCE_PENDING
+```
+
+The stronger claim:
+
+```text
+V1_4_REAL_VALIDATION_COMPLETE
+```
+
+requires real participant evidence and must not be generated by synthetic dogfood.

@@ -12,8 +12,8 @@ import { ActionMenu, EmptyState, ErrorState, Loading, Page, PageHeader, PrimaryB
 const ReviewSessionDetail = lazy(() => import('@/components/review/ReviewSessionDetail'))
 
 const ACTION_LABEL: Record<string, string> = {
-  PRACTICE_THIS: '练这个', SET_NEXT_FOCUS: '设为 Next Focus', CONFIRM_FACT: '确认事实', MARK_MISTAKE: '标记口误',
-  ADD_SOURCE: '补来源', CREATE_STORY: '整理成 Story', ADD_QUICK_NOTE: '记成速记', DONT_REMEMBER: '不记得了',
+  PRACTICE_THIS: '练这个', SET_NEXT_FOCUS: '设为下一步重点', CONFIRM_FACT: '确认事实', MARK_MISTAKE: '标记口误',
+  ADD_SOURCE: '补来源', CREATE_STORY: '整理成故事', ADD_QUICK_NOTE: '记成速记', DONT_REMEMBER: '不记得了',
 }
 
 function Quote({ text }: { text: string }) {
@@ -89,7 +89,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
                 <>
                   <PrimaryButton testId="reflection-practice-next" onClick={() => void act('PRACTICE_THIS', { ...fs.next_step!, id: fs.next_step!.finding_id ?? fs.next_step!.pin_id })}>练这个</PrimaryButton>
                   <SecondaryButton onClick={() => void act('SET_NEXT_FOCUS', { ...fs.next_step!, id: fs.next_step!.finding_id ?? fs.next_step!.pin_id })}>
-                    {status({ id: fs.next_step.finding_id ?? fs.next_step.pin_id }, 'SET_NEXT_FOCUS') ?? '设为 Next Focus'}
+                    {status({ id: fs.next_step.finding_id ?? fs.next_step.pin_id }, 'SET_NEXT_FOCUS') ?? '设为下一步重点'}
                   </SecondaryButton>
                 </>
               ) : <LinkGoal reviewId={data.session_kind === 'REVIEW' ? Number(data.session_ref) : null} onLinked={reload} />}
@@ -106,7 +106,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
                 <div className="flex flex-wrap items-center gap-2"><Pin className="h-3.5 w-3.5 text-accent-amber" aria-hidden /><StatusBadge tone="warn">{p.tag_label ?? p.tag}</StatusBadge></div>
                 {p.question ? <p className="mt-1 text-sm text-text-primary">{p.question}</p> : null}
                 {p.note ? <p className="text-xs text-text-secondary">备注：{p.note}</p> : null}
-                {data.goal_id ? <div className="mt-1.5"><SecondaryButton onClick={() => void act('SET_NEXT_FOCUS', { id: p.id, pin_id: p.id, kind: 'USER_PIN' })}>{status({ id: p.id }, 'SET_NEXT_FOCUS') ?? '设为 Next Focus'}</SecondaryButton></div> : null}
+                {data.goal_id ? <div className="mt-1.5"><SecondaryButton onClick={() => void act('SET_NEXT_FOCUS', { id: p.id, pin_id: p.id, kind: 'USER_PIN' })}>{status({ id: p.id }, 'SET_NEXT_FOCUS') ?? '设为下一步重点'}</SecondaryButton></div> : null}
               </li>
             ))}
           </ul>
@@ -161,14 +161,14 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
             </ul>
           ) : <p className="text-xs text-text-muted">没有需要核对的说法。</p>}
         </Section>
-        <Section title="Story 机会">
+        <Section title="故事机会">
           {fs.story_opportunities.length ? (
             <ul className="space-y-2">
               {fs.story_opportunities.map((s) => (
                 <li key={s.id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
                   <p className="text-xs text-text-primary">{s.question}</p>
                   <Quote text={s.actual_speech} />
-                  <div className="mt-1.5"><SecondaryButton onClick={() => void act('CREATE_STORY', s as unknown as Record<string, unknown>)}>{status(s, 'CREATE_STORY') ?? '整理成 Story 草稿'}</SecondaryButton></div>
+                  <div className="mt-1.5"><SecondaryButton onClick={() => void act('CREATE_STORY', s as unknown as Record<string, unknown>)}>{status(s, 'CREATE_STORY') ?? '整理成故事草稿'}</SecondaryButton></div>
                 </li>
               ))}
             </ul>
@@ -222,9 +222,9 @@ function FindingRow({ f, goalLinked, act, status }: {
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         {goalLinked ? <SecondaryButton onClick={() => void act('PRACTICE_THIS', finding)}>{status(f, 'PRACTICE_THIS') ?? '练这个'}</SecondaryButton> : null}
         <ActionMenu label="更多复盘操作" actions={[
-          ...(goalLinked ? [{ key: 'focus', label: '设为 Next Focus', onSelect: () => void act('SET_NEXT_FOCUS', finding) }] : []),
+          ...(goalLinked ? [{ key: 'focus', label: '设为下一步重点', onSelect: () => void act('SET_NEXT_FOCUS', finding) }] : []),
           { key: 'note', label: '记成速记', onSelect: () => void act('ADD_QUICK_NOTE', finding) },
-          ...(f.actual_speech ? [{ key: 'story', label: '整理成 Story 草稿', onSelect: () => void act('CREATE_STORY', finding) }] : []),
+          ...(f.actual_speech ? [{ key: 'story', label: '整理成故事草稿', onSelect: () => void act('CREATE_STORY', finding) }] : []),
         ]} />
         {status(f, 'SET_NEXT_FOCUS') || status(f, 'ADD_QUICK_NOTE') || status(f, 'CREATE_STORY') ? (
           <span role="status" className="text-[11px] text-status-direct">{status(f, 'SET_NEXT_FOCUS') || status(f, 'ADD_QUICK_NOTE') || status(f, 'CREATE_STORY')}</span>
@@ -259,7 +259,7 @@ function LinkGoal({ reviewId, onLinked }: { reviewId: number | null; onLinked: (
   if (!reviewId) return <p className="text-xs text-text-muted">这场练习没有关联目标。</p>
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-secondary">关联到求职目标后可以设为 Next Focus：</span>
+      <span className="text-text-secondary">关联到求职目标后可以设为下一步重点：</span>
       <select aria-label="选择求职目标" value={goalId} onChange={(e) => setGoalId(e.target.value)} className="rounded-lg border border-bg-hover bg-bg-primary px-2 py-1">
         <option value="">选择目标</option>
         {(goals.data?.items ?? []).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}

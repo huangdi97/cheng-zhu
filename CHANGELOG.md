@@ -1,5 +1,27 @@
 # 修复日志
 
+## 2026-10-05 - v1.4.0：Product Validation Hardening
+
+- 不新增一级产品，继续使用 v1.3 的 Goal-centered IA；本版重点验证和硬化 Goal → Prepare/Practice → Live → Reflection → Next Focus 的长期闭环
+- 合并原 v1.4 产品/UI hardening 与发布/验证 hardening 为单一实现线：Live 当前问题/Fast Cue 优先、历史轮次降级、Goal/Prepare/Reflection 文案去内部术语
+- Settings → Diagnostics 直接回答 A–F 六个验证问题；原始指标仍保留在展开层，真实用户证据继续标记为 `REAL_USER_EVIDENCE_PENDING`
+- Goal Room 增加同一 Goal 内的可解释能力趋势，不生成录用概率、候选人百分位或伪“准备度”
+- Reflection → Quick Note、Pin → Next Focus、Fact Inbox 打开/解决都走真实写回，并进入 local-first ProductEvent
+- CI 增加 7-day / 30-session / 100-session synthetic continuity、3-hour-equivalent soak、数据完整性与版本一致性门禁
+- Windows release 要求 frontend / desktop / packaged backend sidecar 同为 1.4.0；v1.3.0 在 v1.4 全绿发布前保持 stable
+- 仍未宣称 PMF、真实面试迁移、真实长期用户有效性；这些必须由真实参与者证据补齐
+
+## 2026-10-05 - v1.3.0：Goal-centered Interview OS
+
+- 一级导航收敛为：首页 / 求职目标 / 我的成竹 / 练习 / 资料库 / 历史 / 设置；「上场」成为全局动作
+- Goal Room、Next Focus、Fact Inbox、Material Taxonomy、Quick Notes、Question Banks、Command Palette、Guided First Practice 全部进入产品主链
+- Practice 3.0 支持 Round / Persona / Demeanor / Difficulty / Question Source、adaptive follow-up、2–3 人 Panel、Content Coach × Delivery Coach
+- Live 改为 Question → Fast Cue → Source/Warning 优先；Deep Answer、Transcript、Quick Notes 等成为第二层
+- Pin Moment、Nudge / Open Thread、Closing Mode、五层语言配置、Overlay 3.0、Reflection → Next Focus 完成
+- v1.2-R2 Verified Interview Core 保持冻结：InterviewPack、Context Compiler、Provenance、Truth Guard、Fast Cue before Deep 不被 UI 重构破坏
+- Windows installer / portable、GitHub Release、download-back 与 runtime UI evidence 均完成；v1.3.0 于 2026-10-05 发布
+- Personal Conversation Intelligence 的 Future Profile contracts 完整保留，但 Meeting / Presentation / 1:1 没有提前进入一级产品
+
 ## 2026-09-30 - v1.2.2：繁忙 CPU 下更快的首个提示；语言切换更稳
 
 - 本地 Whisper：面试官一停顿（80 ms）就不再送音频给预览解码，最终转写不再排在无用的预览解码之后（受控基准 p95 尾部的主因）

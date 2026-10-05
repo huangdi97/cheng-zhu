@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ControlBar from './ControlBar'
 import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
+import { useOsStore } from '@/stores/osStore'
+import { parsePath, useRouter } from '@/lib/router'
 
+
+const productApiMock = vi.hoisted(() => ({
+  liveEnd: vi.fn(),
+}))
 
 const apiMock = vi.hoisted(() => ({
   ask: vi.fn(),
@@ -27,6 +33,12 @@ vi.mock('@/lib/api', () => ({
   },
   getErrorMessage: (error: unknown, fallback = '操作失败') =>
     error instanceof Error ? error.message : fallback,
+}))
+
+vi.mock('@/lib/productApi', () => ({
+  productApi: {
+    ...productApiMock,
+  },
 }))
 
 vi.mock('@/components/ResumeHistory', () => ({
@@ -61,7 +73,29 @@ describe('ControlBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     updateConfigAndRefreshMock.mockResolvedValue(undefined)
+    productApiMock.liveEnd.mockResolvedValue({
+      session_id: 'live-1',
+      goal_id: 'goal-1',
+      review_session_id: 902,
+      reflection_ref: { session_kind: 'REVIEW', session_ref: '902' },
+    })
     localStorage.clear()
+    window.location.hash = ''
+    useRouter.setState({ route: parsePath('/home') })
+    useOsStore.setState({
+      createGoalOpen: false,
+      goLiveOpen: false,
+      goLiveGoalId: null,
+      commandPaletteOpen: false,
+      pinDialogOpen: false,
+      quickNotesOpen: false,
+      contextGoalId: null,
+      live: null,
+      activePracticeId: null,
+      activePracticeQuestion: '',
+      memoVisible: false,
+    })
+
     vi.stubGlobal('FileReader', MockFileReader as any)
     ;(window as any).electronAPI = {
       syncOverlayWindow: vi.fn().mockResolvedValue(undefined),
@@ -471,6 +505,74 @@ describe('ControlBar', () => {
     await waitFor(() => {
       expect(input).toHaveValue('')
     })
+  })
+
+  it('closes the Goal Live session and opens Reflection in the same stop action', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    useInterviewStore.setState({ isRecording: true, isPaused: false } as any)
+    useOsStore.setState({
+      live: {
+        sessionId: 'live-1',
+        goalId: 'goal-1',
+        goalTitle: 'MindRank · AIDD Agent Engineer',
+        startedAt: Date.now(),
+      },
+    })
+
+    render(<ControlBar />)
+    fireEvent.click(screen.getByRole('button', { name: /结束面试/ }))
+
+    await waitFor(() => expect(apiMock.stop).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(productApiMock.liveEnd).toHaveBeenCalledWith('live-1'))
+    await waitFor(() => expect(window.location.hash).toBe('#/reflection/review/902'))
+    expect(useOsStore.getState().live).toBeNull()
+    expect(window.electronAPI?.syncOverlayWindow).toHaveBeenCalledWith({ visible: false })
+  })
+
+  it('recovers the Live session id from the route after a renderer reload', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    useInterviewStore.setState({ isRecording: true, isPaused: false } as any)
+    useOsStore.setState({ live: null })
+    useRouter.setState({ route: parsePath('/live/live-reloaded') })
+    productApiMock.liveEnd.mockResolvedValueOnce({
+      session_id: 'live-reloaded',
+      goal_id: 'goal-1',
+      review_session_id: 903,
+      reflection_ref: { session_kind: 'REVIEW', session_ref: '903' },
+    })
+
+    render(<ControlBar />)
+    fireEvent.click(screen.getByRole('button', { name: /结束面试/ }))
+
+    await waitFor(() => expect(productApiMock.liveEnd).toHaveBeenCalledWith('live-reloaded'))
+    await waitFor(() => expect(window.location.hash).toBe('#/reflection/review/903'))
+  })
+
+  it('falls back to Goal interviews when the review row is not ready yet', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    productApiMock.liveEnd.mockResolvedValueOnce({
+      session_id: 'live-1',
+      goal_id: 'goal-1',
+      review_session_id: null,
+      reflection_ref: null,
+    })
+    useInterviewStore.setState({ isRecording: true, isPaused: false } as any)
+    useOsStore.setState({
+      live: {
+        sessionId: 'live-1',
+        goalId: 'goal-1',
+        goalTitle: 'MindRank · AIDD Agent Engineer',
+        startedAt: Date.now(),
+      },
+    })
+
+    render(<ControlBar />)
+    fireEvent.click(screen.getByRole('button', { name: /结束面试/ }))
+
+    await waitFor(() => expect(productApiMock.liveEnd).toHaveBeenCalledWith('live-1'))
+    await waitFor(() => expect(window.location.hash).toBe('#/goals/goal-1/interviews'))
+    expect(useInterviewStore.getState().toastMessage).toContain('复盘正在生成')
+    expect(useOsStore.getState().live).toBeNull()
   })
 
   it('surfaces stop failures instead of swallowing them', async () => {

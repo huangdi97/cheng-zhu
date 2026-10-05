@@ -4,7 +4,7 @@
 
 成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
 
-> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.3.0](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.3.0)。v1.4.0 只有在完整 CI、Windows packaged replay、download-back 与发布门禁全绿后才成为新的 stable。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
+> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [GitHub Latest](https://github.com/huangdi97/cheng-zhu/releases/latest)。v1.4.0 已完成完整 CI、Windows packaged replay、SHA256、download-back 并正式发布；v1.4.x 只接受验证/摩擦/可靠性类收口，不再扩一级产品。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
 v1.3 将成竹组织成一个 **Goal-centered Interview OS**：用户不是在“简历 / 题库 / 实时辅助 / 复盘”几个模块之间来回切换，而是围绕一个具体的公司 × 岗位持续推进。
 
@@ -16,7 +16,7 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 
 长期方向是 Personal Conversation Intelligence，但 Meeting / Presentation / 1:1 等 Conversation Profile 仍属于未来版本，不在当前 v1.3 一级导航里提前产品化。
 
-> v1.4.0 正在做 **Product Validation Hardening**：不新增一级产品，而是把 Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值做成 local-first 的可验证闭环。自动化与 synthetic dogfood 只属于工程证据，不能冒充真实用户 PMF。
+> v1.4 已完成 **Product Validation Hardening** 的工程闭环：Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值都进入 local-first 可验证链路；7-day / 30-session / 100-session synthetic continuity 与 packaged release gate 已落地。自动化和 synthetic dogfood 仍然只是工程证据，`REAL_USER_EVIDENCE_PENDING` 不变。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 

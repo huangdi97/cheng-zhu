@@ -12,6 +12,44 @@ v1.4.2 是 v1.4.1 之后的产品工艺与公开产品面收口补丁。
 GitHub Release 中用户下载到的产品事实
 ```
 
+## Release provenance closure
+
+在最终发布审计中发现，v1.4.1 的 Release workflow 从：
+
+```text
+2355a1cdb71d60ae7f5d497150bdcd94499e9a3e
+```
+
+检出并构建 Windows 产物；但长时间构建期间 `main` 又前进到了：
+
+```text
+df286e768a874eab12365259c50e7742c77c33d9
+```
+
+旧 workflow 的 `gh release create` 没有显式 `--target`，因此 GitHub 在创建 `v1.4.1` tag 时使用了当时较新的默认分支 HEAD。两者之间包含 `backend/services/product/live.py`、`next_focus.py` 等产品代码变化，所以不能把它当成纯文档偏差。
+
+v1.4.2 将发布不变量升级为：
+
+```text
+CI-proven SHA
+==
+Release checkout SHA
+==
+binary source SHA
+==
+public tag SHA
+```
+
+自动发布器现在从刚刚通过 main CI 的 `workflow_run.head_sha` 检出源码，并把该 SHA 作为 `source_sha` 传入 Release workflow。Release 创建 tag 时显式使用 `--target <source_sha>`，并在：
+
+- tag 创建后；
+- GitHub Release download-back 前；
+- 最终从 draft 发布前；
+
+三次验证 tag SHA 与 binary source SHA 一致。任何不一致都会直接使发布失败。
+
+download-back evidence 同时记录 `source_sha` 与 `tag_sha`，因此后续可以从发布证据直接证明“这个安装包来自哪一个源码快照”。
+
 ## 主要变化
 
 ### Preflight 产品语言收口
@@ -111,6 +149,8 @@ v1.4.2 继续要求：
 - 安装后 packaged smoke。
 
 只有这些门禁全部通过后才允许发布。
+
+此外 v1.4.2 新增 release-provenance gate：公开 tag 必须与本次 installer / portable 的构建源码 SHA 完全相同。
 
 ## 真实用户边界
 

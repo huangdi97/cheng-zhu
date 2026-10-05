@@ -67,8 +67,8 @@ test.describe('R2 live cue-first', () => {
     await expect(warning.getByRole('button', { name: '继续，但不要扩展细节' })).toBeVisible()
     await expect(warning.getByRole('button', { name: '稍后确认' })).toBeVisible()
 
-    // Unfrozen session: the pack bar says so and offers the freeze path.
-    await expect(page.getByTestId('live-pack-bar')).toContainText('Interview Pack 未冻结')
+    // Unfrozen session: user language exposes the action, not pack internals.
+    await expect(page.getByTestId('live-pack-bar')).toContainText('本场资料还没冻结')
   })
 
   test('share privacy defaults OFF and human assistance defaults to practice only in settings', async ({ context, page }) => {

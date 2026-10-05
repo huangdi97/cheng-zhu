@@ -10,10 +10,10 @@ test.describe('R2 live cue-first', () => {
     await installMocks(context, {
       messages: [
         ...COMMON_WS_BOOTSTRAP,
-        { type: 'answer_start', delay: 80, id: 'qa-r2-1', question: '你实际用过 Redis Cluster 吗？', source: 'asr', model_name: 'GPT-4.1 Mini' },
+        { type: 'answer_start', delay: 40, id: 'qa-r2-1', question: '你实际用过 Redis Cluster 吗？', source: 'asr', model_name: 'GPT-4.1 Mini' },
         {
           type: 'guidance_fast',
-          delay: 40,
+          delay: 80,
           id: 'qa-r2-1',
           question_raw: '你实际用过 Redis Cluster 吗？',
           resolved_question: '你实际用过 Redis Cluster 吗？',

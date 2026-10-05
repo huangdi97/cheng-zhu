@@ -35,7 +35,7 @@ function QuestionTree({ nodes }: { nodes: QuestionNode[] }) {
     const list = children.get(parent) ?? []
     if (!list.length) return null
     return (
-      <ul className={depth ? 'ml-4 border-l border-bg-hover/60 pl-3 space-y-1' : 'space-y-2'} role={depth ? 'group' : 'tree'} aria-label={depth ? undefined : 'Question Graph'}>
+      <ul className={depth ? 'ml-4 border-l border-bg-hover/60 pl-3 space-y-1' : 'space-y-2'} role={depth ? 'group' : 'tree'} aria-label={depth ? undefined : '可能追问'}>
         {list.map((n) => (
           <li key={n.id} role="treeitem" aria-expanded={children.has(n.id) ? true : undefined} className="text-xs">
             <span className={depth ? 'text-text-secondary' : 'font-medium text-text-primary'}>{n.text}</span>
@@ -107,7 +107,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
           ) : <EmptyState title="导入简历并确认事实后显示" action={<SecondaryButton onClick={() => navigate(paths.me('resume'))}>去导入简历</SecondaryButton>} />}
         </Section>
         <Section title="可能追问">
-          {data.question_graph.length ? <QuestionTree nodes={data.question_graph} /> : <EmptyState title="暂无问题图" />}
+          {data.question_graph.length ? <QuestionTree nodes={data.question_graph} /> : <EmptyState title="暂无追问建议" />}
         </Section>
       </div>
       <div>
@@ -150,8 +150,8 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
           <QuickNotesPanel goalId={goal.id} context="goal" compact selectedIds={noteIds}
             onSelectionChange={(ids) => { setNoteIds(ids); void productApi.patchGoal(goal.id, { selected_quick_note_ids: ids }).then(() => void reloadPrep()) }} />
         </Section>
-        <Section title="本场上下文预览（InterviewPack）">
-          <p className="text-[11px] text-text-muted">点击「上场」后会在上场检查中冻结。只有「就绪」的资料会进入；速记以「你的提醒」身份进入，不是证据。</p>
+        <Section title="本场带入内容">
+          <p className="text-[11px] text-text-muted">点击「上场」后，这些内容会在上场检查中确认并冻结。只有「就绪」的资料会带入；速记只是你的提醒，不会被当作经历证据。</p>
           <ul className="mt-1.5 space-y-1 text-xs">
             <li>速记：{data.pack_preview.quick_notes.length ? data.pack_preview.quick_notes.map((n) => n.title || n.content.slice(0, 12)).join('、') : '未选择（默认带上置顶速记）'}</li>
             <li>资料：{data.pack_preview.materials.length ? data.pack_preview.materials.map((m) => m.title).join('、') : '未选择'}</li>

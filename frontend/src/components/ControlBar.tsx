@@ -937,7 +937,7 @@ export default function ControlBar() {
           </button>
         )}
 
-        {!isExamMode && <ResumeMountInline className="bg-bg-primary/45" />}
+        {!isExamMode && !isRecording && <ResumeMountInline className="bg-bg-primary/45" />}
 
         {streamingIds.length > 0 && (
           <button onClick={handleCancelAsk} disabled={cancellingAsk}

@@ -53,6 +53,29 @@ def main() -> int:
     if expected and not notes.is_file():
         errors.append(f"missing release notes: {notes.relative_to(ROOT)}")
 
+    # A valid release must be reproducible from one exact commit: the SHA that
+    # passed main CI is the SHA checked out for packaging and the SHA targeted
+    # by the public tag. This gate prevents a moving-main race from creating a
+    # tag for newer source than the installer/portable binaries actually used.
+    release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    publisher_workflow = (
+        ROOT / ".github" / "workflows" / "publish-v1.4.2-on-green-main.yml"
+    ).read_text(encoding="utf-8")
+    for token in (
+        "source_sha:",
+        "CHENGZHU_RELEASE_SOURCE_SHA",
+        "--target $sourceSha",
+        "tag $tag points to $tagSha but binaries were built from $sourceSha",
+    ):
+        if token not in release_workflow:
+            errors.append(f"release workflow missing provenance invariant: {token}")
+    for token in (
+        "github.event.workflow_run.head_sha",
+        'gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"',
+    ):
+        if token not in publisher_workflow:
+            errors.append(f"v1.4.2 publisher missing exact-SHA invariant: {token}")
+
     if errors:
         print(json.dumps({"ok": False, "versions": versions, "errors": errors}, ensure_ascii=False, indent=2))
         return 1

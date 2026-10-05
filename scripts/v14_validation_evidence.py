@@ -123,6 +123,12 @@ def _markdown(payload: dict[str, Any]) -> str:
         lines += ["", f"## {title}", "", "    " + json.dumps(v[key], ensure_ascii=False)]
     lines += [
         "",
+        "## Product friction audit",
+        "",
+        "    " + json.dumps(v["friction_audit"], ensure_ascii=False),
+    ]
+    lines += [
+        "",
         "## Honest conclusion",
         "",
         "- PRODUCT_VALIDATION_INFRA_COMPLETE: supported by the local event store, six-question report, continuity dogfood and integrity checks.",

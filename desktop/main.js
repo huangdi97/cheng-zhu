@@ -19,6 +19,36 @@ if (process.env.CHENGZHU_USER_DATA_DIR) {
 // 如个别旧设备透明窗口出现渲染异常，可设环境变量 ELECTRON_DISABLE_HW_ACCEL=1 回退。
 const RUNTIME_EVIDENCE_MODE = process.env.CHENGZHU_RUNTIME_EVIDENCE === '1';
 
+function writeRuntimeEvidenceStage(stage, extra = {}) {
+  if (!RUNTIME_EVIDENCE_MODE) return;
+  const raw = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_STATUS || '').trim();
+  if (!raw) return;
+  try {
+    const file = path.resolve(raw);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({
+      stage,
+      at: new Date().toISOString(),
+      pid: process.pid,
+      packaged: app.isPackaged,
+      ...extra,
+    }, null, 2));
+  } catch {
+    // Evidence diagnostics must never affect normal startup.
+  }
+}
+
+writeRuntimeEvidenceStage('main-loaded');
+
+if (RUNTIME_EVIDENCE_MODE) {
+  // Hosted Windows runners do not provide a normal interactive desktop.
+  // Electron documents --no-sandbox as testing-only; keep it strictly scoped
+  // to the disposable runtime-evidence process so production sandboxing is
+  // unchanged.
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-gpu');
+}
+
 if (process.platform === 'win32') {
   if (!RUNTIME_EVIDENCE_MODE) {
     app.commandLine.appendSwitch('enable-transparent-visuals');
@@ -358,6 +388,7 @@ async function runRuntimeEvidencePlan() {
   const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
   const entries = [];
   const startedAt = new Date().toISOString();
+  writeRuntimeEvidenceStage('plan-started', { plan: planPath, result: resultPath });
   try {
     for (const [index, rawStep] of (Array.isArray(plan.steps) ? plan.steps : []).entries()) {
       const step = rawStep && typeof rawStep === 'object' ? rawStep : {};
@@ -1890,6 +1921,7 @@ app.on('before-quit', (event) => {
 });
 
 app.whenReady().then(async () => {
+  writeRuntimeEvidenceStage('app-ready');
   try {
     app.setName(APP_DISPLAY_NAME);
   } catch {
@@ -1911,6 +1943,7 @@ app.whenReady().then(async () => {
       console.log(`Using evidence sidecar on ${SERVER_URL} (packaged=${app.isPackaged})...`);
       await waitForOwnedExternalServer(app.isPackaged ? 90000 : 40000);
       console.log('Evidence sidecar ready, creating window...');
+      writeRuntimeEvidenceStage('external-backend-ready', { server_url: SERVER_URL });
     } catch (err) {
       console.error('Failed to connect to evidence sidecar:', err.message);
       isQuitting = true;
@@ -1949,6 +1982,7 @@ app.whenReady().then(async () => {
 
   syncSharePrivacyFromConfig();
   createWindow();
+  writeRuntimeEvidenceStage('window-created', { server_url: SERVER_URL });
   if (runtimeEvidencePlanPath()) {
     // File-plan mode avoids a localhost listener entirely. Wait until the real
     // packaged renderer has completed its first navigation before sending DOM
@@ -1956,7 +1990,10 @@ app.whenReady().then(async () => {
     // remain pending indefinitely on hosted Windows runners, leaving neither a
     // success nor a failure result file.
     void waitForMainWindowLoad()
-      .then(() => runRuntimeEvidencePlan())
+      .then(() => {
+        writeRuntimeEvidenceStage('renderer-ready', { url: mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : '' });
+        return runRuntimeEvidencePlan();
+      })
       .catch((error) => {
         console.error('Runtime evidence plan failed:', error?.message || error);
         const resultPath = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_RESULT || '').trim();

@@ -115,8 +115,13 @@ function PrivacyGroup({ goalId }: { goalId: string }) {
       <p className="text-[11px] text-text-muted">共享隐私：减少成竹私人内容在受支持的屏幕共享/录屏路径中意外出现，不是安全或不可检测保证。</p>
       <ToggleRow label="练习的本地表达分析" hint="语速、结论时间、填充词；只在本机计算，不上传音频。" checked={config?.practice_delivery_analytics_enabled !== false}
         onChange={(v) => void updateConfigAndRefresh({ practice_delivery_analytics_enabled: v })} />
-      <ToggleRow label="远程遥测" hint="默认关闭。本地产品分析始终只保存在这台电脑上。" checked={!!config?.remote_telemetry_opt_in}
-        onChange={(v) => void updateConfigAndRefresh({ remote_telemetry_opt_in: v })} />
+      <div className="flex items-start justify-between gap-3 border-b border-bg-tertiary/60 py-2.5">
+        <span className="text-sm text-text-primary">
+          产品分析
+          <span className="block text-[11px] text-text-muted">当前版本只保存在这台电脑上；没有后台上传器。未来若提供远程遥测，必须再次明确征得同意。</span>
+        </span>
+        <StatusBadge tone="ok">仅本地</StatusBadge>
+      </div>
       <div className="flex items-center gap-2 pt-2">
         <SecondaryButton onClick={() => navigate(paths.settings('diagnostics'))}>查看本地产品分析</SecondaryButton>
         <SecondaryButton onClick={() => { if (window.confirm('清空本机记录的产品使用事件？')) void productApi.clearEvents().then((r) => setCleared(r.deleted)) }}>清空本地分析记录</SecondaryButton>

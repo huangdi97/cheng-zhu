@@ -1,12 +1,54 @@
 # Chengzhu v1.4.0 — Final Reality Report
 
-> **Status:** RELEASE_CANDIDATE — final CI / packaged / publish gates pending.
+> **Status:** RELEASE_READY_WITH_EXTERNAL_BLOCKERS
 >
-> This report is evidence-led. Synthetic product-loop evidence may support engineering closure, but it must not be described as real-user validation or PMF.
+> v1.4.0 is publicly released and its required engineering/release gates are closed.
+> This report distinguishes engineering evidence from real-user evidence. Synthetic / local signals must not be described as PMF or real-interview transfer.
 
-## 1. Product baseline
+## 1. Final release facts
 
-v1.4.0 is a hardening release on top of the released v1.3.0 Goal-centered Interview OS.
+```text
+main merge commit:
+31c920ba159eb99d6c687b34aa282fe2b7062e6f
+
+authoritative PR:
+#11
+feat/chengzhu-v1.4-final-hardening
+merged = true
+
+main CI:
+run 37315468179
+conclusion = success
+
+release publish / download-back workflow:
+run 37316020206
+conclusion = success
+
+tag:
+v1.4.0
+
+GitHub Release:
+published 2026-10-05T13:37:12Z
+```
+
+Public assets:
+
+```text
+Chengzhu-Setup-x64.exe
+Chengzhu-Portable-x64.zip
+SHA256SUMS.txt
+LICENSE.txt
+THIRD_PARTY_NOTICES.md
+RELEASE_NOTES_v1.4.0.md
+```
+
+The release workflow completed the release replay/download-back path rather than treating the local build directory as release evidence.
+
+---
+
+## 2. Product baseline
+
+v1.4.0 hardens the released v1.3 Goal-centered Interview OS.
 
 Frozen product loop:
 
@@ -21,76 +63,25 @@ Goal
 → Next Focus
 ```
 
-No new top-level product is introduced in v1.4.
+v1.4 does not add another top-level product.
 
-Current stable while this report is being finalized:
-
-```text
-v1.3.0
-```
-
-Target release:
+Top-level IA remains:
 
 ```text
-v1.4.0
+首页
+求职目标
+我的成竹
+练习
+资料库
+历史
+设置
+
+                         [上场]
 ```
 
-## 2. Unified v1.4 implementation line
+---
 
-Authoritative PR:
-
-```text
-#11
-feat/chengzhu-v1.4-final-hardening
-```
-
-Former PR #9 contained product/UI hardening. Its changes were merged into PR #11 and #9 was closed so v1.4 has one authoritative branch.
-
-The unified branch includes:
-
-- current Question / Fast Cue visually authoritative in Live;
-- previous turns secondary/collapsed;
-- Goal / Prepare / Reflection language rewritten for users rather than internal-system terminology;
-- product-readable A–F validation UI;
-- Goal progress trends without hire/readiness scores;
-- local-first ProductEvent validation;
-- Reflection → Next Focus;
-- Reflection → Quick Note;
-- Pin → Reflection → Next Focus;
-- Fact Inbox burden loop;
-- 7-day / 30-session / 100-session synthetic continuity;
-- 3-hour-equivalent answer-worker soak;
-- migration / export / delete integrity;
-- v1.4 version and release consistency.
-
-## 3. Six product-validation questions
-
-| Question | Engineering path | Current truth |
-| --- | --- | --- |
-| A · Goal reused over time? | local ProductEvent + longitudinal synthetic continuity | ENGINEERING_PROVEN / REAL_USER_PENDING |
-| B · Reflection changes next Prepare? | ReflectionAction → NextFocus → Goal/Practice | ENGINEERING_PROVEN |
-| C · Fast Cue useful? | rendered / expanded / Deep / feedback / speech-after-cue signals | INSTRUMENTED / REAL_USER_PENDING |
-| D · Practice transfers? | rubric linkage + synthetic/mock before/after | SYNTHETIC_OR_MOCK_ONLY / REAL_INTERVIEW_PENDING |
-| E · Fact Inbox burden? | backlog / resolve / dismiss / reopen / time signals | INSTRUMENTED / REAL_USER_PENDING |
-| F · Quick Notes / Pin valuable? | Pack use + Reflection write-back + Pin conversion | ENGINEERING_PROVEN / REAL_USER_PENDING |
-
-Required evidence label remains:
-
-```text
-REAL_USER_EVIDENCE_PENDING
-```
-
-Not allowed:
-
-```text
-PMF_PROVEN
-REAL_INTERVIEW_TRANSFER_PROVEN
-V1_4_REAL_VALIDATION_COMPLETE
-```
-
-until real participant evidence exists.
-
-## 4. Product/UI status
+## 3. Product/UI status
 
 ### Studio
 
@@ -105,6 +96,7 @@ until real participant evidence exists.
 - Command Palette: PRODUCT_COMPLETE
 - Settings 3.0: PRODUCT_COMPLETE
 - History / Reflection: PRODUCT_COMPLETE
+- Goal progress trends: PRODUCT_COMPLETE without hire/readiness scores
 
 ### Practice
 
@@ -114,7 +106,7 @@ until real participant evidence exists.
 - Role-specific rubrics: PRODUCT_COMPLETE
 - Panel / Multi-persona: PRODUCT_COMPLETE
 - Content Coach × Delivery Coach: PRODUCT_COMPLETE
-- Progress trends: PRODUCT_COMPLETE
+- Goal-scoped progress trends: PRODUCT_COMPLETE
 
 ### Live
 
@@ -134,11 +126,99 @@ until real participant evidence exists.
 
 - first Goal: PRODUCT_COMPLETE
 - Guided First Practice: PRODUCT_COMPLETE
+- Practice question → Fast Cue → own answer → Content/Delivery feedback: PRODUCT_COMPLETE
 - hardware/provider fallback explicitly labelled: PRODUCT_COMPLETE
 
-## 5. Frozen Verified Core
+---
 
-v1.4 must not regress:
+## 4. Six v1.4 validation questions
+
+| Question | Engineering path | Final v1.4 truth |
+| --- | --- | --- |
+| A · Goal reused over time? | local ProductEvent + longitudinal synthetic continuity | ENGINEERING_PROVEN / REAL_USER_PENDING |
+| B · Reflection changes next Prepare? | ReflectionAction → NextFocus → Goal/Practice | ENGINEERING_PROVEN |
+| C · Fast Cue useful? | rendered / expanded / Deep / feedback / speech-after-cue signals | INSTRUMENTED / REAL_USER_PENDING |
+| D · Practice transfers? | rubric linkage + synthetic/mock before/after | SYNTHETIC_OR_MOCK_ONLY / REAL_INTERVIEW_PENDING |
+| E · Fact Inbox burden? | backlog / resolve / dismiss / reopen / time signals | INSTRUMENTED / REAL_USER_PENDING |
+| F · Quick Notes / Pin valuable? | Pack use + Reflection write-back + Pin conversion | ENGINEERING_PROVEN / REAL_USER_PENDING |
+
+Required truth label:
+
+```text
+REAL_USER_EVIDENCE_PENDING
+```
+
+Not allowed:
+
+```text
+PMF_PROVEN
+REAL_INTERVIEW_TRANSFER_PROVEN
+V1_4_REAL_VALIDATION_COMPLETE
+```
+
+until real participant evidence exists.
+
+---
+
+## 5. Engineering validation
+
+v1.4 includes deterministic evidence for:
+
+```text
+7-day synthetic continuity
+30-session synthetic continuity
+100-session synthetic reliability
+3-hour-equivalent simulated soak
+migration compatibility
+export/delete integrity
+no cross-Goal contamination
+provider-failure recovery
+bounded state / latency history
+```
+
+These prove engineering continuity only.
+
+They do **not** simulate:
+
+- real sleep/wake behavior;
+- real audio-device switching;
+- real network/provider incidents;
+- human fatigue;
+- real 3-hour interview participation;
+- real longitudinal retention.
+
+Those remain external evidence.
+
+---
+
+## 6. Local-first validation / privacy
+
+ProductEvent is local-first.
+
+Allowed event content is bounded metadata such as:
+
+- IDs;
+- counts;
+- booleans;
+- durations;
+- bounded categories.
+
+Rejected from validation events:
+
+- full resume;
+- raw audio;
+- API keys;
+- full transcript;
+- full evidence documents;
+- arbitrary high-risk free text.
+
+Remote telemetry remains opt-in and is not required for engineering completion.
+
+---
+
+## 7. Frozen Verified Core
+
+v1.4.0 preserves the v1.2/v1.3 Verified Core:
 
 - frozen InterviewPack;
 - Context Compiler authority;
@@ -151,52 +231,13 @@ v1.4 must not regress:
 - Share Privacy boundary;
 - packaged Windows sidecar.
 
-Final verdict remains pending until the final branch/main CI proves these invariants.
+Main CI and packaged release replay closed without weakening these gates.
 
-## 6. Local-first validation and privacy
+---
 
-Allowed ProductEvent data is limited to minimal event metadata such as IDs, counts, booleans, durations and bounded categories.
+## 8. Release engineering
 
-Rejected from validation events:
-
-- full resume;
-- raw audio;
-- API keys;
-- full transcript;
-- full evidence documents;
-- arbitrary high-risk free text.
-
-Remote telemetry remains opt-in and is not required for v1.4 engineering closure.
-
-## 7. Reliability evidence
-
-Required engineering evidence:
-
-```text
-7-day synthetic continuity
-30-session synthetic continuity
-100-session synthetic reliability
-3-hour-equivalent simulated soak
-export/delete integrity
-migration compatibility
-no cross-Goal contamination
-provider-failure recovery
-bounded state / latency history
-```
-
-Not simulated:
-
-- real sleep/wake;
-- real audio device switching;
-- real network/provider incidents;
-- human fatigue;
-- real 3-hour interview participation.
-
-Those stay external.
-
-## 8. Version consistency
-
-Required v1.4.0 version surfaces:
+Version-bearing surfaces agree on v1.4.0:
 
 ```text
 frontend/package.json
@@ -207,66 +248,61 @@ backend/sidecar.py APP_VERSION
 docs/RELEASE_NOTES_v1.4.0.md
 ```
 
-The release-version gate verifies all version-bearing package/runtime surfaces agree before publication.
+Required release evidence is closed:
 
-## 9. CI
+- backend suite: PASS
+- frontend unit/typecheck/build: PASS
+- desktop suite: PASS
+- functional Playwright: PASS
+- visual regression: PASS
+- accessibility/e2e gates: PASS
+- packaged smoke: PASS
+- Windows installer + portable: PASS
+- clean-install replay: PASS
+- release SHA256 generation: PASS
+- GitHub Release: PASS
+- release download-back verification: PASS
 
-Final PR #11 evidence:
+---
 
-```text
-CI run: PENDING
-backend: PENDING
-frontend: PENDING
-desktop: PENDING
-Playwright functional: PENDING
-Playwright visual: PENDING
-e2e smoke: PENDING
-Windows packaged smoke: PENDING
-ci-gate: PENDING
-```
+## 9. Friction audit and v1.4.1 patch
 
-This section must be updated from actual GitHub Actions results before merge.
-
-## 10. Windows packaged / release evidence
-
-Required before RELEASE_READY:
-
-- bundled backend reports v1.4.0;
-- fresh first run succeeds;
-- frontend served;
-- Fast Cue arrives before Deep;
-- frozen InterviewPack survives restart;
-- install directory stays unchanged;
-- installer and portable build;
-- runtime UI evidence artifact;
-- clean installer replay;
-- SHA256SUMS;
-- download-back verification.
-
-Current status:
+After v1.4.0 release, a final interaction-path audit found one real product-loop defect:
 
 ```text
-PENDING FINAL PR #11 RELEASE PREFLIGHT
+Live stop
+→ Verified realtime core stopped
+→ product-layer live/end was not guaranteed
+→ Reflection routing / live_completed / session linkage could be missed
 ```
 
-## 11. Public release
-
-Target:
+This does **not** invalidate the v1.4.0 release engineering evidence, but it is a product-loop defect and is being closed by:
 
 ```text
-tag: v1.4.0
-GitHub Release: PENDING
-installer: PENDING
-portable: PENDING
-SHA256: PENDING
-download-back: PENDING
+PR #12
+fix/v1.4-live-reflection-closure
+target v1.4.1
 ```
 
-Do not mark RELEASE_READY before these are real repository/release facts.
+The patch makes the formal stop action:
 
-## 12. External blockers / non-claims
+```text
+POST /api/stop
+→ productApi.liveEnd(session_id)
+→ close Goal/session linkage
+→ clear session overrides
+→ record live_completed
+→ obtain reflection_ref
+→ open Reflection
+```
 
-Not required for Windows engineering release, but still external:
+Until v1.4.1 is published, v1.4.0 remains the current stable release.
+
+---
+
+## 10. External blockers / non-claims
+
+Not required for the Windows engineering release:
 
 - code-signing certificate;
 - macOS signing / notarization;
@@ -276,11 +312,22 @@ Not required for Windows engineering release, but still external:
 - real longitudinal users;
 - real multi-hour human sessions.
 
-## 13. Personal Conversation Intelligence
+Therefore the correct release statement is:
 
-Future Conversation Profile remains canonical but not productized in v1.4.
+```text
+V1_4_ENGINEERING_COMPLETE
+PRODUCT_VALIDATION_INFRA_COMPLETE
+RELEASE_READY_WITH_EXTERNAL_BLOCKERS
+REAL_USER_EVIDENCE_PENDING
+```
 
-Retained future concepts:
+---
+
+## 11. Personal Conversation Intelligence
+
+Future Conversation Profile remains canonical but is intentionally **not productized** in v1.4.
+
+Retained concepts:
 
 - Recall;
 - Talking Point;
@@ -295,39 +342,19 @@ Retained future concepts:
 
 No Meeting / Presentation / 1:1 top-level navigation is added.
 
-## 14. Final verdict rules
+---
 
-### RELEASE_READY
-
-Only if:
+## 12. Final verdict
 
 ```text
-PR #11 CI = green
-PR #11 Release preflight = green
-merged main = green
-v1.4.0 Release exists
-release assets exist
-SHA256 exists
-download-back / clean-install replay = green
-version consistency = green
+v1.4.0 PUBLIC RELEASE = PASS
+MAIN CI = PASS
+WINDOWS PACKAGED RELEASE = PASS
+DOWNLOAD-BACK = PASS
+V1_4_ENGINEERING_COMPLETE = PASS
+PRODUCT_VALIDATION_INFRA_COMPLETE = PASS
+REAL_USER_EVIDENCE_PENDING = TRUE
+PMF_PROVEN = FALSE
 ```
 
-### RELEASE_READY_WITH_EXTERNAL_BLOCKERS
-
-Allowed if every engineering/release gate above is green and only the explicitly external items in §12 remain.
-
-### NOT_READY
-
-Any red required gate, missing release asset, version drift, or failed clean-install replay means NOT_READY.
-
-## 15. Truth statement
-
-The strongest allowed statement before real-user research is:
-
-```text
-V1_4_ENGINEERING_COMPLETE
-PRODUCT_VALIDATION_INFRA_COMPLETE
-REAL_USER_EVIDENCE_PENDING
-```
-
-The report will be updated with exact SHAs, workflow IDs, artifact hashes and the public Release after final closure.
+A later v1.4.1 patch may improve product-loop closure, but it must preserve the same evidence boundary.

@@ -6,9 +6,15 @@
 
 > 当前 Canonical：[docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)（Current Canonical = v1.3-R2 · Goal-centered Interview OS · 2026-10-01）；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [v1.2.2](https://github.com/huangdi97/cheng-zhu/releases/tag/v1.2.2)。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
-实时听题，自动生成专业面试回答。它是一个开着就能用的面试辅助工具：你负责听题和临场反应，它负责转写、答题、截图审题，卡壳的时候还能把问答框挂在旁边。
+v1.3 将成竹组织成一个 **Goal-centered Interview OS**：用户不是在“简历 / 题库 / 实时辅助 / 复盘”几个模块之间来回切换，而是围绕一个具体的公司 × 岗位持续推进。
 
-面向面试准备、模拟练习与复盘场景：支持系统音频 / 麦克风转写、截图审题、多模型切换、知识库引用；Electron 端提供 Boss Key、托盘和轻量悬浮窗，方便在本机学习与练习时快速查看回答建议。
+```text
+Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflection → Next Focus
+```
+
+当前产品仍然 Interview-first。它把已经验证过的实时核心——系统音频 / 麦克风转写、Fast Cue、Deep Answer、截图上下文、来源与事实边界——放进这条 Goal 循环；同时通过 Fact Inbox、Stories、Quick Notes、Question Banks、Practice 3.0 和 Reflection write-back，让“下一次打开成竹”能够延续上一场真实发生的事情。
+
+长期方向是 Personal Conversation Intelligence，但 Meeting / Presentation / 1:1 等 Conversation Profile 仍属于未来版本，不在当前 v1.3 一级导航里提前产品化。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
 
@@ -29,15 +35,18 @@
 
 ## 为什么值得试
 
-> 不是“问答玩具”，而是围绕技术面试练习节奏设计：听题、识别问题、生成建议、引用自己的笔记，并把准备和复盘纳入同一条学习闭环。
+> 不是“回答生成器”，而是把一个具体求职目标从准备一直带到下一次行动。
 
-| 场景 | 能力 |
+| 场景 | v1.3 能力 |
 | --- | --- |
-| **实时面试** | 系统音频 / 麦克风转写，自动识别问题，多模型并行生成回答；开放观点、设计和追问会自动展开机制、取舍、边界与验证 |
-| **卡壳补位** | 截图审题、识图模型分析、知识库引用本地笔记 |
-| **个人材料接入** | 简历上传、简历优化、知识库引用本地笔记，让答案更贴近你的经历 |
-| **桌面端使用体验** | Boss Key、托盘、轻量悬浮问答框、移动到鼠标附近 |
-| **复盘与提升** | 面试复盘、知识点能力分析、求职看板、Offer 对比 |
+| **求职目标** | 一个公司 × 岗位对应一个 Goal Room；Next Focus 根据材料缺口、练习弱点和真实 Session Reflection 持续变化 |
+| **我的成竹** | Resume / Project facts / Fact Inbox / Stories / Skills / 表达偏好；个人事实与通用知识严格分源 |
+| **准备与资料** | Project Materials、Knowledge Bases、Quick Notes、Question Banks 分角色管理；材料有 Processing / Ready / Failed / Replacing 生命周期 |
+| **练习** | Round / Persona / Demeanor / Difficulty / Question Source；支持 adaptive follow-up、2–3 人 Panel、Content Coach × Delivery Coach |
+| **上场** | Preflight 冻结本场上下文；Live 默认只突出 Question → Fast Cue → Source/Warning，Deep Answer 为第二层 |
+| **会中辅助** | Pin Moment、Quick Notes、受约束的 Nudge / Open Thread、Closing Mode；Human Coach 仅在政策允许的场景工作 |
+| **复盘与延续** | Reflection 优先给 Next Step / strengths / improvements / fact checks / story opportunities，并可写回 Goal 的 Next Focus |
+| **桌面体验** | Ctrl+K Command Palette、Compact/Standard/Focus Overlay、Light/Dark、390px、键盘与可访问性支持 |
 
 ## 面试主流程
 
@@ -162,7 +171,7 @@ sequenceDiagram
 - `Chengzhu-Setup-x64.exe`：安装版（按用户安装，无需管理员）
 - `Chengzhu-Portable-x64.zip`：解压即用
 
-不需要安装 Python、Node.js 或 pip。首次打开会有引导：本地数据位置 → 模型（填自己的 API Key）→ 语音识别 → 麦克风 / 系统音频测试 → 共享隐私默认值（默认关闭）→ 导入简历 → 第一个目标岗位。所有数据保存在 `%APPDATA%\Chengzhu`。安装包暂未代码签名，首次运行时 Windows SmartScreen 可能提示，选择「仍要运行」即可；请核对 Release 中的 `SHA256SUMS.txt`。
+不需要安装 Python、Node.js 或 pip。首次打开会有 11 步引导：本地数据 → 模型 → 语音识别 → 麦克风 / 系统音频 → 共享隐私（默认关闭）→ 简历 → 第一个 Goal → Guided First Practice → 完成。第一次演练会实际走过 Practice 问题、Fast Cue、自己的回答以及 Content / Delivery feedback；无法使用硬件或 provider 时 fallback 会明确标注，不会冒充真实 runtime evidence。所有数据保存在 `%APPDATA%\Chengzhu`。安装包暂未代码签名，首次运行时 Windows SmartScreen 可能提示，选择「仍要运行」即可；请核对 Release 中的 `SHA256SUMS.txt`。
 
 ### 从源码运行
 

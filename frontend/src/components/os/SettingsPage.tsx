@@ -176,6 +176,8 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
   const value = asRecord(data.F_quick_notes_and_pins)
   const notes = asRecord(value.quick_notes)
   const pins = asRecord(value.pins)
+  const friction = asRecord(data.friction_audit)
+  const frictionJourneys = Array.isArray(friction.journeys) ? friction.journeys.map(asRecord) : []
   const evidence = String(data.evidence_level || 'NO_DATA')
   const real = String(data.real_user_validation || 'REAL_USER_VALIDATION_PENDING')
   const evidenceTone = evidence === 'LOCAL_DEVICE_USAGE' ? 'info' : evidence === 'SYNTHETIC_DOGFOOD' ? 'warn' : 'muted'
@@ -227,6 +229,25 @@ function ValidationSummary({ data }: { data: Record<string, unknown> }) {
           </article>
         ))}
       </div>
+      {frictionJourneys.length ? (
+        <section aria-label="关键路径摩擦" className="rounded-xl border border-bg-hover/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-xs font-semibold text-text-primary">关键路径摩擦</h4>
+            <StatusBadge tone={friction.all_within_budget === true ? 'ok' : 'warn'}>
+              {friction.all_within_budget === true ? '交互预算内' : '需要收口'}
+            </StatusBadge>
+          </div>
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {frictionJourneys.map((j) => (
+              <li key={String(j.key)} className="flex items-center justify-between gap-2 rounded-lg bg-bg-tertiary/30 px-2.5 py-2 text-[11px]">
+                <span className="min-w-0 text-text-secondary">{String(j.label || j.key)}</span>
+                <span className="flex-shrink-0 tabular-nums text-text-primary">{metric(j.designed_steps, '0')} 步 / 预算 {metric(j.budget, '—')}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] text-text-muted">步数是最短产品路径的设计预算；完成次数只是本机信号，不代表真实用户研究结论。</p>
+        </section>
+      ) : null}
       <p className="text-[11px] leading-relaxed text-text-muted">
         这里只显示这台电脑上的本地使用信号。Synthetic / automated evidence 只能证明工程闭环；
         没有真实用户证据时，成竹不会把它写成 PMF 或“面试成功率”。

@@ -89,9 +89,20 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run dist:win
 
+      - name: Install Playwright Chromium for hosted-runner evidence fallback
+        working-directory: frontend
+        run: npx playwright install chromium
+
       - name: Capture v1.3 packaged runtime UI evidence
         working-directory: frontend
-        run: node scripts/capture-v13-packaged-window-evidence.mjs
+        shell: pwsh
+        run: |
+          node scripts/capture-v13-packaged-window-evidence.mjs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Hosted Windows runner could not reach Electron BrowserWindow evidence mode; falling back to packaged sidecar + packaged frontend-dist in headless Chromium. The manifest records this limitation explicitly."
+            node scripts/capture-v13-packaged-web-evidence.mjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4

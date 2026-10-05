@@ -125,6 +125,8 @@ describe('App bootstrap', () => {
   })
 
   it('does not allow disabled models to be picked as the priority answer model', async () => {
+    window.history.replaceState(null, '', '#/live/test')
+    useRouter.setState({ route: parsePath('/live/test') })
     apiMock.getConfig.mockResolvedValue({
       models: [
         { name: 'Enabled Model', supports_vision: false, enabled: true },
@@ -150,6 +152,8 @@ describe('App bootstrap', () => {
   })
 
   it('serializes priority model changes so the latest selection wins', async () => {
+    window.history.replaceState(null, '', '#/live/test')
+    useRouter.setState({ route: parsePath('/live/test') })
     const firstSave = deferred<{ ok: boolean }>()
     apiMock.getConfig.mockResolvedValue({
       models: [
@@ -197,6 +201,8 @@ describe('App bootstrap', () => {
   })
 
   it('surfaces model health detail in the priority model tooltip', async () => {
+    window.history.replaceState(null, '', '#/live/test')
+    useRouter.setState({ route: parsePath('/live/test') })
     useInterviewStore.setState({
       modelHealth: { 0: 'error' },
       modelHealthDetail: { 0: '401 unauthorized' },

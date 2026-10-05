@@ -214,6 +214,18 @@ test.describe('v1.3 Goal-centered product loop', () => {
           D_practice_transfer: { measured: 2, improved: 1 },
           E_fact_inbox_burden: { backlog_size: 3, resolution_rate: 0.8 },
           F_quick_notes_and_pins: { quick_notes: { selected_into_pack: 4 }, pins: { next_focus_from_pin: 2 } },
+          friction_audit: {
+            all_within_budget: true,
+            evidence_type: 'DESIGN_PATH_PLUS_LOCAL_COMPLETION_SIGNAL',
+            journeys: [
+              { key: 'home_to_practice', label: 'Home → Practice', designed_steps: 2, budget: 3, completed: 2 },
+              { key: 'goal_to_live', label: 'Goal → Go Live', designed_steps: 2, budget: 2, completed: 1 },
+              { key: 'live_to_quick_note', label: 'Live → Quick Notes', designed_steps: 1, budget: 1, completed: 1 },
+              { key: 'live_to_pin', label: 'Live → Pin', designed_steps: 2, budget: 2, completed: 1 },
+              { key: 'session_to_reflection', label: 'End Session → Reflection', designed_steps: 0, budget: 1, completed: 2 },
+              { key: 'reflection_to_next_practice', label: 'Reflection → Next Focus → Practice', designed_steps: 2, budget: 3, completed: 1 },
+            ],
+          },
           nudges: { shown: 2, dismissed: 1, actioned: 1, disabled: 0 },
           note: '本地产品分析。',
         },
@@ -226,6 +238,9 @@ test.describe('v1.3 Goal-centered product loop', () => {
       await expect(summary.getByText(title)).toBeVisible()
     }
     await expect(summary).toContainText('REAL_USER_VALIDATION_PENDING')
+    await expect(summary.getByRole('heading', { name: '关键路径摩擦' })).toBeVisible()
+    await expect(summary).toContainText('Home → Practice')
+    await expect(summary).toContainText('2 步 / 预算 3')
     await expect(summary).toContainText('不能')
     await expect(summary).toContainText('PMF')
   })

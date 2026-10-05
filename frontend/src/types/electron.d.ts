@@ -25,6 +25,7 @@ declare global {
       overlayDragStart?: () => void
       overlayDragEnd?: () => void
       getOverlayState?: () => Promise<(OverlayStatePayload & { visible: boolean }) | null>
+      setOverlayLayout?: (layout: { dock?: string; interaction?: string; size?: string }) => Promise<{ ok: boolean; layout: { dock: string; interaction: string; size: string } }>
       onOverlayState?: (callback: (payload: OverlayStatePayload) => void) => (() => void)
       onShortcuts?: (callback: (payload: Record<string, Record<string, unknown>> | undefined) => void) => (() => void)
       onFocusTabCommand?: (callback: (direction: 'prev' | 'next') => void) => (() => void)

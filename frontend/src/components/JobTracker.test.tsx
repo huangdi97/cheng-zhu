@@ -739,9 +739,12 @@ describe('JobTracker', () => {
     render(<JobTracker />)
     await waitFor(() => expect(screen.getAllByText('Acme').length).toBeGreaterThan(0))
 
-    fireEvent.change(screen.getAllByLabelText('当前阶段')[0], { target: { value: 'interview1' } })
-    fireEvent.change(screen.getByLabelText('下次跟进'), { target: { value: '2024-03-13' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存进度' }))
+    // Selecting the first application is an effect after the list resolves.
+    // Wait for the detail editor itself instead of racing on the list text.
+    const stageEditors = await screen.findAllByLabelText('当前阶段')
+    fireEvent.change(stageEditors[0], { target: { value: 'interview1' } })
+    fireEvent.change(await screen.findByLabelText('下次跟进'), { target: { value: '2024-03-13' } })
+    fireEvent.click(await screen.findByRole('button', { name: '保存进度' }))
 
     await waitFor(() => expect(apiMock.jobTrackerPatchApplication).toHaveBeenCalledWith(1, expect.objectContaining({
       stage: 'interview1',

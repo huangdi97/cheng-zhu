@@ -123,7 +123,7 @@ export default function ResumeOptimizer() {
             <div className="rounded-xl border border-bg-hover/40 bg-bg-primary/60 px-3 py-2">
               <p className="text-text-muted">简历状态</p>
               <p className={`mt-1 font-medium ${config?.has_resume ? 'text-accent-green' : 'text-text-primary'}`}>
-                {config?.has_resume ? '已挂载' : '未上传'}
+                {config?.has_resume ? '已选用' : '未上传'}
               </p>
             </div>
             <div className="rounded-xl border border-bg-hover/40 bg-bg-primary/60 px-3 py-2">
@@ -138,9 +138,9 @@ export default function ResumeOptimizer() {
         </div>
 
         <ResumeMountPanel
-          title="Resume Mount"
-          description="这里的分析直接使用当前挂载简历，不会维护另一份独立副本。"
-          sharedNote="和主流程、面试复盘共用同一份简历历史与当前挂载记录。"
+          title="当前简历"
+          description="这里的分析直接使用你当前选中的简历，不会另外维护一份副本。"
+          sharedNote="准备、练习和复盘都会使用同一份当前简历；切换后会在新的 Interview Pack 中生效。"
           variant="light"
         />
 
@@ -183,8 +183,8 @@ export default function ResumeOptimizer() {
         <div className="rounded-2xl border border-bg-hover/40 bg-bg-secondary/40 min-h-full">
           <div className="flex items-center justify-between gap-3 border-b border-bg-hover/30 px-4 py-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-accent-blue">Analysis Desk</p>
-              <h4 className="mt-1 text-sm font-semibold text-text-primary">输出结果</h4>
+              <p className="text-xs font-medium text-accent-blue">分析结果</p>
+              <h4 className="mt-1 text-sm font-semibold text-text-primary">优化建议</h4>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-full border border-bg-hover/50 bg-bg-primary/70 px-3 py-1 text-[11px] text-text-secondary">
@@ -235,7 +235,7 @@ export default function ResumeOptimizer() {
               <p className="text-sm text-text-primary">先把材料放齐，再开始分析。</p>
               <div className="grid gap-2 text-left">
                 {[
-                  '1. 上传当前简历，确保内容已挂载。',
+                  '1. 上传或选中当前简历。',
                   '2. 粘贴目标岗位 JD，把关键词和职责写完整。',
                   '3. 点击“开始分析”，等待模型生成修改建议。',
                 ].map((item) => (

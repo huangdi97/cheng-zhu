@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,7 +14,8 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
-  font-family: 'Plus Jakarta Sans', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
 }
 
 html.overlay-window,
@@ -31,7 +30,7 @@ html[data-overlay='1'] #root {
 }
 
 code, pre, .font-mono {
-  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }
 
 .app-drag-region {
@@ -58,53 +57,55 @@ code, pre, .font-mono {
 
 :root,
 [data-theme='vscode-light-plus'] {
-  --c-bg-primary: 247 248 250;
-  --c-bg-secondary: 255 255 255;
-  --c-bg-tertiary: 239 242 247;
-  --c-bg-hover: 228 232 239;
-  --c-text-primary: 15 23 42;
-  --c-text-secondary: 71 85 105;
-  --c-text-muted: 94 108 132;
-  --c-accent-blue: 29 78 216;    /* #1D4ED8 */
-  --c-accent-green: 22 101 52;   /* #166534: AA on white and on its 10-20% tints */
-  --c-accent-red: 185 28 28;     /* #B91C1C */
-  --c-accent-amber: 146 64 14;   /* #92400E */
-  --c-grad-from: 37 99 235;
-  --c-grad-to: 99 91 230;
-  --c-primary-container: 219 234 254;
-  --c-on-primary-container: 30 64 175;
-  --c-secondary-container: 220 252 231;
-  --c-on-secondary-container: 22 101 52;
-  --c-tertiary-container: 254 243 199;
-  --c-on-tertiary-container: 146 64 14;
-  --c-surface-variant: 244 244 245;
-  --c-on-surface-variant: 82 82 91;
-  --c-outline-variant: 228 228 231;
-  --c-scrollbar-thumb: 180 180 180;
-  --c-scrollbar-thumb-hover: 150 150 150;
-  --c-selection-bg: 37 99 235;
+  /* v1.3-R2 Professional Workbench — canonical §41.
+   * Internal "vscode-*" IDs are retained only for preference migration. */
+  --c-bg-primary: 246 247 246;     /* Canvas #F6F7F6 */
+  --c-bg-secondary: 255 255 255;   /* Surface #FFFFFF */
+  --c-bg-tertiary: 240 243 241;    /* Surface Alt #F0F3F1 */
+  --c-bg-hover: 228 233 230;
+  --c-text-primary: 27 36 32;      /* #1B2420 */
+  --c-text-secondary: 88 98 93;    /* #58625D */
+  --c-text-muted: 105 116 110;
+  --c-accent-blue: 47 107 87;      /* Bamboo #2F6B57; token name retained */
+  --c-accent-green: 37 106 75;
+  --c-accent-red: 173 69 69;
+  --c-accent-amber: 134 85 31;
+  --c-grad-from: 47 107 87;
+  --c-grad-to: 63 100 117;         /* Ink Blue #3F6475 */
+  --c-primary-container: 221 235 228;
+  --c-on-primary-container: 36 83 66;
+  --c-secondary-container: 224 233 237;
+  --c-on-secondary-container: 50 79 92;
+  --c-tertiary-container: 245 233 215;
+  --c-on-tertiary-container: 112 72 27;
+  --c-surface-variant: 244 246 245;
+  --c-on-surface-variant: 88 98 93;
+  --c-outline-variant: 218 225 221;
+  --c-scrollbar-thumb: 177 187 181;
+  --c-scrollbar-thumb-hover: 144 157 150;
+  --c-selection-bg: 47 107 87;
   --c-selection-fg: 255 255 255;
-  --c-md-code-bg: 240 240 240;
-  --c-md-pre-bg: 246 248 250;
-  --c-md-pre-border: 220 220 220;
-  --c-md-strong: 30 30 30;
-  --c-md-blockquote: 80 80 80;
-  --c-code-shell-bg: 246 248 250;
-  --c-code-header-bg: 237 241 245;
-  --c-code-inline-bg: 234 242 250;
-  --c-code-inline-fg: 12 99 141;
-  --c-surface-panel: 250 251 253;
+  --c-md-code-bg: 237 241 239;
+  --c-md-pre-bg: 248 249 248;
+  --c-md-pre-border: 215 223 219;
+  --c-md-strong: 27 36 32;
+  --c-md-blockquote: 88 98 93;
+  --c-code-shell-bg: 248 250 249;
+  --c-code-header-bg: 236 241 238;
+  --c-code-inline-bg: 229 238 233;
+  --c-code-inline-fg: 42 94 77;
+  --c-surface-panel: 249 250 249;
   --c-surface-elevated: 255 255 255;
   --c-surface-glass: 255 255 255;
-  --c-border-subtle: 225 231 239;
-  --c-border-strong: 153 166 186;
-  --c-console-shell-bg: 250 252 255;
-  --c-console-header-bg: 235 241 248;
-  --c-timeline-rail: 187 198 214;
+  --c-border-subtle: 221 227 223;
+  --c-border-strong: 151 164 157;
+  --c-console-shell-bg: 248 250 249;
+  --c-console-header-bg: 235 240 237;
+  --c-timeline-rail: 182 194 187;
   --c-overlay-backdrop: 255 255 255;
-  --c-overlay-border: 37 99 235;
-  --c-lyric-shell-bg: 247 250 253;
-  --c-lyric-shell-border: 125 170 224;
+  --c-overlay-border: 47 107 87;
+  --c-lyric-shell-bg: 248 250 249;
+  --c-lyric-shell-border: 63 100 117;
   /* 悬浮窗(HUD)独立调色板：悬浮于第三方会议软件之上，有意不跟随主界面主题 */
   --c-ov-surface: 255 255 255;
   --c-ov-text: 30 41 59;
@@ -117,53 +118,54 @@ code, pre, .font-mono {
 }
 
 [data-theme='vscode-dark-plus'] {
-  --c-bg-primary: 9 10 14;
-  --c-bg-secondary: 18 20 27;
-  --c-bg-tertiary: 25 28 38;
-  --c-bg-hover: 33 37 49;
-  --c-text-primary: 236 240 247;
-  --c-text-secondary: 160 169 185;
-  --c-text-muted: 131 141 157;
-  --c-accent-blue: 104 112 244;
-  --c-accent-green: 52 211 153;
-  --c-accent-red: 248 113 113;
-  --c-accent-amber: 251 191 36;
-  --c-grad-from: 104 112 244;
-  --c-grad-to: 167 139 250;
-  --c-primary-container: 30 58 138;
-  --c-on-primary-container: 219 234 254;
-  --c-secondary-container: 20 83 45;
-  --c-on-secondary-container: 220 252 231;
-  --c-tertiary-container: 92 64 20;
-  --c-on-tertiary-container: 254 243 199;
-  --c-surface-variant: 39 39 42;
-  --c-on-surface-variant: 161 161 170;
-  --c-outline-variant: 63 63 70;
-  --c-scrollbar-thumb: 51 65 85;
-  --c-scrollbar-thumb-hover: 71 85 105;
-  --c-selection-bg: 99 102 241;
-  --c-selection-fg: 255 255 255;
-  --c-md-code-bg: 30 41 59;
-  --c-md-pre-bg: 15 23 42;
-  --c-md-pre-border: 30 41 59;
-  --c-md-strong: 226 232 240;
-  --c-md-blockquote: 148 163 184;
-  --c-code-shell-bg: 11 18 32;
-  --c-code-header-bg: 17 26 46;
-  --c-code-inline-bg: 27 36 56;
-  --c-code-inline-fg: 219 234 254;
-  --c-surface-panel: 21 24 32;
-  --c-surface-elevated: 30 34 45;
-  --c-surface-glass: 23 27 37;
-  --c-border-subtle: 46 52 67;
-  --c-border-strong: 83 95 119;
-  --c-console-shell-bg: 10 16 28;
-  --c-console-header-bg: 18 25 44;
-  --c-timeline-rail: 87 102 132;
-  --c-overlay-backdrop: 14 18 29;
-  --c-overlay-border: 129 140 248;
-  --c-lyric-shell-bg: 21 26 41;
-  --c-lyric-shell-border: 129 140 248;
+  /* Chengzhu dark: quiet warm-black surfaces + bamboo primary. */
+  --c-bg-primary: 17 21 19;        /* #111513 */
+  --c-bg-secondary: 23 29 26;      /* #171D1A */
+  --c-bg-tertiary: 30 38 34;       /* #1E2622 */
+  --c-bg-hover: 39 49 44;
+  --c-text-primary: 230 236 232;   /* #E6ECE8 */
+  --c-text-secondary: 181 193 186;
+  --c-text-muted: 145 158 151;
+  --c-accent-blue: 120 182 157;    /* #78B69D */
+  --c-accent-green: 111 207 159;
+  --c-accent-red: 242 143 143;
+  --c-accent-amber: 224 169 106;
+  --c-grad-from: 120 182 157;
+  --c-grad-to: 113 151 168;
+  --c-primary-container: 42 76 62;
+  --c-on-primary-container: 215 235 226;
+  --c-secondary-container: 45 68 78;
+  --c-on-secondary-container: 218 232 238;
+  --c-tertiary-container: 75 59 35;
+  --c-on-tertiary-container: 241 221 190;
+  --c-surface-variant: 35 43 39;
+  --c-on-surface-variant: 181 193 186;
+  --c-outline-variant: 58 70 64;
+  --c-scrollbar-thumb: 63 78 70;
+  --c-scrollbar-thumb-hover: 84 101 92;
+  --c-selection-bg: 120 182 157;
+  --c-selection-fg: 17 21 19;
+  --c-md-code-bg: 30 38 34;
+  --c-md-pre-bg: 14 18 16;
+  --c-md-pre-border: 46 58 52;
+  --c-md-strong: 230 236 232;
+  --c-md-blockquote: 164 178 170;
+  --c-code-shell-bg: 14 19 17;
+  --c-code-header-bg: 24 31 28;
+  --c-code-inline-bg: 36 48 42;
+  --c-code-inline-fg: 169 218 197;
+  --c-surface-panel: 21 27 24;
+  --c-surface-elevated: 29 37 33;
+  --c-surface-glass: 25 32 29;
+  --c-border-subtle: 47 59 53;
+  --c-border-strong: 88 107 97;
+  --c-console-shell-bg: 14 19 17;
+  --c-console-header-bg: 24 31 28;
+  --c-timeline-rail: 93 115 104;
+  --c-overlay-backdrop: 17 21 19;
+  --c-overlay-border: 120 182 157;
+  --c-lyric-shell-bg: 23 29 26;
+  --c-lyric-shell-border: 120 182 157;
 }
 
 [data-theme='vscode-dark-hc'] {
@@ -571,10 +573,8 @@ code, pre, .font-mono {
 }
 /* ========== App shell: 极淡品牌光晕 + 主题背景 ========== */
 .app-shell {
-  background:
-    radial-gradient(1100px 520px at 18% -12%, rgb(var(--c-grad-from) / 0.07), transparent 62%),
-    radial-gradient(900px 480px at 100% 108%, rgb(var(--c-grad-to) / 0.05), transparent 60%),
-    rgb(var(--c-bg-primary));
+  /* No large "AI glow" gradients: the main canvas is intentionally quiet. */
+  background: rgb(var(--c-bg-primary));
 }
 
 
@@ -627,13 +627,9 @@ code, pre, .font-mono {
 
 /* ========== Enhanced header gradient ========== */
 .header-gradient {
-  background: linear-gradient(
-    180deg,
-    rgb(var(--c-surface-elevated) / 0.85) 0%,
-    rgb(var(--c-bg-secondary) / 0.92) 100%
-  );
-  border-bottom: 1px solid rgb(var(--c-border-subtle) / 0.4);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04);
+  background: rgb(var(--c-bg-secondary) / 0.94);
+  border-bottom: 1px solid rgb(var(--c-border-subtle) / 0.7);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025);
 }
 
 /* ========== Transcription item entry ========== */
@@ -1630,4 +1626,97 @@ select:focus-visible {
 /* ===== SettingsDrawer 搜索: 搜索激活时隐藏非 Section/Collapsible 的装饰性/外部内容 ===== */
 [data-in-search="1"] > *:not([data-search-title]) {
   display: none !important;
+}
+
+/* ========== v1.3 Overlay 3.0 compact strip ========== */
+.ov-root--compact {
+  padding: 4px;
+  align-items: center;
+}
+.ov-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: rgb(15 23 42 / 0.72);
+  color: #f1f5f9;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ov-compact-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.ov-compact-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #94a3b8;
+  flex-shrink: 0;
+}
+.ov-compact-dot--on {
+  background: #22c55e;
+}
+
+/* ========== v1.3 Accessibility ========== */
+/* Font scaling: Settings → General can set --app-font-scale (1 = default). */
+html {
+  font-size: calc(16px * var(--app-font-scale, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --c-text-muted: var(--c-text-secondary);
+  }
+  :focus-visible {
+    outline: 3px solid rgb(var(--c-accent-blue));
+    outline-offset: 2px;
+  }
+}
+
+@media (forced-colors: active) {
+  .btn-primary,
+  .btn-subtle {
+    border: 1px solid ButtonText;
+  }
+  :focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+
+/* Chengzhu dark primary uses a light bamboo surface. Legacy utility call-sites
+ * often pair bg-accent-blue with text-white, so normalize their foreground. */
+[data-theme='vscode-dark-plus'] .btn-primary,
+[data-theme='vscode-dark-plus'] .bg-accent-blue.text-white {
+  color: rgb(var(--c-bg-primary));
 }

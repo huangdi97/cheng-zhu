@@ -1,0 +1,48 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { parsePath, useRouter } from '@/lib/router'
+import { useOsStore } from '@/stores/osStore'
+import { useOverlayLayout } from '@/stores/overlayLayoutStore'
+import { buildCommands, contextOf, executeCommand, rankCommands } from './commands'
+
+vi.mock('@/lib/productApi', () => ({
+  productApi: { home: vi.fn(async () => ({ next_interview: { goal_id: 'g_next' }, focus_goal: null })) },
+  track: vi.fn(),
+}))
+
+vi.mock('@/lib/api', () => ({
+  api: { askFromServerScreen: vi.fn(async () => ({})), ask: vi.fn(async () => ({})), stop: vi.fn(async () => ({})), intelSessionClaims: vi.fn(async () => []), intelResolveSessionClaim: vi.fn() },
+}))
+
+describe('Command Palette', () => {
+  beforeEach(() => {
+    useRouter.setState({ route: parsePath('#/home') })
+    useOsStore.setState({ createGoalOpen: false, quickNotesOpen: false, pinDialogOpen: false })
+  })
+
+  it('ranks the current context first', () => {
+    const cmds = buildCommands('g1')
+    const home = rankCommands(cmds, '', 'home').slice(0, 4).map((c) => c.id)
+    expect(home).toEqual(['create-goal', 'open-next', 'start-practice', 'go-live'])
+    const live = rankCommands(cmds, '', 'live').slice(0, 3).map((c) => c.id)
+    expect(live).toContain('toggle-overlay')
+    expect(rankCommands(cmds, '', 'me')[0].id).toBe('confirm-facts')
+    expect(rankCommands(cmds, 'pin', 'goal').map((c) => c.id)).toContain('pin')
+    expect(contextOf(parsePath('#/goals/g1/prepare'))).toBe('goal')
+  })
+
+  it('executes real actions, not a search demo', async () => {
+    const cmds = buildCommands('g1')
+    await executeCommand(cmds.find((c) => c.id === 'create-goal')!, 'home')
+    expect(useOsStore.getState().createGoalOpen).toBe(true)
+    await executeCommand(cmds.find((c) => c.id === 'open-next')!, 'home')
+    expect(useRouter.getState().route).toMatchObject({ name: 'goal', params: { goalId: 'g_next' } })
+    await executeCommand(cmds.find((c) => c.id === 'continue-prepare')!, 'goal')
+    expect(useRouter.getState().route.params.tab).toBe('prepare')
+    await executeCommand(cmds.find((c) => c.id === 'overlay-compact')!, 'live')
+    expect(useOverlayLayout.getState().size).toBe('COMPACT')
+    await executeCommand(cmds.find((c) => c.id === 'pin')!, 'live')
+    expect(useOsStore.getState().pinDialogOpen).toBe(true)
+    await executeCommand(cmds.find((c) => c.id === 'nav-settings')!, 'global')
+    expect(useRouter.getState().route.name).toBe('settings')
+  })
+})

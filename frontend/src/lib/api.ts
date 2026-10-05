@@ -91,6 +91,19 @@ async function uploadRequest<T = any>(url: string, form: FormData): Promise<T> {
   return (await parseResponseBody(res)) as T
 }
 
+/**
+ * List endpoints are typed as arrays, but the body is untrusted: a partial or
+ * unexpected payload must never reach UI code that calls `.filter`/`.map` on
+ * it — that crashes the whole screen. Normalising here keeps the array
+ * contract true at the boundary instead of casting without checking.
+ */
+async function requestArray<T>(url: string, opts?: RequestInit): Promise<T[]> {
+  const body = await request<unknown>(url, opts)
+  if (Array.isArray(body)) return body as T[]
+  console.warn(`[chengzhu] expected an array from ${url}`)
+  return []
+}
+
 async function request<T = any>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetchBackend(buildApiUrl(url), {
     ...opts,
@@ -184,6 +197,14 @@ export interface StoryItem {
   action: string
   result: string
   reflection: string
+  /** v1.3 Stories 3.0: capability category travels as a tag. */
+  tags?: string[]
+  /** Stable ids of evidence/material records linked by the user or Reflection. */
+  source_ids?: string[]
+  /** Stable ids of confirmed skill cards linked to this Story. */
+  skill_ids?: string[]
+  /** Most recent session whose frozen InterviewPack included this Story. */
+  last_used_session?: string
   updated_at?: number
 }
 
@@ -828,7 +849,7 @@ export const api = {
 
   // R2: session claims
   intelSessionClaims: (sessionId?: string) =>
-    request<SessionClaimItem[]>(`/api/intelligence/session-claims${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`),
+    requestArray<SessionClaimItem>(`/api/intelligence/session-claims${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`),
   intelResolveSessionClaim: (id: string, action: string) =>
     request<SessionClaimItem>(`/api/intelligence/session-claims/${encodeURIComponent(id)}/resolve`, {
       method: 'POST',
@@ -845,17 +866,17 @@ export const api = {
     ),
 
   // R2: stories / voice / skill cards
-  intelStories: () => request<StoryItem[]>('/api/intelligence/stories'),
-  intelCreateStory: (body: Omit<StoryItem, 'id' | 'updated_at'>) =>
+  intelStories: () => requestArray<StoryItem>('/api/intelligence/stories'),
+  intelCreateStory: (body: Omit<StoryItem, 'id' | 'updated_at' | 'tags'> & { tags?: string[] }) =>
     request<{ id: string }>('/api/intelligence/stories', { method: 'POST', body: JSON.stringify(body) }),
-  intelUpdateStory: (id: string, body: Omit<StoryItem, 'id' | 'updated_at'>) =>
+  intelUpdateStory: (id: string, body: Omit<StoryItem, 'id' | 'updated_at' | 'tags'> & { tags?: string[] }) =>
     request<{ id: string }>(`/api/intelligence/stories/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
   intelDeleteStory: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/api/intelligence/stories/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   intelVoice: () => request<VoicePreferences>('/api/intelligence/voice-preferences'),
   intelSaveVoice: (body: VoicePreferences) =>
     request<VoicePreferences>('/api/intelligence/voice-preferences', { method: 'PUT', body: JSON.stringify(body) }),
-  intelSkillCards: () => request<SkillCardOverview[]>('/api/intelligence/skill-cards'),
+  intelSkillCards: () => requestArray<SkillCardOverview>('/api/intelligence/skill-cards'),
   intelReviewR2: (reviewSessionId: number) =>
     request<{ review_session_id: number; turns: Array<Record<string, unknown>>; session_claims: Array<Record<string, unknown>> }>(
       `/api/intelligence/review/${reviewSessionId}/r2`,
@@ -877,3 +898,6 @@ export const api = {
   coachRevoke: (id: string) =>
     request<{ id: string; revoked: boolean }>(`/api/coach/sessions/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }),
 }
+
+/** Shared transport for sibling API modules (lib/productApi.ts). */
+export { request as apiRequest, uploadRequest as apiUpload }

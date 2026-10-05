@@ -155,8 +155,19 @@ class AppConfig(BaseModel):
 
     position: str = "后端开发"
     language: str = "Python"
-    # 回答语言：中文 / English（控制答案输出语言，区别于上面的编程语言）
+    # 回答语言：中文 / English / FOLLOW_INTERVIEW（跟随面试官语言）。
+    # v1.3 Language Layering：UI / 面试(ASR=whisper_language) / 回答 / 编程(language) / 术语 五层独立。
     answer_language: str = "中文"
+    # 技术术语策略：AUTO（沿用 v1.2 规则）/ KEEP_ENGLISH（保留英文）/ TRANSLATE（译为回答语言）/ BILINGUAL（中英并列）
+    technical_term_policy: str = "AUTO"
+    # 界面语言：zh-CN / en-US（只影响界面，不影响识别和回答）
+    ui_language: str = "zh-CN"
+    # v1.3：主动提示（Nudge）；练习的本地表达分析默认开启（Live 的表达分析沿用
+    # speech_adoption_analytics_live，默认关闭，需用户开启）
+    proactive_guidance_enabled: bool = True
+    practice_delivery_analytics_enabled: bool = True
+    # v1.4 远程遥测：默认关闭；本地产品分析始终只在本机
+    remote_telemetry_opt_in: bool = False
     # JD / PrepSpace 的岗位描述文本；注入回答 prompt 的 <jd_context> 段
     jd_text: Optional[str] = None
     # 面试笔记文本；注入回答 prompt 的 <notes> 段
@@ -423,27 +434,70 @@ class AppConfig(BaseModel):
 
 _config: Optional[AppConfig] = None
 _config_lock = threading.RLock()
+# v1.3 Settings layering: "This Session Override" values. Applied on top of the
+# persisted config for the running session only; never written to config.json.
+_session_overlay: dict[str, Any] = {}
+_effective: Optional[AppConfig] = None
+
+
+def _raw_config() -> AppConfig:
+    global _config
+    if _config is None:
+        _config = _load_config()
+    return _config
 
 
 def get_config() -> AppConfig:
-    global _config
+    global _effective
     with _config_lock:
-        if _config is None:
-            _config = _load_config()
-        return _config
+        raw = _raw_config()
+        if not _session_overlay:
+            return raw
+        if _effective is None:
+            data = raw.model_dump()
+            data.update({k: v for k, v in _session_overlay.items() if k in data})
+            _effective = AppConfig(**data)
+        return _effective
 
 
 def update_config(updates: dict) -> AppConfig:
-    global _config
+    global _config, _effective
     with _config_lock:
-        cfg = get_config()
+        cfg = _raw_config()
         data = cfg.model_dump()
         for k, v in updates.items():
             if hasattr(cfg, k):
                 data[k] = v
         _config = AppConfig(**data)
+        _effective = None
         _save_config(_config)
-        return _config
+        return get_config()
+
+
+def set_session_overlay(values: dict[str, Any]) -> dict[str, Any]:
+    """Replace the session override layer; unknown keys are ignored."""
+    global _effective
+    with _config_lock:
+        known = set(_raw_config().model_dump())
+        _session_overlay.clear()
+        _session_overlay.update({k: v for k, v in (values or {}).items() if k in known})
+        _effective = None
+        return dict(_session_overlay)
+
+
+def clear_session_overlay() -> None:
+    set_session_overlay({})
+
+
+def session_overlay() -> dict[str, Any]:
+    with _config_lock:
+        return dict(_session_overlay)
+
+
+def persisted_config() -> AppConfig:
+    """The global defaults as saved on disk (no session override)."""
+    with _config_lock:
+        return _raw_config()
 
 
 def _load_config() -> AppConfig:

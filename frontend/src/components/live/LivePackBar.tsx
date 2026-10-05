@@ -4,6 +4,11 @@ import { api, type PackSummary } from '@/lib/api'
 import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 
+const AI_LABEL: Record<string, string> = {
+  AI_FORBIDDEN: 'AI 辅助：关闭',
+  AI_ALLOWED: 'AI 辅助：允许',
+  AI_KNOWLEDGE_ONLY: 'AI 辅助：仅知识',
+}
 const HUMAN_LABEL: Record<string, string> = {
   HUMAN_FORBIDDEN: '人工协助：禁止',
   HUMAN_PRACTICE_ONLY: '人工协助：仅练习',
@@ -49,8 +54,8 @@ export default function LivePackBar() {
     return (
       <div data-testid="live-pack-bar" className="flex flex-wrap items-center gap-2 px-3 md:px-5 py-2 border-b border-bg-tertiary/70 bg-status-inferred/5 text-xs">
         <LockOpen className="w-3.5 h-3.5 text-status-inferred" aria-hidden />
-        <span className="font-medium text-status-inferred">Interview Pack 未冻结</span>
-        <span className="text-text-muted">练习可直接开始；正式场次请先在岗位目标里冻结本场资料。</span>
+        <span className="font-medium text-status-inferred">本场资料还没冻结</span>
+        <span className="text-text-muted">练习可以直接开始；正式面试请先回到求职目标确认这一场要带进去的资料。</span>
         <button type="button" onClick={() => setAppMode('job-tracker')} className="ml-auto rounded-full border border-bg-hover px-2.5 py-0.5 font-medium text-text-secondary hover:bg-bg-hover/60">
           去冻结
         </button>
@@ -62,13 +67,12 @@ export default function LivePackBar() {
     <div data-testid="live-pack-bar" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 md:px-5 py-2 border-b border-bg-tertiary/70 bg-bg-secondary/40 text-[11px] text-text-secondary">
       <span className="inline-flex items-center gap-1 font-medium text-status-direct">
         <Lock className="w-3.5 h-3.5" aria-hidden />
-        Pack rev {pack.revision}
+        本场资料已冻结
       </span>
-      <span className="text-text-primary font-medium">{pack.job.title || '未选择岗位'}{pack.job.company ? ` @ ${pack.job.company}` : ''}</span>
-      <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" aria-hidden />{pack.policies.ai_policy}</span>
+      <span className="text-text-primary font-medium">{pack.job.title || '未选择岗位'}{pack.job.company ? ` · ${pack.job.company}` : ''}</span>
+      <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" aria-hidden />{AI_LABEL[pack.policies.ai_policy] ?? pack.policies.ai_policy}</span>
       <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" aria-hidden />{HUMAN_LABEL[pack.policies.human_assistance_policy] ?? pack.policies.human_assistance_policy}</span>
       <span className="inline-flex items-center gap-1"><EyeOff className="w-3 h-3" aria-hidden />{SHARE_LABEL[pack.policies.share_privacy_policy] ?? pack.policies.share_privacy_policy}</span>
-      <span className="font-mono text-text-muted">{pack.content_hash}</span>
     </div>
   )
 }

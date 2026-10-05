@@ -18,7 +18,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.intelligence_migrations")
 
-LATEST_SCHEMA_VERSION = 3
+LATEST_SCHEMA_VERSION = 4
 
 # Step 1: initial Intelligence Core schema (master doc section 32).
 _V1_TABLES: tuple[str, ...] = (
@@ -327,10 +327,29 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_turn_trace_session ON turn_trace(session_id, created_at)")
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """v1.3 Stories 3.0 relationships.
+
+    Story truth/content remains the verified v1 core. These additive metadata
+    columns make the canonical source/skill links and last-used session
+    explicit without changing any existing Story semantics.
+    """
+    existing = _column_names(conn, "story")
+    additions = {
+        "source_ids_json": "TEXT NOT NULL DEFAULT '[]'",
+        "skill_ids_json": "TEXT NOT NULL DEFAULT '[]'",
+        "last_used_session": "TEXT NOT NULL DEFAULT ''",
+    }
+    for column, ddl in additions.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE story ADD COLUMN {column} {ddl}")
+
+
 _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "initial intelligence core schema"),
     2: (_migrate_v2, "r2 provenance axes, interview pack, session claims"),
     3: (_migrate_v3, "r2 turn trace for review 2.0"),
+    4: (_migrate_v4, "v1.3 stories source/skill/last-used metadata"),
 }
 
 

@@ -125,6 +125,19 @@ describe('uiPrefsStore overlay state sync', () => {
     expect(localStorage.getItem(__UI_PREFS_TEST_KEYS.overlayPromptAutoFollow)).toBe('1')
   })
 
+
+  it('defaults fresh v1.3 Live to cue-first and preserves an explicit transcript choice', () => {
+    localStorage.removeItem(__UI_PREFS_TEST_KEYS.assistTranscriptCollapsed)
+    expect(useUiPrefsStore.getState().assistTranscriptCollapsed).toBe(true)
+
+    useUiPrefsStore.getState().setAssistTranscriptCollapsed(false)
+    expect(localStorage.getItem(__UI_PREFS_TEST_KEYS.assistTranscriptCollapsed)).toBe('0')
+    expect(useUiPrefsStore.getState().assistTranscriptCollapsed).toBe(false)
+
+    useUiPrefsStore.getState().setAssistTranscriptCollapsed(true)
+    expect(localStorage.getItem(__UI_PREFS_TEST_KEYS.assistTranscriptCollapsed)).toBe('1')
+  })
+
   it('tracks overlay window visibility without persisting it as a style preference', () => {
     useUiPrefsStore.getState().applyInterviewOverlayState({
       initialized: false,

@@ -154,3 +154,52 @@ export function buildLiveGuidance(qa: { question?: string; answer?: string; guid
   const cue = buildFastCueViewModel(qa.fastCue ?? guidance.fast_cue)
   return { vm, cue }
 }
+
+// ---------------------------------------------------------------------------
+// v1.3 Live status: ONE status for Main UI and Overlay (never ASR/Retrieval/
+// Compiler/LLM side by side). Pure function, same inputs → same label.
+// ---------------------------------------------------------------------------
+
+export type LiveStatus = 'IDLE' | 'LISTENING' | 'QUESTION_DETECTED' | 'PREPARING' | 'CUE_READY' | 'ANSWERING' | 'RECONNECTING'
+
+export const LIVE_STATUS_LABELS: Record<LiveStatus, string> = {
+  IDLE: '等待开始',
+  LISTENING: '正在聆听',
+  QUESTION_DETECTED: '检测到问题',
+  PREPARING: '准备中',
+  CUE_READY: 'Cue 已就绪',
+  ANSWERING: '深度回答生成中',
+  RECONNECTING: '重新连接中',
+}
+
+export const LIVE_STATUS_LABELS_EN: Record<LiveStatus, string> = {
+  IDLE: 'Idle',
+  LISTENING: 'Listening',
+  QUESTION_DETECTED: 'Question detected',
+  PREPARING: 'Preparing',
+  CUE_READY: 'Cue ready',
+  ANSWERING: 'Answering',
+  RECONNECTING: 'Reconnecting',
+}
+
+export interface LiveStatusInput {
+  isRecording: boolean
+  wsConnected: boolean
+  qa: { answer?: string; fastCue?: unknown; guidance?: unknown; status?: string } | null
+  streaming: boolean
+  /** ms since the latest question appeared */
+  questionAgeMs?: number | null
+}
+
+export function deriveLiveStatus(input: LiveStatusInput): LiveStatus {
+  if (input.isRecording && !input.wsConnected) return 'RECONNECTING'
+  if (!input.isRecording && !input.streaming) return 'IDLE'
+  const qa = input.qa
+  if (!qa || !input.streaming) return 'LISTENING'
+  const cue = buildFastCueViewModel(qa.fastCue ?? (isRecord(qa.guidance) ? qa.guidance.fast_cue : undefined))
+  const hasAnswer = typeof qa.answer === 'string' && qa.answer.trim().length > 0
+  if (hasAnswer) return 'ANSWERING'
+  if (cue) return 'CUE_READY'
+  if (input.questionAgeMs != null && input.questionAgeMs < 1500) return 'QUESTION_DETECTED'
+  return 'PREPARING'
+}

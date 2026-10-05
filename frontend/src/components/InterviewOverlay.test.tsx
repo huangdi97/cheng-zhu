@@ -434,7 +434,8 @@ describe('InterviewOverlay', () => {
       interviewOverlayShowBg: false,
       interviewOverlayPromptMaxWidth: 700,
     })
-    useInterviewStore.setState({ qaPairs: [], streamingIds: [] })
+    // before the session starts: v1.3 auto-compact only applies while recording
+    useInterviewStore.setState({ qaPairs: [], streamingIds: [], isRecording: false })
 
     try {
       render(<InterviewOverlay />)

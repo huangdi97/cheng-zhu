@@ -15,9 +15,11 @@ export const COLOR_SCHEME_STORAGE_KEY = 'ia-color-scheme'
 export const DEFAULT_COLOR_SCHEME_ID: ColorSchemeId = 'vscode-light-plus'
 
 export const COLOR_SCHEME_OPTIONS: { id: ColorSchemeId; label: string; hint: string }[] = [
-  { id: 'vscode-light-plus', label: 'Light+', hint: '默认浅色，接近 VS Code Light+，日间作答首选' },
-  { id: 'vscode-dark-plus', label: 'Dark+', hint: 'VS Code Dark+ 深色，经典程序员配色' },
-  { id: 'vscode-dark-hc', label: 'Dark 高对比', hint: '黑底高对比，低视力 / 强光场景' },
+  // IDs stay unchanged so existing localStorage/preferences migrate without
+  // churn. Labels are product language, not implementation provenance.
+  { id: 'vscode-light-plus', label: '成竹 · 浅色', hint: '默认：竹青 / 墨青专业工作台，适合日间准备与复盘' },
+  { id: 'vscode-dark-plus', label: '成竹 · 深色', hint: '低亮度竹青深色工作台，适合夜间与长时间使用' },
+  { id: 'vscode-dark-hc', label: '高对比', hint: '黑底高对比，面向低视力 / 强光场景' },
   { id: 'nord', label: 'Nord', hint: '北欧冷灰蓝，低饱和长时间作答不累眼' },
   { id: 'editorial-glass', label: 'Editorial Glass', hint: '纸感留白与玻璃层次，适合阅读' },
   { id: 'solarized-dark', label: 'Solarized Dark', hint: '经典暖黄护眼深色，弱蓝光夜间友好' },

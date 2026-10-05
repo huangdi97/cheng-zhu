@@ -147,6 +147,12 @@ export interface AppConfig {
   speech_adoption_analytics_live?: boolean
   fast_cue_model_index?: number
   onboarding_completed?: boolean
+  /** v1.3 Language Layering + guidance + analytics */
+  technical_term_policy?: 'AUTO' | 'KEEP_ENGLISH' | 'TRANSLATE' | 'BILINGUAL'
+  ui_language?: 'zh-CN' | 'en-US'
+  proactive_guidance_enabled?: boolean
+  practice_delivery_analytics_enabled?: boolean
+  remote_telemetry_opt_in?: boolean
 }
 
 export type QAStatus = 'streaming' | 'done' | 'cancelled' | 'error'

@@ -92,6 +92,13 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_preload_stt, daemon=True).start()
     assist.preload_candidate_asr_if_enabled()
     try:
+        from api.product import init_product_layer
+
+        backfill = init_product_layer()
+        _log.info("PRODUCT layer ready backfill=%s", backfill)
+    except Exception as e:
+        _log.error("Product layer init failed: %s", e, exc_info=True)
+    try:
         from services.storage.resume_history import restore_active_resume
         if restore_active_resume():
             _log.info("Resume auto-restored from history (id=%s)", cfg.resume_active_history_id)
@@ -258,6 +265,10 @@ from api import coach as coach_api  # noqa: E402
 
 app.include_router(coach_api.candidate_router, prefix="/api")
 app.include_router(coach_api.helper_router)
+# v1.3 Goal-centered product layer (Goal / Library / Practice 3.0 / Live / Reflection / v1.4 validation)
+from api import product as product_api  # noqa: E402
+
+app.include_router(product_api.router, prefix="/api/product")
 
 
 if os.path.isdir(FRONTEND_DIR):

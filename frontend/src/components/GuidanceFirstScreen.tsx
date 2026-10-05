@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { track } from '@/lib/productApi'
 import { AlertTriangle, BookOpen, Globe, UserCheck, Users } from 'lucide-react'
 import { CUE_SOURCE_LABELS, type CueSource, type FastCueViewModel } from '@/lib/guidanceViewModel'
 
@@ -32,9 +34,26 @@ export function CueSourceBadge({ source }: { source: CueSource }) {
 
 interface FastCuePanelProps {
   cue: FastCueViewModel
+  /** v1.4: when set, shows the one-tap helpful / not-needed signals (local only). */
+  qaId?: string
 }
 
-export default function GuidanceFirstScreen({ cue }: FastCuePanelProps) {
+function CueFeedback({ qaId }: { qaId: string }) {
+  const [sent, setSent] = useState<string | null>(null)
+  if (sent) return <p className="text-[10px] text-text-muted" role="status">{sent}</p>
+  const send = (name: 'fast_cue_helpful' | 'fast_cue_dismissed', label: string) => {
+    track(name, { qa: qaId.slice(0, 32) })
+    setSent(label)
+  }
+  return (
+    <div className="flex gap-2 text-[10px]" aria-label="这条 Cue 有帮助吗">
+      <button type="button" className="text-text-muted hover:text-status-direct" onClick={() => send('fast_cue_helpful', '已记录：有帮助')}>有帮助</button>
+      <button type="button" className="text-text-muted hover:text-status-risk" onClick={() => send('fast_cue_dismissed', '已记录：不需要')}>不需要</button>
+    </div>
+  )
+}
+
+export default function GuidanceFirstScreen({ cue, qaId }: FastCuePanelProps) {
   return (
     <section aria-label="Fast Cue" data-testid="fast-cue" className="rounded-xl border border-accent-blue/20 bg-accent-blue/5 p-3 mb-2 space-y-2">
       {cue.direction && (
@@ -67,6 +86,7 @@ export default function GuidanceFirstScreen({ cue }: FastCuePanelProps) {
           {cue.ttfugUserMs != null ? `提示 ${cue.ttfugUserMs}ms（自说完）` : `提示 ${cue.ttfugInternalMs}ms（自问题确定）`}
         </p>
       )}
+      {qaId ? <CueFeedback qaId={qaId} /> : null}
     </section>
   )
 }

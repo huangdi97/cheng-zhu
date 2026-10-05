@@ -46,7 +46,7 @@ describe('ResumeMount', () => {
       />,
     )
 
-    expect(screen.getByText('当前没有挂载简历')).toBeInTheDocument()
+    expect(screen.getByText('当前没有选用简历')).toBeInTheDocument()
     expect(screen.getByText('resume-history-panel')).toBeInTheDocument()
   })
 
@@ -102,7 +102,7 @@ describe('ResumeMount', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '取消挂载' }))
+    fireEvent.click(screen.getByRole('button', { name: '取消选用' }))
 
     await waitFor(() => {
       expect(apiMock.deleteResume).toHaveBeenCalled()

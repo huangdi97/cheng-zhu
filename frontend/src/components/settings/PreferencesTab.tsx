@@ -205,7 +205,7 @@ export default function PreferencesTab() {
               <div className={`w-2 h-2 rounded-full ${sttLoaded ? (sttActiveProvider === 'whisper' ? 'bg-accent-amber' : 'bg-accent-green') : sttLoading ? 'bg-accent-amber animate-pulse' : 'bg-accent-red'}`} />
               <span className="text-xs font-medium text-text-primary">语音识别</span>
             </div>
-            <p className="text-[11px] text-text-muted mt-1">
+            <p className="text-[11px] text-text-secondary mt-1">
               {sttLoaded ? (sttActiveProvider === 'whisper' ? 'Whisper 降级就绪' : sttFallbackLoaded ? '就绪，降级已预备' : '就绪') : sttLoading ? '加载中' : '未就绪'} · {sttLabel}
             </p>
           </div>
@@ -215,7 +215,7 @@ export default function PreferencesTab() {
             className="rounded-xl border border-accent-blue/30 bg-accent-blue/10 px-3 py-2.5 text-left hover:bg-accent-blue/15 transition-colors"
           >
             <span className="text-xs font-medium text-accent-blue">语音配置</span>
-            <p className="text-[11px] text-text-muted mt-1">切换 STT 与断句参数</p>
+            <p className="text-[11px] text-text-secondary mt-1">切换 STT 与断句参数</p>
           </button>
         </div>
       </Section>

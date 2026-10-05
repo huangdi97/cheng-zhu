@@ -407,15 +407,41 @@ _STORY_FIELDS = ("title", "situation", "challenge", "action", "result", "reflect
 
 
 def save_story(story_id: str, candidate_id: str, fields: dict[str, Any], tags: Optional[list[str]] = None) -> None:
-    """User-authored Story (S/C/A/R/Reflection). Never AI-invented."""
+    """User-authored Story plus explicit v1.3 source/skill/use relations.
+
+    Source and skill ids are relationship metadata only; they never elevate
+    the Story truth state. last_used_session is operational provenance for the
+    most recent frozen InterviewPack that included this Story.
+    """
     now = time.time()
     values = [str(fields.get(key, "") or "") for key in _STORY_FIELDS]
+    source_ids = [str(x) for x in (fields.get("source_ids") or []) if str(x).strip()]
+    skill_ids = [str(x) for x in (fields.get("skill_ids") or []) if str(x).strip()]
+    last_used = str(fields.get("last_used_session") or "")
     _write(
-        "INSERT INTO story (id, candidate_id, title, situation, challenge, action, result, reflection, tags_json, truth_status, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUPPORTED', ?, ?) "
+        "INSERT INTO story (id, candidate_id, title, situation, challenge, action, result, reflection, tags_json, "
+        "source_ids_json, skill_ids_json, last_used_session, truth_status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUPPORTED', ?, ?) "
         "ON CONFLICT(id) DO UPDATE SET title=excluded.title, situation=excluded.situation, challenge=excluded.challenge, "
-        "action=excluded.action, result=excluded.result, reflection=excluded.reflection, tags_json=excluded.tags_json, updated_at=excluded.updated_at",
-        (story_id, candidate_id, *values, json.dumps(tags or [], ensure_ascii=False), now, now),
+        "action=excluded.action, result=excluded.result, reflection=excluded.reflection, tags_json=excluded.tags_json, "
+        "source_ids_json=excluded.source_ids_json, skill_ids_json=excluded.skill_ids_json, "
+        "last_used_session=CASE WHEN excluded.last_used_session <> '' THEN excluded.last_used_session ELSE story.last_used_session END, "
+        "updated_at=excluded.updated_at",
+        (
+            story_id, candidate_id, *values, json.dumps(tags or [], ensure_ascii=False),
+            json.dumps(source_ids, ensure_ascii=False), json.dumps(skill_ids, ensure_ascii=False),
+            last_used, now, now,
+        ),
+    )
+
+
+def mark_story_used(story_id: str, session_id: str) -> None:
+    """Record the latest session that froze this Story into its pack."""
+    if not story_id or not session_id:
+        return
+    _write(
+        "UPDATE story SET last_used_session = ?, updated_at = ? WHERE id = ?",
+        (str(session_id), time.time(), str(story_id)),
     )
 
 

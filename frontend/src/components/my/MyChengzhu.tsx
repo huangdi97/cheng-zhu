@@ -6,7 +6,7 @@ import FactsSources from './FactsSources'
 const ResumeOptimizer = lazy(() => import('@/components/ResumeOptimizer'))
 
 // R2 Stage M「我的成竹」：概览 / 简历 / 项目 / 事实与来源 / Stories / Skills / 我的表达。
-type TabKey = 'overview' | 'resume' | 'projects' | 'facts' | 'stories' | 'skills' | 'voice'
+export type TabKey = 'overview' | 'resume' | 'projects' | 'facts' | 'stories' | 'skills' | 'voice'
 
 const TABS: Array<[TabKey, string]> = [
   ['overview', '概览'],
@@ -18,7 +18,7 @@ const TABS: Array<[TabKey, string]> = [
   ['voice', '我的表达'],
 ]
 
-function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
+export function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
   const [facts, setFacts] = useState<FactsPayload | null>(null)
   const [stories, setStories] = useState<StoryItem[]>([])
   const [cards, setCards] = useState<SkillCardOverview[]>([])
@@ -49,7 +49,7 @@ function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
   )
 }
 
-function Projects() {
+export function Projects() {
   const [cards, setCards] = useState<SkillCardOverview[]>([])
   useEffect(() => { api.intelSkillCards().then(setCards).catch(() => setCards([])) }, [])
   const projects = Array.from(new Map(cards.map((c) => [c.project_name, c])).values())
@@ -71,7 +71,14 @@ function Projects() {
   )
 }
 
-const EMPTY_STORY: Omit<StoryItem, 'id' | 'updated_at'> = { title: '', situation: '', challenge: '', action: '', result: '', reflection: '' }
+// v1.3 Stories 3.0 capability categories (canonical §6)
+const STORY_CATEGORIES: Array<[string, string]> = [
+  ['Ownership', 'Ownership 担当'], ['Conflict', '冲突处理'], ['Failure', '失败与反思'], ['Leadership', '领导力'],
+  ['Ambiguity', '模糊情境决策'], ['Collaboration', '协作'], ['Difficult Problem', '解决困难问题'],
+  ['Influence', '影响他人'], ['Trade-off', '取舍'], ['Learning', '学习成长'],
+]
+
+const EMPTY_STORY: Omit<StoryItem, 'id' | 'updated_at' | 'tags'> = { title: '', situation: '', challenge: '', action: '', result: '', reflection: '' }
 const STORY_FIELDS: Array<[keyof typeof EMPTY_STORY, string]> = [
   ['title', '标题'],
   ['situation', 'Situation 情境'],
@@ -81,20 +88,25 @@ const STORY_FIELDS: Array<[keyof typeof EMPTY_STORY, string]> = [
   ['reflection', 'Reflection 反思'],
 ]
 
-function Stories() {
+export function Stories() {
   const pushToast = useInterviewStore((s) => s.pushToast)
   const [items, setItems] = useState<StoryItem[]>([])
   const [draft, setDraft] = useState(EMPTY_STORY)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingRelations, setEditingRelations] = useState<{ source_ids: string[]; skill_ids: string[]; last_used_session: string }>({ source_ids: [], skill_ids: [], last_used_session: '' })
+  const [category, setCategory] = useState('')
   const load = useCallback(() => { api.intelStories().then(setItems).catch(() => setItems([])) }, [])
   useEffect(() => { load() }, [load])
 
   const save = async () => {
     if (!draft.title.trim()) return
     try {
-      if (editingId) await api.intelUpdateStory(editingId, draft)
-      else await api.intelCreateStory(draft)
+      const body = { ...draft, ...editingRelations, tags: category ? [category] : [] }
+      if (editingId) await api.intelUpdateStory(editingId, body)
+      else await api.intelCreateStory(body)
       setDraft(EMPTY_STORY)
+      setEditingRelations({ source_ids: [], skill_ids: [], last_used_session: '' })
+      setCategory('')
       setEditingId(null)
       load()
     } catch (error) {
@@ -107,6 +119,14 @@ function Stories() {
       <div className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-4 space-y-2" data-testid="story-builder">
         <h3 className="text-sm font-semibold text-text-primary">{editingId ? '编辑 Story' : 'Story Builder'}</h3>
         <p className="text-[11px] text-text-muted">只写你真实经历过的事。成竹不会替你编造经历；这里的内容会冻结进 Interview Pack 作为个人来源。</p>
+        <label className="block">
+          <span className="text-[11px] text-text-muted">能力分类</span>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Story 能力分类"
+            className="mt-0.5 w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-sm text-text-primary">
+            <option value="">未分类</option>
+            {STORY_CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>
         {STORY_FIELDS.map(([key, label]) => (
           <label key={key} className="block">
             <span className="text-[11px] text-text-muted">{label}</span>
@@ -123,7 +143,7 @@ function Stories() {
           <button type="button" onClick={() => void save()} disabled={!draft.title.trim()}
             className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">保存</button>
           {editingId && (
-            <button type="button" onClick={() => { setEditingId(null); setDraft(EMPTY_STORY) }}
+            <button type="button" onClick={() => { setEditingId(null); setDraft(EMPTY_STORY); setEditingRelations({ source_ids: [], skill_ids: [], last_used_session: '' }) }}
               className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs text-text-muted">取消</button>
           )}
         </div>
@@ -135,11 +155,23 @@ function Stories() {
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold text-text-primary">{story.title}</span>
               <span className="flex gap-2 text-[11px]">
-                <button type="button" className="text-accent-blue" onClick={() => { setEditingId(story.id); setDraft({ title: story.title, situation: story.situation, challenge: story.challenge, action: story.action, result: story.result, reflection: story.reflection }) }}>编辑</button>
+                <button type="button" className="text-accent-blue" onClick={() => {
+                  setEditingId(story.id)
+                  setCategory((story.tags ?? [])[0] ?? '')
+                  setEditingRelations({ source_ids: story.source_ids ?? [], skill_ids: story.skill_ids ?? [], last_used_session: story.last_used_session ?? '' })
+                  setDraft({ title: story.title, situation: story.situation, challenge: story.challenge, action: story.action, result: story.result, reflection: story.reflection })
+                }}>编辑</button>
                 <button type="button" className="text-text-muted hover:text-status-risk" onClick={() => api.intelDeleteStory(story.id).then(load)}>删除</button>
               </span>
             </div>
             <p className="mt-1 text-xs text-text-secondary">{[story.situation, story.action, story.result].filter(Boolean).join(' → ')}</p>
+            {(story.source_ids?.length || story.skill_ids?.length || story.last_used_session) ? (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-text-muted" aria-label="Story 关联">
+                {story.source_ids?.length ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">来源 {story.source_ids.length}</span> : null}
+                {story.skill_ids?.length ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">技能 {story.skill_ids.length}</span> : null}
+                {story.last_used_session ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">最近用于场次 {story.last_used_session.slice(0, 12)}</span> : null}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -147,7 +179,7 @@ function Stories() {
   )
 }
 
-function Skills() {
+export function Skills() {
   const [cards, setCards] = useState<SkillCardOverview[]>([])
   const load = useCallback(() => { api.intelSkillCards().then(setCards).catch(() => setCards([])) }, [])
   useEffect(() => { load() }, [load])
@@ -172,7 +204,7 @@ function Skills() {
   )
 }
 
-function Voice() {
+export function Voice() {
   const pushToast = useInterviewStore((s) => s.pushToast)
   const [prefs, setPrefs] = useState<VoicePreferences | null>(null)
   const [banned, setBanned] = useState('')

@@ -5,6 +5,7 @@ import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import KbReferenceBanner from '@/components/kb/KbReferenceBanner'
 import type { ColorSchemeId } from '@/lib/colorScheme'
 import { buildLiveGuidance } from '@/lib/guidanceViewModel'
+import { track } from '@/lib/productApi'
 import GuidanceFirstScreen from './GuidanceFirstScreen'
 
 const SoundTest = lazy(() => import('./SoundTest'))
@@ -181,6 +182,44 @@ function renderAnswerBody(
   )
 }
 
+function DeepAnswerDisclosure({
+  qa,
+  isStreaming,
+  stream,
+  colorScheme,
+}: {
+  qa: QAPair
+  isStreaming: boolean
+  stream: boolean
+  colorScheme: ColorSchemeId
+}) {
+  const [open, setOpen] = useState(false)
+  const hasDeep = Boolean(qa.answer || qa.thinkContent || isStreaming || qa.status === 'error' || qa.status === 'cancelled')
+  if (!hasDeep) return null
+
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next) track('deep_opened', { qa: qa.id.slice(0, 32) })
+  }
+
+  return (
+    <div className="mt-2 border-t border-bg-hover/50 pt-2" data-testid="deep-answer-disclosure">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 rounded-lg px-1 py-1 text-left text-[11px] font-medium text-text-secondary hover:text-text-primary"
+      >
+        <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
+        <span>{open ? '收起完整回答' : '展开完整回答'}</span>
+        {isStreaming && !open ? <span className="ml-1 text-[10px] font-normal text-text-muted">正在生成，不影响先看 Cue</span> : null}
+      </button>
+      {open ? <div className="mt-2">{renderAnswerBody(qa, isStreaming, stream, colorScheme)}</div> : null}
+    </div>
+  )
+}
+
 type QACardProps = {
   qa: QAPair
   isStreaming: boolean
@@ -188,9 +227,10 @@ type QACardProps = {
   colorScheme: ColorSchemeId
   animate: boolean
   animateDelayMs: number
+  cueFirst: boolean
 }
 
-const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, animate, animateDelayMs }: QACardProps) {
+const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, animate, animateDelayMs, cueFirst }: QACardProps) {
   const srcLabel = sourceLabel(qa.questionSource)
   const suggestion = useInterviewStore((s) => s.suggestionsById[qa.id])
   // R2 cue-first: the Fast Cue (guidance_fast) renders above the deep answer
@@ -258,8 +298,10 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
               )}
             </div>
             <KbReferenceBanner qaId={qa.id} />
-            {cue && <GuidanceFirstScreen cue={cue} />}
-            {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
+            {cue && <GuidanceFirstScreen cue={cue} qaId={qa.id} />}
+            {cue && cueFirst
+              ? <DeepAnswerDisclosure qa={qa} isStreaming={isStreaming} stream={stream} colorScheme={colorScheme} />
+              : renderAnswerBody(qa, isStreaming, stream, colorScheme)}
           </div>
         </div>
       </div>
@@ -322,8 +364,10 @@ const QACard = memo(function QACard({ qa, isStreaming, stream, colorScheme, anim
             )}
           </div>
           <KbReferenceBanner qaId={qa.id} />
-          {cue && <GuidanceFirstScreen cue={cue} />}
-          {renderAnswerBody(qa, isStreaming, stream, colorScheme)}
+          {cue && <GuidanceFirstScreen cue={cue} qaId={qa.id} />}
+          {cue && cueFirst
+            ? <DeepAnswerDisclosure qa={qa} isStreaming={isStreaming} stream={stream} colorScheme={colorScheme} />
+            : renderAnswerBody(qa, isStreaming, stream, colorScheme)}
         </div>
       </div>
       {suggestion && !isStreaming && (
@@ -520,6 +564,7 @@ export default function AnswerPanel() {
             colorScheme={colorScheme}
             animate={animate}
             animateDelayMs={0}
+            cueFirst={!isExamMode}
           />
         )
       })}

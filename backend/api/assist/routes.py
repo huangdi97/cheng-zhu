@@ -30,6 +30,19 @@ router = APIRouter()
 _rlog = get_logger("assist.routes")
 
 
+def _require_screen_guidance_policy():
+    """Require an effective session policy that permits high-assistance screen solving."""
+    from services.intelligence.policy import auto_answer_allowed
+
+    cfg = get_config()
+    if not auto_answer_allowed(cfg):
+        raise HTTPException(
+            403,
+            "当前会话的 AI 辅助策略不允许截图或图片解题；请仅在明确允许 AI 辅助的练习或会话中使用。",
+        )
+    return cfg
+
+
 class ManualQuestion(BaseModel):
     text: str = Field(..., max_length=10000)
     image: Optional[str] = None
@@ -165,6 +178,8 @@ async def api_question_boundary_discard():
 async def api_ask(body: ManualQuestion):
     if not body.text.strip() and not body.image:
         raise HTTPException(400, "\u95ee\u9898\u4e0d\u80fd\u4e3a\u7a7a")
+    if body.image:
+        _require_screen_guidance_policy()
     text = body.text.strip() or "\u8bf7\u5206\u6790\u8fd9\u5f20\u56fe\u7247\u4e2d\u7684\u9898\u76ee\uff0c\u5e76\u7ed9\u51fa\u9762\u8bd5\u56de\u7b54"
     src = "manual_image" if body.image else "manual_text"
     queued = submit_answer_task((text, body.image, True, src, {"origin": "manual"}))
@@ -175,6 +190,7 @@ async def api_ask(body: ManualQuestion):
 
 @router.post("/ask-from-server-screen")
 async def api_ask_from_server_screen():
+    _require_screen_guidance_policy()
     from services.llm import has_vision_model
     from services.capture import ScreenCaptureError, capture_primary_left_half_data_url
 
@@ -208,7 +224,7 @@ async def api_ask_from_server_screen_region(body: ScreenRegionRequest):
     """桌面端「框选截图」：按自定义矩形区域截取主屏并提交识图解题。"""
     from services.capture.screen_capture import capture_primary_region_data_url
 
-    cfg = get_config()
+    cfg = _require_screen_guidance_policy()
     try:
         data_url = await run_in_threadpool(
             capture_primary_region_data_url,
@@ -244,6 +260,7 @@ async def api_capture_server_screen():
 
 @router.post("/ask-from-server-screens")
 async def api_ask_from_server_screens(body: MultiServerScreenQuestion):
+    _require_screen_guidance_policy()
     from services.llm import has_vision_model
 
     images = [img for img in body.images if img]

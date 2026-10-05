@@ -1,0 +1,402 @@
+"""Versioned schema for product.db (v1.3 Goal-centered product layer).
+
+ COMPATIBILITY:
+  - product.db is a new file. The v1.2 Verified Core databases
+    (intelligence / prep / review / job_tracker / kb / knowledge) are never
+    altered by these migrations; product rows only *reference* their ids.
+  - Every step is additive and idempotent (CREATE ... IF NOT EXISTS,
+    ALTER ... ADD COLUMN guarded by PRAGMA table_info), tracked by
+    PRAGMA user_version + schema_migrations like intelligence_migrations.
+  - Rollback plan: product.db is backed up before any upgrade
+    (product.backup_database); deleting product.db returns the app to v1.2
+    behaviour with no loss of v1.2 data.
+"""
+from __future__ import annotations
+
+import sqlite3
+import time
+from typing import Callable
+
+from core.logger import get_logger
+
+_log = get_logger("storage.product_migrations")
+
+LATEST_SCHEMA_VERSION = 1
+
+_V1_TABLES: tuple[str, ...] = (
+    # --- Goal (long-lived job target) ---
+    """
+    CREATE TABLE IF NOT EXISTS goal (
+        id TEXT PRIMARY KEY,
+        company TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT '',
+        jd TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        stage TEXT NOT NULL DEFAULT '',
+        next_interview_at REAL,
+        interview_round TEXT NOT NULL DEFAULT '',
+        goal_notes TEXT NOT NULL DEFAULT '',
+        selected_resume_id INTEGER,
+        selected_material_ids_json TEXT NOT NULL DEFAULT '[]',
+        selected_kb_ids_json TEXT NOT NULL DEFAULT '[]',
+        selected_quick_note_ids_json TEXT NOT NULL DEFAULT '[]',
+        active_question_bank_ids_json TEXT NOT NULL DEFAULT '[]',
+        next_focus_id TEXT NOT NULL DEFAULT '',
+        offer_state TEXT NOT NULL DEFAULT 'NONE',
+        role_family TEXT NOT NULL DEFAULT '',
+        legacy_prep_space_id INTEGER,
+        application_id INTEGER,
+        job_profile_id TEXT NOT NULL DEFAULT '',
+        settings_json TEXT NOT NULL DEFAULT '{}',
+        last_opened_at REAL,
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS goal_material (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT NOT NULL REFERENCES goal(id) ON DELETE CASCADE,
+        material_id TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        UNIQUE(goal_id, material_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS goal_interview (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT NOT NULL REFERENCES goal(id) ON DELETE CASCADE,
+        round TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT 'REAL',
+        status TEXT NOT NULL DEFAULT 'UPCOMING',
+        scheduled_at REAL,
+        notes TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS goal_offer (
+        goal_id TEXT PRIMARY KEY REFERENCES goal(id) ON DELETE CASCADE,
+        status TEXT NOT NULL DEFAULT 'NONE',
+        comp TEXT NOT NULL DEFAULT '',
+        deadline REAL,
+        notes TEXT NOT NULL DEFAULT '',
+        updated_at REAL NOT NULL
+    )
+    """,
+    # Sessions are never copied: a link row points at the owning store
+    # (review_sessions for real/practice reflections, practice_session here).
+    """
+    CREATE TABLE IF NOT EXISTS goal_session_link (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT NOT NULL REFERENCES goal(id) ON DELETE CASCADE,
+        session_kind TEXT NOT NULL,
+        review_session_id INTEGER,
+        practice_id TEXT NOT NULL DEFAULT '',
+        live_session_id TEXT NOT NULL DEFAULT '',
+        goal_interview_id TEXT NOT NULL DEFAULT '',
+        round TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL
+    )
+    """,
+    # --- Materials + lifecycle ---
+    """
+    CREATE TABLE IF NOT EXISTS material (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL DEFAULT 'PROJECT',
+        usage TEXT NOT NULL DEFAULT 'FACTS',
+        title TEXT NOT NULL DEFAULT '',
+        active_version_id TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS material_version (
+        id TEXT PRIMARY KEY,
+        material_id TEXT NOT NULL REFERENCES material(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        filename TEXT NOT NULL DEFAULT '',
+        content_text TEXT NOT NULL DEFAULT '',
+        content_hash TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'PROCESSING',
+        error TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    # --- Quick Notes ---
+    """
+    CREATE TABLE IF NOT EXISTS quick_note (
+        id TEXT PRIMARY KEY,
+        scope TEXT NOT NULL DEFAULT 'GLOBAL',
+        goal_id TEXT,
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        pinned INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        revision INTEGER NOT NULL DEFAULT 1,
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    # --- Question banks ---
+    """
+    CREATE TABLE IF NOT EXISTS question_bank (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        scope TEXT NOT NULL DEFAULT 'USER',
+        role TEXT NOT NULL DEFAULT '',
+        company TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'USER_ADDED',
+        goal_id TEXT,
+        builtin INTEGER NOT NULL DEFAULT 0,
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS question_bank_item (
+        id TEXT PRIMARY KEY,
+        bank_id TEXT NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT '',
+        difficulty TEXT NOT NULL DEFAULT 'STANDARD',
+        origin TEXT NOT NULL DEFAULT 'USER_ADDED',
+        source_url TEXT NOT NULL DEFAULT '',
+        rounds_json TEXT NOT NULL DEFAULT '[]',
+        created_at REAL NOT NULL
+    )
+    """,
+    # --- Practice 3.0 ---
+    """
+    CREATE TABLE IF NOT EXISTS practice_profile (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        config_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS practice_session (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT,
+        config_json TEXT NOT NULL DEFAULT '{}',
+        state_json TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        review_session_id INTEGER,
+        guided INTEGER NOT NULL DEFAULT 0,
+        started_at REAL NOT NULL,
+        ended_at REAL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS practice_turn (
+        id TEXT PRIMARY KEY,
+        practice_id TEXT NOT NULL REFERENCES practice_session(id) ON DELETE CASCADE,
+        seq INTEGER NOT NULL,
+        persona_id TEXT NOT NULL DEFAULT '',
+        move TEXT NOT NULL DEFAULT 'OPEN',
+        question TEXT NOT NULL,
+        question_source TEXT NOT NULL DEFAULT '',
+        answer TEXT NOT NULL DEFAULT '',
+        answer_duration_ms INTEGER,
+        content_json TEXT NOT NULL DEFAULT '{}',
+        delivery_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL,
+        answered_at REAL
+    )
+    """,
+    # Per-dimension rubric observations feed ProgressTrend (derived, not stored).
+    """
+    CREATE TABLE IF NOT EXISTS rubric_observation (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT,
+        session_kind TEXT NOT NULL,
+        session_ref TEXT NOT NULL,
+        turn_ref TEXT NOT NULL DEFAULT '',
+        dimension TEXT NOT NULL,
+        level INTEGER NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS delivery_metrics (
+        id TEXT PRIMARY KEY,
+        session_kind TEXT NOT NULL,
+        session_ref TEXT NOT NULL,
+        turn_ref TEXT NOT NULL DEFAULT '',
+        goal_id TEXT,
+        metrics_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL
+    )
+    """,
+    # --- Live: pins, nudges, closing ---
+    """
+    CREATE TABLE IF NOT EXISTS pin_moment (
+        id TEXT PRIMARY KEY,
+        session_kind TEXT NOT NULL DEFAULT 'LIVE',
+        session_id TEXT NOT NULL,
+        turn_id TEXT NOT NULL DEFAULT '',
+        goal_id TEXT,
+        tag TEXT NOT NULL DEFAULT 'IMPORTANT',
+        question TEXT NOT NULL DEFAULT '',
+        transcript_excerpt TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        ts REAL NOT NULL,
+        used_in_reflection INTEGER NOT NULL DEFAULT 0,
+        created_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS nudge_event (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        text TEXT NOT NULL DEFAULT '',
+        topic_key TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'SHOWN',
+        reason TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS closing_mode_event (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        trigger TEXT NOT NULL DEFAULT 'INTERVIEW_CLOSING',
+        suggestions_json TEXT NOT NULL DEFAULT '[]',
+        created_at REAL NOT NULL
+    )
+    """,
+    # --- Reflection + Next Focus ---
+    """
+    CREATE TABLE IF NOT EXISTS next_focus (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT NOT NULL REFERENCES goal(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        topic_key TEXT NOT NULL DEFAULT '',
+        reason TEXT NOT NULL DEFAULT '',
+        source_kind TEXT NOT NULL DEFAULT '',
+        source_ref TEXT NOT NULL DEFAULT '',
+        actions_json TEXT NOT NULL DEFAULT '[]',
+        priority INTEGER NOT NULL DEFAULT 50,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        origin TEXT NOT NULL DEFAULT 'DERIVED',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS reflection_action (
+        id TEXT PRIMARY KEY,
+        goal_id TEXT,
+        session_kind TEXT NOT NULL DEFAULT '',
+        session_ref TEXT NOT NULL DEFAULT '',
+        finding_id TEXT NOT NULL DEFAULT '',
+        finding_kind TEXT NOT NULL DEFAULT '',
+        action TEXT NOT NULL,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        result_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL
+    )
+    """,
+    # --- Settings layering (Global / Goal / Session) ---
+    """
+    CREATE TABLE IF NOT EXISTS setting_override (
+        scope TEXT NOT NULL,
+        scope_id TEXT NOT NULL DEFAULT '',
+        key TEXT NOT NULL,
+        value_json TEXT NOT NULL,
+        updated_at REAL NOT NULL,
+        PRIMARY KEY(scope, scope_id, key)
+    )
+    """,
+    # --- v1.4 local product analytics ---
+    """
+    CREATE TABLE IF NOT EXISTS product_event (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        ts REAL NOT NULL,
+        goal_id TEXT NOT NULL DEFAULT '',
+        session_id TEXT NOT NULL DEFAULT '',
+        props_json TEXT NOT NULL DEFAULT '{}'
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS session_feedback (
+        id TEXT PRIMARY KEY,
+        session_kind TEXT NOT NULL,
+        session_ref TEXT NOT NULL,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        UNIQUE(session_kind, session_ref, question)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS product_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    )
+    """,
+)
+
+_V1_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_goal_status ON goal(status, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_goal_interview_goal ON goal_interview(goal_id, scheduled_at)",
+    "CREATE INDEX IF NOT EXISTS idx_goal_session_goal ON goal_session_link(goal_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_goal_session_review ON goal_session_link(review_session_id)",
+    "CREATE INDEX IF NOT EXISTS idx_material_version ON material_version(material_id, version)",
+    "CREATE INDEX IF NOT EXISTS idx_quick_note_scope ON quick_note(scope, goal_id, sort_order)",
+    "CREATE INDEX IF NOT EXISTS idx_bank_item_bank ON question_bank_item(bank_id)",
+    "CREATE INDEX IF NOT EXISTS idx_practice_goal ON practice_session(goal_id, started_at)",
+    "CREATE INDEX IF NOT EXISTS idx_practice_turn ON practice_turn(practice_id, seq)",
+    "CREATE INDEX IF NOT EXISTS idx_rubric_goal ON rubric_observation(goal_id, dimension, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_pin_session ON pin_moment(session_id, ts)",
+    "CREATE INDEX IF NOT EXISTS idx_nudge_session ON nudge_event(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_next_focus_goal ON next_focus(goal_id, status, priority)",
+    "CREATE INDEX IF NOT EXISTS idx_reflection_action_goal ON reflection_action(goal_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_product_event_name ON product_event(name, ts)",
+    "CREATE INDEX IF NOT EXISTS idx_product_event_goal ON product_event(goal_id, ts)",
+)
+
+
+def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
+    for statement in statements:
+        conn.execute(statement)
+
+
+_MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
+    1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "v1.3 goal-centered product layer"),
+}
+
+
+def ensure_schema(conn: sqlite3.Connection) -> int:
+    """Bring product.db to LATEST_SCHEMA_VERSION; returns the version before."""
+    before = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if before >= LATEST_SCHEMA_VERSION:
+        return before
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS schema_migrations ("
+        "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at REAL NOT NULL)"
+    )
+    for version in sorted(_MIGRATIONS):
+        if version <= before:
+            continue
+        apply_step, name = _MIGRATIONS[version]
+        apply_step(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+            (version, name, time.time()),
+        )
+        conn.execute(f"PRAGMA user_version = {int(version)}")
+        _log.info("product migration applied: v%s %s", version, name)
+    conn.commit()
+    return before

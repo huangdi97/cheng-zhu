@@ -116,6 +116,20 @@ class InterviewPack:
         return dict(self.payload.get("answer_preferences") or {})
 
     @property
+    def user_notes(self) -> list[dict[str, Any]]:
+        """v1.3 Quick Notes selected into this pack. Never evidence."""
+        return list(self.payload.get("user_notes") or [])
+
+    @property
+    def goal_materials(self) -> list[dict[str, Any]]:
+        """v1.3 READY Goal materials frozen into this pack."""
+        return list(self.payload.get("goal_materials") or [])
+
+    @property
+    def goal_id(self) -> str:
+        return str(self.payload.get("goal_id", "") or "")
+
+    @property
     def controlled_memory(self) -> dict[str, list[str]]:
         return dict(self.payload.get("controlled_memory") or {})
 
@@ -275,10 +289,21 @@ def build_pack_payload(
     )
     job = storage.get_job_profile(job_id) if job_id else None
     voice = storage.get_voice_profile("local") or (storage.get_voice_profile(candidate_id) if candidate_id else None)
-    stories = [
-        {key: row.get(key, "") for key in ("id", "title", "situation", "challenge", "action", "result", "reflection")}
-        for row in storage.list_all_stories()
-    ]
+    stories = []
+    for row in storage.list_all_stories():
+        story = {
+            key: row.get(key, "")
+            for key in ("id", "title", "situation", "challenge", "action", "result", "reflection")
+        }
+        for raw_key, public_key in (("tags_json", "tags"), ("source_ids_json", "source_ids"), ("skill_ids_json", "skill_ids")):
+            try:
+                story[public_key] = json.loads(row.get(raw_key) or "[]")
+            except (TypeError, json.JSONDecodeError):
+                story[public_key] = []
+        # The frozen object records which session is using it. Database usage is
+        # only mutated after the immutable pack row is successfully persisted.
+        story["last_used_session"] = session_id
+        stories.append(story)
     memory = {
         kind: [str(item.get("text", "")) for item in storage.list_memory_items(kind, limit=20)]
         for kind in ("knowledge_weakness", "repeated_topic", "communication_profile")
@@ -349,6 +374,8 @@ def freeze_pack(payload: dict[str, Any], *, reason: str = "freeze") -> Interview
             "created_at": payload.get("created_at") or time.time(),
         }
     )
+    for story in payload.get("stories") or []:
+        storage.mark_story_used(str(story.get("id") or ""), str(payload["session_id"]))
     return InterviewPack(id=pack_id, session_id=payload["session_id"], revision=1, payload=payload, content_hash=content_hash)
 
 

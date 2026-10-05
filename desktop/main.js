@@ -4,13 +4,56 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
+// Release/runtime evidence needs a disposable profile so CI never touches a
+// developer or runner's normal Chengzhu data. Electron's Chromium
+// --user-data-dir flag does not reliably change app.getPath('userData') early
+// enough for our backend launcher, so support an explicit process-level
+// override before app.whenReady(). Normal users never set this variable.
+if (process.env.CHENGZHU_USER_DATA_DIR) {
+  app.setPath('userData', path.resolve(process.env.CHENGZHU_USER_DATA_DIR));
+}
+
 // Windows: 透明 BrowserWindow 需要 DWM 硬件加速。
 // 保留硬件加速可以让成竹的窗口隐私保护标记按系统能力工作；
 // 这只是尽量减少本机录屏/截图的意外捕获，不承诺对第三方会议软件或系统策略隐身。
 // 如个别旧设备透明窗口出现渲染异常，可设环境变量 ELECTRON_DISABLE_HW_ACCEL=1 回退。
+const RUNTIME_EVIDENCE_MODE = process.env.CHENGZHU_RUNTIME_EVIDENCE === '1';
+
+function writeRuntimeEvidenceStage(stage, extra = {}) {
+  if (!RUNTIME_EVIDENCE_MODE) return;
+  const raw = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_STATUS || '').trim();
+  if (!raw) return;
+  try {
+    const file = path.resolve(raw);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({
+      stage,
+      at: new Date().toISOString(),
+      pid: process.pid,
+      packaged: app.isPackaged,
+      ...extra,
+    }, null, 2));
+  } catch {
+    // Evidence diagnostics must never affect normal startup.
+  }
+}
+
+writeRuntimeEvidenceStage('main-loaded');
+
+if (RUNTIME_EVIDENCE_MODE) {
+  // Hosted Windows runners do not provide a normal interactive desktop.
+  // Electron documents --no-sandbox as testing-only; keep it strictly scoped
+  // to the disposable runtime-evidence process so production sandboxing is
+  // unchanged.
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-gpu');
+}
+
 if (process.platform === 'win32') {
-  app.commandLine.appendSwitch('enable-transparent-visuals');
-  if (process.env.ELECTRON_DISABLE_HW_ACCEL === '1') {
+  if (!RUNTIME_EVIDENCE_MODE) {
+    app.commandLine.appendSwitch('enable-transparent-visuals');
+  }
+  if (process.env.ELECTRON_DISABLE_HW_ACCEL === '1' || RUNTIME_EVIDENCE_MODE) {
     app.disableHardwareAcceleration();
   }
 }
@@ -68,13 +111,20 @@ let PORT = PREFERRED_PORT;
 let SERVER_URL = `http://127.0.0.1:${PORT}`;
 const sharePrivacy = require('./sharePrivacy');
 const backendLauncher = require('./backendLauncher');
+const overlayLayout = require('./overlayLayout');
 // R2 Stage T: Share Privacy is OFF by default; one state drives both windows.
 const sharePrivacyState = sharePrivacy.createSharePrivacyState(sharePrivacy.DEFAULT_MODE);
 let backendStderrTail = '';
-const INSTANCE_NONCE = backendLauncher.newInstanceNonce();
+const evidenceNonce = String(process.env.CHENGZHU_INSTANCE_NONCE || '').trim();
+const INSTANCE_NONCE = (
+  process.env.CHENGZHU_RUNTIME_EVIDENCE === '1' && evidenceNonce.length >= 24
+)
+  ? evidenceNonce
+  : backendLauncher.newInstanceNonce();
 
 let mainWindow = null;
 let overlayWindow = null;
+let overlayLayoutState = { dock: 'FREE', interaction: 'INTERACTIVE', size: 'STANDARD' };
 let tray = null;
 let pythonProcess = null;
 let isQuitting = false;
@@ -98,6 +148,528 @@ let lastOverlayState = {
   promptAutoFollow: false,
   maxLines: 0,
 };
+
+let runtimeEvidenceServer = null;
+
+function runtimeEvidenceEnabled() {
+  const token = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_TOKEN || '');
+  return process.env.CHENGZHU_RUNTIME_EVIDENCE === '1' && token.length >= 24;
+}
+
+function evidenceJson(res, status, payload) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function evidenceReadJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 256 * 1024) {
+        reject(new Error('runtime evidence request too large'));
+        try { req.destroy(); } catch { /* ignore */ }
+      }
+    });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function evidenceSafeName(name) {
+  const raw = String(name || 'capture').trim();
+  const safe = raw.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  return (safe || 'capture').slice(0, 120);
+}
+
+function runtimeEvidencePlanPath() {
+  // File-plan mode is local process orchestration: it never opens an evidence
+  // HTTP listener, so it does not need the bridge bearer token. Requiring the
+  // token here made plan startup depend on an unrelated transport concern.
+  if (process.env.CHENGZHU_RUNTIME_EVIDENCE !== '1') return '';
+  const raw = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_PLAN || '').trim();
+  if (!raw) return '';
+  return path.resolve(raw);
+}
+
+function waitForMainWindowLoad(timeoutMs = 45000) {
+  return new Promise((resolve, reject) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      reject(new Error('main window unavailable before evidence plan'));
+      return;
+    }
+
+    // createWindow() intentionally clears Chromium cache before calling
+    // loadURL(). During that small gap isLoadingMainFrame() is false even
+    // though the renderer is still on the initial blank document. Treating
+    // that as "loaded" lets executeJavaScript() race the first navigation and
+    // can leave the packaged evidence plan pending forever on hosted Windows.
+    // A ready renderer therefore means: the real Chengzhu HTTP document has
+    // committed, it belongs to this sidecar, and the main frame is idle.
+    const isAppDocumentReady = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return false;
+      const url = String(mainWindow.webContents.getURL() || '');
+      if (!/^https?:\/\//i.test(url)) return false;
+      if (SERVER_URL && !url.startsWith(SERVER_URL)) return false;
+      return !mainWindow.webContents.isLoadingMainFrame();
+    };
+
+    let settled = false;
+    let poll = null;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (poll) clearInterval(poll);
+      mainWindow?.webContents.removeListener('did-finish-load', onFinish);
+      mainWindow?.webContents.removeListener('did-fail-load', onFail);
+      mainWindow?.webContents.removeListener('did-start-navigation', onNavigation);
+      if (error) reject(error);
+      else resolve();
+    };
+    const check = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        finish(new Error('main window destroyed before evidence plan'));
+        return;
+      }
+      if (isAppDocumentReady()) finish();
+    };
+    const onFinish = () => check();
+    const onNavigation = () => check();
+    const onFail = (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (isMainFrame === false) return;
+      finish(new Error(`main window failed to load (${errorCode}): ${errorDescription} ${validatedURL || ''}`));
+    };
+    const timer = setTimeout(
+      () => finish(new Error(`main window load timeout after ${timeoutMs}ms; url=${mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : 'destroyed'}`)),
+      Math.max(1000, Number(timeoutMs) || 45000),
+    );
+
+    mainWindow.webContents.on('did-finish-load', onFinish);
+    mainWindow.webContents.on('did-fail-load', onFail);
+    mainWindow.webContents.on('did-start-navigation', onNavigation);
+    poll = setInterval(check, 100);
+    check();
+  });
+}
+
+async function evidenceCaptureToFile(outputDir, name, targetName = 'main') {
+  const target = targetName === 'overlay' ? overlayWindow : mainWindow;
+  if (!target || target.isDestroyed()) throw new Error(`${targetName} window unavailable`);
+  const image = await target.capturePage();
+  const safe = evidenceSafeName(name);
+  const file = path.join(outputDir, safe.endsWith('.png') ? safe : `${safe}.png`);
+  fs.writeFileSync(file, image.toPNG());
+  return { file, target: targetName, width: image.getSize().width, height: image.getSize().height, url: target.webContents.getURL() };
+}
+
+// Runtime evidence must never deadlock the release runner. Hosted Windows has
+// exhibited both failure modes at different times:
+//   1) webContents.executeJavaScript() never settles after first navigation;
+//   2) DevTools Runtime.enable itself never settles on an offscreen renderer.
+// Use CDP as the primary transport, but put *every* stage behind a hard timeout
+// and fall back to executeJavaScript. A hung transport therefore becomes a
+// normal plan error that is written to the result file instead of a 3-minute
+// outer watchdog timeout.
+let evidenceDebuggerAttached = false;
+let evidenceDebuggerReady = false;
+
+function evidenceWithTimeout(promise, timeoutMs, label) {
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label} timeout after ${timeoutMs}ms`)),
+        Math.max(250, Number(timeoutMs) || 8000),
+      );
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+async function evidenceEvaluateViaDebugger(expression, timeoutMs) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+  const debuggerApi = mainWindow.webContents.debugger;
+  if (!evidenceDebuggerAttached) {
+    if (!debuggerApi.isAttached()) debuggerApi.attach('1.3');
+    evidenceDebuggerAttached = true;
+  }
+  if (!evidenceDebuggerReady) {
+    await evidenceWithTimeout(
+      debuggerApi.sendCommand('Runtime.enable'),
+      Math.min(timeoutMs, 5000),
+      'runtime evidence Runtime.enable',
+    );
+    evidenceDebuggerReady = true;
+  }
+  const result = await evidenceWithTimeout(
+    debuggerApi.sendCommand('Runtime.evaluate', {
+      expression: String(expression),
+      returnByValue: true,
+      awaitPromise: true,
+      userGesture: true,
+    }),
+    timeoutMs,
+    'runtime evidence CDP evaluate',
+  );
+  if (result?.exceptionDetails) {
+    const description = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'renderer evaluation failed';
+    throw new Error(description);
+  }
+  return result?.result?.value;
+}
+
+async function evidenceEvaluateViaWebContents(expression, timeoutMs) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+  return evidenceWithTimeout(
+    mainWindow.webContents.executeJavaScript(String(expression), true),
+    timeoutMs,
+    'runtime evidence executeJavaScript',
+  );
+}
+
+async function evidenceEvaluate(expression, timeoutMs = 8000) {
+  try {
+    return await evidenceEvaluateViaDebugger(expression, timeoutMs);
+  } catch (debuggerError) {
+    // A half-attached debugger can poison later CDP calls. Detach best-effort
+    // before trying the independent webContents transport.
+    try {
+      const debuggerApi = mainWindow?.webContents?.debugger;
+      if (debuggerApi?.isAttached()) debuggerApi.detach();
+    } catch { /* best effort */ }
+    evidenceDebuggerAttached = false;
+    evidenceDebuggerReady = false;
+    try {
+      return await evidenceEvaluateViaWebContents(expression, timeoutMs);
+    } catch (webContentsError) {
+      const d = debuggerError?.message || String(debuggerError);
+      const w = webContentsError?.message || String(webContentsError);
+      throw new Error(`runtime evidence renderer unavailable; CDP: ${d}; executeJavaScript: ${w}`);
+    }
+  }
+}
+
+function evidenceFillSelector(selector, value) {
+  return evidenceEvaluate(
+    `(() => {
+      const el = document.querySelector(${JSON.stringify(String(selector || ''))});
+      if (!el) return false;
+      const proto = Object.getPrototypeOf(el);
+      const setter = proto && Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (setter) setter.call(el, ${JSON.stringify(String(value ?? ''))});
+      else el.value = ${JSON.stringify(String(value ?? ''))};
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`,
+  );
+}
+
+async function runRuntimeEvidencePlan() {
+  const planPath = runtimeEvidencePlanPath();
+  if (!planPath) return;
+  const outputDir = path.resolve(
+    process.env.CHENGZHU_RUNTIME_EVIDENCE_DIR || path.join(app.getPath('userData'), 'runtime-evidence'),
+  );
+  fs.mkdirSync(outputDir, { recursive: true });
+  const resultPath = path.resolve(
+    process.env.CHENGZHU_RUNTIME_EVIDENCE_RESULT || path.join(outputDir, 'plan-result.json'),
+  );
+  const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+  const entries = [];
+  const startedAt = new Date().toISOString();
+  writeRuntimeEvidenceStage('plan-started', { plan: planPath, result: resultPath });
+  try {
+    for (const [index, rawStep] of (Array.isArray(plan.steps) ? plan.steps : []).entries()) {
+      const step = rawStep && typeof rawStep === 'object' ? rawStep : {};
+      const kind = String(step.kind || '');
+      if (kind === 'sleep') {
+        await new Promise((resolve) => setTimeout(resolve, Math.max(0, Math.min(30000, Number(step.ms) || 0))));
+        continue;
+      }
+      if (kind === 'wait') {
+        const found = await evidenceWaitForSelector(step.selector, step.timeout_ms);
+        if (!found) throw new Error(`step ${index}: selector timeout ${step.selector}`);
+        continue;
+      }
+      if (kind === 'navigate') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const hash = String(step.hash || '#/home');
+        await evidenceEvaluate(`location.hash = ${JSON.stringify(hash)}`);
+        if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
+          throw new Error(`step ${index}: navigation selector timeout ${step.selector}`);
+        }
+        continue;
+      }
+      if (kind === 'reload') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        mainWindow.webContents.reload();
+        if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
+          throw new Error(`step ${index}: reload selector timeout ${step.selector}`);
+        }
+        continue;
+      }
+      if (kind === 'click') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const selector = String(step.selector || '');
+        const clicked = await evidenceEvaluate(
+          `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true })()`,
+        );
+        if (!clicked) throw new Error(`step ${index}: click target missing ${selector}`);
+        continue;
+      }
+      if (kind === 'fill') {
+        const filled = await evidenceFillSelector(step.selector, step.value);
+        if (!filled) throw new Error(`step ${index}: fill target missing ${step.selector}`);
+        continue;
+      }
+      if (kind === 'key') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const keyCode = String(step.key || '');
+        const modifiers = Array.isArray(step.modifiers) ? step.modifiers.map(String) : [];
+        if (!keyCode) throw new Error(`step ${index}: key required`);
+        mainWindow.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+        mainWindow.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+        continue;
+      }
+      if (kind === 'storage') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const key = String(step.key || '');
+        if (!key) throw new Error(`step ${index}: storage key required`);
+        await evidenceEvaluate(
+          `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(step.value ?? ''))})`,
+        );
+        continue;
+      }
+      if (kind === 'resize') {
+        if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+        const width = Math.max(360, Math.min(2400, Number(step.width) || 1200));
+        const height = Math.max(500, Math.min(1800, Number(step.height) || 800));
+        mainWindow.setMinimumSize(360, 500);
+        mainWindow.setSize(Math.round(width), Math.round(height));
+        continue;
+      }
+      if (kind === 'ask') {
+        await postBackend('/api/ask', JSON.stringify({ text: String(step.text || '') }));
+        continue;
+      }
+      if (kind === 'capture') {
+        if (step.selector && !(await evidenceWaitForSelector(step.selector, step.timeout_ms))) {
+          throw new Error(`step ${index}: capture selector timeout ${step.selector}`);
+        }
+        if (step.delay_ms) await new Promise((resolve) => setTimeout(resolve, Math.min(10000, Number(step.delay_ms) || 0)));
+        const captured = await evidenceCaptureToFile(outputDir, step.name || `capture-${index + 1}`, step.target || 'main');
+        entries.push({ name: step.name || `capture-${index + 1}`, note: String(step.note || ''), ...captured });
+        continue;
+      }
+      throw new Error(`step ${index}: unsupported evidence plan kind ${kind}`);
+    }
+    const result = {
+      ok: true,
+      evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN',
+      packaged: app.isPackaged,
+      version: app.getVersion(),
+      backend_url: SERVER_URL,
+      user_data: app.getPath('userData'),
+      started_at: startedAt,
+      completed_at: new Date().toISOString(),
+      entries,
+    };
+    fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'manifest.json'), JSON.stringify(result, null, 2));
+  } catch (error) {
+    const result = {
+      ok: false,
+      evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN',
+      error: error?.message || String(error),
+      packaged: app.isPackaged,
+      version: app.getVersion(),
+      started_at: startedAt,
+      completed_at: new Date().toISOString(),
+      entries,
+    };
+    fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
+    throw error;
+  } finally {
+    if (plan.auto_quit !== false) setTimeout(() => { isQuitting = true; app.quit(); }, 250);
+  }
+}
+
+async function evidenceWaitForSelector(selector, timeoutMs = 20000) {
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window unavailable');
+  const deadline = Date.now() + Math.max(250, Math.min(120000, Number(timeoutMs) || 20000));
+  const encoded = JSON.stringify(String(selector || ''));
+  while (Date.now() < deadline) {
+    const found = await evidenceEvaluate(
+      `Boolean(document.querySelector(${encoded}))`,
+      5000,
+    ).catch(() => false);
+    if (found) return true;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  return false;
+}
+
+function startRuntimeEvidenceBridge() {
+  if (!runtimeEvidenceEnabled() || runtimeEvidenceServer) return;
+  const requestedPort = Number(process.env.CHENGZHU_RUNTIME_EVIDENCE_PORT || 0);
+  const token = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_TOKEN || '');
+  const outputDir = path.resolve(
+    process.env.CHENGZHU_RUNTIME_EVIDENCE_DIR
+      || path.join(app.getPath('userData'), 'runtime-evidence'),
+  );
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  runtimeEvidenceServer = http.createServer(async (req, res) => {
+    try {
+      if (token && req.headers['x-chengzhu-evidence-token'] !== token) {
+        evidenceJson(res, 403, { ok: false, error: 'forbidden' });
+        return;
+      }
+      const url = new URL(req.url || '/', 'http://127.0.0.1');
+      if (req.method === 'GET' && url.pathname === '/status') {
+        evidenceJson(res, 200, {
+          ok: true,
+          ready: Boolean(mainWindow && !mainWindow.isDestroyed()),
+          backend_url: SERVER_URL,
+          window_url: mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : '',
+          user_data: app.getPath('userData'),
+          output_dir: outputDir,
+          packaged: app.isPackaged,
+          version: app.getVersion(),
+        });
+        return;
+      }
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        evidenceJson(res, 409, { ok: false, error: 'main window unavailable' });
+        return;
+      }
+
+      const body = req.method === 'POST' ? await evidenceReadJson(req) : {};
+      if (req.method === 'POST' && url.pathname === '/navigate') {
+        const hash = String(body.hash || '#/home');
+        await evidenceEvaluate(
+          `location.hash = ${JSON.stringify(hash)}`,
+        );
+        const found = body.selector
+          ? await evidenceWaitForSelector(body.selector, body.timeout_ms)
+          : true;
+        evidenceJson(res, found ? 200 : 408, { ok: found, hash, selector: body.selector || null });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/reload') {
+        mainWindow.webContents.reload();
+        const found = body.selector
+          ? await evidenceWaitForSelector(body.selector, body.timeout_ms)
+          : true;
+        evidenceJson(res, found ? 200 : 408, { ok: found });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/wait') {
+        const found = await evidenceWaitForSelector(body.selector, body.timeout_ms);
+        evidenceJson(res, found ? 200 : 408, { ok: found, selector: body.selector || null });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/storage') {
+        const key = String(body.key || '');
+        if (!key) throw new Error('storage key required');
+        await evidenceEvaluate(
+          `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(String(body.value ?? ''))})`,
+        );
+        evidenceJson(res, 200, { ok: true, key });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/resize') {
+        const width = Math.max(360, Math.min(2400, Number(body.width) || 1200));
+        const height = Math.max(500, Math.min(1800, Number(body.height) || 800));
+        mainWindow.setMinimumSize(360, 500);
+        mainWindow.setSize(Math.round(width), Math.round(height));
+        evidenceJson(res, 200, { ok: true, width, height });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/key') {
+        const modifiers = Array.isArray(body.modifiers) ? body.modifiers.map(String) : [];
+        const keyCode = String(body.key || '');
+        if (!keyCode) throw new Error('key required');
+        mainWindow.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+        mainWindow.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+        evidenceJson(res, 200, { ok: true });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/click') {
+        const selector = String(body.selector || '');
+        if (!selector) throw new Error('selector required');
+        const clicked = await mainWindow.webContents.executeJavaScript(
+          `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return false; el.click(); return true })()`,
+          true,
+        );
+        evidenceJson(res, clicked ? 200 : 404, { ok: Boolean(clicked), selector });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/fill') {
+        const selector = String(body.selector || '');
+        if (!selector) throw new Error('selector required');
+        const filled = await mainWindow.webContents.executeJavaScript(
+          `(() => {
+            const el = document.querySelector(${JSON.stringify(selector)});
+            if (!el) return false;
+            const setter = Object.getOwnPropertyDescriptor(el.__proto__, 'value')?.set;
+            if (setter) setter.call(el, ${JSON.stringify(String(body.value ?? ''))});
+            else el.value = ${JSON.stringify(String(body.value ?? ''))};
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          })()`,
+          true,
+        );
+        evidenceJson(res, filled ? 200 : 404, { ok: Boolean(filled), selector });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/capture') {
+        const name = evidenceSafeName(body.name);
+        const target = body.target === 'overlay' ? overlayWindow : mainWindow;
+        if (!target || target.isDestroyed()) {
+          evidenceJson(res, 409, { ok: false, error: `${body.target || 'main'} window unavailable` });
+          return;
+        }
+        const image = await target.capturePage();
+        const file = path.join(outputDir, name.endsWith('.png') ? name : `${name}.png`);
+        fs.writeFileSync(file, image.toPNG());
+        evidenceJson(res, 200, {
+          ok: true,
+          file,
+          target: body.target === 'overlay' ? 'overlay' : 'main',
+          width: image.getSize().width,
+          height: image.getSize().height,
+          url: target.webContents.getURL(),
+        });
+        return;
+      }
+      evidenceJson(res, 404, { ok: false, error: 'not found' });
+    } catch (error) {
+      evidenceJson(res, 500, { ok: false, error: error?.message || String(error) });
+    }
+  });
+
+  runtimeEvidenceServer.listen(
+    Number.isFinite(requestedPort) ? requestedPort : 0,
+    '127.0.0.1',
+    () => {
+      const address = runtimeEvidenceServer.address();
+      console.log(`[runtime-evidence] bridge ready on 127.0.0.1:${address && typeof address === 'object' ? address.port : requestedPort}`);
+    },
+  );
+}
 
 const OVERLAY_PRESET = { width: 480, height: 320, minWidth: 300, minHeight: 100, resizable: true };
 
@@ -333,6 +905,45 @@ function waitForServer(timeout = 40000) {
   });
 }
 
+function evidenceExternalBackendUrl() {
+  if (!runtimeEvidenceEnabled()) return '';
+  const raw = String(process.env.CHENGZHU_EVIDENCE_BACKEND_URL || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname)) return '';
+    return url.origin;
+  } catch {
+    return '';
+  }
+}
+
+function waitForOwnedExternalServer(timeout = 90000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const req = http.get(`${SERVER_URL}/api/instance`, { timeout: 1000 }, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode === 200 && backendLauncher.isOwnInstance(JSON.parse(body), INSTANCE_NONCE)) return resolve();
+          } catch { /* retry below */ }
+          retry();
+        });
+      });
+      req.on('error', retry);
+      req.on('timeout', () => { req.destroy(); retry(); });
+    };
+    const retry = () => {
+      if (Date.now() - start > timeout) return reject(new Error('Evidence backend start timeout'));
+      setTimeout(check, 300);
+    };
+    check();
+  });
+}
+
 function startPythonBackend() {
   const userDataDir = app.getPath('userData');
   if (app.isPackaged) backendLauncher.ensureUserDataLayout(userDataDir);
@@ -416,12 +1027,16 @@ function createWindow() {
     title: APP_DISPLAY_NAME,
     frame: false,
     show: false,
+    // Hosted Windows CI has no reliable interactive DWM desktop. Runtime
+    // evidence renders through webPreferences.offscreen below; production
+    // remains the normal visible window path.
     // R2: a normal installed app shows in the taskbar (no stealth default).
     skipTaskbar: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      offscreen: RUNTIME_EVIDENCE_MODE,
     },
   });
 
@@ -439,7 +1054,7 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    if (!RUNTIME_EVIDENCE_MODE) mainWindow.show();
   });
 
   // Windows 下最小化 = 隐藏到托盘
@@ -491,6 +1106,7 @@ function createOverlayWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      offscreen: RUNTIME_EVIDENCE_MODE,
     },
   });
 
@@ -578,6 +1194,23 @@ function sendShortcutsState() {
   });
 }
 
+function applyOverlayLayout() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const flags = overlayLayout.interactionFlags(overlayLayoutState.interaction);
+  overlayWindow.setIgnoreMouseEvents(flags.ignoreMouseEvents, { forward: true });
+  overlayWindow.setFocusable(flags.focusable);
+  if (!overlayLayout.layoutOwnsBounds(overlayLayoutState)) return;
+  const current = overlayWindow.getBounds();
+  const display = screen.getDisplayMatching(current);
+  const bounds = overlayLayout.computeOverlayBounds(display.workArea, overlayLayoutState, current, {
+    widthPct: lastOverlayState?.focusWidthPct,
+    heightPct: lastOverlayState?.focusHeightPct,
+  });
+  overlayAutoResizeUntil = Date.now() + 500;
+  overlayWindow.setMinimumSize(Math.min(200, bounds.width), Math.min(40, bounds.height));
+  overlayWindow.setBounds(bounds, false);
+}
+
 function showOverlayWindow() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   if (!overlayWindow._overlayReady) {
@@ -586,6 +1219,7 @@ function showOverlayWindow() {
   }
   applyOverlayModeBounds();
   overlayWindow.setFocusable(false);
+  applyOverlayLayout();
   if (process.platform === 'darwin' || process.platform === 'win32') {
     overlayWindow.showInactive();
   } else {
@@ -1055,6 +1689,13 @@ ipcMain.handle('sync-overlay-window', (_event, payload = {}) => {
   return { ok: true, visible: true };
 });
 ipcMain.handle('get-overlay-state', () => lastOverlayState);
+// v1.3 Overlay 3.0: Dock × Interaction × Size, requested by the overlay renderer
+// (it knows when it is idle → COMPACT or showing a cue → STANDARD/FOCUS).
+ipcMain.handle('set-overlay-layout', (_event, payload = {}) => {
+  overlayLayoutState = overlayLayout.normalizeLayout({ ...overlayLayoutState, ...payload });
+  applyOverlayLayout();
+  return { ok: true, layout: overlayLayoutState };
+});
 ipcMain.handle('resize-overlay-window', (_event, payload = {}) => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return { ok: false };
   const mode = lastOverlayState?.mode || (lastOverlayState?.showBg === false ? 'prompt' : 'glass');
@@ -1267,6 +1908,10 @@ function gracefulStopPython(timeoutMs = 20000) {
 
 app.on('before-quit', (event) => {
   isQuitting = true;
+  if (runtimeEvidenceServer) {
+    try { runtimeEvidenceServer.close(); } catch { /* ignore */ }
+    runtimeEvidenceServer = null;
+  }
   if (!pythonProcess || pythonStopPromise) return;
   event.preventDefault();
   gracefulStopPython().then(() => {
@@ -1276,42 +1921,101 @@ app.on('before-quit', (event) => {
 });
 
 app.whenReady().then(async () => {
+  writeRuntimeEvidenceStage('app-ready');
   try {
     app.setName(APP_DISPLAY_NAME);
   } catch {
     /* 个别平台/版本可能不支持 */
   }
   createAppMenu();
-  const picked = await backendLauncher.pickPort(PREFERRED_PORT);
-  if (picked == null) {
-    const { dialog } = require('electron');
-    dialog.showErrorBox('成竹无法启动', `端口 ${PREFERRED_PORT}–${PREFERRED_PORT + 19} 都被占用。请关闭占用端口的程序后重试。`);
-    app.quit();
-    return;
-  }
-  PORT = picked;
-  SERVER_URL = `http://127.0.0.1:${PORT}`;
-  console.log(`Starting backend on ${SERVER_URL} (packaged=${app.isPackaged})...`);
-  startPythonBackend();
 
-  try {
-    // First launch of the packaged sidecar unpacks and imports more modules.
-    await waitForServer(app.isPackaged ? 90000 : 40000);
-    console.log('Backend ready, creating window...');
-  } catch (err) {
-    console.error('Failed to start backend:', err.message);
-    const { dialog } = require('electron');
-    dialog.showErrorBox(
-      '成竹后端启动超时',
-      backendLauncher.describeStartupFailure({ code: 'timeout', stderrTail: backendStderrTail, port: PORT, packaged: app.isPackaged }),
-    );
-    isQuitting = true;
-    app.quit();
-    return;
+  // CI runtime-evidence mode may orchestrate the *packaged* sidecar explicitly
+  // before launching the GUI. This avoids Windows runner deadlocks caused by a
+  // GUI process recursively owning another long-lived child, while still
+  // exercising the real Chengzhu.exe, real packaged backend and installed
+  // frontend resources. Normal production launches never take this branch.
+  const externalEvidenceBackend = evidenceExternalBackendUrl();
+  if (externalEvidenceBackend) {
+    SERVER_URL = externalEvidenceBackend;
+    try {
+      const parsed = new URL(SERVER_URL);
+      PORT = Number(parsed.port || 80);
+      console.log(`Using evidence sidecar on ${SERVER_URL} (packaged=${app.isPackaged})...`);
+      await waitForOwnedExternalServer(app.isPackaged ? 90000 : 40000);
+      console.log('Evidence sidecar ready, creating window...');
+      writeRuntimeEvidenceStage('external-backend-ready', { server_url: SERVER_URL });
+    } catch (err) {
+      console.error('Failed to connect to evidence sidecar:', err.message);
+      isQuitting = true;
+      app.quit();
+      return;
+    }
+  } else {
+    const picked = await backendLauncher.pickPort(PREFERRED_PORT);
+    if (picked == null) {
+      const { dialog } = require('electron');
+      dialog.showErrorBox('成竹无法启动', `端口 ${PREFERRED_PORT}–${PREFERRED_PORT + 19} 都被占用。请关闭占用端口的程序后重试。`);
+      app.quit();
+      return;
+    }
+    PORT = picked;
+    SERVER_URL = `http://127.0.0.1:${PORT}`;
+    console.log(`Starting backend on ${SERVER_URL} (packaged=${app.isPackaged})...`);
+    startPythonBackend();
+
+    try {
+      // First launch of the packaged sidecar unpacks and imports more modules.
+      await waitForServer(app.isPackaged ? 90000 : 40000);
+      console.log('Backend ready, creating window...');
+    } catch (err) {
+      console.error('Failed to start backend:', err.message);
+      const { dialog } = require('electron');
+      dialog.showErrorBox(
+        '成竹后端启动超时',
+        backendLauncher.describeStartupFailure({ code: 'timeout', stderrTail: backendStderrTail, port: PORT, packaged: app.isPackaged }),
+      );
+      isQuitting = true;
+      app.quit();
+      return;
+    }
   }
 
   syncSharePrivacyFromConfig();
   createWindow();
+  writeRuntimeEvidenceStage('window-created', { server_url: SERVER_URL });
+  if (runtimeEvidencePlanPath()) {
+    // File-plan mode avoids a localhost listener entirely. Wait until the real
+    // packaged renderer has completed its first navigation before sending DOM
+    // queries. executeJavaScript() issued during the initial load can otherwise
+    // remain pending indefinitely on hosted Windows runners, leaving neither a
+    // success nor a failure result file.
+    void waitForMainWindowLoad()
+      .then(() => {
+        writeRuntimeEvidenceStage('renderer-ready', { url: mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.getURL() : '' });
+        return runRuntimeEvidencePlan();
+      })
+      .catch((error) => {
+        console.error('Runtime evidence plan failed:', error?.message || error);
+        const resultPath = String(process.env.CHENGZHU_RUNTIME_EVIDENCE_RESULT || '').trim();
+        if (resultPath) {
+          try {
+            fs.writeFileSync(path.resolve(resultPath), JSON.stringify({
+              ok: false,
+              evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN',
+              error: error?.message || String(error),
+              packaged: app.isPackaged,
+              version: app.getVersion(),
+              completed_at: new Date().toISOString(),
+              entries: [],
+            }, null, 2));
+          } catch (writeError) {
+            console.error('Failed to write runtime evidence startup failure:', writeError?.message || writeError);
+          }
+        }
+      });
+  } else {
+    startRuntimeEvidenceBridge();
+  }
   createTray();
   registerShortcuts();
 

@@ -266,10 +266,28 @@ def _memo_reference_section(memo: Optional[str], max_chars: int = 2400) -> str:
     )
 
 
-def _answer_language_rule(answer_language: str) -> str:
+_TERM_POLICY_RULES = {
+    "KEEP_ENGLISH": "- 技术术语保留英文原文（如 Redis Cluster、RAG、Kafka），不要强行翻译。\n",
+    "TRANSLATE": "- 技术术语译为回答语言的常见说法，首次出现时括号注明原文。\n",
+    "BILINGUAL": "- 关键技术术语中英并列给出，例如「一致性哈希（consistent hashing）」。\n",
+}
+
+
+def _term_policy_rule(policy: str) -> str:
+    return _TERM_POLICY_RULES.get((policy or "KEEP_ENGLISH").strip().upper(), _TERM_POLICY_RULES["KEEP_ENGLISH"])
+
+
+def _answer_language_rule(answer_language: str, term_policy: str = "") -> str:
+    """Answer language and technical-term policy are independent layers
+    (v1.3 Language Layering); neither is derived from UI or ASR language."""
     lang = (answer_language or "中文").strip()
+    term = _term_policy_rule(term_policy) if term_policy and term_policy.upper() != "AUTO" else ""
+    if lang.upper() == "FOLLOW_INTERVIEW":
+        return "- 用与面试官当前提问相同的语言回答（中文提问用中文，英文提问用英文）。\n" + term
     if lang.lower() in ("en", "english", "英文", "英语"):
-        return "- 请用英文回答（面试官用中文提问也保持英文输出；术语可保留英文原文）。\n"
+        return "- 请用英文回答（面试官用中文提问也保持英文输出；术语可保留英文原文）。\n" + term
+    if term:
+        return "- 请用中文回答。\n" + term
     return "- 请用中文回答；中英夹杂的技术术语按常见中文表达给出，必要时括号注明英文。\n"
 
 
@@ -283,6 +301,7 @@ def _base_prompt_prefix(
     memo_section: str = "",
     answer_language: str = "中文",
     include_focus_tabs: bool = True,
+    term_policy: str = "",
 ) -> str:
     kb_citation = ""
     if kb_section:
@@ -296,7 +315,7 @@ def _base_prompt_prefix(
         f"{memo_section}"
         f"{kb_section}"
         "通用规则：\n"
-        f"{_answer_language_rule(answer_language)}"
+        f"{_answer_language_rule(answer_language, term_policy)}"
         "- 不编造项目经历、线上数据或截图里不可见的信息；\n"
         f"{_QUESTION_FIDELITY_RULE}"
         f"{_PROJECT_GROUNDING_RULE}"
@@ -732,16 +751,17 @@ def build_system_prompt(
             relation_to_previous=relation_to_previous,
         )
     answer_language = getattr(cfg, "answer_language", "中文") or "中文"
+    term_policy = str(getattr(cfg, "technical_term_policy", "AUTO") or "AUTO")
     lang_lower = cfg.language.lower()
     region = _normalize_screen_region(screen_region or getattr(cfg, "screen_capture_region", "left_half"))
     if mode == PROMPT_MODE_WRITTEN_EXAM:
         prefix = _written_exam_prefix(kb_section)
         body = _written_exam_prompt_body(cfg.language, lang_lower, region)
     elif mode == PROMPT_MODE_SERVER_SCREEN:
-        prefix = _base_prompt_prefix(position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language)
+        prefix = _base_prompt_prefix(position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language, term_policy=term_policy)
         body = _server_screen_prompt_body(cfg.language, lang_lower, region)
     elif mode == PROMPT_MODE_MANUAL_TEXT:
-        prefix = _base_prompt_prefix(position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language)
+        prefix = _base_prompt_prefix(position, cfg.language, resume_section, kb_section, jd_section=jd_section, notes_section=notes_section, memo_section=memo_section, answer_language=answer_language, term_policy=term_policy)
         body = _manual_text_prompt_body(cfg.language, lang_lower)
     else:
         concise_realtime = bool(
@@ -761,6 +781,7 @@ def build_system_prompt(
             memo_section=memo_section,
             answer_language=answer_language,
             include_focus_tabs=not concise_realtime,
+            term_policy=term_policy,
         )
         body = _asr_realtime_prompt_body(
             cfg.language,

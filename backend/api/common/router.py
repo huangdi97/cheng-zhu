@@ -136,6 +136,12 @@ class ConfigUpdate(BaseModel):
     speech_adoption_analytics_live: Optional[bool] = None
     fast_cue_model_index: Optional[int] = None
     onboarding_completed: Optional[bool] = None
+    # v1.3 language layering / guidance / analytics
+    technical_term_policy: Optional[str] = None
+    ui_language: Optional[str] = None
+    proactive_guidance_enabled: Optional[bool] = None
+    practice_delivery_analytics_enabled: Optional[bool] = None
+    remote_telemetry_opt_in: Optional[bool] = None
 
 
 _MODEL_API_KEY_KEEP = "__IA_KEEP_EXISTING_API_KEY__"
@@ -303,6 +309,14 @@ async def api_update_config(body: ConfigUpdate):
             if _value not in _allowed:
                 raise HTTPException(status_code=422, detail=f"{_key} 必须是 {'/'.join(sorted(_allowed))} 之一")
             d[_key] = _value
+    # v1.3 language layering: each layer validated independently
+    if "technical_term_policy" in d:
+        _tp = str(d["technical_term_policy"]).strip().upper()
+        if _tp not in {"AUTO", "KEEP_ENGLISH", "TRANSLATE", "BILINGUAL"}:
+            raise HTTPException(status_code=422, detail="technical_term_policy 必须是 AUTO/KEEP_ENGLISH/TRANSLATE/BILINGUAL 之一")
+        d["technical_term_policy"] = _tp
+    if "ui_language" in d and d["ui_language"] not in {"zh-CN", "en-US"}:
+        raise HTTPException(status_code=422, detail="ui_language 必须是 zh-CN 或 en-US")
     try:
         if "assist_auto_answer_mode" in d:
             mode = str(d["assist_auto_answer_mode"] or "").strip().lower()

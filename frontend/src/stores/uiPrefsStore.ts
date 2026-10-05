@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { navigate as navigateToRoute, routeForLegacyMode } from '@/lib/router'
 import type { ColorSchemeId } from '@/lib/colorScheme'
 import {
   COLOR_SCHEME_STORAGE_KEY,
@@ -40,6 +41,7 @@ export const __UI_PREFS_TEST_KEYS = {
   overlayPromptMaxWidth: INTERVIEW_OVERLAY_STORAGE_KEYS.promptMaxWidth,
   overlayPromptAutoFollow: INTERVIEW_OVERLAY_STORAGE_KEYS.promptAutoFollow,
   overlayMaxLines: INTERVIEW_OVERLAY_STORAGE_KEYS.maxLines,
+  assistTranscriptCollapsed: ASSIST_TRANSCRIPT_COLLAPSED_KEY,
 }
 
 const APP_MODE_VALUES: ReadonlySet<AppMode> = new Set([
@@ -258,10 +260,17 @@ function readAssistSplitPct(): number {
 }
 
 function readAssistTranscriptCollapsed(): boolean {
+  // v1.3 Live Cockpit is cue-first: Question / Fast Cue / Source-Warning are
+  // the glanceable first layer, while the transcript is explicitly secondary.
+  // Preserve any user's stored choice; only a brand-new profile defaults to
+  // the transcript panel collapsed.
   try {
-    return localStorage.getItem(ASSIST_TRANSCRIPT_COLLAPSED_KEY) === '1'
+    const stored = localStorage.getItem(ASSIST_TRANSCRIPT_COLLAPSED_KEY)
+    if (stored === '0') return false
+    if (stored === '1') return true
+    return true
   } catch {
-    return false
+    return true
   }
 }
 
@@ -357,6 +366,8 @@ export const useUiPrefsStore = create<UiPrefsState>((set) => ({
       /* ignore */
     }
     set(mode === 'knowledge' ? { appMode: target, reviewHubTab: 'ability' } : { appMode: target })
+    // v1.3 route adapter: legacy callers move the object-centric router too.
+    navigateToRoute(routeForLegacyMode(target))
   },
   setAssistMode: (mode) => {
     try {

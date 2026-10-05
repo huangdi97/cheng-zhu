@@ -53,6 +53,18 @@ jobs:
           python -c "import sys, json; sys.path.insert(0, '.'); from evals.runners.route_runner import run_route_eval, run_seven_turn; r = run_route_eval(); s7 = run_seven_turn(); print(json.dumps({'exact': r['route_accuracy_exact'], 'semantic': r['route_accuracy_semantic'], 'seven_exact': s7['route_accuracy_exact'], 'unsupported_blocked': r['unsupported_claim_rate']})); assert r['route_accuracy_exact'] >= 0.9; assert s7['route_accuracy_exact'] >= 0.85; assert r['unsupported_claim_rate'] >= 0.95"
           python -m evals.r2_eval --check
 
+      - name: v1.4 product-loop engineering evidence
+        working-directory: .
+        run: python scripts/v14_validation_evidence.py --out-dir artifacts/validation
+
+      - name: Upload v1.4 validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1.4-engineering-validation
+          path: artifacts/validation
+          retention-days: 14
+          if-no-files-found: error
+
       - name: License gate (MIT root + generated third-party notices)
         working-directory: .
         run: python scripts/generate_third_party_notices.py --check

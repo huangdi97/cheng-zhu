@@ -1,6 +1,8 @@
 """Tests for the Stage P AI policy gate and intelligence export."""
 from types import SimpleNamespace
 
+import pytest
+
 from services.intelligence.policy import (
     auto_answer_allowed,
     live_guidance_allowed,
@@ -75,3 +77,18 @@ def test_export_endpoint_registered():
 
     paths = {route.path for route in router.routes}
     assert "/export" in paths
+
+def test_screen_guidance_policy_requires_full_ai_permission(monkeypatch):
+    from fastapi import HTTPException
+    from api.assist import routes as assist_routes
+
+    for policy in ("AI_FORBIDDEN", "AI_LIMITED"):
+        monkeypatch.setattr(assist_routes, "get_config", lambda p=policy: _cfg(p))
+        with pytest.raises(HTTPException) as exc:
+            assist_routes._require_screen_guidance_policy()
+        assert exc.value.status_code == 403
+        assert "AI 辅助策略" in exc.value.detail
+
+    for policy in ("AI_ALLOWED", "AI_EXPECTED"):
+        monkeypatch.setattr(assist_routes, "get_config", lambda p=policy: _cfg(p))
+        assert assist_routes._require_screen_guidance_policy().ai_policy_mode == policy

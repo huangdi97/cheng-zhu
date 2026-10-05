@@ -69,7 +69,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
               : { key: 'resume', label: '恢复为进行中', onSelect: () => setStatus('ACTIVE') },
             { key: 'complete', label: '标记已结束', onSelect: () => setStatus('COMPLETED') },
             { key: 'delete', label: '删除目标', danger: true, onSelect: () => {
-              if (window.confirm(`删除「${goal.title}」？目标内的速记、面试轮次和 Next Focus 会一起删除；练习与复盘记录保留在历史里。`)) {
+              if (window.confirm(`删除「${goal.title}」？目标内的速记、面试轮次和下一步建议会一起删除；练习与复盘记录保留在历史里。`)) {
                 void productApi.deleteGoal(goal.id).then(() => navigate(paths.goals()))
               }
             } },
@@ -200,7 +200,7 @@ function ProgressTrends({ goalId }: { goalId: string }) {
           ) : null}
         </ul>
       ) : null}
-      <p className="mt-2 text-[10px] text-text-muted">这些是同一 Goal 内的练习/复盘观察，不是录用概率，也不和其他候选人比较。</p>
+      <p className="mt-2 text-[10px] text-text-muted">这些只反映同一求职目标下的练习和复盘变化，不是录用概率，也不和其他候选人比较。</p>
     </Section>
   )
 }

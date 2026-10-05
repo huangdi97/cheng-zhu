@@ -53,6 +53,29 @@ def main() -> int:
     if expected and not notes.is_file():
         errors.append(f"missing release notes: {notes.relative_to(ROOT)}")
 
+    # Release provenance is part of version consistency: the published tag
+    # must resolve to the same commit that produced the installer/portable
+    # artifacts. A previous workflow used the moving default branch when
+    # creating the tag, allowing main to advance during a long Windows build.
+    release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    publisher_workflow = (ROOT / ".github" / "workflows" / "publish-current-on-green-main.yml").read_text(encoding="utf-8")
+    required_release_tokens = [
+        "source_sha:",
+        "CHENGZHU_RELEASE_SOURCE_SHA",
+        "--target $sourceSha",
+        "tag $tag points to $tagSha but binaries were built from $sourceSha",
+    ]
+    for token in required_release_tokens:
+        if token not in release_workflow:
+            errors.append(f"release workflow missing provenance invariant: {token}")
+    required_publisher_tokens = [
+        "github.event.workflow_run.head_sha",
+        'gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"',
+    ]
+    for token in required_publisher_tokens:
+        if token not in publisher_workflow:
+            errors.append(f"auto-publisher missing exact-SHA invariant: {token}")
+
     if errors:
         print(json.dumps({"ok": False, "versions": versions, "errors": errors}, ensure_ascii=False, indent=2))
         return 1

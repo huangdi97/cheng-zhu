@@ -145,10 +145,12 @@ def run_week(set_clock: Callable[[Callable[[], float]], None]) -> dict[str, Any]
             goal_id=goal["id"],
             payload={"content": "下一场先明确个人职责与决策边界", "tags": ["NEXT_FOCUS"]},
         ).get("quick_note")
+    # QuickNote deliberately has no persisted "origin" field: truth role and
+    # user content stay minimal. Reflection provenance is a local ProductEvent.
     checks["day5_reflection_can_create_quick_note"] = bool(
         reflected_note
         and quick_notes.get_note(str(reflected_note["id"]))
-        and quick_notes.get_note(str(reflected_note["id"])).get("origin") == "REFLECTION"
+        and events.counts().get("quick_note_from_reflection", 0) >= 1
     )
 
     # Day 6 — reopen (fresh process)

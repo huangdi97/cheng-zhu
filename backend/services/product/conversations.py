@@ -1195,6 +1195,7 @@ def prepare_space(space_id: str) -> dict[str, Any]:
             "unresolved_count": len(active) + len(unresolved),
             "known_participants": len(detail["participants"]),
         },
+        "agenda": [item["title"] for item in (active[:3] + unresolved[:4])],
         "expected_questions": [item["title"] for item in unresolved[:5]],
         "contribution_candidates": [
             {"text": item["title"], "source_refs": item.get("source_refs") or [], "kind": "RECALL"}

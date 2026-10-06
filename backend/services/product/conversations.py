@@ -875,10 +875,32 @@ def _text_match_score(question: str, haystack: str) -> int:
     h = str(haystack or "").lower()
     if not q or not h:
         return 0
+
+    q_tokens = _query_tokens(q)
+    # Distinctive alphanumeric tokens such as 50x, v2, sha256, Q4 or 30%
+    # carry factual identity.  If the question contains one, a candidate that
+    # only shares generic words ("data scale") must not be called grounded.
+    distinctive = {
+        token for token in q_tokens
+        if any(ch.isdigit() for ch in token)
+    }
+    if distinctive and any(token not in h for token in distinctive):
+        return 0
+
     score = 4 if q in h else 0
-    for token in _query_tokens(q):
+    matched = 0
+    for token in q_tokens:
         if token and token in h:
             score += 1
+            matched += 1
+
+    # For multi-token questions without an exact phrase, require more than one
+    # meaningful overlap. This keeps Manual Ask precision-biased and avoids a
+    # single generic word turning unrelated frozen context into "grounded".
+    if not score:
+        return 0
+    if q not in h and len(q_tokens) >= 2 and matched < 2:
+        return 0
     return score
 
 

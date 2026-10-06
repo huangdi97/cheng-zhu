@@ -145,6 +145,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
+  const setGoalStatus = async (goalId: string, status: 'ACTIVE' | 'RESOLVED') => {
+    setSessionBusy(true); setSessionError('')
+    try {
+      await conversationApi.patchGoal(goalId, { status })
+      await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
   const setArchived = async (archived: boolean) => {
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
@@ -320,7 +329,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <div className="mt-2"><SecondaryButton onClick={addParticipant} disabled={sessionBusy || (!participantName.trim() && !participantRole.trim())} icon={<Plus className="h-3.5 w-3.5" />}>添加明确信息</SecondaryButton></div>
           </Section>
           <Section title="Conversation Goals">
-            {space.goals.length ? <div className="space-y-1">{space.goals.map((g) => <div key={g.id} className="text-xs text-text-primary">• {g.title}</div>)}</div> : <p className="text-xs text-text-muted">可把本次需要形成 Decision / 明确 owner 等目标写在这里。</p>}
+            {space.goals.length ? <div className="space-y-2">{space.goals.map((g) => <div key={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-tertiary/70 px-3 py-2">
+              <div><div className="text-xs font-medium text-text-primary">{g.title}</div>{g.outcome_definition ? <div className="mt-1 text-[11px] text-text-muted">{g.outcome_definition}</div> : null}</div>
+              <div className="flex items-center gap-2"><StatusBadge tone={g.status === 'ACTIVE' ? 'ok' : 'muted'}>{g.status}</StatusBadge><SecondaryButton disabled={sessionBusy} onClick={() => setGoalStatus(g.id, g.status === 'ACTIVE' ? 'RESOLVED' : 'ACTIVE')}>{g.status === 'ACTIVE' ? '完成目标' : '重新打开'}</SecondaryButton></div>
+            </div>)}</div> : <p className="text-xs text-text-muted">可把本次需要形成 Decision / 明确 owner 等目标写在这里；ACTIVE Goal 会自动进入下一场 Session Pack。</p>}
             <div className="mt-3 flex gap-2"><input className={inputCls} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="新增一个可验证的对话目标" /><SecondaryButton onClick={addGoal} disabled={sessionBusy || !goalTitle.trim()} icon={<Plus className="h-3.5 w-3.5" />}>添加</SecondaryButton></div>
           </Section>
           <Section title="数据保留与删除">

@@ -8,8 +8,11 @@
 ## 1. Final release facts
 
 ```text
-authoritative main / public tag / binary source:
+CI-proven v1.4.2 release baseline / public tag / binary source:
 ce72eb4068408fd22be8eb421503e7b1b59dc856
+
+note:
+main may advance after this release through docs-only truth-sync commits; that does not change the immutable v1.4.2 tag or binary provenance.
 
 main CI:
 run 37409763712
@@ -51,7 +54,7 @@ chengzhu-runtime-ui-evidence
 chengzhu-download-back-verification
 ```
 
-The public v1.4.2 tag resolves to the exact same SHA used by the green main CI and release build. This closes the moving-main provenance defect discovered in v1.4.1.
+The public v1.4.2 tag resolves to the exact same SHA that passed main CI and was checked out for the release build. This closes the moving-main provenance defect discovered in v1.4.1. Later docs-only main commits are not part of the already-published binary and are not allowed to rewrite that provenance.
 
 ---
 
@@ -215,7 +218,7 @@ The v1.4.1 moving-main race is explicitly superseded by v1.4.2 as the reproducib
 Required and now proven for v1.4.2:
 
 ```text
-green main CI head SHA
+green main CI head SHA at release time
 ==
 release source_sha
 ==

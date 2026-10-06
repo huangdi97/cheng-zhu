@@ -36,6 +36,7 @@ def is_active() -> bool:
 def status(session_id: str = "") -> dict[str, Any]:
     with _lock:
         active = bool(_active_session_id)
+        legacy = get_session()
         return {
             "active": active,
             "session_id": _active_session_id,
@@ -43,6 +44,7 @@ def status(session_id: str = "") -> dict[str, Any]:
             "device_id": _device_id,
             "candidate_mic_device_id": _candidate_mic_device_id,
             "mode": "TRANSCRIPTION_ONLY" if active else "IDLE",
+            "paused": bool(getattr(legacy, "is_paused", False)) if active else False,
         }
 
 
@@ -102,6 +104,13 @@ def start(session_id: str, device_id: int, candidate_mic_device_id: Optional[int
         try:
             from api.assist.pipeline import start_nonblocking
             start_nonblocking(_device_id, _candidate_mic_device_id)
+            # Candidate/self-mic capture is an optional degraded path. The
+            # shared pipeline records 0 when opening it failed; expose that
+            # actual state instead of echoing the requested device id.
+            if _candidate_mic_device_id is not None:
+                actual_candidate = int(getattr(legacy, "last_candidate_mic_device_id", 0) or 0)
+                if actual_candidate <= 0:
+                    _candidate_mic_device_id = None
         except Exception:
             with conversation_lock:
                 for key, value in _legacy_snapshot.items():

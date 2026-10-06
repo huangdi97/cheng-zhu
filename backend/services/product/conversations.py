@@ -1105,6 +1105,86 @@ def _recall_for_topic(space_id: str, topic: str) -> Optional[dict[str, Any]]:
     return best[1] if best else None
 
 
+OPEN_THREAD_ITEM_TYPES = {"OpenQuestion", "Risk", "Objection"}
+THREAD_CONFIRMED_REVIEW = {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
+
+
+def _thread_for_item(item: dict[str, Any]) -> Optional[dict[str, Any]]:
+    for thread in store.select(
+        "conversation_open_thread",
+        where="space_id = ?",
+        params=(item["space_id"],),
+        order="created_at DESC",
+        limit=500,
+    ):
+        for ref in thread.get("source_refs") or []:
+            if str(ref.get("kind") or "") == "CONVERSATION_ITEM" and str(ref.get("id") or "") == item["id"]:
+                return thread
+    return None
+
+
+def _sync_open_thread(item: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Project reviewed unresolved items into the longitudinal Open Thread view.
+
+    AI_EXTRACTED candidates never become persistent threads by themselves.
+    The Conversation Item remains the truth object; the thread is only a
+    continuity/read-model projection with a provenance edge back to that item.
+    """
+    if item.get("type") not in OPEN_THREAD_ITEM_TYPES:
+        return None
+
+    existing = _thread_for_item(item)
+    active = (
+        item.get("review_status") in THREAD_CONFIRMED_REVIEW
+        and item.get("state") not in {"DONE", "SUPERSEDED", "UNKNOWN"}
+    )
+    now = store.now()
+    item_ref = {
+        "kind": "CONVERSATION_ITEM",
+        "id": item["id"],
+        "session_id": item.get("session_id") or "",
+        "visibility": "PRIVATE",
+    }
+    source_refs = [item_ref, *list(item.get("source_refs") or [])]
+
+    if active:
+        if existing:
+            store.update("conversation_open_thread", existing["id"], {
+                "kind": item["type"],
+                "text": item["title"],
+                "owner_id": item.get("owner_id") or "",
+                "status": "OPEN",
+                "source_refs": source_refs,
+                "resolved_at": None,
+            })
+            return store.get("conversation_open_thread", existing["id"])
+        row = {
+            "id": store.new_id("cot_"),
+            "space_id": item["space_id"],
+            "session_id": item.get("session_id") or "",
+            "kind": item["type"],
+            "text": item["title"],
+            "owner_id": item.get("owner_id") or "",
+            "status": "OPEN",
+            "source_refs": source_refs,
+            "created_at": now,
+            "resolved_at": None,
+        }
+        store.insert("conversation_open_thread", row)
+        return store.get("conversation_open_thread", row["id"])
+
+    if existing and existing.get("status") == "OPEN":
+        store.update("conversation_open_thread", existing["id"], {
+            "status": "RESOLVED",
+            "resolved_at": now,
+            "text": item["title"],
+            "owner_id": item.get("owner_id") or "",
+            "source_refs": source_refs,
+        })
+        return store.get("conversation_open_thread", existing["id"])
+    return existing
+
+
 def add_item(
     session_id: str,
     *,
@@ -1162,7 +1242,9 @@ def add_item(
         "updated_at": ts,
     }
     store.insert("conversation_item", row)
-    return require_item(row["id"])
+    saved = require_item(row["id"])
+    _sync_open_thread(saved)
+    return saved
 
 
 def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = None) -> dict[str, Any]:
@@ -1194,6 +1276,13 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
             raise ValueError("只有 COMMITTED 事项才能标记 DONE")
         update["state"] = "DONE"
         update["review_status"] = "USER_CONFIRMED"
+    elif action == "RESOLVE":
+        if item["type"] not in OPEN_THREAD_ITEM_TYPES:
+            raise ValueError("只有 OpenQuestion / Risk / Objection 可以标记已解决")
+        if item["review_status"] not in THREAD_CONFIRMED_REVIEW:
+            raise ValueError("未确认事项不能直接标记已解决")
+        update["state"] = "DONE"
+        update["review_status"] = "USER_CONFIRMED"
     elif action == "SUPERSEDE":
         update["state"] = "SUPERSEDED"
         update["review_status"] = "USER_CONFIRMED"
@@ -1203,7 +1292,9 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
         raise ValueError("审核动作不支持")
     update["updated_at"] = store.now()
     store.update("conversation_item", item_id, update)
-    return require_item(item_id)
+    saved = require_item(item_id)
+    _sync_open_thread(saved)
+    return saved
 
 
 def continue_summary(session_id: str) -> dict[str, Any]:
@@ -1874,16 +1965,20 @@ def prepare_space(space_id: str) -> dict[str, Any]:
         "next_session": next_sessions[0] if next_sessions else None,
         "open_commitments": active,
         "open_questions": unresolved,
+        "open_threads": detail["threads"],
         "related_decisions": decisions[:12],
         "participants": detail["participants"],
         "selected_sources": detail.get("selected_source_ids") or [],
         "selected_quick_notes": detail.get("selected_quick_note_ids") or [],
         "brief": {
             "last_change": detail["decisions"][0] if detail["decisions"] else None,
-            "unresolved_count": len(active) + len(unresolved),
+            "unresolved_count": len(active) + len(detail["threads"]),
             "known_participants": len(detail["participants"]),
         },
-        "agenda": [item["title"] for item in (active[:3] + unresolved[:4])],
+        "agenda": (
+            [item["title"] for item in active[:3]]
+            + [thread["text"] for thread in detail["threads"][:4]]
+        ),
         "expected_questions": [item["title"] for item in unresolved[:5]],
         "contribution_candidates": [
             {"text": item["title"], "source_refs": item.get("source_refs") or [], "kind": "RECALL"}

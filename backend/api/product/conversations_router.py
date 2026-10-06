@@ -421,6 +421,7 @@ class GuidanceBody(BaseModel):
     audience_priority: str = Field(default="", max_length=800)
     audience_concern: str = Field(default="", max_length=1200)
     decision_authority: str = Field(default="", max_length=500)
+    relationship_context: str = Field(default="", max_length=800)
 
 
 @router.post("/sessions/{session_id}/guidance/evaluate")

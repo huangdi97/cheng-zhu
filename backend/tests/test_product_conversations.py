@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from services.product import conversations
+from services.product import conversations, materials
 from services.storage import product as store
 
 
@@ -247,3 +247,24 @@ def test_thirty_session_continuity_stays_bounded_and_traceable(product_env):
     pack = conversations.start_session(latest["id"])["pack"]
     assert len(pack["payload"]["confirmed_items"]) == 6
     assert all(row["source_refs"] for row in pack["payload"]["confirmed_items"])
+
+
+def test_session_pack_freezes_ready_material_version_and_user_notes(product_env):
+    material = materials.create_material(
+        "Q4 Benchmark", kind="PROJECT", usage="FACTS",
+        text="Q4 benchmark 已覆盖十倍数据规模，并记录了 offline migration 的测试结果。" * 3,
+    )
+    from services.product import quick_notes
+    qn = quick_notes.create_note("提醒：先确认 rollback owner", title="Review reminder")
+    space = conversations.create_space(
+        "Architecture", "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+        selected_quick_note_ids=[qn["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    pack = conversations.start_session(session["id"])["pack"]
+    assert pack["payload"]["sources"][0]["material_id"] == material["id"]
+    assert pack["payload"]["sources"][0]["text"].startswith("Q4 benchmark")
+    assert pack["payload"]["sources"][0]["is_personal_evidence"] is True
+    assert pack["payload"]["quick_notes"][0]["kind"] == "USER_NOTE"
+    assert pack["payload"]["quick_notes"][0].get("is_evidence") is None

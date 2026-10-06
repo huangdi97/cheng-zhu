@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Download, Play, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
+import { productApi } from '@/lib/productApi'
 import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationItem, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
@@ -24,6 +25,8 @@ function ItemRow({ item, onChanged }: { item: ConversationItem; onChanged: () =>
 export default function ConversationSpacePage({ spaceId, tab }: { spaceId: string; tab: ConversationTab }) {
   const detail = useAsync(() => conversationApi.space(spaceId), [spaceId])
   const prepare = useAsync(() => conversationApi.prepare(spaceId), [spaceId])
+  const materials = useAsync(() => productApi.materials(), [])
+  const quickNotes = useAsync(() => productApi.quickNotes(), [])
   const [capture, setCapture] = useState<CaptureMode>('NOTES_ONLY')
   const [processing, setProcessing] = useState<ProcessingMode>('LOCAL')
   const [mode, setMode] = useState<AssistanceMode>('BALANCED')
@@ -36,6 +39,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [participantName, setParticipantName] = useState('')
   const [participantRole, setParticipantRole] = useState('')
   const [goalTitle, setGoalTitle] = useState('')
+  const [sourceSaving, setSourceSaving] = useState(false)
 
   useEffect(() => { if (detail.data?.default_mode) setMode(detail.data.default_mode) }, [detail.data?.default_mode])
 
@@ -81,6 +85,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       await detail.reload(); await prepare.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
+  }
+
+  const toggleSource = async (id: string) => {
+    const selected = new Set(space.selected_source_ids ?? [])
+    if (selected.has(id)) selected.delete(id); else selected.add(id)
+    setSourceSaving(true); setSessionError('')
+    try { await conversationApi.patchSpace(spaceId, { selected_source_ids: Array.from(selected) }); await detail.reload(); await prepare.reload() }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSourceSaving(false) }
+  }
+
+  const toggleQuickNote = async (id: string) => {
+    const selected = new Set(space.selected_quick_note_ids ?? [])
+    if (selected.has(id)) selected.delete(id); else selected.add(id)
+    setSourceSaving(true); setSessionError('')
+    try { await conversationApi.patchSpace(spaceId, { selected_quick_note_ids: Array.from(selected) }); await detail.reload(); await prepare.reload() }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSourceSaving(false) }
   }
 
   const exportSpace = async () => {
@@ -157,6 +179,23 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <div className="rounded-xl bg-bg-secondary/40 p-3"><div className="text-[11px] text-text-muted">未完成承诺</div><div className="mt-1 text-sm text-text-primary">{prepare.data?.open_commitments.length ?? 0}</div></div>
               <div className="rounded-xl bg-bg-secondary/40 p-3"><div className="text-[11px] text-text-muted">开放问题</div><div className="mt-1 text-sm text-text-primary">{prepare.data?.open_questions.length ?? 0}</div></div>
             </div>
+          </Section>
+          <Section title="本场带入来源">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-2 text-xs font-semibold text-text-secondary">项目资料 / 知识库</div>
+                {materials.loading ? <Loading /> : materials.data?.items.length ? <div className="space-y-1.5">{materials.data.items.map((m) => {
+                  const ready = m.lifecycle.state === 'READY' || m.lifecycle.state === 'REPLACING'
+                  const checked = (space.selected_source_ids ?? []).includes(m.id)
+                  return <label key={m.id} className={`flex items-start gap-2 rounded-xl px-2 py-1.5 text-xs ${ready ? 'hover:bg-bg-hover/40' : 'opacity-50'}`}><input type="checkbox" checked={checked} disabled={!ready || sourceSaving} onChange={() => void toggleSource(m.id)} className="mt-0.5" /><span><span className="text-text-primary">{m.title}</span><span className="ml-1 text-text-muted">{m.kind} · {m.usage} · {m.lifecycle.state}</span></span></label>
+                })}</div> : <p className="text-xs text-text-muted">资料库里还没有 Ready 资料。可以先不带资料开始。</p>}
+              </div>
+              <div>
+                <div className="mb-2 text-xs font-semibold text-text-secondary">Quick Notes</div>
+                {quickNotes.loading ? <Loading /> : quickNotes.data?.items.length ? <div className="space-y-1.5">{quickNotes.data.items.map((n) => <label key={n.id} className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-xs hover:bg-bg-hover/40"><input type="checkbox" checked={(space.selected_quick_note_ids ?? []).includes(n.id)} disabled={sourceSaving} onChange={() => void toggleQuickNote(n.id)} className="mt-0.5" /><span><span className="text-text-primary">{n.title || n.content.slice(0, 50)}</span><span className="ml-1 text-text-muted">用户速记 · 非证据</span></span></label>)}</div> : <p className="text-xs text-text-muted">没有 Quick Notes。</p>}
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本与所选 Quick Notes；后续替换资料不会静默改写这场的 Pack。</p>
           </Section>
           <Section title="Preflight">
             <div className="grid gap-3 md:grid-cols-3">

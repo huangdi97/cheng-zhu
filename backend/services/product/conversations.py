@@ -15,6 +15,7 @@ import hashlib
 import json
 from typing import Any, Optional
 
+from services.product import materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -322,11 +323,23 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         if note:
             selected_notes.append({"id": note["id"], "title": note.get("title", ""), "content": note.get("content", ""), "kind": "USER_NOTE"})
     participants = store.select("conversation_participant", where="space_id = ?", params=(space["id"],), order="created_at ASC")
+    selected_sources: list[dict[str, Any]] = []
+    skipped_sources: list[dict[str, str]] = []
+    for source_id in space.get("selected_source_ids") or []:
+        ready = materials.ready_text(str(source_id))
+        if ready:
+            selected_sources.append(ready)
+        else:
+            raw = store.get("material", str(source_id))
+            skipped_sources.append({"id": str(source_id), "title": (raw or {}).get("title", ""), "reason": "NOT_READY"})
+
     payload = {
         "contract": "v2.0-R1",
         "space": {"id": space["id"], "profile": space["profile"], "title": space["title"]},
         "goal_ids": session.get("goal_ids") or [],
         "selected_source_ids": space.get("selected_source_ids") or [],
+        "sources": selected_sources,
+        "skipped_sources": skipped_sources,
         "quick_notes": selected_notes,
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
-import type { AssistanceMode, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItem, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -32,7 +32,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [summary, setSummary] = useState<ConversationContinue | null>(null)
   const [mode, setMode] = useState<AssistanceMode>('BALANCED')
   const [askText, setAskText] = useState('')
-  const [askResult, setAskResult] = useState<{ answer: string; matches: ConversationItem[]; grounded: boolean } | null>(null)
+  const [askResult, setAskResult] = useState<ConversationAskResult | null>(null)
   const [capture, setCapture] = useState<ConversationCaptureStatus | null>(null)
   const [segments, setSegments] = useState<ConversationTranscriptSegment[]>([])
   const [primaryDevice, setPrimaryDevice] = useState('')
@@ -269,13 +269,23 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-bg-tertiary p-4">
-            <h2 className="text-sm font-semibold text-text-primary">问成竹 · 已确认历史</h2>
-            <p className="mt-1 text-[11px] text-text-muted">只检索这个 Space 中已经确认、仍有效的 Decision / Commitment 等记录；找不到就明确说找不到。</p>
+            <h2 className="text-sm font-semibold text-text-primary">问成竹 · 本场可追溯上下文</h2>
+            <p className="mt-1 text-[11px] text-text-muted">检索开始时冻结的 Ready sources / Quick Notes、已确认历史，以及本场当前 transcript。每条结果标明 authority；观察和笔记不会冒充 confirmed truth。</p>
             <div className="mt-3 space-y-2">
-              <textarea className={inputCls} rows={2} value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="例如：我们之前为什么决定用 v2？" />
-              <SecondaryButton disabled={busy || !askText.trim()} onClick={ask}>查已确认记录</SecondaryButton>
+              <textarea className={inputCls} rows={2} value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="例如：之前为什么用 v2？Q4 benchmark 说了什么？刚才是否提到 rollback？" />
+              <SecondaryButton disabled={busy || !askText.trim()} onClick={ask}>查本场可用来源</SecondaryButton>
             </div>
-            {askResult ? <div className="mt-3 rounded-xl bg-bg-secondary/45 p-3"><p className="text-xs text-text-primary">{askResult.answer}</p><p className="mt-1 text-[11px] text-text-muted">{askResult.grounded ? `已找到 ${askResult.matches.length} 条可追溯记录` : '没有用模型猜测答案'}</p></div> : null}
+            {askResult ? <div className="mt-3 rounded-xl bg-bg-secondary/45 p-3">
+              <p className="text-xs text-text-primary">{askResult.answer}</p>
+              <p className="mt-1 text-[11px] text-text-muted">{askResult.grounded ? `已找到 ${askResult.matches.length} 条可追溯来源 · ${askResult.truth_confirmed ? '顶部命中为已确认事实' : '顶部命中不是已确认事实'}` : '没有用模型猜测答案'}</p>
+              {askResult.matches.length ? <div className="mt-3 space-y-2">{askResult.matches.slice(0, 4).map((match) => (
+                <div key={`${match.kind}:${match.id}`} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-2.5 py-2">
+                  <div className="flex flex-wrap items-center gap-1.5"><StatusBadge tone={match.authority === 'CONFIRMED_TRUTH' ? 'ok' : match.authority === 'PERSONAL_EVIDENCE' ? 'info' : 'muted'}>{match.kind}</StatusBadge><span className="text-[10px] font-semibold text-text-muted">{match.authority}</span></div>
+                  <div className="mt-1 text-xs font-medium text-text-primary">{match.title}</div>
+                  {match.excerpt ? <div className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-text-muted">{match.excerpt}</div> : null}
+                </div>
+              ))}</div> : null}
+            </div> : null}
           </div>
 
           <div className="rounded-2xl border border-bg-tertiary p-4">

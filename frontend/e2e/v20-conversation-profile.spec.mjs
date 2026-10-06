@@ -225,9 +225,20 @@ function mocks() {
       }
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/ask` && method === 'POST') return {
-      answer: '找到可追溯的相关记录：offline migration 采用 v2',
-      matches: [DECISION],
+      answer: '已确认历史：offline migration 采用 v2 — Benchmark Note',
+      matches: [{
+        id: DECISION.id,
+        kind: 'CONFIRMED_ITEM',
+        authority: 'CONFIRMED_TRUTH',
+        title: DECISION.title,
+        excerpt: 'Benchmark Note',
+        item_type: 'Decision',
+        state: 'AGREED',
+        review_status: 'USER_CONFIRMED',
+        source_refs: DECISION.source_refs,
+      }],
       grounded: true,
+      truth_confirmed: true,
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/end` && method === 'POST') {
       session = { ...session, status: 'ENDED', ended_at: 3 }
@@ -351,9 +362,10 @@ test.describe('v2.0 Conversation Profile', () => {
       apiOverrides: mocks(),
     })
     await page.goto(`/#/conversation/live/${SESSION.id}`)
-    await page.getByPlaceholder('例如：我们之前为什么决定用 v2？').fill('offline sync v2')
-    await page.getByRole('button', { name: '查已确认记录' }).click()
-    await expect(page.getByText('找到可追溯的相关记录：offline migration 采用 v2')).toBeVisible()
+    await page.getByPlaceholder('例如：之前为什么用 v2？Q4 benchmark 说了什么？刚才是否提到 rollback？').fill('offline sync v2')
+    await page.getByRole('button', { name: '查本场可用来源' }).click()
+    await expect(page.getByText('已确认历史：offline migration 采用 v2 — Benchmark Note')).toBeVisible()
+    await expect(page.getByText('CONFIRMED_TRUTH')).toBeVisible()
 
     await page.getByText('我正在连续表达').click()
     await page.getByLabel('值得补充的候选内容（如有）').fill('应该补充 benchmark')

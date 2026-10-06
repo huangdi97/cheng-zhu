@@ -448,8 +448,10 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     return require_space(space_id) if clean else current
 
 
-def delete_space(space_id: str) -> bool:
+def delete_space(space_id: str, *, confirm: bool = False) -> bool:
     require_space(space_id)
+    if not confirm:
+        raise ValueError("删除整个 Conversation Space 会彻底擦除其 Session、Items、Packs、Drafts 与 provenance tombstones；请明确确认")
     return store.delete("conversation_space", space_id)
 
 

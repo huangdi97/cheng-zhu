@@ -190,6 +190,15 @@ function mocks() {
         configured_stt_provider: 'whisper',
         main_audio_remote_possible: false,
         self_mic_remote_possible: false,
+        data_path: {
+          capture: 'STRUCTURED_NOTES_ONLY',
+          stt: 'NOT_USED',
+          inference: 'LOCAL_DETERMINISTIC',
+          retention: 'LOCAL_PRODUCT_DB',
+          writeback: 'LOCAL_REVIEWED_DRAFT_ONLY',
+          audio_retention: 'OFF',
+          transcript_retention: 'SPACE_POLICY',
+        },
         blockers: [],
       },
       pack_preview: {
@@ -275,6 +284,15 @@ function mocks() {
         configured_stt_provider: 'whisper',
         main_audio_remote_possible: false,
         self_mic_remote_possible: false,
+        data_path: {
+          capture: 'STRUCTURED_NOTES_ONLY',
+          stt: 'NOT_USED',
+          inference: 'LOCAL_DETERMINISTIC',
+          retention: 'LOCAL_PRODUCT_DB',
+          writeback: 'LOCAL_REVIEWED_DRAFT_ONLY',
+          audio_retention: 'OFF',
+          transcript_retention: 'SPACE_POLICY',
+        },
         blockers: [],
       },
       policy: SESSION.policy,
@@ -476,7 +494,9 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Session Pulse')).toBeVisible()
     await expect(page.getByText(SPACE.default_goal)).toBeVisible()
     await expect(page.getByText('PACK abcdef12')).toBeVisible()
-    await expect(page.getByText('Data path · LOCAL / STT whisper')).toBeVisible()
+    await expect(page.getByText('Inference · LOCAL_DETERMINISTIC')).toBeVisible()
+    await expect(page.getByText('Retention · LOCAL_PRODUCT_DB')).toBeVisible()
+    await expect(page.getByText('Write-back · LOCAL_REVIEWED_DRAFT_ONLY')).toBeVisible()
     await expect(page.getByLabel('当前受众')).toHaveValue('cp-1')
     await expect(page.getByPlaceholder('对方明确角色，例如 CTO / 客户')).toHaveValue('Backend')
     await expect(page.getByPlaceholder('对方明确优先级')).toHaveValue('迁移稳定性')

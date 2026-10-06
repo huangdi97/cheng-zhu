@@ -858,16 +858,24 @@ def session_context(session_id: str) -> dict[str, Any]:
         {"id": note.get("id") or "", "title": note.get("title") or ""}
         for note in payload.get("quick_notes") or []
     ]
-    participants = [
-        {
+    participants = []
+    for p in payload.get("participants") or []:
+        counterparty = p.get("counterparty_state") or {}
+        if not isinstance(counterparty, dict):
+            counterparty = {}
+        participants.append({
             "id": p.get("id") or "",
             "display_name": p.get("display_name") or "",
             "role": p.get("role") or "",
             "organization": p.get("organization") or "",
-            "counterparty_state": p.get("counterparty_state") or {},
-        }
-        for p in payload.get("participants") or []
-    ]
+            "counterparty_state": {
+                "known_explicit": dict(counterparty.get("known_explicit") or {}),
+                "source_refs": list(counterparty.get("source_refs") or []),
+                "confidence": float(counterparty.get("confidence") or 0.0),
+                "temporary_inferences": list(counterparty.get("temporary_inferences") or []),
+                "unknown": list(counterparty.get("unknown") or []),
+            },
+        })
     return {
         "session_id": session_id,
         "space": payload.get("space") or {"id": session["space_id"]},

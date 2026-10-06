@@ -748,6 +748,28 @@ def _score(body: dict[str, Any]) -> OpportunityScore:
         "stale_context_risk",
     }
     values = {key: float(body.get(key) or 0.0) for key in keys}
+
+    # Stakeholder-aware expression uses only explicit user-provided context.
+    # Presence of a known audience modestly raises role relevance; textual
+    # overlap raises it further. We never infer hidden intent, emotion or
+    # personality from the other party.
+    audience_parts = [
+        str(body.get("audience_role") or ""),
+        str(body.get("audience_priority") or ""),
+        str(body.get("audience_concern") or ""),
+        str(body.get("decision_authority") or ""),
+    ]
+    audience_text = " ".join(part for part in audience_parts if part).strip().lower()
+    candidate_text = " ".join([
+        str(body.get("candidate_text") or ""),
+        str(body.get("current_topic") or ""),
+        str(body.get("direct_question") or ""),
+    ]).lower()
+    if audience_text:
+        values["role_relevance"] = max(values["role_relevance"], 0.5)
+        tokens = {token for token in audience_text.replace("/", " ").replace("，", " ").split() if len(token) >= 2}
+        if any(token in candidate_text for token in tokens):
+            values["role_relevance"] = max(values["role_relevance"], 1.0)
     return OpportunityScore(**values)
 
 
@@ -796,6 +818,15 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     current_topic = str(body.get("current_topic") or "").strip()[:500]
     if current_topic:
         state["current_topic"] = current_topic
+    audience_context = {
+        "role": str(body.get("audience_role") or "")[:240],
+        "explicit_priority": str(body.get("audience_priority") or "")[:800],
+        "explicit_concern": str(body.get("audience_concern") or "")[:1200],
+        "decision_authority": str(body.get("decision_authority") or "")[:500],
+    }
+    if any(audience_context.values()):
+        state["audience_context"] = {k: v for k, v in audience_context.items() if v}
+    if current_topic or any(audience_context.values()):
         store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
     source_refs = list(body.get("source_refs") or [])
@@ -977,6 +1008,37 @@ def prepare_space(space_id: str) -> dict[str, Any]:
             for item in decisions[:5] if item.get("source_refs")
         ],
     }
+
+
+def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
+    rows = store.rows(
+        "SELECT s.*, sp.title AS space_title, sp.profile AS space_profile "
+        "FROM conversation_session s JOIN conversation_space sp ON sp.id = s.space_id "
+        "WHERE s.status = 'ENDED' "
+        "ORDER BY COALESCE(s.ended_at, s.started_at, s.created_at) DESC LIMIT ?",
+        (max(1, min(500, int(limit))),),
+    )
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        session_id = row["id"]
+        row["decisions_count"] = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE session_id = ? AND type = 'Decision' AND state = 'AGREED'",
+            (session_id,),
+        ) or 0)
+        row["commitments_count"] = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE session_id = ? AND type IN ('Commitment','Task') AND state IN ('COMMITTED','DONE')",
+            (session_id,),
+        ) or 0)
+        row["open_questions_count"] = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE session_id = ? AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+            (session_id,),
+        ) or 0)
+        row["review_required"] = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE session_id = ? AND review_status = 'AI_EXTRACTED'",
+            (session_id,),
+        ) or 0)
+        out.append(row)
+    return out
 
 
 def home_summary() -> dict[str, Any]:

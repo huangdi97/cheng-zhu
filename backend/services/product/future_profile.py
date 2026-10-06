@@ -170,6 +170,9 @@ class ConversationProfile:
     productized: bool
     default_mode: AssistanceMode = AssistanceMode.BALANCED
     design_complete: bool = True
+    runtime_available: bool = False
+    launch_wedge: bool = False
+    specialized_behavior_validated: bool = False
 
 
 @dataclass
@@ -312,6 +315,8 @@ PROFILES: tuple[ConversationProfile, ...] = (
         "面试",
         (GuidanceKind.ANSWER_CUE, GuidanceKind.QUESTION, GuidanceKind.RISK, GuidanceKind.DELIVERY),
         productized=True,
+        runtime_available=True,
+        specialized_behavior_validated=True,
     ),
     ConversationProfile(
         ConversationProfileKind.PROJECT_SYNC,
@@ -323,7 +328,9 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
             GuidanceKind.TALKING_POINT,
         ),
-        productized=True,
+        productized=False,
+        runtime_available=True,
+        launch_wedge=True,
     ),
     ConversationProfile(
         ConversationProfileKind.DESIGN_REVIEW,
@@ -335,13 +342,16 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.RISK,
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
         ),
-        productized=True,
+        productized=False,
+        runtime_available=True,
+        launch_wedge=True,
     ),
     ConversationProfile(
         ConversationProfileKind.PRESENTATION_QA,
         "演示 / Q&A",
         (GuidanceKind.ANSWER_CUE, GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.DELIVERY),
         productized=False,
+        runtime_available=True,
         default_mode=AssistanceMode.PRESENTATION,
     ),
     ConversationProfile(
@@ -349,6 +359,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
         "1:1",
         (GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.TALKING_POINT, GuidanceKind.RISK),
         productized=False,
+        runtime_available=True,
         default_mode=AssistanceMode.ONE_ON_ONE,
     ),
     ConversationProfile(
@@ -356,6 +367,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
         "客户会",
         tuple(GuidanceKind),
         productized=False,
+        runtime_available=True,
     ),
     ConversationProfile(
         ConversationProfileKind.NEGOTIATION,
@@ -374,6 +386,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
         "会议（兼容抽象）",
         tuple(GuidanceKind),
         productized=False,
+        runtime_available=True,
     ),
 )
 

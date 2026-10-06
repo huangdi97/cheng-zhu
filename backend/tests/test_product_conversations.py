@@ -152,3 +152,45 @@ def test_delete_space_cascades_conversation_runtime_only(product_env):
     assert conversations.delete_space(space["id"]) is True
     assert store.get("conversation_session", session["id"]) is None
     assert store.select("goal") == []  # v1 Interview store remains independent
+
+
+def test_source_aware_ask_only_uses_confirmed_items(product_env):
+    space = conversations.create_space("Architecture", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    source = [{"kind": "USER_NOTE", "excerpt": "offline sync v2 uses conflict merge"}]
+    proposed = conversations.add_item(
+        session["id"], item_type="Decision", title="采用 offline sync v2",
+        source_refs=source, source_excerpt="offline sync v2 uses conflict merge",
+        epistemic_status="OBSERVED",
+    )
+    before = conversations.ask(session["id"], "offline sync v2")
+    assert before["grounded"] is False
+    conversations.review_item(proposed["id"], "CONFIRM")
+    after = conversations.ask(session["id"], "offline sync v2")
+    assert after["grounded"] is True
+    assert after["matches"][0]["id"] == proposed["id"]
+
+
+def test_topic_recall_and_live_mode_update(product_env):
+    space = conversations.create_space("Architecture", "DESIGN_REVIEW")
+    s1 = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(s1["id"])
+    item = conversations.add_item(
+        s1["id"], item_type="Decision", title="offline migration 采用 v2",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "excerpt": "offline migration 用 v2"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(s1["id"])
+
+    s2 = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(s2["id"])
+    shown = conversations.evaluate_guidance(s2["id"], {"current_topic": "offline migration"})
+    assert shown["guidance"]["kind"] == "RECALL"
+    assert shown["guidance"]["reason"] == "TOPIC_RECALL"
+
+    updated = conversations.update_session(s2["id"], {"assistance_mode": "QUIET"})
+    assert updated["assistance_mode"] == "QUIET"
+    quiet = conversations.evaluate_guidance(s2["id"], {"current_topic": "offline migration"})
+    assert quiet["guidance"] is None

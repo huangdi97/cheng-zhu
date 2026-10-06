@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PauseCircle, Pin, Square, Volume2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
-import type { ConversationContinue, ConversationGuidance, ConversationItemType } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationContinue, ConversationGuidance, ConversationItemType } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -20,6 +20,13 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [itemTitle, setItemTitle] = useState('')
   const [owner, setOwner] = useState('')
   const [summary, setSummary] = useState<ConversationContinue | null>(null)
+  const [mode, setMode] = useState<AssistanceMode>('BALANCED')
+  const [askText, setAskText] = useState('')
+  const [askResult, setAskResult] = useState<{ answer: string; matches: ConversationItem[]; grounded: boolean } | null>(null)
+
+  useEffect(() => {
+    if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
+  }, [session.data?.assistance_mode])
 
   if (session.loading) return <Page><Loading /></Page>
   if (session.error || !session.data) return <Page><ErrorState message={session.error ?? '会话不存在'} onRetry={session.reload} /></Page>
@@ -45,6 +52,20 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       })
       setGuidance(result.guidance); setSuppressed(result.suppressed ?? '')
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+
+  const changeMode = async (next: AssistanceMode) => {
+    setMode(next)
+    try { await conversationApi.patchSession(sessionId, { assistance_mode: next }); await session.reload() }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const ask = async () => {
+    if (!askText.trim()) return
+    setBusy(true); setError('')
+    try { setAskResult(await conversationApi.ask(sessionId, askText.trim())) }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
   }
 
@@ -82,9 +103,19 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/25 p-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div><div className="flex items-center gap-2"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-green opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-accent-green" /></span><span className="text-xs font-semibold text-text-primary">Listening / Context</span></div><p className="mt-1 text-[11px] text-text-muted">一次只显示一个最高价值 Guidance；没有足够价值时保持 SILENT。</p></div>
-              <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />我正在连续表达</label>
+              <div className="flex items-center gap-2">
+                <select value={mode} onChange={(e) => void changeMode(e.target.value as AssistanceMode)} aria-label="帮助方式"
+                  className="rounded-xl border border-bg-hover bg-bg-primary px-2 py-1.5 text-xs text-text-primary outline-none">
+                  <option value="QUIET">Quiet</option>
+                  <option value="BALANCED">Balanced</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="PRESENTATION">Presentation</option>
+                  <option value="ONE_ON_ONE">1:1</option>
+                </select>
+                <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />我正在连续表达</label>
+              </div>
             </div>
             <div className="mt-4 grid gap-3">
               <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
@@ -114,6 +145,16 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         </div>
 
         <aside className="space-y-4">
+          <div className="rounded-2xl border border-bg-tertiary p-4">
+            <h2 className="text-sm font-semibold text-text-primary">问成竹 · 已确认历史</h2>
+            <p className="mt-1 text-[11px] text-text-muted">只检索这个 Space 中已经确认、仍有效的 Decision / Commitment 等记录；找不到就明确说找不到。</p>
+            <div className="mt-3 space-y-2">
+              <textarea className={inputCls} rows={2} value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="例如：我们之前为什么决定用 v2？" />
+              <SecondaryButton disabled={busy || !askText.trim()} onClick={ask}>查已确认记录</SecondaryButton>
+            </div>
+            {askResult ? <div className="mt-3 rounded-xl bg-bg-secondary/45 p-3"><p className="text-xs text-text-primary">{askResult.answer}</p><p className="mt-1 text-[11px] text-text-muted">{askResult.grounded ? `已找到 ${askResult.matches.length} 条可追溯记录` : '没有用模型猜测答案'}</p></div> : null}
+          </div>
+
           <div className="rounded-2xl border border-bg-tertiary p-4">
             <h2 className="text-sm font-semibold text-text-primary">记录结构化事项</h2>
             <p className="mt-1 text-[11px] text-text-muted">模型抽取默认只是待确认 Candidate，不会自动升级成团队 Decision。</p>

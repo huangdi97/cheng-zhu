@@ -57,6 +57,10 @@ export const conversationApi = {
     consent_ack: boolean
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
+  patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack'>>) =>
+    request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),
+  ask: (id: string, question: string) =>
+    request<{ answer: string; matches: ConversationItem[]; grounded: boolean }>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
   preflight: (id: string) => request<ConversationPreflight>(`${B}/sessions/${encodeURIComponent(id)}/preflight`),
   start: (id: string) => request<{ session: ConversationSession; pack: Record<string, unknown> }>(`${B}/sessions/${encodeURIComponent(id)}/start`, json('POST')),
   end: (id: string) => request<ConversationContinue>(`${B}/sessions/${encodeURIComponent(id)}/end`, json('POST')),

@@ -365,6 +365,73 @@ def start_session(session_id: str) -> dict[str, Any]:
     return {"session": require_session(session_id), "pack": pack}
 
 
+def update_session(session_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    session = require_session(session_id)
+    clean: dict[str, Any] = {}
+    if "assistance_mode" in patch:
+        clean["assistance_mode"] = _require_choice(str(patch["assistance_mode"]), ASSISTANCE_MODES, "帮助方式")
+    if "consent_ack" in patch and session["status"] == "UPCOMING":
+        clean["consent_ack"] = bool(patch["consent_ack"])
+    if "capture_mode" in patch and session["status"] == "UPCOMING":
+        clean["capture_mode"] = _require_choice(str(patch["capture_mode"]), CAPTURE_MODES, "记录方式")
+    if "processing_mode" in patch and session["status"] == "UPCOMING":
+        clean["processing_mode"] = _require_choice(str(patch["processing_mode"]), PROCESSING_MODES, "处理方式")
+    if clean:
+        clean["updated_at"] = store.now()
+        store.update("conversation_session", session_id, clean)
+    return require_session(session_id)
+
+
+def ask(session_id: str, question: str) -> dict[str, Any]:
+    """Source-aware local recall. It never invents an answer when no source matches."""
+    session = require_session(session_id)
+    question = str(question or "").strip()
+    if not question:
+        raise ValueError("问题不能为空")
+    tokens = {x.lower() for x in question.replace("？", " ").replace("?", " ").replace("，", " ").split() if len(x) >= 2}
+    confirmed = _confirmed_context_items(session["space_id"])
+    ranked: list[tuple[int, dict[str, Any]]] = []
+    for item in confirmed:
+        haystack = " ".join([
+            str(item.get("title") or ""),
+            str(item.get("detail") or ""),
+            str(item.get("source_excerpt") or ""),
+        ]).lower()
+        score = sum(1 for token in tokens if token in haystack)
+        if score:
+            ranked.append((score, item))
+    ranked.sort(key=lambda pair: (pair[0], pair[1].get("updated_at") or 0), reverse=True)
+    matches = [item for _, item in ranked[:5]]
+    if not matches:
+        return {
+            "answer": "没有找到足够可靠、已确认且与当前问题直接相关的历史记录。",
+            "matches": [],
+            "grounded": False,
+        }
+    return {
+        "answer": "找到可追溯的相关记录：" + "；".join(item["title"] for item in matches[:3]),
+        "matches": matches,
+        "grounded": True,
+    }
+
+
+def _recall_for_topic(space_id: str, topic: str) -> Optional[dict[str, Any]]:
+    """Small deterministic retrieval fallback for local/offline runtime."""
+    topic = str(topic or "").strip().lower()
+    if not topic:
+        return None
+    tokens = {x for x in topic.replace("/", " ").replace("-", " ").split() if len(x) >= 2}
+    if not tokens:
+        tokens = {topic}
+    best: tuple[int, dict[str, Any]] | None = None
+    for item in _confirmed_context_items(space_id):
+        haystack = " ".join([str(item.get("title") or ""), str(item.get("detail") or ""), str(item.get("source_excerpt") or "")]).lower()
+        score = sum(1 for token in tokens if token in haystack)
+        if score and (best is None or score > best[0]):
+            best = (score, item)
+    return best[1] if best else None
+
+
 def add_item(
     session_id: str,
     *,
@@ -597,6 +664,16 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
             text=candidate_text[:1200], source_refs=source_refs, status="SHOWN", reason="HIGH_VALUE_OPPORTUNITY", score=score,
         )
         return {"guidance": event, "suppressed": None}
+
+    recall = _recall_for_topic(session["space_id"], state.get("current_topic") or "")
+    if mode != "QUIET" and recall:
+        refs = list(recall.get("source_refs") or [])
+        if refs:
+            event = _persist_guidance(
+                session_id, kind="RECALL", action=ExpressionAction.RECALL.value,
+                text=recall["title"], source_refs=refs, status="SHOWN", reason="TOPIC_RECALL",
+            )
+            return {"guidance": event, "suppressed": None}
 
     open_questions = store.select(
         "conversation_item",

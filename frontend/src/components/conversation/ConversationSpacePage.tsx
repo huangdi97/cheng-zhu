@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Play, Plus, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Download, Play, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationItem, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
@@ -33,6 +33,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [sessionBusy, setSessionBusy] = useState(false)
   const [sessionError, setSessionError] = useState('')
   const [continueData, setContinueData] = useState<ConversationContinue | null>(null)
+  const [participantName, setParticipantName] = useState('')
+  const [participantRole, setParticipantRole] = useState('')
+  const [goalTitle, setGoalTitle] = useState('')
 
   useEffect(() => { if (detail.data?.default_mode) setMode(detail.data.default_mode) }, [detail.data?.default_mode])
 
@@ -58,6 +61,50 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
+  const addParticipant = async () => {
+    if (!participantName.trim() && !participantRole.trim()) return
+    setSessionBusy(true); setSessionError('')
+    try {
+      await conversationApi.addParticipant(spaceId, { display_name: participantName.trim(), role: participantRole.trim() })
+      setParticipantName(''); setParticipantRole('')
+      await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const addGoal = async () => {
+    if (!goalTitle.trim()) return
+    setSessionBusy(true); setSessionError('')
+    try {
+      await conversationApi.addGoal(spaceId, { title: goalTitle.trim() })
+      setGoalTitle('')
+      await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const exportSpace = async () => {
+    setSessionBusy(true); setSessionError('')
+    try {
+      const payload = await conversationApi.exportSpace(spaceId)
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `chengzhu-conversation-${spaceId}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const deleteSpace = async () => {
+    if (!window.confirm('删除这个对话空间？其中的 Session、Guidance 与派生事项会一起删除；Interview 数据不会受影响。')) return
+    setSessionBusy(true); setSessionError('')
+    try { await conversationApi.deleteSpace(spaceId); navigate(paths.conversationSpaces()) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)); setSessionBusy(false) }
+  }
+
   const start = async () => {
     if (!sessionId) return
     setSessionBusy(true); setSessionError('')
@@ -72,7 +119,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     <Page wide testId="conversation-space">
       <button type="button" onClick={() => navigate(paths.conversationSpaces())} className="mb-3 inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary"><ArrowLeft className="h-3.5 w-3.5" /> 对话空间</button>
       <PageHeader eyebrow={space.profile} title={space.title} subtitle={space.description || space.default_goal || '持续保留 Decision、Commitment 与 Open Question。'}
-        actions={<PrimaryButton onClick={() => navigate(paths.conversationSpace(spaceId, 'prepare'))} icon={<Play className="h-3.5 w-3.5" />}>准备 / 开始</PrimaryButton>} />
+        actions={<>
+          <SecondaryButton onClick={exportSpace} disabled={sessionBusy} icon={<Download className="h-3.5 w-3.5" />}>导出</SecondaryButton>
+          <SecondaryButton onClick={deleteSpace} disabled={sessionBusy} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton>
+          <PrimaryButton onClick={() => navigate(paths.conversationSpace(spaceId, 'prepare'))} icon={<Play className="h-3.5 w-3.5" />}>准备 / 开始</PrimaryButton>
+        </>} />
       <Tabs tabs={tabs} value={tab} label="对话空间" onChange={(v) => navigate(paths.conversationSpace(spaceId, v))} />
 
       {tab === 'overview' ? (
@@ -88,6 +139,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           </div>
           <Section title="参与者（只记录明确信息）">
             {space.participants.length ? <div className="flex flex-wrap gap-2">{space.participants.map((p) => <span key={p.id} className="rounded-full border border-bg-tertiary px-2.5 py-1 text-xs text-text-secondary">{p.display_name || '未命名'}{p.role ? ` · ${p.role}` : ''}</span>)}</div> : <p className="text-xs text-text-muted">还没有明确参与者；系统不会凭声音自动建立长期身份。</p>}
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><input className={inputCls} value={participantName} onChange={(e) => setParticipantName(e.target.value)} placeholder="姓名 / 昵称（可选）" /><input className={inputCls} value={participantRole} onChange={(e) => setParticipantRole(e.target.value)} placeholder="明确角色，例如 Backend" /><SecondaryButton onClick={addParticipant} disabled={sessionBusy || (!participantName.trim() && !participantRole.trim())} icon={<Plus className="h-3.5 w-3.5" />}>添加</SecondaryButton></div>
+          </Section>
+          <Section title="Conversation Goals">
+            {space.goals.length ? <div className="space-y-1">{space.goals.map((g) => <div key={g.id} className="text-xs text-text-primary">• {g.title}</div>)}</div> : <p className="text-xs text-text-muted">可把本次需要形成 Decision / 明确 owner 等目标写在这里。</p>}
+            <div className="mt-3 flex gap-2"><input className={inputCls} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="新增一个可验证的对话目标" /><SecondaryButton onClick={addGoal} disabled={sessionBusy || !goalTitle.trim()} icon={<Plus className="h-3.5 w-3.5" />}>添加</SecondaryButton></div>
           </Section>
         </div>
       ) : null}
@@ -129,7 +185,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               </div>
             </div>
           ))}</div> : <EmptyState title="还没有会话" body="从“准备”创建本场 Preflight。" />}
-          {continueData ? <div className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4"><h3 className="text-sm font-semibold text-text-primary">这场之后</h3><p className="mt-1 text-xs text-text-muted">Decision {continueData.decisions.length} · Commitment {continueData.commitments.length} · Open Question {continueData.open_questions.length} · 待确认 {continueData.review_required}</p>{continueData.next_focus ? <p className="mt-3 text-sm text-text-primary">Next Focus · {continueData.next_focus.title}</p> : null}</div> : null}
+          {continueData ? <div className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">
+            <h3 className="text-sm font-semibold text-text-primary">这场之后</h3>
+            <p className="mt-1 text-xs text-text-muted">Decision {continueData.decisions.length} · Commitment {continueData.commitments.length} · Open Question {continueData.open_questions.length} · 待确认 {continueData.review_required}</p>
+            {continueData.next_focus ? <p className="mt-3 text-sm text-text-primary">Next Focus · {continueData.next_focus.title}</p> : null}
+            {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
+          </div> : null}
         </div>
       ) : null}
 

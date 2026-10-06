@@ -136,6 +136,29 @@ def get_session(session_id: str):
         return conversations.require_session(session_id)
 
 
+class SessionPatch(BaseModel):
+    assistance_mode: Optional[str] = None
+    capture_mode: Optional[str] = None
+    processing_mode: Optional[str] = None
+    consent_ack: Optional[bool] = None
+
+
+@router.patch("/sessions/{session_id}")
+def patch_session(session_id: str, body: SessionPatch):
+    with domain_errors():
+        return conversations.update_session(session_id, body.model_dump(exclude_unset=True))
+
+
+class AskBody(BaseModel):
+    question: str = Field(max_length=2000)
+
+
+@router.post("/sessions/{session_id}/ask")
+def ask_session(session_id: str, body: AskBody):
+    with domain_errors():
+        return conversations.ask(session_id, body.question)
+
+
 @router.get("/sessions/{session_id}/preflight")
 def preflight(session_id: str):
     with domain_errors():

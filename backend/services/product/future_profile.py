@@ -133,6 +133,7 @@ class ConversationSessionPolicy:
     share_privacy: str = "OFF"
     external_writeback: str = "REVIEW_REQUIRED"
     participant_consent_status: str = "NOT_RECORDED"
+    participant_transparency_plan: str = "NOT_RECORDED"
     connector_permissions: list[str] = field(default_factory=list)
     speaker_biometric_identity: str = "OFF"
     emotion_sentiment_profiling: str = "OFF"

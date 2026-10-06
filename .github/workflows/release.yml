@@ -350,17 +350,6 @@ jobs:
             smoke_passed = $smoke.passed
           } | ConvertTo-Json -Depth 4 | Set-Content dist/release/download-back-verification.json -Encoding utf8
 
-      - name: Upload download-back verification
-        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: chengzhu-download-back-verification
-          path: |
-            dist/release/download-back-smoke.json
-            dist/release/download-back-verification.json
-          retention-days: 30
-          if-no-files-found: error
-
       - name: Publish verified GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
@@ -398,3 +387,15 @@ jobs:
             $verification | ConvertTo-Json -Depth 6 | Set-Content $verificationPath -Encoding utf8
           }
           Write-Host "published release tag/source invariant: $tag -> $tagSha"
+
+
+      - name: Upload download-back verification
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chengzhu-download-back-verification
+          path: |
+            dist/release/download-back-smoke.json
+            dist/release/download-back-verification.json
+          retention-days: 30
+          if-no-files-found: error

@@ -55,6 +55,13 @@ class MultiServerScreenQuestion(BaseModel):
 @router.post("/start")
 async def api_start(body: dict):
     from .exam_test import is_exam_preflight_running
+    from services.product import conversation_capture
+
+    if conversation_capture.is_active():
+        raise HTTPException(
+            409,
+            "Conversation 正在使用音频采集；请先结束或停止该对话的转写，再开始 Interview Live。",
+        )
 
     if is_exam_preflight_running():
         raise HTTPException(409, "笔试链路检测正在运行，请等待检测结束后再开始")

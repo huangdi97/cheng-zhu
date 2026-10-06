@@ -37,6 +37,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [sharePrivacy, setSharePrivacy] = useState<'OFF' | 'PRIVATE_OVERLAY'>('OFF')
   const [externalWriteback, setExternalWriteback] = useState<'OFF' | 'REVIEW_REQUIRED'>('REVIEW_REQUIRED')
   const [participantConsent, setParticipantConsent] = useState<'NOT_RECORDED' | 'USER_REPORTS_ALLOWED' | 'USER_REPORTS_CONSENTED' | 'NOT_APPLICABLE'>('NOT_RECORDED')
+  const [participantTransparency, setParticipantTransparency] = useState<'NOT_RECORDED' | 'USER_WILL_NOTIFY_VERBALLY' | 'USER_WILL_NOTIFY_IN_CHAT' | 'USER_REPORTS_ALREADY_NOTIFIED' | 'NOT_APPLICABLE'>('NOT_RECORDED')
   const [consent, setConsent] = useState(false)
   const [preflight, setPreflight] = useState<ConversationPreflight | null>(null)
   const [sessionId, setSessionId] = useState('')
@@ -80,6 +81,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           share_privacy: sharePrivacy,
           external_writeback: externalWriteback,
           participant_consent_status: participantConsent,
+          participant_transparency_plan: participantTransparency,
         },
       })
       setSessionId(session.id)
@@ -347,9 +349,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay（Conversation runtime 未接线，会阻止开始）</option></select></Field>
               <Field label="外部写回"><select className={inputCls} value={externalWriteback} onChange={(e) => setExternalWriteback(e.target.value as typeof externalWriteback)}><option value="REVIEW_REQUIRED">只生成草稿，必须确认</option><option value="OFF">完全关闭</option></select></Field>
               <Field label="参与者同意状态（仅用户报告）"><select className={inputCls} value={participantConsent} onChange={(e) => setParticipantConsent(e.target.value as typeof participantConsent)}><option value="NOT_RECORDED">未记录 / 未确认</option><option value="USER_REPORTS_ALLOWED">用户报告当前场景允许</option><option value="USER_REPORTS_CONSENTED">用户报告已取得所需参与者同意</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
+              <Field label="透明告知计划（仅用户报告）"><select className={inputCls} value={participantTransparency} onChange={(e) => setParticipantTransparency(e.target.value as typeof participantTransparency)}><option value="NOT_RECORDED">尚未记录</option><option value="USER_WILL_NOTIFY_VERBALLY">我会口头告知</option><option value="USER_WILL_NOTIFY_IN_CHAT">我会在会议聊天中告知</option><option value="USER_REPORTS_ALREADY_NOTIFIED">我报告已完成告知</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
               <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/25 p-3 text-[11px] text-text-muted">Speaker biometric identity、emotion/sentiment profiling、hidden-intent claims 在 v2 中固定为 OFF，不能由会话设置放开。</div>
             </div>
-            <label className="mt-4 flex items-start gap-2 text-xs text-text-secondary"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" /><span>我已确认当前场景允许我使用所选择的记录/转写方式。这个勾选不代表其他参与者已经同意。</span></label>
+            <label className="mt-4 flex items-start gap-2 text-xs text-text-secondary"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" /><span>我已确认当前场景允许我使用所选择的记录/转写方式。这个勾选不代表其他参与者已经同意，也不代表成竹已自动通知他们；上方“透明告知计划”只记录我的计划/报告。</span></label>
             <div className="mt-4 flex gap-2"><PrimaryButton disabled={sessionBusy} onClick={makePreflight} icon={<ShieldCheck className="h-3.5 w-3.5" />}>{sessionBusy ? '检查中…' : '生成本场并检查'}</PrimaryButton>{preflight && !preflight.blockers.length ? <PrimaryButton disabled={sessionBusy} onClick={start}>开始会话</PrimaryButton> : null}</div>
             {sessionError ? <div className="mt-3"><ErrorState message={sessionError} /></div> : null}
             {preflight ? <div className="mt-4 rounded-2xl border border-bg-tertiary p-3">

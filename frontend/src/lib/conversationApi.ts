@@ -138,6 +138,7 @@ export const conversationApi = {
     current_topic?: string
     direct_question?: string
     answer_cue?: string
+    critical_risk?: string
     candidate_text?: string
     source_refs?: SourceRef[]
     user_speaking?: boolean

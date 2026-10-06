@@ -20,10 +20,12 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [deliveryFocus, setDeliveryFocus] = useState('')
   const [criticalRisk, setCriticalRisk] = useState('')
   const [source, setSource] = useState('')
+  const [audienceParticipantId, setAudienceParticipantId] = useState('')
   const [audienceRole, setAudienceRole] = useState('')
   const [audiencePriority, setAudiencePriority] = useState('')
   const [audienceConcern, setAudienceConcern] = useState('')
   const [decisionAuthority, setDecisionAuthority] = useState('')
+  const [relationshipContext, setRelationshipContext] = useState('')
   const [speaking, setSpeaking] = useState(false)
   const [guidance, setGuidance] = useState<ConversationGuidance | null>(null)
   const [suppressed, setSuppressed] = useState('')
@@ -45,6 +47,23 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
   }, [session.data?.assistance_mode])
+
+  useEffect(() => {
+    const participants = liveContext.data?.participants ?? []
+    if (!audienceParticipantId && participants.length) setAudienceParticipantId(participants[0].id)
+  }, [liveContext.data?.participants, audienceParticipantId])
+
+  useEffect(() => {
+    if (!audienceParticipantId) return
+    const participant = liveContext.data?.participants.find((item) => item.id === audienceParticipantId)
+    if (!participant) return
+    const known = participant.counterparty_state.known_explicit ?? {}
+    setAudienceRole(participant.role || '')
+    setAudiencePriority(known.priority || '')
+    setAudienceConcern(known.concern || '')
+    setDecisionAuthority(known.decision_authority || '')
+    setRelationshipContext(known.relationship_context || '')
+  }, [audienceParticipantId, liveContext.data?.participants])
 
   useEffect(() => {
     const all = devices.data?.devices ?? []
@@ -141,6 +160,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         audience_priority: audiencePriority,
         audience_concern: audienceConcern,
         decision_authority: decisionAuthority,
+        relationship_context: relationshipContext,
       })
       setGuidance(result.guidance); setSuppressed(result.suppressed ?? '')
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -241,11 +261,17 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <div className="text-xs font-semibold text-text-secondary">Stakeholder-aware Expression · 只用明确信息</div>
                 <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。优先级：Direct Question &gt; Critical Risk &gt; Talking Point / Delivery explicit request &gt; proactive Opportunity / Recall / Question。</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <select className={inputCls} value={audienceParticipantId} onChange={(e) => setAudienceParticipantId(e.target.value)} aria-label="当前受众">
+                    <option value="">不绑定已知参与者</option>
+                    {(liveContext.data?.participants ?? []).map((participant) => <option key={participant.id} value={participant.id}>{participant.display_name || '未命名'}{participant.role ? ` · ${participant.role}` : ''}</option>)}
+                  </select>
                   <input className={inputCls} value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="对方明确角色，例如 CTO / 客户" />
                   <input className={inputCls} value={decisionAuthority} onChange={(e) => setDecisionAuthority(e.target.value)} placeholder="明确决策权限（可选）" />
                   <input className={inputCls} value={audiencePriority} onChange={(e) => setAudiencePriority(e.target.value)} placeholder="对方明确优先级" />
                   <input className={inputCls} value={audienceConcern} onChange={(e) => setAudienceConcern(e.target.value)} placeholder="对方明确 concern" />
+                  <input className={inputCls} value={relationshipContext} onChange={(e) => setRelationshipContext(e.target.value)} placeholder="关系上下文，例如客户技术负责人" />
                 </div>
+                {audienceParticipantId ? <p className="mt-2 text-[10px] text-text-muted">已从 Frozen Session Pack 带入该参与者的 explicit state；你可以在本场覆盖表达上下文，但不会改写长期 Counterparty State。</p> : null}
               </div>
             </div>
             <div className="mt-4"><PrimaryButton disabled={busy || s.status !== 'ACTIVE'} onClick={evaluate} icon={<Volume2 className="h-3.5 w-3.5" />}>评估当前 Guidance</PrimaryButton></div>

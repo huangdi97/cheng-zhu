@@ -497,6 +497,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Inference · LOCAL_DETERMINISTIC')).toBeVisible()
     await expect(page.getByText('Retention · LOCAL_PRODUCT_DB')).toBeVisible()
     await expect(page.getByText('Write-back · LOCAL_REVIEWED_DRAFT_ONLY')).toBeVisible()
+    await page.getByText('高级 / 手动 Guidance 验证').click()
     await expect(page.getByLabel('当前受众')).toHaveValue('cp-1')
     await expect(page.getByPlaceholder('对方明确角色，例如 CTO / 客户')).toHaveValue('Backend')
     await expect(page.getByPlaceholder('对方明确优先级')).toHaveValue('迁移稳定性')
@@ -525,6 +526,7 @@ test.describe('v2.0 Conversation Profile', () => {
       apiOverrides: mocks(),
     })
     await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await page.getByText('高级 / 手动 Guidance 验证').click()
     await expect(page.getByLabel('明确 Talking Point（如有）')).toBeVisible()
     await expect(page.getByLabel('Delivery / 表达重点（如有）')).toBeVisible()
     await page.getByLabel('明确 Talking Point（如有）').fill('先明确 rollback owner 再谈 release window')
@@ -547,7 +549,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('已确认历史：offline migration 采用 v2 — Benchmark Note')).toBeVisible()
     await expect(page.getByText('CONFIRMED_TRUTH')).toBeVisible()
 
-    await page.getByText('我正在连续表达').click()
+    await page.getByText('高级 / 手动 Guidance 验证').click()
+    await page.getByText('模拟：我正在连续表达').click()
     await page.getByLabel('高价值 Opportunity 候选（如有）').fill('应该补充 benchmark')
     await page.getByLabel('来源 / 依据').fill('benchmark source')
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()

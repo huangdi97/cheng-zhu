@@ -682,7 +682,7 @@ def test_delete_space_cascades_conversation_runtime_only(product_env):
     assert store.select("goal") == []  # v1 Interview store remains independent
 
 
-def test_source_aware_ask_only_uses_confirmed_items(product_env):
+def test_source_aware_ask_does_not_promote_unconfirmed_items(product_env):
     space = conversations.create_space("Architecture", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)
     conversations.start_session(session["id"])
@@ -698,6 +698,85 @@ def test_source_aware_ask_only_uses_confirmed_items(product_env):
     after = conversations.ask(session["id"], "offline sync v2")
     assert after["grounded"] is True
     assert after["matches"][0]["id"] == proposed["id"]
+
+
+
+
+def test_manual_ask_uses_frozen_ready_sources_not_latest_material(product_env):
+    material = materials.create_material(
+        "Q4 Benchmark",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Q4 benchmark: offline migration was validated at 10x data scale. rollback owner remained open.",
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["sources"][0]
+    frozen_version = frozen["version_id"]
+
+    first = conversations.ask(session["id"], "10x data scale")
+    assert first["grounded"] is True
+    assert first["truth_confirmed"] is False
+    assert first["matches"][0]["kind"] == "FROZEN_SOURCE"
+    assert first["matches"][0]["authority"] == "PERSONAL_EVIDENCE"
+    assert first["matches"][0]["source_refs"][0]["version_id"] == frozen_version
+
+    materials.replace_material(
+        material["id"],
+        text="Replacement says 50x data scale and removes the old 10x wording.",
+    )
+    # The active material changed, but this already-started session still reads
+    # the frozen v1 source text.
+    still_frozen = conversations.ask(session["id"], "10x data scale")
+    assert still_frozen["grounded"] is True
+    assert still_frozen["matches"][0]["source_refs"][0]["version_id"] == frozen_version
+
+    not_silently_refreshed = conversations.ask(session["id"], "50x data scale")
+    assert not_silently_refreshed["grounded"] is False
+
+
+def test_manual_ask_labels_quick_note_and_transcript_without_promoting_truth(product_env):
+    from services.product import quick_notes
+
+    note = quick_notes.create_note(
+        "先确认 rollback owner，再讨论发布窗口。",
+        title="Review reminder",
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_quick_note_ids=[note["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    note_result = conversations.ask(session["id"], "rollback owner")
+    assert note_result["grounded"] is True
+    assert note_result["truth_confirmed"] is False
+    assert note_result["matches"][0]["kind"] == "QUICK_NOTE"
+    assert note_result["matches"][0]["authority"] == "USER_NOTE_NOT_EVIDENCE"
+
+    store.insert("conversation_transcript_segment", {
+        "id": store.new_id("cts_"),
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "刚才 Alex 提到发布时间可能是周五，但还没有形成确认。",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    transcript_result = conversations.ask(session["id"], "发布时间 周五")
+    assert transcript_result["grounded"] is True
+    assert transcript_result["truth_confirmed"] is False
+    assert transcript_result["matches"][0]["kind"] == "TRANSCRIPT_SEGMENT"
+    assert transcript_result["matches"][0]["authority"] == "OBSERVED_NOT_CONFIRMED"
 
 
 def test_topic_recall_and_live_mode_update(product_env):

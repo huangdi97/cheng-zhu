@@ -236,6 +236,54 @@ def test_counterparty_state_persists_only_explicit_fields(product_env):
     assert "hidden_intent" not in state["known_explicit"]
 
 
+
+
+def test_counterparty_correction_updates_future_sessions_without_rewriting_frozen_pack(product_env):
+    space = conversations.create_space("Counterparty Correction", "CLIENT_CALL")
+    participant = conversations.add_participant(
+        space["id"],
+        display_name="Alex",
+        role="CTO",
+        explicit_priority="速度",
+        explicit_concern="迁移风险",
+        relationship_context="客户技术负责人",
+    )
+
+    first = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(first["id"])
+    first_ctx = conversations.session_context(first["id"])
+    frozen = first_ctx["participants"][0]["counterparty_state"]["known_explicit"]
+    assert frozen["priority"] == "速度"
+    assert frozen["concern"] == "迁移风险"
+
+    corrected = conversations.update_participant(participant["id"], {
+        "explicit_priority": "稳定性",
+        "explicit_concern": "",
+        "stated_position": "先灰度",
+        "decision_authority": "架构方案批准人",
+        "relationship_context": "客户技术负责人",
+    })
+    known = corrected["counterparty_state"]["known_explicit"]
+    assert known["priority"] == "稳定性"
+    assert "concern" not in known
+    assert known["stated_position"] == "先灰度"
+    assert "concern" in corrected["counterparty_state"]["unknown"]
+    assert corrected["counterparty_state"]["temporary_inferences"] == []
+
+    # Already-started session remains on the old frozen participant state.
+    still_frozen = conversations.session_context(first["id"])
+    assert still_frozen["participants"][0]["counterparty_state"]["known_explicit"]["priority"] == "速度"
+    assert still_frozen["participants"][0]["counterparty_state"]["known_explicit"]["concern"] == "迁移风险"
+
+    second = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(second["id"])
+    second_ctx = conversations.session_context(second["id"])
+    future = second_ctx["participants"][0]["counterparty_state"]["known_explicit"]
+    assert future["priority"] == "稳定性"
+    assert "concern" not in future
+    assert future["stated_position"] == "先灰度"
+
+
 def test_stakeholder_context_influences_score_without_hidden_inference(product_env):
     space = conversations.create_space("Design", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")

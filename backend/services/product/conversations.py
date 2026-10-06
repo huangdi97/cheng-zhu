@@ -24,6 +24,7 @@ from services.product.future_profile import (
     GuidanceKind,
     OpportunityScore,
 )
+from services.storage import intelligence as intelligence_store
 from services.storage import product as store
 
 
@@ -121,6 +122,20 @@ def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict
     source["emotion_sentiment_profiling"] = "OFF"
     source["hidden_intent_claims"] = "OFF"
     return source
+
+
+def _expression_profile() -> dict[str, Any]:
+    """Reuse the user's existing '我的表达' preferences for Conversation.
+
+    This is intentionally the same profile Interview uses; Conversation does
+    not create a second voice/style truth store.
+    """
+    row = intelligence_store.get_voice_profile("local")
+    profile = (row or {}).get("profile") if row else {}
+    if not isinstance(profile, dict):
+        return {}
+    prefs = profile.get("explicit_preferences") or {}
+    return dict(prefs) if isinstance(prefs, dict) else {}
 
 
 def _counterparty_state(
@@ -491,6 +506,7 @@ def preflight(session_id: str) -> dict[str, Any]:
                 (space["id"],),
             ) or 0),
             "confirmed_items_count": len(_confirmed_context_items(space["id"])),
+            "expression_profile": _expression_profile(),
             "policy": {
                 **policy,
                 "capture_mode": session["capture_mode"],
@@ -545,6 +561,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "quick_notes": selected_notes,
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
+        "expression_profile": _expression_profile(),
         "policy": {
             **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],

@@ -727,6 +727,121 @@ def test_frozen_pack_records_resolved_processing_route(product_env, monkeypatch)
     assert runtime["blockers"] == []
 
 
+
+
+def test_profile_aware_guidance_taxonomy_and_expression_delivery(product_env, monkeypatch):
+    monkeypatch.setattr(
+        conversations.intelligence_store,
+        "get_voice_profile",
+        lambda owner: {
+            "profile": {
+                "explicit_preferences": {
+                    "conclusion_first": True,
+                    "target_seconds": 45,
+                    "shape": "bullet",
+                }
+            }
+        },
+    )
+    src = [{"kind": "DOCUMENT", "id": "bench", "visibility": "PRIVATE"}]
+
+    presentation_space = conversations.create_space("Demo", "PRESENTATION_QA")
+    presentation = conversations.create_session(
+        presentation_space["id"],
+        consent_ack=True,
+        assistance_mode="PRESENTATION",
+    )
+    conversations.start_session(presentation["id"])
+
+    blocked = conversations.evaluate_guidance(presentation["id"], {
+        "candidate_text": "主动补充一个销售式机会点",
+        "source_refs": src,
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+        "goal_relevance": 1, "decision_impact": 1,
+    })
+    assert blocked["guidance"] is None
+    assert blocked["suppressed"] == "PROFILE_GUIDANCE_NOT_ALLOWED"
+
+    delivery = conversations.evaluate_guidance(presentation["id"], {
+        "delivery_focus": "回答 CTO 的 rollback concern",
+        "audience_role": "CTO",
+        "audience_concern": "rollback 风险",
+    })
+    assert delivery["guidance"]["kind"] == "DELIVERY"
+    assert delivery["guidance"]["reason"] == "EXPRESSION_PLANNER"
+    assert "先给结论" in delivery["guidance"]["text"]
+    assert "45 秒" in delivery["guidance"]["text"]
+    assert "CTO" in delivery["guidance"]["text"]
+    assert "rollback 风险" in delivery["guidance"]["text"]
+    assert delivery["guidance"]["source_refs"] == []
+
+    one_on_one_space = conversations.create_space("1:1", "ONE_ON_ONE")
+    one_on_one = conversations.create_session(
+        one_on_one_space["id"],
+        consent_ack=True,
+        assistance_mode="ONE_ON_ONE",
+    )
+    conversations.start_session(one_on_one["id"])
+    tp = conversations.evaluate_guidance(one_on_one["id"], {
+        "candidate_text": "补充已经确认的下周行动项",
+        "source_refs": src,
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+        "goal_relevance": 1, "decision_impact": 1,
+    })
+    assert tp["guidance"]["kind"] == "TALKING_POINT"
+    assert tp["guidance"]["reason"] == "HIGH_VALUE_TALKING_POINT"
+
+    direct = conversations.evaluate_guidance(presentation["id"], {
+        "direct_question": "为什么？",
+    })
+    assert direct["guidance"]["kind"] == "ANSWER_CUE"
+
+
+def test_explicit_talking_point_requires_profile_permission_and_source(product_env):
+    presentation_space = conversations.create_space("Demo", "PRESENTATION_QA")
+    presentation = conversations.create_session(presentation_space["id"], consent_ack=True)
+    conversations.start_session(presentation["id"])
+    blocked = conversations.evaluate_guidance(presentation["id"], {
+        "talking_point": "这里补充一个未经允许的 talking point",
+        "source_refs": [{"kind": "DOCUMENT", "id": "src", "visibility": "PRIVATE"}],
+    })
+    assert blocked["suppressed"] == "PROFILE_GUIDANCE_NOT_ALLOWED"
+
+    review_space = conversations.create_space("Review", "DESIGN_REVIEW")
+    review = conversations.create_session(review_space["id"], consent_ack=True)
+    conversations.start_session(review["id"])
+    no_source = conversations.evaluate_guidance(review["id"], {
+        "talking_point": "这个要点没有来源",
+    })
+    assert no_source["suppressed"] == "TALKING_POINT_WITHOUT_ALLOWED_SOURCE"
+
+    shown = conversations.evaluate_guidance(review["id"], {
+        "talking_point": "Q4 benchmark 已证明 10x data scale",
+        "source_refs": [{"kind": "DOCUMENT", "id": "bench", "visibility": "PRIVATE"}],
+    })
+    assert shown["guidance"]["kind"] == "TALKING_POINT"
+    assert shown["guidance"]["expression_action"] == "ADD_TALKING_POINT"
+
+
+def test_direct_question_cancels_stale_proactive_talking_point(product_env):
+    space = conversations.create_space("1:1", "ONE_ON_ONE")
+    session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="ONE_ON_ONE")
+    conversations.start_session(session["id"])
+    shown = conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "补充明确行动项",
+        "source_refs": [{"kind": "DOCUMENT", "id": "task", "visibility": "PRIVATE"}],
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+        "goal_relevance": 1, "decision_impact": 1,
+    })["guidance"]
+    assert shown["kind"] == "TALKING_POINT"
+
+    direct = conversations.evaluate_guidance(session["id"], {"direct_question": "下一步是什么？"})
+    assert direct["guidance"]["kind"] == "ANSWER_CUE"
+    history = conversations.guidance_history(session["id"], 20)
+    old = next(x for x in history if x["id"] == shown["id"])
+    assert old["user_action"] == "CANCELLED_BY_DIRECT_QUESTION"
+
+
 def test_opportunity_needs_source_and_threshold(product_env):
     space = conversations.create_space("Sync", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")

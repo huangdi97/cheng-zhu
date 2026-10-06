@@ -1276,6 +1276,62 @@ def _persist_guidance(
     return saved
 
 
+def _space_guidance_kinds(session: dict[str, Any]) -> set[str]:
+    space = require_space(session["space_id"])
+    config = SPACE_PROFILES.get(str(space.get("profile") or ""), {})
+    return {str(kind) for kind in (config.get("guidance") or [])}
+
+
+def _guidance_kind_allowed(session: dict[str, Any], kind: str) -> bool:
+    # Direct questions and critical factual risk remain universal safety/value
+    # lanes. Other proactive kinds must respect the selected Profile template.
+    if kind in {"ANSWER_CUE", "RISK"}:
+        return True
+    return kind in _space_guidance_kinds(session)
+
+
+def _delivery_cue(session: dict[str, Any], body: dict[str, Any]) -> str:
+    expression = _expression_profile()
+    audience = {
+        "role": str(body.get("audience_role") or "").strip(),
+        "priority": str(body.get("audience_priority") or "").strip(),
+        "concern": str(body.get("audience_concern") or "").strip(),
+    }
+    focus = str(body.get("delivery_focus") or "").strip()
+    mode = str(session.get("assistance_mode") or "BALANCED").upper()
+
+    parts: list[str] = []
+    if bool(expression.get("conclusion_first")):
+        parts.append("先给结论")
+    shape = str(expression.get("shape") or "").strip().lower()
+    if shape == "bullet":
+        parts.append("用 2–3 个要点展开")
+    elif shape:
+        parts.append(f"沿用表达结构 {shape}")
+
+    seconds = expression.get("target_seconds")
+    if isinstance(seconds, (int, float)) and seconds > 0:
+        parts.append(f"控制在约 {int(seconds)} 秒")
+
+    if mode == "PRESENTATION":
+        parts.append("先主张，再给一条最强证据，最后回到下一步或 Q&A")
+    elif mode == "ONE_ON_ONE":
+        parts.append("先确认共同目标，再区分已知/未知，最后给出可执行 follow-up")
+
+    if audience["role"]:
+        parts.append(f"面向 {audience['role']} 只保留与其明确职责相关的内容")
+    if audience["priority"]:
+        parts.append(f"优先回应对方明确优先级：{audience['priority']}")
+    if audience["concern"]:
+        parts.append(f"显式处理对方已表达 concern：{audience['concern']}")
+    if focus:
+        parts.append(f"本次表达重点：{focus}")
+
+    if not parts:
+        parts = ["一句结论 + 一条有来源的依据 + 一个明确下一步"]
+    return "；".join(parts)[:1200]
+
+
 def _source_visibility_allows_guidance(source_refs: list[dict[str, Any]]) -> bool:
     blocked = {"BLOCKED", "NO_GUIDANCE", "HIDDEN"}
     return not any(str(ref.get("visibility") or "").upper() in blocked for ref in source_refs)
@@ -1389,6 +1445,50 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         )
         return {"guidance": event, "suppressed": None}
 
+    talking_point = str(body.get("talking_point") or "").strip()
+    if talking_point:
+        if not _guidance_kind_allowed(session, "TALKING_POINT"):
+            event = _persist_guidance(
+                session_id, kind="TALKING_POINT", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="PROFILE_GUIDANCE_NOT_ALLOWED",
+            )
+            return {"guidance": None, "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED", "event": event}
+        if not source_refs or not _source_visibility_allows_guidance(source_refs):
+            event = _persist_guidance(
+                session_id, kind="TALKING_POINT", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="TALKING_POINT_WITHOUT_ALLOWED_SOURCE",
+            )
+            return {"guidance": None, "suppressed": "TALKING_POINT_WITHOUT_ALLOWED_SOURCE", "event": event}
+        event = _persist_guidance(
+            session_id,
+            kind="TALKING_POINT",
+            action=ExpressionAction.ADD_TALKING_POINT.value,
+            text=talking_point[:1200],
+            source_refs=source_refs,
+            status="SHOWN",
+            reason="MANUAL_TALKING_POINT",
+        )
+        return {"guidance": event, "suppressed": None}
+
+    delivery_focus = str(body.get("delivery_focus") or "").strip()
+    if delivery_focus:
+        if not _guidance_kind_allowed(session, "DELIVERY"):
+            event = _persist_guidance(
+                session_id, kind="DELIVERY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=[], status="SUPPRESSED", reason="PROFILE_GUIDANCE_NOT_ALLOWED",
+            )
+            return {"guidance": None, "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED", "event": event}
+        event = _persist_guidance(
+            session_id,
+            kind="DELIVERY",
+            action=ExpressionAction.CLARIFY.value,
+            text=_delivery_cue(session, body),
+            source_refs=[],
+            status="SHOWN",
+            reason="EXPRESSION_PLANNER",
+        )
+        return {"guidance": event, "suppressed": None}
+
     if bool(body.get("user_speaking")):
         event = _persist_guidance(
             session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
@@ -1443,15 +1543,29 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
                 text="", source_refs=source_refs, status="SUPPRESSED", reason="BELOW_THRESHOLD", score=score,
             )
             return {"guidance": None, "suppressed": "BELOW_THRESHOLD", "event": event}
+        preferred_kind = "CONTRIBUTION_OPPORTUNITY"
+        if mode in {"ACTIVE", "ONE_ON_ONE"} and _guidance_kind_allowed(session, "TALKING_POINT"):
+            preferred_kind = "TALKING_POINT"
+        elif not _guidance_kind_allowed(session, preferred_kind):
+            if _guidance_kind_allowed(session, "TALKING_POINT"):
+                preferred_kind = "TALKING_POINT"
+            else:
+                event = _persist_guidance(
+                    session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                    text="", source_refs=source_refs, status="SUPPRESSED", reason="PROFILE_GUIDANCE_NOT_ALLOWED", score=score,
+                )
+                return {"guidance": None, "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED", "event": event}
         event = _persist_guidance(
-            session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.ADD_TALKING_POINT.value,
-            text=candidate_text[:1200], source_refs=source_refs, status="SHOWN", reason="HIGH_VALUE_OPPORTUNITY", score=score,
+            session_id, kind=preferred_kind, action=ExpressionAction.ADD_TALKING_POINT.value,
+            text=candidate_text[:1200], source_refs=source_refs, status="SHOWN",
+            reason="HIGH_VALUE_OPPORTUNITY" if preferred_kind == "CONTRIBUTION_OPPORTUNITY" else "HIGH_VALUE_TALKING_POINT",
+            score=score,
         )
         return {"guidance": event, "suppressed": None}
 
     recall = _recall_for_topic(session["space_id"], state.get("current_topic") or "")
     budget_exhausted = _suggestion_budget_exhausted(session_id, mode)
-    if mode != "QUIET" and not budget_exhausted and recall:
+    if mode != "QUIET" and not budget_exhausted and _guidance_kind_allowed(session, "RECALL") and recall:
         refs = list(recall.get("source_refs") or [])
         if refs and _source_visibility_allows_guidance(refs):
             event = _persist_guidance(
@@ -1465,7 +1579,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         where="space_id = ? AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
         params=(session["space_id"],), order="created_at DESC", limit=1,
     )
-    if mode != "QUIET" and not budget_exhausted and open_questions:
+    if mode != "QUIET" and not budget_exhausted and _guidance_kind_allowed(session, "QUESTION") and open_questions:
         item = open_questions[0]
         refs = list(item.get("source_refs") or [])
         if refs and _source_visibility_allows_guidance(refs):
@@ -1607,15 +1721,23 @@ def guidance_from_transcript(
 
     authority = str(useful.get("authority") or "")
     if authority == "CONFIRMED_TRUTH":
+        if not _guidance_kind_allowed(session, "RECALL"):
+            return None
         kind = "RECALL"
         action = ExpressionAction.RECALL.value
         cue = str(useful.get("title") or "")[:1200]
         reason = "TRANSCRIPT_TOPIC_RECALL"
     else:
-        kind = "CONTRIBUTION_OPPORTUNITY"
+        if _guidance_kind_allowed(session, "CONTRIBUTION_OPPORTUNITY"):
+            kind = "CONTRIBUTION_OPPORTUNITY"
+            reason = "TRANSCRIPT_SOURCE_OPPORTUNITY"
+        elif _guidance_kind_allowed(session, "TALKING_POINT"):
+            kind = "TALKING_POINT"
+            reason = "TRANSCRIPT_SOURCE_TALKING_POINT"
+        else:
+            return None
         action = ExpressionAction.ADD_TALKING_POINT.value
         cue = str(useful.get("excerpt") or useful.get("title") or "")[:1200]
-        reason = "TRANSCRIPT_SOURCE_OPPORTUNITY"
 
     if not cue or _recent_duplicate_guidance(session_id, cue, seconds=45.0):
         return None

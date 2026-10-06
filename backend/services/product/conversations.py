@@ -1284,10 +1284,30 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
         update["state"] = "DONE"
         update["review_status"] = "USER_CONFIRMED"
     elif action == "SUPERSEDE":
-        update["state"] = "SUPERSEDED"
+        if item["type"] != "Decision":
+            raise ValueError("只有 Decision 可以建立 supersession 链")
+        if item["state"] != "PROPOSED":
+            raise ValueError("只有新的 Proposed Decision 可以确认并替代旧 Decision")
+        old_id = str(patch.get("supersedes_id") or "").strip()
+        if not old_id or old_id == item_id:
+            raise ValueError("必须选择一个不同的旧 Decision")
+        old = require_item(old_id)
+        if old["type"] != "Decision" or old["space_id"] != item["space_id"]:
+            raise ValueError("只能替代同一 Conversation Space 中的 Decision")
+        if old["state"] != "AGREED":
+            raise ValueError("只能替代当前仍为 AGREED 的旧 Decision")
+        if not item.get("source_refs"):
+            raise ValueError("新 Decision 确认并替代旧 Decision 前需要来源")
+        now = store.now()
+        # Direction is explicit: NEW.supersedes_id -> OLD.id, while OLD becomes
+        # SUPERSEDED. The old Decision remains queryable for provenance/history.
+        store.update("conversation_item", old_id, {
+            "state": "SUPERSEDED",
+            "updated_at": now,
+        })
+        update["state"] = "AGREED"
         update["review_status"] = "USER_CONFIRMED"
-        if patch.get("supersedes_id"):
-            update["supersedes_id"] = str(patch["supersedes_id"])
+        update["supersedes_id"] = old_id
     else:
         raise ValueError("审核动作不支持")
     update["updated_at"] = store.now()

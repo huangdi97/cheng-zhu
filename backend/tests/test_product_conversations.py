@@ -1662,9 +1662,20 @@ def test_session_delete_requires_tombstone_for_confirmed_truth(product_env):
     result = conversations.delete_session(session["id"], confirmed_policy="TOMBSTONE")
     assert result["deleted"] is True and result["provenance_tombstones"] == 1
     assert store.get("conversation_session", session["id"]) is None
+    assert store.get("conversation_item", item["id"]) is None
     tomb = store.select("conversation_provenance_tombstone", where="original_item_id = ?", params=(item["id"],))
     assert tomb and tomb[0]["title"] == "采用 v2"
     assert tomb[0]["source_refs"][0]["kind"] == "TRANSCRIPT_SEGMENT"
+
+    # Tombstones preserve deletion provenance only; they must not behave like
+    # an undeletable memory source for future Conversation sessions.
+    later = conversations.create_session(space["id"], title="After deletion", consent_ack=True)
+    conversations.start_session(later["id"])
+    asked = conversations.ask(later["id"], "采用 v2")
+    assert asked["grounded"] is False
+    assert conversations.guidance_from_transcript(
+        later["id"], "继续讨论采用 v2", channel="PRIMARY_AUDIO",
+    ) is None
 
 
 def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(product_env, monkeypatch):
@@ -1724,6 +1735,10 @@ def test_export_is_categorized_and_keeps_truth_classes_separate(product_env):
     assert [x["id"] for x in exported["confirmed_items"]] == [confirmed["id"]]
     assert [x["id"] for x in exported["unconfirmed_candidates"]] == [candidate["id"]]
     assert "confirmed_items" in exported["export_manifest"]["categories"]
+    assert "session_packs" in exported["export_manifest"]["categories"]
+    assert exported["session_packs"]
+    assert exported["session_packs"] == exported["packs"]  # legacy alias, same local truth
+    assert exported["session_packs"][0]["session_id"] == session["id"]
 
 
 def test_one_hundred_session_state_reliability(product_env):

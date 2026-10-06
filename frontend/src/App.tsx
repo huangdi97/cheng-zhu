@@ -49,6 +49,7 @@ const ConversationOnboardingPage = lazy(() => import('@/components/conversation/
 const ConversationSpacesPage = lazy(() => import('@/components/conversation/ConversationSpacesPage'))
 const ConversationSpacePage = lazy(() => import('@/components/conversation/ConversationSpacePage'))
 const ConversationLivePage = lazy(() => import('@/components/conversation/ConversationLivePage'))
+const ConversationHistoryPage = lazy(() => import('@/components/conversation/ConversationHistoryPage'))
 
 const HEADER_ICON_BTN =
   'inline-flex items-center justify-center min-h-[32px] min-w-[32px] p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-tertiary/60 transition-all duration-200 border border-transparent hover:border-bg-hover/40 flex-shrink-0'
@@ -84,6 +85,7 @@ const CONVERSATION_NAV_ITEMS: NavItem[] = [
   { key: 'spaces', label: 'nav.spaces', Icon: MessageSquareText, path: paths.conversationSpaces(), match: ['conversations', 'conversation', 'conversation-live'] },
   { key: 'me', label: 'nav.me', Icon: FileText, path: paths.me(), match: ['me'] },
   { key: 'library', label: 'nav.library', Icon: Library, path: paths.library(), match: ['library'] },
+  { key: 'history', label: 'nav.history', Icon: ClipboardList, path: paths.history(), match: ['history'] },
 ]
 
 type ProductProfile = 'interview' | 'conversation'
@@ -175,7 +177,7 @@ export default function App() {
   // preserve the user's last choice; profile-specific routes are authoritative.
   useEffect(() => {
     const conversationRoute = ['conversation-home', 'conversation-onboarding', 'conversations', 'conversation', 'conversation-live'].includes(route.name)
-    const interviewRoute = ['home', 'goals', 'goal', 'practice', 'history', 'reflection', 'live'].includes(route.name)
+    const interviewRoute = ['home', 'goals', 'goal', 'practice', 'reflection', 'live'].includes(route.name)
     const next: ProductProfile | null = conversationRoute ? 'conversation' : interviewRoute ? 'interview' : null
     if (next && next !== productProfile) {
       setProductProfile(next)
@@ -465,7 +467,7 @@ export default function App() {
                 {route.name === 'me' ? <MePage tab={route.params.tab} /> : null}
                 {route.name === 'practice' ? <PracticePage practiceId={route.params.practiceId} query={route.query} /> : null}
                 {route.name === 'library' ? <LibraryPage tab={route.params.tab} /> : null}
-                {route.name === 'history' ? <HistoryPage initialGoalId={route.query.goal ?? ''} /> : null}
+                {route.name === 'history' ? (productProfile === 'conversation' ? <ConversationHistoryPage /> : <HistoryPage initialGoalId={route.query.goal ?? ''} />) : null}
                 {route.name === 'reflection' ? <ReflectionPage kind={route.params.kind} sessionRef={route.params.ref} /> : null}
                 {route.name === 'settings' ? <SettingsPage group={route.params.group} query={route.query} /> : null}
                 {route.name === 'conversation-home' ? <ConversationHome /> : null}

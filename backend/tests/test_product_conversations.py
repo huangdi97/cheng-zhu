@@ -303,14 +303,34 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
     # The test never opens real audio. It verifies the exact ownership and
     # policy boundary around the reused pipeline.
     calls = []
-    monkeypatch.setattr(pipeline, "start_nonblocking", lambda device, candidate=None: calls.append(("start", device, candidate)))
-    monkeypatch.setattr(pipeline, "stop_interview_loop", lambda: calls.append(("stop",)))
-    monkeypatch.setattr(pipeline, "pause_interview", lambda: calls.append(("pause",)))
-    monkeypatch.setattr(pipeline, "unpause_interview", lambda device=None, candidate=None: calls.append(("resume", device, candidate)))
-
     previous = config_module.session_overlay()
     legacy = get_session()
     legacy.is_recording = False
+
+    def fake_start(device, candidate=None):
+        calls.append(("start", device, candidate))
+        legacy.is_recording = True
+        legacy.is_paused = False
+        legacy.last_device_id = int(device)
+        legacy.last_candidate_mic_device_id = int(candidate) if candidate is not None else 0
+
+    def fake_pause():
+        calls.append(("pause",))
+        legacy.is_paused = True
+
+    def fake_resume(device=None, candidate=None):
+        calls.append(("resume", device, candidate))
+        legacy.is_paused = False
+
+    def fake_stop():
+        calls.append(("stop",))
+        legacy.is_recording = False
+        legacy.is_paused = False
+
+    monkeypatch.setattr(pipeline, "start_nonblocking", fake_start)
+    monkeypatch.setattr(pipeline, "stop_interview_loop", fake_stop)
+    monkeypatch.setattr(pipeline, "pause_interview", fake_pause)
+    monkeypatch.setattr(pipeline, "unpause_interview", fake_resume)
 
     space = conversations.create_space("Captured Review", "DESIGN_REVIEW")
     session = conversations.create_session(
@@ -337,7 +357,9 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
     assert conversation_capture.transcript(session["id"])[0]["text"] == "offline migration 继续使用 v2"
 
     conversation_capture.pause(session["id"])
+    assert conversation_capture.status(session["id"])["paused"] is True
     conversation_capture.resume(session["id"])
+    assert conversation_capture.status(session["id"])["paused"] is False
     stopped = conversation_capture.stop(session["id"])
     assert stopped["active"] is False
     assert calls[-3:] == [("pause",), ("resume", 1001, 1002), ("stop",)]
@@ -345,6 +367,39 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
 
 
 
+
+
+
+def test_conversation_capture_reports_self_mic_degraded_state(product_env, monkeypatch):
+    import api.assist.pipeline as pipeline
+    from core.session import get_session
+
+    legacy = get_session()
+    legacy.is_recording = False
+    legacy.is_paused = False
+    legacy.last_candidate_mic_device_id = 0
+
+    def degraded_start(device, candidate=None):
+        legacy.is_recording = True
+        legacy.last_device_id = int(device)
+        legacy.last_candidate_mic_device_id = 0
+
+    def degraded_stop():
+        legacy.is_recording = False
+
+    monkeypatch.setattr(pipeline, "start_nonblocking", degraded_start)
+    monkeypatch.setattr(pipeline, "stop_interview_loop", degraded_stop)
+
+    space = conversations.create_space("Degraded Self Mic", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"], capture_mode="TRANSCRIPT", processing_mode="LOCAL", consent_ack=True,
+    )
+    conversations.start_session(session["id"])
+
+    status = conversation_capture.start(session["id"], 1001, 1002)
+    assert status["active"] is True
+    assert status["candidate_mic_device_id"] is None
+    conversation_capture.stop(session["id"])
 
 def test_conversation_capture_transport_never_owns_interview_review_lifecycle(product_env, monkeypatch):
     import api.assist.pipeline as pipeline

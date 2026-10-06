@@ -168,6 +168,8 @@ export const conversationApi = {
     request<ConversationGuidance>(`${B}/guidance/${encodeURIComponent(id)}/status`, json('POST', { action })),
   followupDraft: (sessionId: string) =>
     request<ConversationDraftAction>(`${B}/sessions/${encodeURIComponent(sessionId)}/followup-draft`, json('POST')),
+  derivedDraft: (sessionId: string, kind: 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT') =>
+    request<ConversationDraftAction>(`${B}/sessions/${encodeURIComponent(sessionId)}/derived-draft`, json('POST', { kind })),
   draftActions: (spaceId: string) =>
     request<unknown>(`${B}/spaces/${encodeURIComponent(spaceId)}/draft-actions`).then((p) => list<ConversationDraftAction>(p)),
   reviewDraftAction: (id: string, action: 'APPROVE' | 'DISMISS' | 'RESET') =>

@@ -369,6 +369,16 @@ def create_followup_draft(session_id: str):
         return conversations.followup_draft(session_id)
 
 
+class DerivedDraftCreate(BaseModel):
+    kind: str
+
+
+@router.post("/sessions/{session_id}/derived-draft")
+def create_derived_draft(session_id: str, body: DerivedDraftCreate):
+    with domain_errors():
+        return conversations.derived_writeback_draft(session_id, body.kind)
+
+
 @router.get("/spaces/{space_id}/draft-actions")
 def list_draft_actions(space_id: str, status: str = ""):
     with domain_errors():

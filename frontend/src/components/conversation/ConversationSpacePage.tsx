@@ -16,7 +16,7 @@ function ItemRow({ item, onChanged }: { item: ConversationItem; onChanged: () =>
   return (
     <div className="rounded-xl border border-bg-tertiary/70 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-text-primary">{item.title}</span><StatusBadge tone={tone}>{item.state}</StatusBadge>{item.review_status === 'AI_EXTRACTED' ? <StatusBadge tone="warn">待确认</StatusBadge> : null}</div>
-      <div className="mt-1 text-[11px] text-text-muted">来源 {item.source_refs.length ? item.source_refs.map((s) => s.kind).join(' · ') : '未附来源'}{item.owner_id ? ` · owner ${item.owner_id}` : ''}</div>
+      <div className="mt-1 text-[11px] text-text-muted">来源 {item.source_refs.length ? item.source_refs.map((s) => s.kind).join(' · ') : '未附来源'}{item.speaker_id ? ` · speaker ${item.speaker_id}` : ''}{item.owner_id ? ` · owner ${item.owner_id}` : ''}{item.due_at ? ` · due ${item.due_at}` : ''}{item.supersedes_id ? ` · supersession → ${item.supersedes_id}` : ''}</div>
       {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex gap-2"><SecondaryButton disabled={busy} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : null}
     </div>
   )
@@ -36,6 +36,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [humanPolicy, setHumanPolicy] = useState<'HUMAN_FORBIDDEN' | 'HUMAN_PRACTICE_ONLY' | 'HUMAN_ALLOWED'>('HUMAN_PRACTICE_ONLY')
   const [sharePrivacy, setSharePrivacy] = useState<'OFF' | 'PRIVATE_OVERLAY'>('OFF')
   const [externalWriteback, setExternalWriteback] = useState<'OFF' | 'REVIEW_REQUIRED'>('REVIEW_REQUIRED')
+  const [participantConsent, setParticipantConsent] = useState<'NOT_RECORDED' | 'USER_REPORTS_ALLOWED' | 'USER_REPORTS_CONSENTED' | 'NOT_APPLICABLE'>('NOT_RECORDED')
   const [consent, setConsent] = useState(false)
   const [preflight, setPreflight] = useState<ConversationPreflight | null>(null)
   const [sessionId, setSessionId] = useState('')
@@ -78,6 +79,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           human_assistance: humanPolicy,
           share_privacy: sharePrivacy,
           external_writeback: externalWriteback,
+          participant_consent_status: participantConsent,
         },
       })
       setSessionId(session.id)
@@ -248,6 +250,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <p className="text-xs text-text-muted">{space.default_goal || '当前没有开放事项。'}</p>}
           </Section>
           <div className="grid gap-4 md:grid-cols-2">
+            <Section title="Next Session">
+              {space.next_session ? <div><div className="text-sm text-text-primary">{space.next_session.title}</div><div className="mt-1 text-[11px] text-text-muted">{space.next_session.scheduled_at ? new Date(space.next_session.scheduled_at * 1000).toLocaleString() : '未排期'} · {space.next_session.assistance_mode}</div></div> : <p className="text-xs text-text-muted">暂无已排期的下一场。</p>}
+            </Section>
+            <Section title="Recent Decisions">
+              {space.recent_decisions?.length ? <div className="space-y-1">{space.recent_decisions.map((d) => <div key={d.id} className="text-xs text-text-primary">• {d.title}</div>)}</div> : <p className="text-xs text-text-muted">暂无已确认 Decision。</p>}
+            </Section>
+          </div>
+          {space.last_session_delta ? <Section title="Last Session Delta">
+            <p className="text-xs text-text-secondary">{space.last_session_delta.title} · {space.last_session_delta.what_changed.length} changes · {space.last_session_delta.pins.length} pins · {space.last_session_delta.review_required} 待确认</p>
+            {space.last_session_delta.what_changed.slice(0, 3).map((item) => <div key={item.id} className="mt-1 text-xs text-text-primary">• {item.title} · {item.state}</div>)}
+          </Section> : null}
+          <div className="grid gap-4 md:grid-cols-2">
             <Section title="Open Commitments">{prepare.loading ? <Loading /> : prepare.data?.open_commitments.length ? <div className="space-y-2">{prepare.data.open_commitments.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无。</p>}</Section>
             <Section title="Open Questions">{prepare.loading ? <Loading /> : prepare.data?.open_questions.length ? <div className="space-y-2">{prepare.data.open_questions.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无。</p>}</Section>
           </div>
@@ -256,8 +270,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               const known = p.counterparty_state?.known_explicit ?? {}
               return <div key={p.id} className="rounded-xl border border-bg-tertiary/70 px-3 py-2">
                 <div className="text-xs font-medium text-text-primary">{p.display_name || '未命名'}{p.role ? ` · ${p.role}` : ''}</div>
+                <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Known / Explicit · confidence {Math.round((p.counterparty_state?.confidence ?? 0) * 100)}%</div>
                 {known.priority ? <div className="mt-1 text-[11px] text-text-muted">明确优先级：{known.priority}</div> : null}
                 {known.concern ? <div className="mt-1 text-[11px] text-text-muted">明确关注：{known.concern}</div> : null}
+                {known.stated_position ? <div className="mt-1 text-[11px] text-text-muted">明确立场：{known.stated_position}</div> : null}
+                <div className="mt-2 text-[10px] text-text-muted">Inferred / Temporary：{p.counterparty_state?.temporary_inferences?.length ? '仅本场临时存在' : '无'} · Unknown：{p.counterparty_state?.unknown?.length ?? 0}</div>
               </div>
             })}</div> : <p className="text-xs text-text-muted">还没有明确参与者；系统不会凭声音自动建立长期身份，也不会推断情绪、人格或隐藏意图。</p>}
             <div className="mt-3 grid gap-2 sm:grid-cols-2"><input className={inputCls} value={participantName} onChange={(e) => setParticipantName(e.target.value)} placeholder="姓名 / 昵称（可选）" /><input className={inputCls} value={participantRole} onChange={(e) => setParticipantRole(e.target.value)} placeholder="明确角色，例如 Backend / CTO" /><input className={inputCls} value={participantPriority} onChange={(e) => setParticipantPriority(e.target.value)} placeholder="对方明确说过的优先级（可选）" /><input className={inputCls} value={participantConcern} onChange={(e) => setParticipantConcern(e.target.value)} placeholder="对方明确表达的 concern（可选）" /></div>
@@ -321,6 +338,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <Field label="Human Assistance"><select className={inputCls} value={humanPolicy} onChange={(e) => setHumanPolicy(e.target.value as typeof humanPolicy)}><option value="HUMAN_FORBIDDEN">Forbidden</option><option value="HUMAN_PRACTICE_ONLY">Practice only</option><option value="HUMAN_ALLOWED">Allowed（runtime 未接线，会阻止开始）</option></select></Field>
               <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay</option></select></Field>
               <Field label="外部写回"><select className={inputCls} value={externalWriteback} onChange={(e) => setExternalWriteback(e.target.value as typeof externalWriteback)}><option value="REVIEW_REQUIRED">只生成草稿，必须确认</option><option value="OFF">完全关闭</option></select></Field>
+              <Field label="参与者同意状态（仅用户报告）"><select className={inputCls} value={participantConsent} onChange={(e) => setParticipantConsent(e.target.value as typeof participantConsent)}><option value="NOT_RECORDED">未记录 / 未确认</option><option value="USER_REPORTS_ALLOWED">用户报告当前场景允许</option><option value="USER_REPORTS_CONSENTED">用户报告已取得所需参与者同意</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
               <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/25 p-3 text-[11px] text-text-muted">Speaker biometric identity、emotion/sentiment profiling、hidden-intent claims 在 v2 中固定为 OFF，不能由会话设置放开。</div>
             </div>
             <label className="mt-4 flex items-start gap-2 text-xs text-text-secondary"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" /><span>我已确认当前场景允许我使用所选择的记录/转写方式。这个勾选不代表其他参与者已经同意。</span></label>
@@ -329,6 +347,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {preflight ? <div className="mt-4 rounded-2xl border border-bg-tertiary p-3">
               <div className="space-y-1">{preflight.items.map((x) => <div key={x.key} className="flex items-center justify-between text-xs"><span className="text-text-muted">{x.label}</span><span className="text-text-primary">{String(x.value)}</span></div>)}</div>
               {preflight.blockers.map((x) => <div key={x.key} className="mt-2 text-xs text-status-risk">{x.message}</div>)}
+              <div className="mt-3 rounded-xl bg-bg-secondary/40 p-3">
+                <div className="text-xs font-semibold text-text-secondary">Session Pack Preview</div>
+                <div className="mt-2 grid gap-1 text-[11px] text-text-muted sm:grid-cols-2">
+                  <span>Goals {preflight.pack_preview.goal_ids.length}</span>
+                  <span>Sources {preflight.pack_preview.selected_source_ids.length}</span>
+                  <span>Quick Notes {preflight.pack_preview.selected_quick_note_ids.length}</span>
+                  <span>Participants {preflight.pack_preview.participants_count}</span>
+                  <span>Confirmed items {preflight.pack_preview.confirmed_items_count}</span>
+                  <span>AI {preflight.pack_preview.policy.ai_assistance}</span>
+                </div>
+                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文与 policy 会被冻结进 Session Pack；后续资料替换不会静默改写本场。</p>
+              </div>
               <p className="mt-3 text-[11px] text-text-muted">{preflight.privacy_note}</p>
             </div> : null}
           </Section>
@@ -360,9 +390,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
 
       {tab === 'decisions' ? (
         <div className="pt-3">
-          <Section title="Decisions">
+          <Section title="Decision Timeline / Supersession">
+            <p className="mb-3 text-[11px] text-text-muted">按时间保留 Proposed / Agreed / Superseded；冲突的新 Decision 通过 supersession 链保留旧事实，不直接删除。</p>
             {space.decisions.length ? <div className="space-y-2">{space.decisions.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <EmptyState title="还没有 Decision" body="会中抽取默认只是 Proposed；只有有来源且确认后才会升级为 Agreed。" />}
           </Section>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Section title="Related Objections">
+              {space.objections?.length ? <div className="space-y-2">{space.objections.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无已记录 Objection。</p>}
+            </Section>
+            <Section title="Follow-up Commitments">
+              {space.commitments.length ? <div className="space-y-2">{space.commitments.slice(0, 8).map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无 follow-up commitment。</p>}
+            </Section>
+          </div>
         </div>
       ) : null}
     </Page>

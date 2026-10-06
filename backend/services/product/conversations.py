@@ -1461,47 +1461,151 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return {"guidance": None, "suppressed": reason, "event": event}
 
 
-def guidance_from_transcript(session_id: str, text: str) -> Optional[dict[str, Any]]:
-    """Conservative automatic guidance from final Conversation ASR text."""
+def _looks_like_direct_question(text: str) -> bool:
+    normalized = str(text or "").strip().lower()
+    if not normalized:
+        return False
+    if "?" in normalized or "？" in normalized:
+        return True
+    if normalized.endswith(("吗", "呢", "么")):
+        return True
+    head = normalized[:80]
+    zh_markers = (
+        "为什么", "怎么", "如何", "是否", "能不能", "可以不可以",
+        "有没有", "哪个", "哪一个", "谁", "什么时候", "何时", "多少",
+    )
+    en_markers = (
+        "what ", "why ", "how ", "who ", "when ", "which ",
+        "can you ", "could you ", "do you ", "did you ", "is there ", "are there ",
+    )
+    return any(marker in head for marker in zh_markers) or any(head.startswith(marker) for marker in en_markers)
+
+
+def guidance_from_transcript(
+    session_id: str,
+    text: str,
+    *,
+    channel: str = "PRIMARY_AUDIO",
+) -> Optional[dict[str, Any]]:
+    """Conservative automatic guidance from a final Conversation ASR segment.
+
+    PRIMARY_AUDIO may trigger a direct-question cue or one sourced proactive
+    recall/opportunity. SELF_MIC only updates the topic; it never interrupts
+    the user with an automatic proactive card.
+    """
     session = require_session(session_id)
     if session["status"] != "ACTIVE":
         return None
     policy = _normalize_session_policy(session.get("policy"))
     if policy["ai_assistance"] not in {"AI_ALLOWED", "AI_EXPECTED"}:
         return None
+
+    cleaned = str(text or "").strip()[:500]
+    if not cleaned:
+        return None
     state = dict(session.get("state") or {})
-    state["current_topic"] = str(text or "").strip()[:500]
+    state["current_topic"] = cleaned
     store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
-    if str(session.get("assistance_mode") or "BALANCED").upper() == "QUIET":
+
+    if str(channel or "").upper() == "SELF_MIC":
         return None
-    recall = _recall_for_topic(session["space_id"], state["current_topic"])
-    if not recall:
+
+    # Direct questions are first-class and remain allowed in Quiet mode. Use
+    # only pre-existing/frozen context as the answer cue source; the just-saved
+    # transcript question itself is not an answer.
+    if _looks_like_direct_question(cleaned):
+        result = ask(session_id, cleaned)
+        useful = next(
+            (
+                match for match in result.get("matches") or []
+                if match.get("authority") != "OBSERVED_NOT_CONFIRMED"
+            ),
+            None,
+        )
+        if useful:
+            refs = list(useful.get("source_refs") or [])
+            if refs and not _source_visibility_allows_guidance(refs):
+                useful = None
+        if useful:
+            answer_text = {
+                "CONFIRMED_TRUTH": "已确认历史",
+                "PERSONAL_EVIDENCE": "本场个人证据",
+                "REFERENCE_SOURCE": "本场参考来源",
+                "USER_NOTE_NOT_EVIDENCE": "本场 Quick Note（非证据）",
+            }.get(str(useful.get("authority") or ""), "可追溯来源")
+            cue = f"{answer_text}：{useful.get('title') or ''}"
+            excerpt = str(useful.get("excerpt") or "").strip()
+            if excerpt and excerpt != useful.get("title"):
+                cue += f" — {excerpt[:260]}"
+            refs = list(useful.get("source_refs") or [])
+        else:
+            cue = "这是一个直接问题；本场冻结来源里没有足够直接的可追溯答案。先回答已知部分，并明确不确定项。"
+            refs = []
+
+        recent = store.select(
+            "conversation_guidance_event",
+            where="session_id = ? AND reason = 'TRANSCRIPT_DIRECT_QUESTION' AND text = ? AND created_at >= ?",
+            params=(session_id, cue, store.now() - 20.0),
+            order="created_at DESC",
+            limit=1,
+        )
+        if recent:
+            return None
+        return _persist_guidance(
+            session_id,
+            kind="ANSWER_CUE",
+            action=ExpressionAction.ANSWER.value,
+            text=cue[:1200],
+            source_refs=refs,
+            status="SHOWN",
+            reason="TRANSCRIPT_DIRECT_QUESTION",
+        )
+
+    mode = str(session.get("assistance_mode") or "BALANCED").upper()
+    if mode == "QUIET" or _suggestion_budget_exhausted(session_id, mode):
         return None
-    refs = list(recall.get("source_refs") or [])
+
+    # Reuse the frozen-context retrieval ranking. Only confirmed truth and
+    # frozen Ready sources may become proactive cards. Quick Notes and current
+    # transcript remain queryable through Manual Ask but are not promoted.
+    result = ask(session_id, cleaned)
+    useful = next(
+        (
+            match for match in result.get("matches") or []
+            if match.get("authority") in {"CONFIRMED_TRUTH", "PERSONAL_EVIDENCE", "REFERENCE_SOURCE"}
+        ),
+        None,
+    )
+    if not useful:
+        return None
+
+    refs = list(useful.get("source_refs") or [])
     if not refs or not _source_visibility_allows_guidance(refs):
         return None
-    mode = str(session.get("assistance_mode") or "BALANCED").upper()
-    if _suggestion_budget_exhausted(session_id, mode):
-        return None
-    recent = store.select(
-        "conversation_guidance_event",
-        where="session_id = ? AND kind = 'RECALL' AND text = ? AND created_at >= ?",
-        params=(session_id, recall["title"], store.now() - 45.0),
-        order="created_at DESC",
-        limit=1,
-    )
-    if recent:
+
+    authority = str(useful.get("authority") or "")
+    if authority == "CONFIRMED_TRUTH":
+        kind = "RECALL"
+        action = ExpressionAction.RECALL.value
+        cue = str(useful.get("title") or "")[:1200]
+        reason = "TRANSCRIPT_TOPIC_RECALL"
+    else:
+        kind = "CONTRIBUTION_OPPORTUNITY"
+        action = ExpressionAction.ADD_TALKING_POINT.value
+        cue = str(useful.get("excerpt") or useful.get("title") or "")[:1200]
+        reason = "TRANSCRIPT_SOURCE_OPPORTUNITY"
+
+    if not cue or _recent_duplicate_guidance(session_id, cue, seconds=45.0):
         return None
     return _persist_guidance(
         session_id,
-        kind="RECALL",
-        action=ExpressionAction.RECALL.value,
-        text=recall["title"],
+        kind=kind,
+        action=action,
+        text=cue,
         source_refs=refs,
         status="SHOWN",
-        reason="TRANSCRIPT_TOPIC_RECALL",
+        reason=reason,
     )
-
 
 def guidance_history(session_id: str, limit: int = 30) -> list[dict[str, Any]]:
     require_session(session_id)

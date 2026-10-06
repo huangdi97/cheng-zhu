@@ -102,9 +102,9 @@ function mocks() {
     }
     if (pathname === '/api/product/conversation/templates') return {
       items: [
-        { key: 'PROJECT_SYNC', label: '项目同步', default_mode: 'BALANCED', guidance: ['RECALL', 'QUESTION'] },
-        { key: 'DESIGN_REVIEW', label: '设计评审', default_mode: 'BALANCED', guidance: ['RECALL', 'CONTRIBUTION_OPPORTUNITY'] },
-        { key: 'ONE_ON_ONE', label: '1:1', default_mode: 'ONE_ON_ONE', guidance: ['RECALL', 'QUESTION'] },
+        { key: 'PROJECT_SYNC', label: '项目同步', default_mode: 'BALANCED', guidance: ['RECALL', 'QUESTION', 'TALKING_POINT'], runtime_available: true, launch_wedge: true, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'BETA_WEDGE' },
+        { key: 'DESIGN_REVIEW', label: '设计评审', default_mode: 'BALANCED', guidance: ['RECALL', 'CONTRIBUTION_OPPORTUNITY', 'TALKING_POINT'], runtime_available: true, launch_wedge: true, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'BETA_WEDGE' },
+        { key: 'ONE_ON_ONE', label: '1:1', default_mode: 'ONE_ON_ONE', guidance: ['RECALL', 'QUESTION', 'TALKING_POINT'], runtime_available: true, launch_wedge: false, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'SHARED_RUNTIME_TEMPLATE' },
       ],
     }
     if (pathname === '/api/product/conversation/history') return {
@@ -430,6 +430,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page).toHaveURL(/#\/conversation\/spaces\?new=1/)
     await expect(page.getByLabel('空间名称')).toBeVisible()
     await expect(page.getByText('希望持续达成什么（可选）')).toBeVisible()
+    await expect(page.getByText(/成熟度 · BETA_WEDGE/)).toBeVisible()
   })
 
 

@@ -58,7 +58,7 @@ export const conversationApi = {
   space: (id: string) => request<ConversationSpaceDetail>(`${B}/spaces/${encodeURIComponent(id)}`),
   patchSpace: (id: string, body: Partial<ConversationSpace>) =>
     request<ConversationSpace>(`${B}/spaces/${encodeURIComponent(id)}`, json('PATCH', body)),
-  deleteSpace: (id: string) => request<{ deleted: boolean }>(`${B}/spaces/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteSpace: (id: string, confirm = false) => request<{ deleted: boolean }>(`${B}/spaces/${encodeURIComponent(id)}?confirm=${confirm ? 'true' : 'false'}`, { method: 'DELETE' }),
   prepare: (id: string) => request<ConversationPrepare>(`${B}/spaces/${encodeURIComponent(id)}/prepare`),
   exportSpace: (id: string) => request<Record<string, unknown>>(`${B}/spaces/${encodeURIComponent(id)}/export`),
   retentionPreview: (id: string) => request<{

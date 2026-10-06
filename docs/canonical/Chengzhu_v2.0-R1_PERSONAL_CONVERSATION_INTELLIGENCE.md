@@ -3,8 +3,8 @@
 
 **版本**：v2.0-R1  
 **日期**：2026-10-06  
-**状态**：CANONICAL DESIGN CANDIDATE / IMPLEMENTATION NOT YET CLAIMED  
-**基线**：v1.4.2 Windows reproducible release + main `d2d564f` public-truth sync  
+**状态**：CANONICAL DESIGN COMPLETE / CONVERSATION BETA RUNTIME AVAILABLE / STABLE v2 RELEASE NOT CLAIMED  
+**基线**：v1.4.2 Windows reproducible Interview release + merged Conversation runtime PR #18 + v2 closure PR #19  
 **产品定义**：Personal Conversation Intelligence  
 **首发验证楔子**：项目周会 / 技术设计评审  
 **核心原则**：Help me know **what is worth saying, why, to whom, and whether I should stay silent.**
@@ -70,8 +70,22 @@ PMF_PROVEN = FALSE
 
 - **DESIGN_COMPLETE**：产品、对象、AI、UI、隐私、评测、迁移定义完整；
 - **CONTRACT_COMPLETE**：共享类型与边界可执行；
-- **ENGINEERING_COMPLETE**：需要后续真实实现与 CI/runtime 证明；
+- **RUNTIME_AVAILABLE**：真实 route / UI / API / persistence / test 路径存在；
+- **PRODUCTIZED_RELEASE**：完成 packaged runtime、release artifact、download-back 与公开发布门禁；
 - **REAL_USER_VALIDATED**：需要真实参与者，当前不得宣称。
+
+截至 2026-10-06 的真实状态：
+
+```text
+V2_DESIGN_COMPLETE = TRUE
+V2_CONTRACT_COMPLETE = TRUE
+V2_RUNTIME_AVAILABLE = TRUE
+V2_PRODUCTIZED_RELEASE = FALSE
+REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
+PMF_PROVEN = FALSE
+```
+
+Conversation runtime 已由 PR #18 落地；PR #19 负责 canonical/runtime closure。Project Sync / Design Review 是 launch wedge。其余模板可运行于 shared runtime，但 profile-specific behavior 尚未分别证明。
 
 ---
 
@@ -85,10 +99,17 @@ PMF_PROVEN = FALSE
 - calendar brief；
 - cross-session memory；
 - 实时 suggestions/coaching；
+- agenda / pacing / task execution；
 - task/CRM/project integrations；
 - MCP/agent access。
 
-因此“更好的纪要”不是足够的产品楔子。
+当前官方产品事实进一步显示：Otter Live Assist 已进入实时 glanceable coaching；Teams Facilitator 已把 agenda / timer / decisions / open questions / tasks 推进到会中；Granola 强调 botless、本机捕获与 private-by-default；Zoom / Gemini 已把 in-meeting Q&A、notes/action items 做成基础能力。
+
+因此“更好的纪要”或“有实时提示卡”都不是足够的产品楔子。
+
+完整研究见：
+
+- [2026-10-06 Conversation Competitive Research](../research/Chengzhu_v2.0_Conversation_Competitive_Research_2026-10-06.md)
 
 Chengzhu v2 的核心差异冻结为：
 
@@ -739,6 +760,10 @@ No emotion/sentiment profiling
 No hidden-intent claims
 ```
 
+此外 Preflight 必须展示 **resolved runtime data path**。Capture locality、STT locality、inference locality、retention locality 与 write-back locality 不得混为一个“Local”标签。若用户选择的 policy 与真实 runtime path 不一致，必须 fail-closed；Capture start 还要二次校验，防止 Preflight 后配置变化。
+
+当前未接线的 Conversation Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 必须显式阻断，不能把 policy 选择伪装成已生效能力。
+
 外部 action 先进入 Review Queue，再由用户确认。
 
 ---
@@ -801,6 +826,32 @@ v2 不以“摘要准确率”作为核心。
 - deletion/export integrity；
 - latency / recovery。
 
+评测必须区分两层：
+
+**本地可直接观测 proxy**：
+- source attribution coverage；
+- guidance adoption / dismissal；
+- suppression；
+- duplicate suppression；
+- review queue；
+- approved draft rate；
+- latency / recovery；
+- deletion / export integrity。
+
+**必须真人标注**：
+- Recall Precision；
+- Source Attribution Accuracy；
+- Direct Question Detection；
+- Decision/Commitment State Precision；
+- Opportunity Precision；
+- Interruption Regret；
+- Useful Silence Rate；
+- Continue Write-back Accuracy；
+- real cross-session value；
+- real cognitive load。
+
+adoption 不得偷换成 precision，synthetic success 不得偷换成 real-user value。
+
 原则：
 
 > **对于主动提示，Precision > Recall。少弹一个，比错弹一个更好。**
@@ -814,11 +865,18 @@ v2 不以“摘要准确率”作为核心。
 ```text
 V2_DESIGN_COMPLETE
 V2_CONTRACT_COMPLETE
+V2_RUNTIME_AVAILABLE
 SYNTHETIC_ENGINEERING_PROVEN
 INTERNAL_DOGFOOD_EVIDENCE
 ```
 
-禁止：
+只有经过 packaged/release gate 后才允许：
+
+```text
+V2_PRODUCTIZED_RELEASE
+```
+
+禁止在真实用户证据前声称：
 
 ```text
 V2_PMF_PROVEN
@@ -852,6 +910,10 @@ v2.0-R1 设计完成必须同时存在：
 - rollout；
 - implementation master goal；
 - executable contract types；
-- no false implementation claim。
+- no false implementation / release / validation claim。
 
-本版完成这些后，才允许进入 v2 engineering implementation。
+对应实现总目标：
+
+- [v2.0-R1 Implementation & Rollout Master Goal](Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md)
+
+本版已经从“允许进入 implementation”推进为“设计完整 + Beta runtime 已存在”。下一状态升级必须依赖 PR/CI、packaged runtime、release provenance 或真实用户证据，不能仅靠文档声明。

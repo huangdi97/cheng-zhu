@@ -66,6 +66,12 @@ def home():
     return conversations.home_summary()
 
 
+@router.get("/history")
+def history(limit: int = 100):
+    with domain_errors():
+        return {"items": conversations.conversation_history(limit)}
+
+
 @router.get("/diagnostics")
 def diagnostics():
     return conversations.diagnostics()

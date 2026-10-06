@@ -356,9 +356,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Quick Notes {preflight.pack_preview.selected_quick_note_ids.length}</span>
                   <span>Participants {preflight.pack_preview.participants_count}</span>
                   <span>Confirmed items {preflight.pack_preview.confirmed_items_count}</span>
+                  <span>Expression {Object.keys(preflight.pack_preview.expression_profile ?? {}).length ? '已冻结' : '默认'}</span>
                   <span>AI {preflight.pack_preview.policy.ai_assistance}</span>
                 </div>
-                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文与 policy 会被冻结进 Session Pack；后续资料替换不会静默改写本场。</p>
+                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、我的表达与 policy 会被冻结进 Session Pack；后续资料或表达偏好变化不会静默改写本场。</p>
               </div>
               <p className="mt-3 text-[11px] text-text-muted">{preflight.privacy_note}</p>
             </div> : null}

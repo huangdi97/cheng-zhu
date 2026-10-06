@@ -48,6 +48,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [participantRole, setParticipantRole] = useState('')
   const [participantPriority, setParticipantPriority] = useState('')
   const [participantConcern, setParticipantConcern] = useState('')
+  const [participantPosition, setParticipantPosition] = useState('')
+  const [participantAuthority, setParticipantAuthority] = useState('')
+  const [participantRelationship, setParticipantRelationship] = useState('')
   const [goalTitle, setGoalTitle] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
@@ -100,8 +103,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
         role: participantRole.trim(),
         explicit_priority: participantPriority.trim(),
         explicit_concern: participantConcern.trim(),
+        stated_position: participantPosition.trim(),
+        decision_authority: participantAuthority.trim(),
+        relationship_context: participantRelationship.trim(),
       })
       setParticipantName(''); setParticipantRole(''); setParticipantPriority(''); setParticipantConcern('')
+      setParticipantPosition(''); setParticipantAuthority(''); setParticipantRelationship('')
       await detail.reload(); await prepare.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -283,10 +290,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 {known.priority ? <div className="mt-1 text-[11px] text-text-muted">明确优先级：{known.priority}</div> : null}
                 {known.concern ? <div className="mt-1 text-[11px] text-text-muted">明确关注：{known.concern}</div> : null}
                 {known.stated_position ? <div className="mt-1 text-[11px] text-text-muted">明确立场：{known.stated_position}</div> : null}
+                {known.decision_authority ? <div className="mt-1 text-[11px] text-text-muted">明确决策权限：{known.decision_authority}</div> : null}
+                {known.relationship_context ? <div className="mt-1 text-[11px] text-text-muted">关系上下文：{known.relationship_context}</div> : null}
                 <div className="mt-2 text-[10px] text-text-muted">Inferred / Temporary：{p.counterparty_state?.temporary_inferences?.length ? '仅本场临时存在' : '无'} · Unknown：{p.counterparty_state?.unknown?.length ?? 0}</div>
               </div>
             })}</div> : <p className="text-xs text-text-muted">还没有明确参与者；系统不会凭声音自动建立长期身份，也不会推断情绪、人格或隐藏意图。</p>}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2"><input className={inputCls} value={participantName} onChange={(e) => setParticipantName(e.target.value)} placeholder="姓名 / 昵称（可选）" /><input className={inputCls} value={participantRole} onChange={(e) => setParticipantRole(e.target.value)} placeholder="明确角色，例如 Backend / CTO" /><input className={inputCls} value={participantPriority} onChange={(e) => setParticipantPriority(e.target.value)} placeholder="对方明确说过的优先级（可选）" /><input className={inputCls} value={participantConcern} onChange={(e) => setParticipantConcern(e.target.value)} placeholder="对方明确表达的 concern（可选）" /></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2"><input className={inputCls} value={participantName} onChange={(e) => setParticipantName(e.target.value)} placeholder="姓名 / 昵称（可选）" /><input className={inputCls} value={participantRole} onChange={(e) => setParticipantRole(e.target.value)} placeholder="明确角色，例如 Backend / CTO" /><input className={inputCls} value={participantPriority} onChange={(e) => setParticipantPriority(e.target.value)} placeholder="对方明确说过的优先级（可选）" /><input className={inputCls} value={participantConcern} onChange={(e) => setParticipantConcern(e.target.value)} placeholder="对方明确表达的 concern（可选）" /><input className={inputCls} value={participantPosition} onChange={(e) => setParticipantPosition(e.target.value)} placeholder="对方明确立场，例如先灰度再全量" /><input className={inputCls} value={participantAuthority} onChange={(e) => setParticipantAuthority(e.target.value)} placeholder="明确决策权限，例如架构方案批准人" /><input className={inputCls} value={participantRelationship} onChange={(e) => setParticipantRelationship(e.target.value)} placeholder="关系上下文，例如客户技术负责人 / 跨组协作者" /></div>
             <div className="mt-2"><SecondaryButton onClick={addParticipant} disabled={sessionBusy || (!participantName.trim() && !participantRole.trim())} icon={<Plus className="h-3.5 w-3.5" />}>添加明确信息</SecondaryButton></div>
           </Section>
           <Section title="Conversation Goals">

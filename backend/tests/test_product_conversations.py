@@ -1037,6 +1037,35 @@ def test_transcript_preflight_surfaces_unrecorded_participant_consent_as_warning
     assert participant_item["ok"] is False
 
 
+
+def test_transcript_preflight_surfaces_unrecorded_transparency_plan_as_warning(product_env):
+    space = conversations.create_space("Transparency", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={
+            "participant_consent_status": "USER_REPORTS_ALLOWED",
+            "participant_transparency_plan": "NOT_RECORDED",
+        },
+    )
+    check = conversations.preflight(session["id"])
+    assert any(x["key"] == "participant_transparency_not_recorded" for x in check["warnings"])
+    item = next(x for x in check["items"] if x["key"] == "participant_transparency")
+    assert item["ok"] is False
+
+    updated = conversations.update_session(
+        session["id"],
+        {"policy": {"participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY"}},
+    )
+    assert updated["policy"]["participant_transparency_plan"] == "USER_WILL_NOTIFY_VERBALLY"
+    clean = conversations.preflight(session["id"])
+    assert not any(x["key"] == "participant_transparency_not_recorded" for x in clean["warnings"])
+    assert next(x for x in clean["items"] if x["key"] == "participant_transparency")["ok"] is True
+
+
+
 def test_session_pack_freezes_ready_material_version_and_user_notes(product_env):
     material = materials.create_material(
         "Q4 Benchmark", kind="PROJECT", usage="FACTS",

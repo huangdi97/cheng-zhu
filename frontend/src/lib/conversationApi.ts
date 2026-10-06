@@ -86,6 +86,17 @@ export const conversationApi = {
     relationship_context?: string
     source_refs?: Array<Record<string, unknown>>
   }) => request(`${B}/spaces/${encodeURIComponent(id)}/participants`, json('POST', body)),
+  patchParticipant: (id: string, body: {
+    display_name?: string
+    role?: string
+    organization?: string
+    explicit_priority?: string
+    explicit_concern?: string
+    stated_position?: string
+    decision_authority?: string
+    relationship_context?: string
+    source_refs?: Array<Record<string, unknown>>
+  }) => request(`${B}/participants/${encodeURIComponent(id)}`, json('PATCH', body)),
   createSession: (id: string, body: {
     title?: string
     goal_ids?: string[]

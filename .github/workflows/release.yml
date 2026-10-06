@@ -272,7 +272,7 @@ jobs:
           }
           Write-Host "draft release target/source invariant: $tag -> $draftTarget"
 
-      - name: Download-back verification from published GitHub Release
+      - name: Download-back verification from verified draft GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -341,7 +341,7 @@ jobs:
 
           @{
             tag = $tag
-            source = "GitHub Release download"
+            source = "verified draft GitHub Release download"
             source_sha = $sourceSha
             draft_target_sha = $draftTarget
             tag_sha = $null

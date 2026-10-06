@@ -978,6 +978,55 @@ def test_session_pack_freezes_ready_material_version_and_user_notes(product_env)
     assert pack["payload"]["quick_notes"][0].get("is_evidence") is None
 
 
+
+
+def test_reviewed_derived_drafts_preserve_sources_and_never_claim_external_execution(product_env):
+    space = conversations.create_space("Writeback", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    src = [{"kind": "USER_NOTE", "excerpt": "明确事项", "visibility": "PRIVATE"}]
+
+    decision = conversations.add_item(
+        session["id"], item_type="Decision", title="采用方案 B", source_refs=src,
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+
+    commitment = conversations.add_item(
+        session["id"], item_type="Commitment", title="补 rollout plan",
+        owner_id="me", source_refs=src, epistemic_status="OBSERVED",
+    )
+    conversations.review_item(commitment["id"], "CONFIRM", {"owner_id": "me"})
+
+    question = conversations.add_item(
+        session["id"], item_type="OpenQuestion", title="谁负责 rollback drill？",
+        source_refs=src, epistemic_status="OBSERVED",
+    )
+    conversations.end_session(session["id"])
+
+    decision_draft = conversations.derived_writeback_draft(session["id"], "UPDATE_DECISION_LOG_DRAFT")
+    assert decision_draft["kind"] == "UPDATE_DECISION_LOG_DRAFT"
+    assert "采用方案 B" in decision_draft["content"]
+    assert decision_draft["source_refs"]
+    assert decision_draft["payload"]["external_execution"] is False
+
+    task_draft = conversations.derived_writeback_draft(session["id"], "CREATE_TASK_DRAFT")
+    assert task_draft["kind"] == "CREATE_TASK_DRAFT"
+    assert "补 rollout plan" in task_draft["content"]
+    assert "owner=me" in task_draft["content"]
+
+    issue_draft = conversations.derived_writeback_draft(session["id"], "CREATE_ISSUE_DRAFT")
+    assert issue_draft["kind"] == "CREATE_ISSUE_DRAFT"
+    assert "谁负责 rollback drill？" in issue_draft["content"]
+    assert f"review={question['review_status']}" in issue_draft["content"]
+
+    approved = conversations.review_draft_action(decision_draft["id"], "APPROVE")
+    assert approved["status"] == "APPROVED"
+    assert approved["payload"]["external_execution"] is False
+    assert "sent" not in approved
+    assert "external_id" not in approved
+
+
 def test_adhoc_session_and_reviewed_followup_draft_never_claim_external_send(product_env):
     started = conversations.create_adhoc(title="临时设计讨论", profile="DESIGN_REVIEW")
     assert started["session"]["status"] == "ACTIVE"

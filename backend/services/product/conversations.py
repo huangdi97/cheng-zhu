@@ -81,6 +81,64 @@ RETENTION_PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
+AI_ASSISTANCE_POLICIES = {"AI_FORBIDDEN", "AI_LIMITED", "AI_ALLOWED", "AI_EXPECTED"}
+HUMAN_ASSISTANCE_POLICIES = {"HUMAN_FORBIDDEN", "HUMAN_PRACTICE_ONLY", "HUMAN_ALLOWED"}
+SCREEN_CONTEXT_POLICIES = {"OFF", "MANUAL", "AUTO"}
+SHARE_PRIVACY_POLICIES = {"OFF", "PRIVATE_OVERLAY"}
+EXTERNAL_WRITEBACK_POLICIES = {"OFF", "REVIEW_REQUIRED"}
+DEFAULT_SESSION_POLICY: dict[str, Any] = {
+    "transcript_retention": "SPACE_POLICY",
+    "screen_context": "OFF",
+    "ai_assistance": "AI_ALLOWED",
+    "human_assistance": "HUMAN_PRACTICE_ONLY",
+    "share_privacy": "OFF",
+    "external_writeback": "REVIEW_REQUIRED",
+    "connector_permissions": [],
+    "speaker_biometric_identity": "OFF",
+    "emotion_sentiment_profiling": "OFF",
+    "hidden_intent_claims": "OFF",
+}
+
+
+def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    source = {**DEFAULT_SESSION_POLICY, **dict(base or {}), **dict(raw or {})}
+    source["screen_context"] = _require_choice(str(source.get("screen_context") or "OFF"), SCREEN_CONTEXT_POLICIES, "屏幕上下文")
+    source["ai_assistance"] = _require_choice(str(source.get("ai_assistance") or "AI_ALLOWED"), AI_ASSISTANCE_POLICIES, "AI Assistance")
+    source["human_assistance"] = _require_choice(str(source.get("human_assistance") or "HUMAN_PRACTICE_ONLY"), HUMAN_ASSISTANCE_POLICIES, "Human Assistance")
+    source["share_privacy"] = _require_choice(str(source.get("share_privacy") or "OFF"), SHARE_PRIVACY_POLICIES, "Share Privacy")
+    source["external_writeback"] = _require_choice(str(source.get("external_writeback") or "REVIEW_REQUIRED"), EXTERNAL_WRITEBACK_POLICIES, "外部写回")
+    source["transcript_retention"] = str(source.get("transcript_retention") or "SPACE_POLICY")[:80]
+    source["connector_permissions"] = [str(x)[:160] for x in (source.get("connector_permissions") or [])][:50]
+    # These three policy guarantees are deliberately not user-relaxable in v2.
+    source["speaker_biometric_identity"] = "OFF"
+    source["emotion_sentiment_profiling"] = "OFF"
+    source["hidden_intent_claims"] = "OFF"
+    return source
+
+
+def _counterparty_state(
+    *,
+    explicit_priority: str = "",
+    explicit_concern: str = "",
+    stated_position: str = "",
+    decision_authority: str = "",
+    relationship_context: str = "",
+    source_refs: Optional[list[dict[str, Any]]] = None,
+) -> dict[str, Any]:
+    explicit = {
+        "priority": str(explicit_priority or "")[:800],
+        "concern": str(explicit_concern or "")[:1200],
+        "stated_position": str(stated_position or "")[:1600],
+        "decision_authority": str(decision_authority or "")[:500],
+        "relationship_context": str(relationship_context or "")[:800],
+    }
+    return {
+        "known_explicit": {k: v for k, v in explicit.items() if v},
+        "source_refs": list(source_refs or [])[:20],
+        "temporary_inferences": [],
+        "unknown": [],
+    }
+
 ITEM_TYPES = {t.value for t in ConversationItemType}
 ITEM_STATES = {s.value for s in ConversationItemState}
 REVIEW_STATUSES = {"AI_EXTRACTED", "USER_CONFIRMED", "USER_EDITED", "USER_REJECTED", "SOURCE_CONFIRMED"}
@@ -284,6 +342,12 @@ def add_participant(
     organization: str = "",
     session_id: str = "",
     identity_source: str = "USER",
+    explicit_priority: str = "",
+    explicit_concern: str = "",
+    stated_position: str = "",
+    decision_authority: str = "",
+    relationship_context: str = "",
+    source_refs: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     require_space(space_id)
     if session_id:
@@ -300,6 +364,14 @@ def add_participant(
         "identity_source": str(identity_source or "USER")[:80],
         "visibility": "PRIVATE",
         "observations": [],
+        "counterparty_state": _counterparty_state(
+            explicit_priority=explicit_priority,
+            explicit_concern=explicit_concern,
+            stated_position=stated_position,
+            decision_authority=decision_authority,
+            relationship_context=relationship_context,
+            source_refs=source_refs,
+        ),
         "created_at": ts,
         "updated_at": ts,
     }
@@ -317,6 +389,7 @@ def create_session(
     processing_mode: str = "LOCAL",
     assistance_mode: str = "",
     consent_ack: bool = False,
+    policy: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     space = require_space(space_id)
     capture = _require_choice(capture_mode, CAPTURE_MODES, "记录方式")
@@ -336,6 +409,7 @@ def create_session(
         "processing_mode": processing,
         "assistance_mode": mode,
         "consent_ack": bool(consent_ack),
+        "policy": _normalize_session_policy(policy),
         "pack_id": "",
         "status": "UPCOMING",
         "state": {"current_topic": "", "open_threads": [], "last_guidance_id": ""},
@@ -361,19 +435,29 @@ def preflight(session_id: str) -> dict[str, Any]:
     blockers: list[dict[str, str]] = []
     if session["capture_mode"] == "TRANSCRIPT" and not session["consent_ack"]:
         blockers.append({"key": "consent", "label": "转写确认", "message": "开启转写前，请确认当前场景允许记录/转写。"})
+    policy = _normalize_session_policy(session.get("policy"))
+    retention = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
     items = [
         {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
         {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
         {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": not blockers},
         {"key": "processing", "label": "处理方式", "value": session["processing_mode"], "ok": True},
+        {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": len(space.get("selected_source_ids") or []), "ok": True},
+        {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": True},
+        {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": True},
+        {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": True},
+        {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": True},
+        {"key": "share", "label": "屏幕共享保护", "value": policy["share_privacy"], "ok": True},
+        {"key": "writeback", "label": "外部写回", "value": policy["external_writeback"], "ok": True},
     ]
     return {
         "session": session,
         "space": space,
         "items": items,
         "blockers": blockers,
-        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；成竹不会把点击开始当作其他参与者的同意。",
+        "policy": policy,
+        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；成竹不会把点击开始当作其他参与者的同意，也不会自动共享、自动发送或自动写入外部系统。",
     }
 
 
@@ -421,11 +505,12 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
         "policy": {
+            **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],
             "processing_mode": session["processing_mode"],
             "assistance_mode": session["assistance_mode"],
             "consent_ack": bool(session["consent_ack"]),
-            "external_writeback": "REVIEW_REQUIRED",
+            "retention_policy": dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"]),
         },
     }
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -466,6 +551,8 @@ def update_session(session_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         clean["capture_mode"] = _require_choice(str(patch["capture_mode"]), CAPTURE_MODES, "记录方式")
     if "processing_mode" in patch and session["status"] == "UPCOMING":
         clean["processing_mode"] = _require_choice(str(patch["processing_mode"]), PROCESSING_MODES, "处理方式")
+    if "policy" in patch and session["status"] == "UPCOMING":
+        clean["policy"] = _normalize_session_policy(patch.get("policy"), session.get("policy"))
     if clean:
         clean["updated_at"] = store.now()
         store.update("conversation_session", session_id, clean)
@@ -879,6 +966,16 @@ def prepare_space(space_id: str) -> dict[str, Any]:
         "participants": detail["participants"],
         "selected_sources": detail.get("selected_source_ids") or [],
         "selected_quick_notes": detail.get("selected_quick_note_ids") or [],
+        "brief": {
+            "last_change": detail["decisions"][0] if detail["decisions"] else None,
+            "unresolved_count": len(active) + len(unresolved),
+            "known_participants": len(detail["participants"]),
+        },
+        "expected_questions": [item["title"] for item in unresolved[:5]],
+        "contribution_candidates": [
+            {"text": item["title"], "source_refs": item.get("source_refs") or [], "kind": "RECALL"}
+            for item in decisions[:5] if item.get("source_refs")
+        ],
     }
 
 

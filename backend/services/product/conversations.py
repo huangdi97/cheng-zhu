@@ -437,6 +437,18 @@ def preflight(session_id: str) -> dict[str, Any]:
         blockers.append({"key": "consent", "label": "转写确认", "message": "开启转写前，请确认当前场景允许记录/转写。"})
     policy = _normalize_session_policy(session.get("policy"))
     retention = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
+    if policy["screen_context"] != "OFF":
+        blockers.append({
+            "key": "screen_context_runtime",
+            "label": "屏幕上下文",
+            "message": "Conversation 的 Screen Context runtime 尚未接线；当前必须保持 OFF，不能把 policy 选择伪装成已生效功能。",
+        })
+    if policy["human_assistance"] == "HUMAN_ALLOWED":
+        blockers.append({
+            "key": "human_assistance_runtime",
+            "label": "Human Assistance",
+            "message": "Conversation Human Coach runtime 尚未接线；当前只能使用 HUMAN_FORBIDDEN 或 HUMAN_PRACTICE_ONLY。",
+        })
     items = [
         {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
         {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
@@ -715,6 +727,17 @@ def continue_summary(session_id: str) -> dict[str, Any]:
     commitments = [i for i in items if i["type"] in {"Commitment", "Task"} and i["state"] in {"COMMITTED", "DONE"}]
     open_questions = [i for i in items if i["type"] == "OpenQuestion" and i["state"] not in {"DONE", "SUPERSEDED"}]
     candidates = [i for i in items if i["review_status"] == "AI_EXTRACTED"]
+    what_changed = [
+        i for i in items
+        if i["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
+        and i["state"] in {"AGREED", "COMMITTED", "DONE", "SUPERSEDED"}
+    ]
+    pins = store.select(
+        "conversation_guidance_event",
+        where="session_id = ? AND user_action = 'PINNED'",
+        params=(session_id,),
+        order="created_at ASC",
+    )
     next_focus = None
     if open_questions:
         next_focus = {"kind": "OPEN_QUESTION", "title": open_questions[0]["title"], "source_ref": open_questions[0]["id"]}
@@ -728,6 +751,8 @@ def continue_summary(session_id: str) -> dict[str, Any]:
         "commitments": commitments,
         "open_questions": open_questions,
         "candidates": candidates,
+        "what_changed": what_changed,
+        "pins": pins,
         "next_focus": next_focus,
         "review_required": len(candidates),
     }
@@ -814,6 +839,18 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     session = require_session(session_id)
     if session["status"] != "ACTIVE":
         raise ValueError("只有进行中的会话可以生成实时提示")
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["ai_assistance"] == "AI_FORBIDDEN":
+        event = _persist_guidance(
+            session_id,
+            kind="RECALL",
+            action=ExpressionAction.SILENT.value,
+            text="",
+            source_refs=list(body.get("source_refs") or []),
+            status="SUPPRESSED",
+            reason="POLICY_AI_FORBIDDEN",
+        )
+        return {"guidance": None, "suppressed": "POLICY_AI_FORBIDDEN", "event": event}
     state = dict(session.get("state") or {})
     current_topic = str(body.get("current_topic") or "").strip()[:500]
     if current_topic:
@@ -907,6 +944,9 @@ def guidance_from_transcript(session_id: str, text: str) -> Optional[dict[str, A
     """Conservative automatic guidance from final Conversation ASR text."""
     session = require_session(session_id)
     if session["status"] != "ACTIVE":
+        return None
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["ai_assistance"] not in {"AI_ALLOWED", "AI_EXPECTED"}:
         return None
     state = dict(session.get("state") or {})
     state["current_topic"] = str(text or "").strip()[:500]
@@ -1243,6 +1283,9 @@ def create_draft_action(
     payload: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     session = require_session(session_id)
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["external_writeback"] == "OFF":
+        raise ValueError("本场 External Write-back 已关闭；不会创建 follow-up/task/issue/decision-log 草稿")
     kind = str(kind or "").upper()
     if kind not in DRAFT_ACTION_KINDS:
         raise ValueError("DraftAction 类型不支持")

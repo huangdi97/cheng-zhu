@@ -22,8 +22,13 @@ export type RouteName =
   | 'reflection'
   | 'settings'
   | 'live'
+  | 'conversation-home'
+  | 'conversations'
+  | 'conversation'
+  | 'conversation-live'
 
 export type GoalTab = 'overview' | 'prepare' | 'interviews' | 'offer'
+export type ConversationTab = 'overview' | 'prepare' | 'sessions' | 'decisions'
 
 export interface Route {
   name: RouteName
@@ -35,6 +40,7 @@ export interface Route {
 export type LegacyMode = 'home' | 'assist' | 'review' | 'knowledge' | 'resume-opt' | 'job-tracker' | 'prep'
 
 const GOAL_TABS: GoalTab[] = ['overview', 'prepare', 'interviews', 'offer']
+const CONVERSATION_TABS: ConversationTab[] = ['overview', 'prepare', 'sessions', 'decisions']
 
 function parseQuery(raw: string): Record<string, string> {
   const out: Record<string, string> = {}
@@ -64,6 +70,16 @@ export function parsePath(input: string): Route {
   const path = '/' + segs.map(encodeURIComponent).join('/')
   const route = (name: RouteName, params: Record<string, string> = {}): Route => ({ name, path, params, query })
   switch (segs[0]) {
+    case 'conversation':
+      if (segs[1] === 'live' && segs[2]) return route('conversation-live', { sessionId: segs[2] })
+      if (segs[1] === 'spaces') {
+        if (segs[2]) {
+          const tab = (CONVERSATION_TABS as string[]).includes(segs[3] ?? '') ? segs[3] : 'overview'
+          return route('conversation', { spaceId: segs[2], tab })
+        }
+        return route('conversations')
+      }
+      return route('conversation-home')
     case 'goals':
       if (segs[1]) {
         const tab = (GOAL_TABS as string[]).includes(segs[2] ?? '') ? segs[2] : 'overview'
@@ -101,6 +117,14 @@ export const paths = {
   reflection: (kind: string, ref: string) => `/reflection/${kind.toLowerCase()}/${encodeURIComponent(ref)}`,
   settings: (group = 'general') => `/settings/${group}`,
   live: (sessionId?: string) => (sessionId ? `/live/${encodeURIComponent(sessionId)}` : '/live'),
+  conversationHome: () => '/conversation',
+  conversationSpaces: (spaceId?: string, query?: Record<string, string>) =>
+    withQuery(spaceId ? `/conversation/spaces/${encodeURIComponent(spaceId)}` : '/conversation/spaces', query),
+  conversationSpace: (spaceId: string, tab: ConversationTab = 'overview') =>
+    tab === 'overview'
+      ? `/conversation/spaces/${encodeURIComponent(spaceId)}`
+      : `/conversation/spaces/${encodeURIComponent(spaceId)}/${tab}`,
+  conversationLive: (sessionId: string) => `/conversation/live/${encodeURIComponent(sessionId)}`,
 }
 
 function withQuery(path: string, query?: Record<string, string>): string {
@@ -127,6 +151,11 @@ export function legacyModeForRoute(route: Route): LegacyMode {
     case 'history':
     case 'reflection':
       return 'review'
+    case 'conversation-home':
+    case 'conversations':
+    case 'conversation':
+    case 'conversation-live':
+      return 'home'
     default:
       return 'home'
   }

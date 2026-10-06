@@ -6,7 +6,7 @@
  * through the route adapter in lib/router.
  */
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
-import { Settings, PanelLeftClose, PanelLeftOpen, Minus, X, ChevronDown, Home, Radio, ClipboardList, FileText, Flag, BookOpenCheck, Library, Command as CommandIcon, SlidersHorizontal, MonitorSmartphone } from 'lucide-react'
+import { Settings, PanelLeftClose, PanelLeftOpen, Minus, X, ChevronDown, Home, Radio, ClipboardList, FileText, Flag, BookOpenCheck, Library, Command as CommandIcon, SlidersHorizontal, MonitorSmartphone, MessageSquareText } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useInterviewStore } from '@/stores/configStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
@@ -16,7 +16,7 @@ import { useInterviewWS } from '@/hooks/useInterviewWS'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useOverlayWindowSync } from '@/hooks/useOverlayWindowSync'
 import { updateConfigAndRefresh } from '@/lib/configSync'
-import { hasExplicitRoute, legacyModeForRoute, navigate, paths, routeForLegacyMode, startRouterListener, useRouter, type RouteName } from '@/lib/router'
+import { hasExplicitRoute, legacyModeForRoute, navigate, paths, routeForLegacyMode, startRouterListener, useRouter, type RouteName, type ConversationTab } from '@/lib/router'
 import { useT, useUiLanguage, type StringKey } from '@/lib/i18n'
 import WorkbenchPopover from '@/components/WorkbenchPopover'
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
@@ -44,6 +44,10 @@ const LibraryPage = lazy(() => import('@/components/os/LibraryPage'))
 const HistoryPage = lazy(() => import('@/components/os/HistoryPage'))
 const ReflectionPage = lazy(() => import('@/components/os/ReflectionPage'))
 const SettingsPage = lazy(() => import('@/components/os/SettingsPage'))
+const ConversationHome = lazy(() => import('@/components/conversation/ConversationHome'))
+const ConversationSpacesPage = lazy(() => import('@/components/conversation/ConversationSpacesPage'))
+const ConversationSpacePage = lazy(() => import('@/components/conversation/ConversationSpacePage'))
+const ConversationLivePage = lazy(() => import('@/components/conversation/ConversationLivePage'))
 
 const HEADER_ICON_BTN =
   'inline-flex items-center justify-center min-h-[32px] min-w-[32px] p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-tertiary/60 transition-all duration-200 border border-transparent hover:border-bg-hover/40 flex-shrink-0'
@@ -65,7 +69,7 @@ function WorkbenchMark({ className }: { className?: string }) {
 
 type NavItem = { key: string; label: StringKey; Icon: typeof Home; path: string; match: RouteName[] }
 
-const NAV_ITEMS: NavItem[] = [
+const INTERVIEW_NAV_ITEMS: NavItem[] = [
   { key: 'home', label: 'nav.home', Icon: Home, path: paths.home(), match: ['home'] },
   { key: 'goals', label: 'nav.goals', Icon: Flag, path: paths.goals(), match: ['goals', 'goal'] },
   { key: 'me', label: 'nav.me', Icon: FileText, path: paths.me(), match: ['me'] },
@@ -74,12 +78,22 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'history', label: 'nav.history', Icon: ClipboardList, path: paths.history(), match: ['history', 'reflection'] },
 ]
 
-function AppNavRail({ current }: { current: RouteName }) {
+const CONVERSATION_NAV_ITEMS: NavItem[] = [
+  { key: 'conversation-home', label: 'nav.conversationHome', Icon: Home, path: paths.conversationHome(), match: ['conversation-home'] },
+  { key: 'spaces', label: 'nav.spaces', Icon: MessageSquareText, path: paths.conversationSpaces(), match: ['conversations', 'conversation', 'conversation-live'] },
+  { key: 'me', label: 'nav.me', Icon: FileText, path: paths.me(), match: ['me'] },
+  { key: 'library', label: 'nav.library', Icon: Library, path: paths.library(), match: ['library'] },
+]
+
+type ProductProfile = 'interview' | 'conversation'
+
+function AppNavRail({ current, profile }: { current: RouteName; profile: ProductProfile }) {
   const t = useT()
+  const items = profile === 'conversation' ? CONVERSATION_NAV_ITEMS : INTERVIEW_NAV_ITEMS
   return (
     <nav aria-label={t('nav.label')} className="hidden md:flex flex-col items-center gap-1 w-[76px] flex-shrink-0 border-r border-bg-tertiary/70 bg-bg-secondary/40 py-3 px-1.5 overflow-y-auto scrollbar-none">
       <ul className="flex flex-col items-center gap-1 w-full">
-        {NAV_ITEMS.map(({ key, label, Icon, path, match }) => {
+        {items.map(({ key, label, Icon, path, match }) => {
           const active = match.includes(current)
           return (
             <li key={key} className="w-full">
@@ -118,6 +132,10 @@ export default function App() {
   const isPaused = useInterviewStore((s) => s.isPaused)
   const isExamMode = config?.written_exam_mode === true
   const route = useRouter((s) => s.route)
+  const [productProfile, setProductProfile] = useState<ProductProfile>(() => {
+    try { return window.localStorage.getItem('chengzhu-product-profile') === 'conversation' ? 'conversation' : 'interview' }
+    catch { return 'interview' }
+  })
   const t = useT()
   const uiLanguage = useUiLanguage()
   const appMode = useUiPrefsStore((s) => s.appMode)
@@ -129,6 +147,7 @@ export default function App() {
   const setCommandPalette = useOsStore((s) => s.setCommandPalette)
   const setPinDialog = useOsStore((s) => s.setPinDialog)
   const inLive = route.name === 'live'
+  const inConversationLive = route.name === 'conversation-live'
   useOverlayWindowSync(isRecording, appMode)
 
   const [sessionPopoverOpen, setSessionPopoverOpen] = useState(false)
@@ -150,6 +169,24 @@ export default function App() {
     const mode = legacyModeForRoute(route)
     if (useUiPrefsStore.getState().appMode !== mode) useUiPrefsStore.setState({ appMode: mode })
   }, [route])
+
+  // A profile is a work surface, not a separate account. Shared Me/Library/Settings
+  // preserve the user's last choice; profile-specific routes are authoritative.
+  useEffect(() => {
+    const conversationRoute = ['conversation-home', 'conversations', 'conversation', 'conversation-live'].includes(route.name)
+    const interviewRoute = ['home', 'goals', 'goal', 'practice', 'history', 'reflection', 'live'].includes(route.name)
+    const next: ProductProfile | null = conversationRoute ? 'conversation' : interviewRoute ? 'interview' : null
+    if (next && next !== productProfile) {
+      setProductProfile(next)
+      try { window.localStorage.setItem('chengzhu-product-profile', next) } catch { /* localStorage unavailable */ }
+    }
+  }, [route.name, productProfile])
+
+  const switchProfile = useCallback((next: ProductProfile) => {
+    setProductProfile(next)
+    try { window.localStorage.setItem('chengzhu-product-profile', next) } catch { /* localStorage unavailable */ }
+    navigate(next === 'conversation' ? paths.conversationHome() : paths.home())
+  }, [])
 
   useEffect(() => {
     document.documentElement.lang = uiLanguage
@@ -260,8 +297,17 @@ export default function App() {
   const toasts = useInterviewStore((s) => s.toasts)
   const dismissToast = useInterviewStore((s) => s.dismissToast)
   const wsIsLeader = useInterviewStore((s) => s.wsIsLeader)
-  const currentNav = NAV_ITEMS.find((n) => n.match.includes(route.name))
-  const currentLabel = inLive ? t('action.goLive') : route.name === 'settings' ? t('nav.settings') : currentNav ? t(currentNav.label) : t('nav.home')
+  const activeNavItems = productProfile === 'conversation' ? CONVERSATION_NAV_ITEMS : INTERVIEW_NAV_ITEMS
+  const currentNav = activeNavItems.find((n) => n.match.includes(route.name))
+  const currentLabel = inLive
+    ? t('action.goLive')
+    : inConversationLive
+      ? t('action.startConversation')
+      : route.name === 'settings'
+        ? t('nav.settings')
+        : currentNav
+          ? t(currentNav.label)
+          : t(productProfile === 'conversation' ? 'nav.conversationHome' : 'nav.home')
 
   useEffect(() => {
     if (!fallbackToast) return
@@ -309,6 +355,16 @@ export default function App() {
             <h1 className="text-sm font-bold hidden lg:block flex-shrink-0 tracking-tight">成竹</h1>
           </div>
 
+          <div className="app-no-drag relative ml-1 hidden sm:block">
+            <label className="sr-only" htmlFor="product-profile">{t('action.profile')}</label>
+            <select id="product-profile" value={productProfile} onChange={(e) => switchProfile(e.target.value as ProductProfile)}
+              className="rounded-xl border border-bg-hover/40 bg-bg-tertiary/45 px-2.5 py-1.5 text-xs font-medium text-text-primary outline-none focus:border-accent-blue/60"
+              aria-label={t('action.profile')}>
+              <option value="interview">面试</option>
+              <option value="conversation">对话 Beta</option>
+            </select>
+          </div>
+
           <div className="relative ml-1 md:hidden" ref={moduleMenuRef}>
             <button type="button" onClick={() => setModuleMenuOpen((prev) => !prev)} aria-haspopup="menu" aria-expanded={moduleMenuOpen} aria-label={t('action.modules')}
               className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium transition-colors ${moduleMenuOpen ? 'border-accent-blue/40 bg-accent-blue/10 text-accent-blue' : 'border-bg-hover/30 bg-bg-tertiary/60 text-text-primary'}`}>
@@ -318,7 +374,7 @@ export default function App() {
             </button>
             {moduleMenuOpen ? (
               <div role="menu" aria-label={t('nav.label')} className="absolute left-0 top-[calc(100%+0.5rem)] z-40 min-w-[180px] glass-popover rounded-2xl p-2 animate-fade-up">
-                {[...NAV_ITEMS, { key: 'settings', label: 'nav.settings' as StringKey, Icon: Settings, path: paths.settings(), match: ['settings'] as RouteName[] }].map((item) => (
+                {[...activeNavItems, { key: 'settings', label: 'nav.settings' as StringKey, Icon: Settings, path: paths.settings(), match: ['settings'] as RouteName[] }].map((item) => (
                   <button key={item.key} type="button" role="menuitem" onClick={() => { navigate(item.path); setModuleMenuOpen(false) }}
                     className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${item.match.includes(route.name) ? 'bg-container-primary text-container-on-primary' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'}`}>
                     <span>{t(item.label)}</span>
@@ -371,7 +427,7 @@ export default function App() {
           <button type="button" onClick={() => setCommandPalette(true)} className={`inline-flex ${HEADER_ICON_BTN}`} title={`${t('action.commands')} (Ctrl+K)`} aria-label={t('action.commands')}>
             <CommandIcon className="w-4 h-4" aria-hidden />
           </button>
-          {!inLive ? (
+          {!inLive && productProfile === 'interview' ? (
             <button type="button" onClick={() => openGoLive()} data-testid="go-live"
               className="btn-primary inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold min-h-[32px]">
               <Radio className="h-3.5 w-3.5" aria-hidden /> {t('action.goLive')}
@@ -391,7 +447,7 @@ export default function App() {
       </header>
 
       <div className="flex flex-1 min-h-0">
-        <AppNavRail current={route.name} />
+        <AppNavRail current={route.name} profile={productProfile} />
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {inLive ? <LiveCockpit /> : (
             <PageErrorBoundary resetKey={route.path}>
@@ -405,6 +461,10 @@ export default function App() {
                 {route.name === 'history' ? <HistoryPage initialGoalId={route.query.goal ?? ''} /> : null}
                 {route.name === 'reflection' ? <ReflectionPage kind={route.params.kind} sessionRef={route.params.ref} /> : null}
                 {route.name === 'settings' ? <SettingsPage group={route.params.group} query={route.query} /> : null}
+                {route.name === 'conversation-home' ? <ConversationHome /> : null}
+                {route.name === 'conversations' ? <ConversationSpacesPage query={route.query} /> : null}
+                {route.name === 'conversation' ? <ConversationSpacePage spaceId={route.params.spaceId} tab={route.params.tab as ConversationTab} /> : null}
+                {route.name === 'conversation-live' ? <ConversationLivePage sessionId={route.params.sessionId} /> : null}
               </Suspense>
             </PageErrorBoundary>
           )}

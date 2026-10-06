@@ -16,12 +16,16 @@ const STRINGS = {
   'nav.library': ['资料库', 'Library'],
   'nav.history': ['历史', 'History'],
   'nav.settings': ['设置', 'Settings'],
+  'nav.conversationHome': ['首页', 'Home'],
+  'nav.spaces': ['对话空间', 'Spaces'],
   'nav.label': ['主导航', 'Main navigation'],
   'action.goLive': ['上场', 'Go Live'],
   'action.commands': ['命令面板', 'Command palette'],
   'action.minimize': ['最小化窗口', 'Minimize window'],
   'action.quit': ['退出应用', 'Quit'],
   'action.modules': ['切换功能模块', 'Switch section'],
+  'action.profile': ['工作模式', 'Profile'],
+  'action.startConversation': ['开始', 'Start'],
   'loading': ['加载中…', 'Loading…'],
 } as const
 

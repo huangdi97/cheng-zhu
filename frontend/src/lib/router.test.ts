@@ -18,6 +18,11 @@ describe('v1.3 object-centric routes', () => {
     expect(parsePath('#/reflection/review/12')).toMatchObject({ name: 'reflection', params: { kind: 'REVIEW', ref: '12' } })
     expect(parsePath('#/settings/language').params.group).toBe('language')
     expect(parsePath('#/live/s-1')).toMatchObject({ name: 'live', params: { sessionId: 's-1' } })
+    expect(parsePath('#/conversation').name).toBe('conversation-home')
+    expect(parsePath('#/conversation/spaces').name).toBe('conversations')
+    expect(parsePath('#/conversation/spaces/cs_1/prepare')).toMatchObject({ name: 'conversation', params: { spaceId: 'cs_1', tab: 'prepare' } })
+    expect(parsePath('#/conversation/spaces/cs_1/nope')).toMatchObject({ name: 'conversation', params: { spaceId: 'cs_1', tab: 'overview' } })
+    expect(parsePath('#/conversation/live/cv_1')).toMatchObject({ name: 'conversation-live', params: { sessionId: 'cv_1' } })
     expect(parsePath('#/nowhere').name).toBe('home')
   })
 
@@ -25,6 +30,8 @@ describe('v1.3 object-centric routes', () => {
     expect(parsePath(paths.goal('a b', 'offer'))).toMatchObject({ name: 'goal', params: { goalId: 'a b', tab: 'offer' } })
     expect(parsePath(paths.practice(undefined, { goal: 'g', round: '' })).query).toEqual({ goal: 'g' })
     expect(parsePath(paths.reflection('PRACTICE', 'pr_9')).params).toEqual({ kind: 'PRACTICE', ref: 'pr_9' })
+    expect(parsePath(paths.conversationSpace('a b', 'decisions'))).toMatchObject({ name: 'conversation', params: { spaceId: 'a b', tab: 'decisions' } })
+    expect(parsePath(paths.conversationSpaces(undefined, { new: '1' })).query).toEqual({ new: '1' })
   })
 
   it('adapts the v1.2 appMode both ways', () => {
@@ -38,5 +45,6 @@ describe('v1.3 object-centric routes', () => {
     expect(legacyModeForRoute(parsePath('#/goals/g/prepare'))).toBe('job-tracker')
     expect(legacyModeForRoute(parsePath('#/reflection/practice/p'))).toBe('review')
     expect(legacyModeForRoute(parsePath('#/library'))).toBe('home')
+    expect(legacyModeForRoute(parsePath('#/conversation/spaces/cs_1'))).toBe('home')
   })
 })

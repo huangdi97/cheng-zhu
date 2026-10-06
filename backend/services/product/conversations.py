@@ -1,0 +1,1347 @@
+"""v2.0 Personal Conversation Intelligence product service.
+
+This is the first real runtime path for Conversation Profile.  It is additive
+to the v1 Interview product: no Interview table is renamed or rewritten.
+
+Truth rules:
+- AI extraction is a candidate, never agreement.
+- Decision AGREED requires source + explicit review.
+- Commitment/Task COMMITTED requires owner + source + explicit review.
+- proactive guidance is allowed to return SILENT/suppressed.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any, Optional
+
+from services.product import materials
+from services.product.future_profile import (
+    AssistanceMode,
+    ConversationItemState,
+    ConversationItemType,
+    ExpressionAction,
+    GuidanceKind,
+    OpportunityScore,
+)
+from services.storage import product as store
+
+
+SPACE_PROFILES = {
+    "PROJECT_SYNC": {
+        "label": "项目同步",
+        "default_mode": "BALANCED",
+        "guidance": ["RECALL", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY", "TALKING_POINT"],
+    },
+    "DESIGN_REVIEW": {
+        "label": "设计评审",
+        "default_mode": "BALANCED",
+        "guidance": ["RECALL", "TALKING_POINT", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
+    },
+    "PRESENTATION_QA": {
+        "label": "演示 / Q&A",
+        "default_mode": "PRESENTATION",
+        "guidance": ["ANSWER_CUE", "RECALL", "QUESTION", "DELIVERY"],
+    },
+    "ONE_ON_ONE": {
+        "label": "1:1",
+        "default_mode": "ONE_ON_ONE",
+        "guidance": ["RECALL", "QUESTION", "TALKING_POINT", "RISK"],
+    },
+    "CLIENT_CALL": {
+        "label": "客户会",
+        "default_mode": "BALANCED",
+        "guidance": [k.value for k in GuidanceKind],
+    },
+    "NEGOTIATION": {
+        "label": "谈判",
+        "default_mode": "QUIET",
+        "guidance": ["RECALL", "TALKING_POINT", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
+    },
+}
+ASSISTANCE_MODES = {m.value for m in AssistanceMode}
+CAPTURE_MODES = {"TRANSCRIPT", "NOTES_ONLY", "NO_CAPTURE"}
+PROCESSING_MODES = {"LOCAL", "CLOUD", "OFF"}
+RETENTION_PRESETS: dict[str, dict[str, Any]] = {
+    "MINIMUM": {
+        "preset": "MINIMUM",
+        "transcript_days": 0,
+        "guidance_days": 7,
+        "draft_days": 7,
+        "confirmed_items": "KEEP",
+        "audio_retention": "OFF",
+    },
+    "STANDARD": {
+        "preset": "STANDARD",
+        "transcript_days": 30,
+        "guidance_days": 30,
+        "draft_days": 30,
+        "confirmed_items": "KEEP",
+        "audio_retention": "OFF",
+    },
+}
+
+ITEM_TYPES = {t.value for t in ConversationItemType}
+ITEM_STATES = {s.value for s in ConversationItemState}
+REVIEW_STATUSES = {"AI_EXTRACTED", "USER_CONFIRMED", "USER_EDITED", "USER_REJECTED", "SOURCE_CONFIRMED"}
+EPISTEMIC_STATUSES = {"OBSERVED", "USER_CONFIRMED", "SOURCE_CONFIRMED", "INFERRED", "UNKNOWN"}
+
+
+def templates() -> list[dict[str, Any]]:
+    return [{"key": key, **value} for key, value in SPACE_PROFILES.items()]
+
+
+def _require_choice(value: str, allowed: set[str], label: str) -> str:
+    value = str(value or "").upper()
+    if value not in allowed:
+        raise ValueError(f"{label} 不支持：{value}")
+    return value
+
+
+def require_space(space_id: str) -> dict[str, Any]:
+    row = store.get("conversation_space", space_id)
+    if not row:
+        raise ValueError("对话空间不存在")
+    return row
+
+
+def require_session(session_id: str) -> dict[str, Any]:
+    row = store.get("conversation_session", session_id)
+    if not row:
+        raise ValueError("对话会话不存在")
+    return row
+
+
+def require_item(item_id: str) -> dict[str, Any]:
+    row = store.get("conversation_item", item_id)
+    if not row:
+        raise ValueError("对话事项不存在")
+    return row
+
+
+def create_space(
+    title: str,
+    profile: str = "PROJECT_SYNC",
+    *,
+    description: str = "",
+    default_goal: str = "",
+    default_mode: str = "",
+    project_id: str = "",
+    relationship_key: str = "",
+    selected_source_ids: Optional[list[str]] = None,
+    selected_quick_note_ids: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    title = str(title or "").strip()
+    if not title:
+        raise ValueError("对话空间名称不能为空")
+    profile = str(profile or "").upper()
+    if profile not in SPACE_PROFILES:
+        raise ValueError(f"对话模板不支持：{profile}")
+    mode = (default_mode or SPACE_PROFILES[profile]["default_mode"]).upper()
+    _require_choice(mode, ASSISTANCE_MODES, "帮助方式")
+    ts = store.now()
+    row = {
+        "id": store.new_id("cs_"),
+        "profile": profile,
+        "title": title[:160],
+        "description": str(description or "")[:4000],
+        "status": "ACTIVE",
+        "project_id": str(project_id or "")[:200],
+        "relationship_key": str(relationship_key or "")[:200],
+        "default_goal": str(default_goal or "")[:1000],
+        "default_mode": mode,
+        "selected_source_ids": list(selected_source_ids or []),
+        "selected_quick_note_ids": list(selected_quick_note_ids or []),
+        "retention_policy": dict(RETENTION_PRESETS["STANDARD"]),
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_space", row)
+    if row["default_goal"]:
+        create_goal(row["id"], row["default_goal"])
+    return require_space(row["id"])
+
+
+def list_spaces(status: str = "ACTIVE") -> list[dict[str, Any]]:
+    where = ""
+    params: tuple[Any, ...] = ()
+    if status:
+        where, params = "status = ?", (status.upper(),)
+    return store.select("conversation_space", where=where, params=params, order="updated_at DESC")
+
+
+def list_space_summaries(status: str = "") -> list[dict[str, Any]]:
+    rows = list_spaces(status)
+    now = store.now()
+    out: list[dict[str, Any]] = []
+    for space in rows:
+        upcoming = store.select(
+            "conversation_session",
+            where="space_id = ? AND status = 'UPCOMING' AND scheduled_at IS NOT NULL AND scheduled_at >= ?",
+            params=(space["id"], now),
+            order="scheduled_at ASC",
+            limit=1,
+        )
+        recent = store.select(
+            "conversation_session",
+            where="space_id = ?",
+            params=(space["id"],),
+            order="COALESCE(ended_at, started_at, scheduled_at, created_at) DESC",
+            limit=1,
+        )
+        open_commitments = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE space_id = ? "
+            "AND type IN ('Commitment','Task') AND state NOT IN ('DONE','SUPERSEDED')",
+            (space["id"],),
+        ) or 0)
+        open_questions = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE space_id = ? "
+            "AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+            (space["id"],),
+        ) or 0)
+        out.append({
+            **space,
+            "next_session": upcoming[0] if upcoming else None,
+            "last_session": recent[0] if recent else None,
+            "open_commitments_count": open_commitments,
+            "open_questions_count": open_questions,
+        })
+    return out
+
+
+def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    current = require_space(space_id)
+    allowed = {
+        "title", "description", "status", "project_id", "relationship_key", "default_goal",
+        "default_mode", "selected_source_ids", "selected_quick_note_ids", "retention_policy",
+    }
+    clean = {k: v for k, v in patch.items() if k in allowed}
+    if "title" in clean:
+        clean["title"] = str(clean["title"] or "").strip()[:160]
+        if not clean["title"]:
+            raise ValueError("对话空间名称不能为空")
+    if "default_mode" in clean:
+        clean["default_mode"] = _require_choice(str(clean["default_mode"]), ASSISTANCE_MODES, "帮助方式")
+    if "status" in clean:
+        clean["status"] = str(clean["status"]).upper()
+        if clean["status"] not in {"ACTIVE", "ARCHIVED"}:
+            raise ValueError("对话空间状态不支持")
+    if "retention_policy" in clean:
+        raw_policy = clean["retention_policy"] if isinstance(clean["retention_policy"], dict) else {}
+        preset = str(raw_policy.get("preset") or "CUSTOM").upper()
+        if preset in RETENTION_PRESETS:
+            clean["retention_policy"] = dict(RETENTION_PRESETS[preset])
+        else:
+            def _days(key: str, default: int) -> int:
+                try:
+                    return max(0, min(3650, int(raw_policy.get(key, default))))
+                except (TypeError, ValueError):
+                    return default
+            clean["retention_policy"] = {
+                "preset": "CUSTOM",
+                "transcript_days": _days("transcript_days", 30),
+                "guidance_days": _days("guidance_days", 30),
+                "draft_days": _days("draft_days", 30),
+                "confirmed_items": "KEEP",
+                "audio_retention": "OFF",
+            }
+    clean["updated_at"] = store.now()
+    if clean:
+        store.update("conversation_space", space_id, clean)
+    return require_space(space_id) if clean else current
+
+
+def delete_space(space_id: str) -> bool:
+    require_space(space_id)
+    return store.delete("conversation_space", space_id)
+
+
+def create_goal(space_id: str, title: str, outcome_definition: str = "", priority: int = 50) -> dict[str, Any]:
+    require_space(space_id)
+    title = str(title or "").strip()
+    if not title:
+        raise ValueError("对话目标不能为空")
+    row = {
+        "id": store.new_id("cg_"),
+        "space_id": space_id,
+        "title": title[:240],
+        "outcome_definition": str(outcome_definition or "")[:2000],
+        "status": "ACTIVE",
+        "priority": max(0, min(100, int(priority))),
+        "source": {"kind": "USER"},
+        "created_at": store.now(),
+        "resolved_at": None,
+    }
+    store.insert("conversation_goal", row)
+    return store.get("conversation_goal", row["id"]) or row
+
+
+def add_participant(
+    space_id: str,
+    *,
+    display_name: str = "",
+    role: str = "",
+    organization: str = "",
+    session_id: str = "",
+    identity_source: str = "USER",
+) -> dict[str, Any]:
+    require_space(space_id)
+    if session_id:
+        require_session(session_id)
+    ts = store.now()
+    row = {
+        "id": store.new_id("cp_"),
+        "space_id": space_id,
+        "session_id": session_id or None,
+        "display_name": str(display_name or "")[:160],
+        "role": str(role or "")[:160],
+        "organization": str(organization or "")[:160],
+        "identity_confidence": 1.0 if display_name else 0.0,
+        "identity_source": str(identity_source or "USER")[:80],
+        "visibility": "PRIVATE",
+        "observations": [],
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_participant", row)
+    return store.get("conversation_participant", row["id"]) or row
+
+
+def create_session(
+    space_id: str,
+    *,
+    title: str = "",
+    goal_ids: Optional[list[str]] = None,
+    scheduled_at: Optional[float] = None,
+    capture_mode: str = "NOTES_ONLY",
+    processing_mode: str = "LOCAL",
+    assistance_mode: str = "",
+    consent_ack: bool = False,
+) -> dict[str, Any]:
+    space = require_space(space_id)
+    capture = _require_choice(capture_mode, CAPTURE_MODES, "记录方式")
+    processing = _require_choice(processing_mode, PROCESSING_MODES, "处理方式")
+    mode = _require_choice(assistance_mode or space["default_mode"], ASSISTANCE_MODES, "帮助方式")
+    ts = store.now()
+    row = {
+        "id": store.new_id("cv_"),
+        "space_id": space_id,
+        "goal_ids": list(goal_ids or []),
+        "template": space["profile"],
+        "title": (str(title or "").strip() or space["title"])[:200],
+        "scheduled_at": scheduled_at,
+        "started_at": None,
+        "ended_at": None,
+        "capture_mode": capture,
+        "processing_mode": processing,
+        "assistance_mode": mode,
+        "consent_ack": bool(consent_ack),
+        "pack_id": "",
+        "status": "UPCOMING",
+        "state": {"current_topic": "", "open_threads": [], "last_guidance_id": ""},
+        "source_calendar_event": {},
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_session", row)
+    return require_session(row["id"])
+
+
+def list_sessions(space_id: str) -> list[dict[str, Any]]:
+    require_space(space_id)
+    return store.select(
+        "conversation_session", where="space_id = ?", params=(space_id,),
+        order="COALESCE(started_at, scheduled_at, created_at) DESC",
+    )
+
+
+def preflight(session_id: str) -> dict[str, Any]:
+    session = require_session(session_id)
+    space = require_space(session["space_id"])
+    blockers: list[dict[str, str]] = []
+    if session["capture_mode"] == "TRANSCRIPT" and not session["consent_ack"]:
+        blockers.append({"key": "consent", "label": "转写确认", "message": "开启转写前，请确认当前场景允许记录/转写。"})
+    items = [
+        {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
+        {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
+        {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": not blockers},
+        {"key": "processing", "label": "处理方式", "value": session["processing_mode"], "ok": True},
+        {"key": "sources", "label": "带入来源", "value": len(space.get("selected_source_ids") or []), "ok": True},
+    ]
+    return {
+        "session": session,
+        "space": space,
+        "items": items,
+        "blockers": blockers,
+        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；成竹不会把点击开始当作其他参与者的同意。",
+    }
+
+
+def _confirmed_context_items(space_id: str) -> list[dict[str, Any]]:
+    return store.select(
+        "conversation_item",
+        where="space_id = ? AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED') "
+              "AND state NOT IN ('SUPERSEDED')",
+        params=(space_id,),
+        order="created_at DESC",
+        limit=100,
+    )
+
+
+def freeze_pack(session_id: str) -> dict[str, Any]:
+    session = require_session(session_id)
+    space = require_space(session["space_id"])
+    existing = store.select("conversation_session_pack", where="session_id = ?", params=(session_id,), limit=1)
+    if existing:
+        return existing[0]
+    selected_notes: list[dict[str, Any]] = []
+    for note_id in space.get("selected_quick_note_ids") or []:
+        note = store.get("quick_note", str(note_id))
+        if note:
+            selected_notes.append({"id": note["id"], "title": note.get("title", ""), "content": note.get("content", ""), "kind": "USER_NOTE"})
+    participants = store.select("conversation_participant", where="space_id = ?", params=(space["id"],), order="created_at ASC")
+    selected_sources: list[dict[str, Any]] = []
+    skipped_sources: list[dict[str, str]] = []
+    for source_id in space.get("selected_source_ids") or []:
+        ready = materials.ready_text(str(source_id))
+        if ready:
+            selected_sources.append(ready)
+        else:
+            raw = store.get("material", str(source_id))
+            skipped_sources.append({"id": str(source_id), "title": (raw or {}).get("title", ""), "reason": "NOT_READY"})
+
+    payload = {
+        "contract": "v2.0-R1",
+        "space": {"id": space["id"], "profile": space["profile"], "title": space["title"]},
+        "goal_ids": session.get("goal_ids") or [],
+        "selected_source_ids": space.get("selected_source_ids") or [],
+        "sources": selected_sources,
+        "skipped_sources": skipped_sources,
+        "quick_notes": selected_notes,
+        "confirmed_items": _confirmed_context_items(space["id"]),
+        "participants": participants,
+        "policy": {
+            "capture_mode": session["capture_mode"],
+            "processing_mode": session["processing_mode"],
+            "assistance_mode": session["assistance_mode"],
+            "consent_ack": bool(session["consent_ack"]),
+            "external_writeback": "REVIEW_REQUIRED",
+        },
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    row = {
+        "id": store.new_id("cpack_"),
+        "session_id": session_id,
+        "space_id": space["id"],
+        "payload": payload,
+        "digest": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        "created_at": store.now(),
+    }
+    store.insert("conversation_session_pack", row)
+    store.update("conversation_session", session_id, {"pack_id": row["id"], "updated_at": store.now()})
+    return store.get("conversation_session_pack", row["id"]) or row
+
+
+def start_session(session_id: str) -> dict[str, Any]:
+    check = preflight(session_id)
+    if check["blockers"]:
+        raise ValueError(check["blockers"][0]["message"])
+    session = check["session"]
+    if session["status"] == "ENDED":
+        raise ValueError("已结束的会话不能重新开始")
+    pack = freeze_pack(session_id)
+    ts = store.now()
+    store.update("conversation_session", session_id, {"status": "ACTIVE", "started_at": session.get("started_at") or ts, "updated_at": ts})
+    return {"session": require_session(session_id), "pack": pack}
+
+
+def update_session(session_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    session = require_session(session_id)
+    clean: dict[str, Any] = {}
+    if "assistance_mode" in patch:
+        clean["assistance_mode"] = _require_choice(str(patch["assistance_mode"]), ASSISTANCE_MODES, "帮助方式")
+    if "consent_ack" in patch and session["status"] == "UPCOMING":
+        clean["consent_ack"] = bool(patch["consent_ack"])
+    if "capture_mode" in patch and session["status"] == "UPCOMING":
+        clean["capture_mode"] = _require_choice(str(patch["capture_mode"]), CAPTURE_MODES, "记录方式")
+    if "processing_mode" in patch and session["status"] == "UPCOMING":
+        clean["processing_mode"] = _require_choice(str(patch["processing_mode"]), PROCESSING_MODES, "处理方式")
+    if clean:
+        clean["updated_at"] = store.now()
+        store.update("conversation_session", session_id, clean)
+    return require_session(session_id)
+
+
+def ask(session_id: str, question: str) -> dict[str, Any]:
+    """Source-aware local recall. It never invents an answer when no source matches."""
+    session = require_session(session_id)
+    question = str(question or "").strip()
+    if not question:
+        raise ValueError("问题不能为空")
+    tokens = {x.lower() for x in question.replace("？", " ").replace("?", " ").replace("，", " ").split() if len(x) >= 2}
+    confirmed = _confirmed_context_items(session["space_id"])
+    ranked: list[tuple[int, dict[str, Any]]] = []
+    for item in confirmed:
+        haystack = " ".join([
+            str(item.get("title") or ""),
+            str(item.get("detail") or ""),
+            str(item.get("source_excerpt") or ""),
+        ]).lower()
+        score = sum(1 for token in tokens if token in haystack)
+        if score:
+            ranked.append((score, item))
+    ranked.sort(key=lambda pair: (pair[0], pair[1].get("updated_at") or 0), reverse=True)
+    matches = [item for _, item in ranked[:5]]
+    if not matches:
+        return {
+            "answer": "没有找到足够可靠、已确认且与当前问题直接相关的历史记录。",
+            "matches": [],
+            "grounded": False,
+        }
+    return {
+        "answer": "找到可追溯的相关记录：" + "；".join(item["title"] for item in matches[:3]),
+        "matches": matches,
+        "grounded": True,
+    }
+
+
+def _recall_for_topic(space_id: str, topic: str) -> Optional[dict[str, Any]]:
+    """Small deterministic retrieval fallback for local/offline runtime."""
+    topic = str(topic or "").strip().lower()
+    if not topic:
+        return None
+    tokens = {x for x in topic.replace("/", " ").replace("-", " ").split() if len(x) >= 2}
+    if not tokens:
+        tokens = {topic}
+    best: tuple[int, dict[str, Any]] | None = None
+    for item in _confirmed_context_items(space_id):
+        haystack = " ".join([str(item.get("title") or ""), str(item.get("detail") or ""), str(item.get("source_excerpt") or "")]).lower()
+        score = sum(1 for token in tokens if token in haystack)
+        if score and (best is None or score > best[0]):
+            best = (score, item)
+    return best[1] if best else None
+
+
+def add_item(
+    session_id: str,
+    *,
+    item_type: str,
+    title: str,
+    state: str = "PROPOSED",
+    detail: str = "",
+    owner_id: str = "",
+    speaker_id: str = "",
+    due_at: str = "",
+    source_refs: Optional[list[dict[str, Any]]] = None,
+    source_excerpt: str = "",
+    confidence: float = 0.0,
+    epistemic_status: str = "UNKNOWN",
+    review_status: str = "AI_EXTRACTED",
+    supersedes_id: str = "",
+) -> dict[str, Any]:
+    session = require_session(session_id)
+    item_type = item_type if item_type in ITEM_TYPES else item_type.title()
+    if item_type not in ITEM_TYPES:
+        raise ValueError(f"事项类型不支持：{item_type}")
+    state = _require_choice(state, ITEM_STATES, "事项状态")
+    review_status = _require_choice(review_status, REVIEW_STATUSES, "审核状态")
+    epistemic_status = _require_choice(epistemic_status, EPISTEMIC_STATUSES, "认知状态")
+    refs = list(source_refs or [])
+    if state == "AGREED" and not (refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
+        raise ValueError("Decision 升级为 AGREED 需要来源与明确确认")
+    if state == "COMMITTED" and not (owner_id and refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
+        raise ValueError("Commitment 升级为 COMMITTED 需要 owner、来源与明确确认")
+    title = str(title or "").strip()
+    if not title:
+        raise ValueError("事项内容不能为空")
+    ts = store.now()
+    row = {
+        "id": store.new_id("ci_"),
+        "space_id": session["space_id"],
+        "session_id": session_id,
+        "type": item_type,
+        "state": state,
+        "title": title[:1000],
+        "detail": str(detail or "")[:5000],
+        "speaker_id": str(speaker_id or "")[:120],
+        "owner_id": str(owner_id or "")[:120],
+        "due_at": str(due_at or "")[:120],
+        "source_refs": refs,
+        "source_excerpt": str(source_excerpt or "")[:3000],
+        "confidence": max(0.0, min(1.0, float(confidence or 0.0))),
+        "epistemic_status": epistemic_status,
+        "review_status": review_status,
+        "supersedes_id": str(supersedes_id or "")[:120],
+        "visibility": "PRIVATE",
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_item", row)
+    return require_item(row["id"])
+
+
+def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    item = require_item(item_id)
+    action = str(action or "").upper()
+    patch = dict(patch or {})
+    update: dict[str, Any] = {}
+    if action == "CONFIRM":
+        update["review_status"] = "USER_CONFIRMED"
+        if item["type"] == "Decision" and item["state"] == "PROPOSED":
+            if not item.get("source_refs"):
+                raise ValueError("Decision 确认前需要来源")
+            update["state"] = "AGREED"
+        elif item["type"] in {"Commitment", "Task"} and item["state"] == "PROPOSED":
+            owner = str(patch.get("owner_id") or item.get("owner_id") or "")
+            if not owner or not item.get("source_refs"):
+                raise ValueError("Commitment 确认前需要 owner 与来源")
+            update["owner_id"] = owner
+            update["state"] = "COMMITTED"
+    elif action == "EDIT":
+        for key in ("title", "detail", "owner_id", "speaker_id", "due_at", "source_excerpt"):
+            if key in patch:
+                update[key] = patch[key]
+        update["review_status"] = "USER_EDITED"
+    elif action == "REJECT":
+        update.update({"review_status": "USER_REJECTED", "state": "UNKNOWN"})
+    elif action == "DONE":
+        if item["state"] != "COMMITTED":
+            raise ValueError("只有 COMMITTED 事项才能标记 DONE")
+        update["state"] = "DONE"
+        update["review_status"] = "USER_CONFIRMED"
+    elif action == "SUPERSEDE":
+        update["state"] = "SUPERSEDED"
+        update["review_status"] = "USER_CONFIRMED"
+        if patch.get("supersedes_id"):
+            update["supersedes_id"] = str(patch["supersedes_id"])
+    else:
+        raise ValueError("审核动作不支持")
+    update["updated_at"] = store.now()
+    store.update("conversation_item", item_id, update)
+    return require_item(item_id)
+
+
+def continue_summary(session_id: str) -> dict[str, Any]:
+    session = require_session(session_id)
+    items = store.select("conversation_item", where="session_id = ?", params=(session_id,), order="created_at ASC")
+    decisions = [i for i in items if i["type"] == "Decision" and i["state"] == "AGREED"]
+    commitments = [i for i in items if i["type"] in {"Commitment", "Task"} and i["state"] in {"COMMITTED", "DONE"}]
+    open_questions = [i for i in items if i["type"] == "OpenQuestion" and i["state"] not in {"DONE", "SUPERSEDED"}]
+    candidates = [i for i in items if i["review_status"] == "AI_EXTRACTED"]
+    next_focus = None
+    if open_questions:
+        next_focus = {"kind": "OPEN_QUESTION", "title": open_questions[0]["title"], "source_ref": open_questions[0]["id"]}
+    else:
+        owed = [i for i in commitments if i["state"] == "COMMITTED" and i.get("owner_id") in {"me", "SELF", "我"}]
+        if owed:
+            next_focus = {"kind": "COMMITMENT", "title": owed[0]["title"], "source_ref": owed[0]["id"]}
+    return {
+        "session": session,
+        "decisions": decisions,
+        "commitments": commitments,
+        "open_questions": open_questions,
+        "candidates": candidates,
+        "next_focus": next_focus,
+        "review_required": len(candidates),
+    }
+
+
+def end_session(session_id: str) -> dict[str, Any]:
+    session = require_session(session_id)
+    ts = store.now()
+    if session["status"] != "ENDED":
+        store.update("conversation_session", session_id, {"status": "ENDED", "ended_at": ts, "updated_at": ts})
+    return continue_summary(session_id)
+
+
+def _score(body: dict[str, Any]) -> OpportunityScore:
+    keys = {
+        "relevance", "novelty", "provenance_strength", "role_relevance", "goal_relevance", "urgency",
+        "decision_impact", "interruption_cost", "already_mentioned", "uncertainty", "social_risk",
+        "stale_context_risk",
+    }
+    values = {key: float(body.get(key) or 0.0) for key in keys}
+    return OpportunityScore(**values)
+
+
+def _persist_guidance(
+    session_id: str,
+    *,
+    kind: str,
+    action: str,
+    text: str,
+    source_refs: list[dict[str, Any]],
+    status: str,
+    reason: str = "",
+    score: Optional[OpportunityScore] = None,
+) -> dict[str, Any]:
+    ts = store.now()
+    row = {
+        "id": store.new_id("ge_"),
+        "session_id": session_id,
+        "candidate_id": store.new_id("gc_"),
+        "kind": kind,
+        "expression_action": action,
+        "text": text,
+        "source_refs": source_refs,
+        "status": status,
+        "reason": reason,
+        "score": {"value": score.value, **score.__dict__} if score else {},
+        "user_action": "NONE",
+        "rendered_at": ts if status == "SHOWN" else None,
+        "created_at": ts,
+    }
+    store.insert("conversation_guidance_event", row)
+    saved = store.get("conversation_guidance_event", row["id"]) or row
+    session = require_session(session_id)
+    state = dict(session.get("state") or {})
+    if status == "SHOWN":
+        state["last_guidance_id"] = row["id"]
+        store.update("conversation_session", session_id, {"state": state, "updated_at": ts})
+    return saved
+
+
+def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    session = require_session(session_id)
+    if session["status"] != "ACTIVE":
+        raise ValueError("只有进行中的会话可以生成实时提示")
+    state = dict(session.get("state") or {})
+    current_topic = str(body.get("current_topic") or "").strip()[:500]
+    if current_topic:
+        state["current_topic"] = current_topic
+        store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
+
+    source_refs = list(body.get("source_refs") or [])
+    direct_question = str(body.get("direct_question") or "").strip()
+    if direct_question:
+        event = _persist_guidance(
+            session_id,
+            kind="ANSWER_CUE",
+            action=ExpressionAction.ANSWER.value,
+            text=str(body.get("answer_cue") or "先直接回答问题，再补一条有来源的事实。")[:1200],
+            source_refs=source_refs,
+            status="SHOWN",
+            reason="DIRECT_QUESTION",
+        )
+        return {"guidance": event, "suppressed": None}
+
+    if bool(body.get("user_speaking")):
+        event = _persist_guidance(
+            session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+            text="", source_refs=source_refs, status="SUPPRESSED", reason="USER_SPEAKING",
+        )
+        return {"guidance": None, "suppressed": "USER_SPEAKING", "event": event}
+
+    mode = str(session.get("assistance_mode") or "BALANCED").upper()
+    candidate_text = str(body.get("candidate_text") or "").strip()
+    if candidate_text:
+        if not source_refs:
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=[], status="SUPPRESSED", reason="NO_SOURCE",
+            )
+            return {"guidance": None, "suppressed": "NO_SOURCE", "event": event}
+        score = _score(body)
+        threshold = {"QUIET": float("inf"), "BALANCED": 2.5, "ACTIVE": 1.5, "PRESENTATION": 2.5, "ONE_ON_ONE": 3.0}.get(mode, 2.5)
+        if score.value < threshold:
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="BELOW_THRESHOLD", score=score,
+            )
+            return {"guidance": None, "suppressed": "BELOW_THRESHOLD", "event": event}
+        event = _persist_guidance(
+            session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.ADD_TALKING_POINT.value,
+            text=candidate_text[:1200], source_refs=source_refs, status="SHOWN", reason="HIGH_VALUE_OPPORTUNITY", score=score,
+        )
+        return {"guidance": event, "suppressed": None}
+
+    recall = _recall_for_topic(session["space_id"], state.get("current_topic") or "")
+    if mode != "QUIET" and recall:
+        refs = list(recall.get("source_refs") or [])
+        if refs:
+            event = _persist_guidance(
+                session_id, kind="RECALL", action=ExpressionAction.RECALL.value,
+                text=recall["title"], source_refs=refs, status="SHOWN", reason="TOPIC_RECALL",
+            )
+            return {"guidance": event, "suppressed": None}
+
+    open_questions = store.select(
+        "conversation_item",
+        where="space_id = ? AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+        params=(session["space_id"],), order="created_at DESC", limit=1,
+    )
+    if mode != "QUIET" and open_questions:
+        item = open_questions[0]
+        event = _persist_guidance(
+            session_id, kind="QUESTION", action=ExpressionAction.ASK_QUESTION.value,
+            text=item["title"], source_refs=item.get("source_refs") or [], status="SHOWN", reason="OPEN_QUESTION",
+        )
+        return {"guidance": event, "suppressed": None}
+
+    event = _persist_guidance(
+        session_id, kind="RECALL", action=ExpressionAction.SILENT.value,
+        text="", source_refs=[], status="SUPPRESSED", reason="NO_HIGH_VALUE_GUIDANCE",
+    )
+    return {"guidance": None, "suppressed": "NO_HIGH_VALUE_GUIDANCE", "event": event}
+
+
+def guidance_from_transcript(session_id: str, text: str) -> Optional[dict[str, Any]]:
+    """Conservative automatic guidance from final Conversation ASR text."""
+    session = require_session(session_id)
+    if session["status"] != "ACTIVE":
+        return None
+    state = dict(session.get("state") or {})
+    state["current_topic"] = str(text or "").strip()[:500]
+    store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
+    if str(session.get("assistance_mode") or "BALANCED").upper() == "QUIET":
+        return None
+    recall = _recall_for_topic(session["space_id"], state["current_topic"])
+    if not recall:
+        return None
+    refs = list(recall.get("source_refs") or [])
+    if not refs:
+        return None
+    recent = store.select(
+        "conversation_guidance_event",
+        where="session_id = ? AND kind = 'RECALL' AND text = ? AND created_at >= ?",
+        params=(session_id, recall["title"], store.now() - 45.0),
+        order="created_at DESC",
+        limit=1,
+    )
+    if recent:
+        return None
+    return _persist_guidance(
+        session_id,
+        kind="RECALL",
+        action=ExpressionAction.RECALL.value,
+        text=recall["title"],
+        source_refs=refs,
+        status="SHOWN",
+        reason="TRANSCRIPT_TOPIC_RECALL",
+    )
+
+
+def guidance_history(session_id: str, limit: int = 30) -> list[dict[str, Any]]:
+    require_session(session_id)
+    return store.select(
+        "conversation_guidance_event",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at DESC",
+        limit=max(1, min(100, int(limit))),
+    )
+
+
+def set_guidance_action(guidance_id: str, action: str) -> dict[str, Any]:
+    row = store.get("conversation_guidance_event", guidance_id)
+    if not row:
+        raise ValueError("实时提示不存在")
+    action = str(action or "").upper()
+    if action not in {"EXPANDED", "PINNED", "DISMISSED", "SNOOZED", "USED", "NONE"}:
+        raise ValueError("提示动作不支持")
+    store.update("conversation_guidance_event", guidance_id, {"user_action": action})
+    return store.get("conversation_guidance_event", guidance_id) or row
+
+
+def space_detail(space_id: str) -> dict[str, Any]:
+    space = require_space(space_id)
+    goals = store.select("conversation_goal", where="space_id = ?", params=(space_id,), order="priority DESC, created_at ASC")
+    sessions = list_sessions(space_id)
+    participants = store.select("conversation_participant", where="space_id = ?", params=(space_id,), order="created_at ASC")
+    items = store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at DESC", limit=200)
+    threads = store.select("conversation_open_thread", where="space_id = ? AND status = 'OPEN'", params=(space_id,), order="created_at DESC")
+    return {
+        **space,
+        "goals": goals,
+        "sessions": sessions,
+        "participants": participants,
+        "decisions": [i for i in items if i["type"] == "Decision"],
+        "commitments": [i for i in items if i["type"] in {"Commitment", "Task"}],
+        "open_questions": [i for i in items if i["type"] == "OpenQuestion"],
+        "threads": threads,
+    }
+
+
+def prepare_space(space_id: str) -> dict[str, Any]:
+    detail = space_detail(space_id)
+    active = [i for i in detail["commitments"] if i["state"] not in {"DONE", "SUPERSEDED"}]
+    unresolved = [i for i in detail["open_questions"] if i["state"] not in {"DONE", "SUPERSEDED"}]
+    decisions = [i for i in detail["decisions"] if i["state"] == "AGREED"]
+    next_sessions = [s for s in detail["sessions"] if s["status"] == "UPCOMING"]
+    next_sessions.sort(key=lambda s: s.get("scheduled_at") or float("inf"))
+    return {
+        "space": {k: detail[k] for k in ("id", "profile", "title", "description", "default_goal", "default_mode", "selected_source_ids", "selected_quick_note_ids")},
+        "goals": detail["goals"],
+        "next_session": next_sessions[0] if next_sessions else None,
+        "open_commitments": active,
+        "open_questions": unresolved,
+        "related_decisions": decisions[:12],
+        "participants": detail["participants"],
+        "selected_sources": detail.get("selected_source_ids") or [],
+        "selected_quick_notes": detail.get("selected_quick_note_ids") or [],
+    }
+
+
+def home_summary() -> dict[str, Any]:
+    spaces = list_spaces("ACTIVE")
+    if not spaces:
+        return {
+            "state": "EMPTY", "spaces": [], "next_session": None, "next_focus": None,
+            "owed_by_me": [], "open_questions": [], "recent_change": None,
+        }
+    now = store.now()
+    upcoming = store.select(
+        "conversation_session",
+        where="status = 'UPCOMING' AND scheduled_at IS NOT NULL AND scheduled_at >= ?",
+        params=(now,), order="scheduled_at ASC", limit=1,
+    )
+    owed = store.select(
+        "conversation_item",
+        where="type IN ('Commitment','Task') AND state = 'COMMITTED' AND owner_id IN ('me','SELF','我')",
+        order="created_at DESC", limit=8,
+    )
+    open_questions = store.select(
+        "conversation_item",
+        where="type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+        order="created_at DESC", limit=8,
+    )
+    changes = store.select(
+        "conversation_item",
+        where="review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED') "
+              "AND state IN ('AGREED','COMMITTED','DONE','SUPERSEDED')",
+        order="updated_at DESC", limit=1,
+    )
+    next_focus: Optional[dict[str, Any]] = None
+    if upcoming:
+        next_focus = {"kind": "PREPARE", "title": f"准备下一场：{upcoming[0]['title']}", "space_id": upcoming[0]["space_id"]}
+    elif open_questions:
+        next_focus = {"kind": "OPEN_QUESTION", "title": open_questions[0]["title"], "space_id": open_questions[0]["space_id"]}
+    elif owed:
+        next_focus = {"kind": "COMMITMENT", "title": owed[0]["title"], "space_id": owed[0]["space_id"]}
+    return {
+        "state": "ACTIVE",
+        "spaces": spaces,
+        "next_session": upcoming[0] if upcoming else None,
+        "next_focus": next_focus,
+        "owed_by_me": owed,
+        "open_questions": open_questions,
+        "recent_change": changes[0] if changes else None,
+    }
+
+
+DRAFT_ACTION_KINDS = {
+    "FOLLOWUP_EMAIL_DRAFT",
+    "CREATE_TASK_DRAFT",
+    "CREATE_ISSUE_DRAFT",
+    "UPDATE_DECISION_LOG_DRAFT",
+}
+
+
+def create_adhoc(
+    *,
+    title: str = "临时对话",
+    profile: str = "PROJECT_SYNC",
+    assistance_mode: str = "",
+) -> dict[str, Any]:
+    """Create and start an ad-hoc local session without Calendar/connectors."""
+    space = create_space(title or "临时对话", profile, default_mode=assistance_mode)
+    session = create_session(
+        space["id"],
+        title=title or "临时对话",
+        capture_mode="NOTES_ONLY",
+        processing_mode="LOCAL",
+        assistance_mode=assistance_mode or space["default_mode"],
+        consent_ack=True,
+    )
+    started = start_session(session["id"])
+    return {"space": require_space(space["id"]), **started}
+
+
+def _retention_cutoff(days: int, now: float) -> float:
+    return now if days <= 0 else now - days * 86400.0
+
+
+def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, Any]:
+    space = require_space(space_id)
+    policy = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
+    now_value = float(now if now is not None else store.now())
+    transcript_days = int(policy.get("transcript_days", 30) or 0)
+    guidance_days = int(policy.get("guidance_days", 30) or 0)
+    draft_days = int(policy.get("draft_days", 30) or 0)
+    transcript_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_transcript_segment WHERE space_id = ? AND created_at <= ?",
+        (space_id, _retention_cutoff(transcript_days, now_value)),
+    ) or 0)
+    guidance_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event g "
+        "JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? AND g.created_at <= ?",
+        (space_id, _retention_cutoff(guidance_days, now_value)),
+    ) or 0)
+    draft_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_draft_action WHERE space_id = ? AND created_at <= ?",
+        (space_id, _retention_cutoff(draft_days, now_value)),
+    ) or 0)
+    return {
+        "space_id": space_id,
+        "policy": policy,
+        "would_delete": {
+            "transcript_segments": transcript_count,
+            "guidance_events": guidance_count,
+            "draft_actions": draft_count,
+        },
+        "kept": {
+            "confirmed_items": "KEEP",
+            "session_packs": "KEEP",
+            "provenance_tombstones": "KEEP",
+        },
+        "destructive": any((transcript_count, guidance_count, draft_count)),
+    }
+
+
+def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
+    preview = retention_preview(space_id)
+    if preview["destructive"] and not confirm:
+        raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
+    policy = preview["policy"]
+    now_value = store.now()
+    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0}
+
+    transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
+    for row in store.select(
+        "conversation_transcript_segment",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    ):
+        deleted["transcript_segments"] += int(store.delete("conversation_transcript_segment", row["id"]))
+
+    guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
+    guidance_rows = store.rows(
+        "SELECT g.* FROM conversation_guidance_event g "
+        "JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? AND g.created_at <= ?",
+        (space_id, guidance_cutoff),
+    )
+    for row in guidance_rows:
+        deleted["guidance_events"] += int(store.delete("conversation_guidance_event", row["id"]))
+
+    draft_cutoff = _retention_cutoff(int(policy.get("draft_days", 30) or 0), now_value)
+    for row in store.select(
+        "conversation_draft_action",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, draft_cutoff),
+    ):
+        deleted["draft_actions"] += int(store.delete("conversation_draft_action", row["id"]))
+    return {"space_id": space_id, "deleted": deleted, "policy": policy}
+
+
+def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[str, Any]:
+    session = require_session(session_id)
+    if session["status"] == "ACTIVE":
+        raise ValueError("进行中的会话不能删除；请先结束")
+    confirmed = store.select(
+        "conversation_item",
+        where="session_id = ? AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    policy = str(confirmed_policy or "BLOCK").upper()
+    if confirmed and policy != "TOMBSTONE":
+        raise ValueError("这场包含已确认事项；删除前必须选择 TOMBSTONE 保留 provenance 标记")
+    tombstones = 0
+    if confirmed:
+        ts = store.now()
+        with store.connect() as conn:
+            for item in confirmed:
+                store.insert("conversation_provenance_tombstone", {
+                    "id": store.new_id("cpt_"),
+                    "original_item_id": item["id"],
+                    "space_id": session["space_id"],
+                    "deleted_session_id": session_id,
+                    "type": item["type"],
+                    "title": item["title"],
+                    "state": item["state"],
+                    "review_status": item["review_status"],
+                    "source_refs": item.get("source_refs") or [],
+                    "source_excerpt": item.get("source_excerpt") or "",
+                    "deleted_at": ts,
+                }, conn=conn)
+                tombstones += 1
+            conn.execute("DELETE FROM conversation_session WHERE id = ?", (session_id,))
+    else:
+        store.delete("conversation_session", session_id)
+    return {"deleted": True, "session_id": session_id, "provenance_tombstones": tombstones}
+
+
+def create_draft_action(
+    session_id: str,
+    *,
+    kind: str,
+    title: str = "",
+    content: str = "",
+    target: str = "",
+    source_refs: Optional[list[dict[str, Any]]] = None,
+    payload: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    session = require_session(session_id)
+    kind = str(kind or "").upper()
+    if kind not in DRAFT_ACTION_KINDS:
+        raise ValueError("DraftAction 类型不支持")
+    if not (title or content):
+        raise ValueError("DraftAction 不能为空")
+    ts = store.now()
+    row = {
+        "id": store.new_id("cda_"),
+        "space_id": session["space_id"],
+        "session_id": session_id,
+        "kind": kind,
+        "title": str(title or "")[:300],
+        "content": str(content or "")[:20_000],
+        "target": str(target or "")[:500],
+        "payload": dict(payload or {}),
+        "source_refs": list(source_refs or []),
+        "status": "DRAFT",
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_draft_action", row)
+    return store.get("conversation_draft_action", row["id"]) or row
+
+
+def list_draft_actions(space_id: str, status: str = "") -> list[dict[str, Any]]:
+    require_space(space_id)
+    if status:
+        return store.select(
+            "conversation_draft_action", where="space_id = ? AND status = ?",
+            params=(space_id, status.upper()), order="created_at DESC",
+        )
+    return store.select("conversation_draft_action", where="space_id = ?", params=(space_id,), order="created_at DESC")
+
+
+def review_draft_action(action_id: str, action: str) -> dict[str, Any]:
+    row = store.get("conversation_draft_action", action_id)
+    if not row:
+        raise ValueError("DraftAction 不存在")
+    action = str(action or "").upper()
+    mapping = {"APPROVE": "APPROVED", "DISMISS": "DISMISSED", "RESET": "DRAFT"}
+    if action not in mapping:
+        raise ValueError("DraftAction 审核动作不支持")
+    # APPROVED means the user reviewed the local draft. It deliberately does
+    # not mean an external connector sent/created anything.
+    store.update("conversation_draft_action", action_id, {"status": mapping[action], "updated_at": store.now()})
+    return store.get("conversation_draft_action", action_id) or row
+
+
+def followup_draft(session_id: str) -> dict[str, Any]:
+    summary = continue_summary(session_id)
+    lines = ["这场之后："]
+    if summary["decisions"]:
+        lines.append("Decisions：" + "；".join(x["title"] for x in summary["decisions"]))
+    if summary["commitments"]:
+        lines.append("Commitments：" + "；".join(x["title"] for x in summary["commitments"]))
+    if summary["open_questions"]:
+        lines.append("Open Questions：" + "；".join(x["title"] for x in summary["open_questions"]))
+    if len(lines) == 1:
+        lines.append("当前没有已确认的 Decision / Commitment；建议先完成逐项确认。")
+    sources: list[dict[str, Any]] = []
+    for item in summary["decisions"] + summary["commitments"] + summary["open_questions"]:
+        sources.extend(item.get("source_refs") or [])
+    return create_draft_action(
+        session_id,
+        kind="FOLLOWUP_EMAIL_DRAFT",
+        title=f"{summary['session']['title']} · Follow-up",
+        content="\n".join(lines),
+        source_refs=sources,
+    )
+
+
+def synthetic_demo() -> dict[str, Any]:
+    """Deterministic onboarding dry run; never persisted and never real evidence."""
+    return {
+        "evidence": "SYNTHETIC_DEMO",
+        "scenario": "DESIGN_REVIEW",
+        "title": "Android Architecture Review · Dry Run",
+        "goal": "明确 offline migration 方案并确认 rollback owner",
+        "steps": [
+            {
+                "kind": "PROPOSAL",
+                "title": "Proposal ≠ Decision",
+                "input": "Alex：我建议 offline sync v2。",
+                "output": "建议被记录为 Proposal；没有共识证据，不会写成 AGREED。",
+                "state": "PROPOSED",
+            },
+            {
+                "kind": "RECALL",
+                "title": "跨场 Recall",
+                "input": "话题回到 offline migration。",
+                "output": "上次已确认：offline migration 采用 v2。",
+                "source": "Synthetic prior Design Review · confirmed",
+            },
+            {
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "title": "值得补充",
+                "input": "讨论数据规模时，你有一条已选来源。",
+                "output": "Q4 benchmark 已覆盖 10x data scale。",
+                "source": "Synthetic Benchmark Note",
+            },
+            {
+                "kind": "SILENT",
+                "title": "Stay Silent",
+                "input": "你正在连续表达，且没有新的高价值信息。",
+                "output": "SILENT · USER_SPEAKING",
+            },
+            {
+                "kind": "CONTINUE",
+                "title": "会后逐项确认",
+                "input": "模型提取：rollback owner = 未知。",
+                "output": "保留为 Open Question / 待确认；不会猜 owner，也不会自动写外部系统。",
+            },
+        ],
+        "privacy": {
+            "capture_default": "NOTES_ONLY",
+            "processing_default": "LOCAL",
+            "audio_retention": "OFF",
+            "external_writeback": "DRAFT_ONLY_REVIEW_REQUIRED",
+        },
+    }
+
+
+def diagnostics() -> dict[str, Any]:
+    """Local-only Conversation runtime health and engineering evidence.
+
+    Counts describe this device only. They are deliberately not interpreted
+    as product-market fit or real-user validation.
+    """
+    from services.product import conversation_capture
+    from services.storage.product_migrations import LATEST_SCHEMA_VERSION
+
+    spaces = int(store.scalar("SELECT COUNT(*) FROM conversation_space") or 0)
+    sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session") or 0)
+    active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
+    ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
+    transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
+    confirmed_items = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
+    ) or 0)
+    pending_items = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_item WHERE review_status = 'AI_EXTRACTED'"
+    ) or 0)
+    shown = int(store.scalar("SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SHOWN'") or 0)
+    suppressed = int(store.scalar("SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED'") or 0)
+    sourced_shown = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event "
+        "WHERE status = 'SHOWN' AND source_refs_json NOT IN ('[]','null','')"
+    ) or 0)
+    drafts = int(store.scalar("SELECT COUNT(*) FROM conversation_draft_action") or 0)
+    approved_drafts = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_draft_action WHERE status = 'APPROVED'"
+    ) or 0)
+    capture = conversation_capture.status()
+    return {
+        "contract": "v2.0-R1",
+        "schema_version": store.schema_version(),
+        "expected_schema_version": LATEST_SCHEMA_VERSION,
+        "capture": capture,
+        "runtime": {
+            "spaces": spaces,
+            "sessions": sessions,
+            "active_sessions": active_sessions,
+            "ended_sessions": ended_sessions,
+            "transcript_segments": transcripts,
+            "confirmed_items": confirmed_items,
+            "pending_review_items": pending_items,
+            "guidance_shown": shown,
+            "guidance_suppressed": suppressed,
+            "sourced_guidance_shown": sourced_shown,
+            "draft_actions": drafts,
+            "approved_drafts": approved_drafts,
+        },
+        "health": {
+            "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",
+            "capture": "AVAILABLE" if not capture["active"] else "IN_USE",
+            "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
+            "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
+            "external_connectors": "NOT_CONFIGURED",
+        },
+        "evidence": {
+            "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
+            "real_conversation_user_evidence": "REAL_CONVERSATION_USER_EVIDENCE_PENDING",
+            "pmf": "PMF_PROVEN_FALSE",
+        },
+        "privacy": {
+            "remote_telemetry": "OFF",
+            "auto_external_writeback": "OFF",
+            "speaker_biometric_identity": "OFF",
+        },
+    }
+
+
+def export_space(space_id: str) -> dict[str, Any]:
+    detail = space_detail(space_id)
+    items = store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at ASC")
+    transcript = store.select(
+        "conversation_transcript_segment", where="space_id = ?", params=(space_id,), order="created_at ASC"
+    )
+    guidance = store.rows(
+        "SELECT g.* FROM conversation_guidance_event g JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? ORDER BY g.created_at ASC",
+        (space_id,),
+    )
+    notes: list[dict[str, Any]] = []
+    for note_id in detail.get("selected_quick_note_ids") or []:
+        note = store.get("quick_note", str(note_id))
+        if note:
+            notes.append(note)
+    source_manifest: list[dict[str, Any]] = []
+    for material_id in detail.get("selected_source_ids") or []:
+        material = store.get("material", str(material_id))
+        if material:
+            source_manifest.append({
+                "id": material["id"],
+                "kind": material["kind"],
+                "usage": material["usage"],
+                "title": material["title"],
+                "active_version_id": material.get("active_version_id") or "",
+            })
+        else:
+            source_manifest.append({"id": str(material_id), "missing": True})
+    confirmed = [
+        item for item in items
+        if item["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
+    ]
+    candidates = [item for item in items if item["review_status"] == "AI_EXTRACTED"]
+    tombstones = store.select(
+        "conversation_provenance_tombstone",
+        where="space_id = ?",
+        params=(space_id,),
+        order="deleted_at ASC",
+    )
+    # Explicit categories are primary. Legacy aggregate keys stay for tooling
+    # compatibility but point to the same local data, not a second truth store.
+    return {
+        "kind": "CONVERSATION_SPACE",
+        "contract": "v2.0-R1",
+        "export_manifest": {
+            "categories": [
+                "transcript", "notes", "confirmed_items", "unconfirmed_candidates",
+                "guidance", "source_manifest", "draft_actions", "provenance_tombstones",
+            ],
+            "privacy": "LOCAL_EXPORT",
+            "contains_external_secrets": False,
+        },
+        "space": {k: v for k, v in detail.items() if k not in {"goals", "sessions", "participants", "decisions", "commitments", "open_questions", "threads"}},
+        "goals": detail["goals"],
+        "sessions": detail["sessions"],
+        "participants": detail["participants"],
+        "transcript": transcript,
+        "notes": notes,
+        "confirmed_items": confirmed,
+        "unconfirmed_candidates": candidates,
+        "guidance": guidance,
+        "source_manifest": source_manifest,
+        "draft_actions": list_draft_actions(space_id),
+        "provenance_tombstones": tombstones,
+        "items": items,
+        "threads": detail["threads"],
+        "packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
+    }

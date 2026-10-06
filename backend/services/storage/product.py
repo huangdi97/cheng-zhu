@@ -31,7 +31,7 @@ DB_PATH = sqlite_path("product.db")
 _LOCK = threading.RLock()
 _READY_PATHS: set[str] = set()
 
-_BOOL_COLUMNS = frozenset({"pinned", "builtin", "used_in_reflection", "guided"})
+_BOOL_COLUMNS = frozenset({"pinned", "builtin", "used_in_reflection", "guided", "consent_ack", "is_final"})
 _COLUMNS_CACHE: dict[tuple[str, str], list[str]] = {}
 
 

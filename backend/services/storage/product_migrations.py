@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 4
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -368,6 +368,221 @@ _V1_INDEXES: tuple[str, ...] = (
 )
 
 
+
+# --- v2.0 Personal Conversation Intelligence (additive; v1 tables untouched) ---
+_V2_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_space (
+        id TEXT PRIMARY KEY,
+        profile TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        project_id TEXT NOT NULL DEFAULT '',
+        relationship_key TEXT NOT NULL DEFAULT '',
+        default_goal TEXT NOT NULL DEFAULT '',
+        default_mode TEXT NOT NULL DEFAULT 'BALANCED',
+        selected_source_ids_json TEXT NOT NULL DEFAULT '[]',
+        selected_quick_note_ids_json TEXT NOT NULL DEFAULT '[]',
+        retention_policy_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_goal (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        outcome_definition TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        priority INTEGER NOT NULL DEFAULT 50,
+        source_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL,
+        resolved_at REAL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_session (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        goal_ids_json TEXT NOT NULL DEFAULT '[]',
+        template TEXT NOT NULL DEFAULT 'PROJECT_SYNC',
+        title TEXT NOT NULL DEFAULT '',
+        scheduled_at REAL,
+        started_at REAL,
+        ended_at REAL,
+        capture_mode TEXT NOT NULL DEFAULT 'NOTES_ONLY',
+        processing_mode TEXT NOT NULL DEFAULT 'LOCAL',
+        assistance_mode TEXT NOT NULL DEFAULT 'BALANCED',
+        consent_ack INTEGER NOT NULL DEFAULT 0,
+        pack_id TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'UPCOMING',
+        state_json TEXT NOT NULL DEFAULT '{}',
+        source_calendar_event_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_session_pack (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL UNIQUE REFERENCES conversation_session(id) ON DELETE CASCADE,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        payload_json TEXT NOT NULL,
+        digest TEXT NOT NULL,
+        created_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_participant (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT,
+        display_name TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT '',
+        organization TEXT NOT NULL DEFAULT '',
+        identity_confidence REAL NOT NULL DEFAULT 0,
+        identity_source TEXT NOT NULL DEFAULT '',
+        visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+        observations_json TEXT NOT NULL DEFAULT '[]',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_item (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT 'PROPOSED',
+        title TEXT NOT NULL,
+        detail TEXT NOT NULL DEFAULT '',
+        speaker_id TEXT NOT NULL DEFAULT '',
+        owner_id TEXT NOT NULL DEFAULT '',
+        due_at TEXT NOT NULL DEFAULT '',
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        source_excerpt TEXT NOT NULL DEFAULT '',
+        confidence REAL NOT NULL DEFAULT 0,
+        epistemic_status TEXT NOT NULL DEFAULT 'UNKNOWN',
+        review_status TEXT NOT NULL DEFAULT 'AI_EXTRACTED',
+        supersedes_id TEXT NOT NULL DEFAULT '',
+        visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_open_thread (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT,
+        kind TEXT NOT NULL DEFAULT 'OPEN_QUESTION',
+        text TEXT NOT NULL,
+        owner_id TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        created_at REAL NOT NULL,
+        resolved_at REAL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_guidance_event (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
+        candidate_id TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL,
+        expression_action TEXT NOT NULL,
+        text TEXT NOT NULL DEFAULT '',
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'SHOWN',
+        reason TEXT NOT NULL DEFAULT '',
+        score_json TEXT NOT NULL DEFAULT '{}',
+        user_action TEXT NOT NULL DEFAULT 'NONE',
+        rendered_at REAL,
+        created_at REAL NOT NULL
+    )
+    """,
+)
+
+_V2_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_space_status ON conversation_space(status, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_goal_space ON conversation_goal(space_id, status, priority)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_session_space ON conversation_session(space_id, scheduled_at, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_session_status ON conversation_session(status, scheduled_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_participant_space ON conversation_participant(space_id, session_id)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_item_space ON conversation_item(space_id, type, state, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_item_session ON conversation_item(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_thread_space ON conversation_open_thread(space_id, status, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_guidance_session ON conversation_guidance_event(session_id, created_at)",
+)
+
+# --- v2.0 runtime closure: post-core additive tables ---
+# Kept as a separate migration because early v2 development builds may already
+# have PRAGMA user_version=2. Never silently assume those databases rerun v2.
+_V3_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_draft_action (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT REFERENCES conversation_session(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        target TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_transcript_segment (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL,
+        text TEXT NOT NULL,
+        provider TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL DEFAULT '',
+        is_final INTEGER NOT NULL DEFAULT 1,
+        created_at REAL NOT NULL
+    )
+    """,
+)
+
+_V3_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_draft_space ON conversation_draft_action(space_id, status, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_transcript_session ON conversation_transcript_segment(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_transcript_space ON conversation_transcript_segment(space_id, created_at)",
+)
+
+# --- v2.0 lifecycle closure: deletion provenance ---
+_V4_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_provenance_tombstone (
+        id TEXT PRIMARY KEY,
+        original_item_id TEXT NOT NULL,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        deleted_session_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        state TEXT NOT NULL,
+        review_status TEXT NOT NULL,
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        source_excerpt TEXT NOT NULL DEFAULT '',
+        deleted_at REAL NOT NULL
+    )
+    """,
+)
+
+_V4_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_tombstone_space ON conversation_provenance_tombstone(space_id, deleted_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_tombstone_original ON conversation_provenance_tombstone(original_item_id)",
+)
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -375,6 +590,9 @@ def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> 
 
 _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "v1.3 goal-centered product layer"),
+    2: (lambda conn: _apply_statements(conn, _V2_TABLES + _V2_INDEXES), "v2.0 personal conversation intelligence"),
+    3: (lambda conn: _apply_statements(conn, _V3_TABLES + _V3_INDEXES), "v2.0 conversation runtime closure"),
+    4: (lambda conn: _apply_statements(conn, _V4_TABLES + _V4_INDEXES), "v2.0 deletion provenance tombstones"),
 }
 
 

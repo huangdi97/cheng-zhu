@@ -4,7 +4,8 @@
  * Ranking: commands of the current context first, then global ones.
  */
 import { api } from '@/lib/api'
-import { navigate, paths, type Route } from '@/lib/router'
+import { conversationApi } from '@/lib/conversationApi'
+import { navigate, paths, useRouter, type Route } from '@/lib/router'
 import { productApi, track } from '@/lib/productApi'
 import { useInterviewStore } from '@/stores/configStore'
 import { useOsStore } from '@/stores/osStore'
@@ -12,7 +13,16 @@ import { useOverlayLayout } from '@/stores/overlayLayoutStore'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import { goLive, openGoal, startPractice } from './actions'
 
-export type CommandContext = 'home' | 'goal' | 'live' | 'me' | 'practice' | 'global'
+export type CommandContext =
+  | 'home'
+  | 'goal'
+  | 'live'
+  | 'me'
+  | 'practice'
+  | 'conversation-home'
+  | 'conversation-space'
+  | 'conversation-live'
+  | 'global'
 
 export interface Command {
   id: string
@@ -35,9 +45,20 @@ export function contextOf(route: Route): CommandContext {
       return 'me'
     case 'practice':
       return 'practice'
+    case 'conversation-home':
+    case 'conversations':
+      return 'conversation-home'
+    case 'conversation':
+      return 'conversation-space'
+    case 'conversation-live':
+      return 'conversation-live'
     default:
       return 'global'
   }
+}
+
+function currentRoute(): Route {
+  return useRouter.getState().route
 }
 
 function toast(message: string): void {
@@ -49,7 +70,7 @@ function latestQuestion(): string {
   return qa.length ? qa[qa.length - 1].question : ''
 }
 
-export function buildCommands(goalId: string | null): Command[] {
+export function buildCommands(goalId: string | null, route: Route = currentRoute()): Command[] {
   const os = useOsStore.getState()
   const overlay = useOverlayLayout.getState()
   return [
@@ -110,6 +131,64 @@ export function buildCommands(goalId: string | null): Command[] {
         await api.stop()
       },
     },
+    // --- Conversation Profile ---
+    {
+      id: 'conversation-new-space', label: '创建对话空间', contexts: ['conversation-home', 'conversation-space'],
+      keywords: 'conversation space 新建 对话 空间',
+      run: () => navigate(paths.conversationSpaces(undefined, { new: '1' })),
+    },
+    {
+      id: 'conversation-adhoc', label: '开始临时会话', contexts: ['conversation-home', 'conversation-space'],
+      keywords: 'adhoc 临时 会话 开始',
+      run: async () => {
+        const result = await conversationApi.adhoc({ title: '临时对话', profile: 'PROJECT_SYNC', assistance_mode: 'BALANCED' })
+        navigate(paths.conversationLive(result.session.id))
+      },
+    },
+    {
+      id: 'conversation-prepare-next', label: '准备下一场', contexts: ['conversation-home'],
+      keywords: 'prepare next 下一场 准备',
+      run: async () => {
+        const home = await conversationApi.home()
+        if (home.next_session) navigate(paths.conversationSpace(home.next_session.space_id, 'prepare'))
+        else if (home.next_focus?.space_id) navigate(paths.conversationSpace(home.next_focus.space_id, 'prepare'))
+        else toast('还没有可以准备的对话空间')
+      },
+    },
+    {
+      id: 'conversation-decisions', label: '打开当前空间的决策', contexts: ['conversation-space'],
+      keywords: 'decision 决策 agreed',
+      run: () => {
+        const spaceId = route.name === 'conversation' ? route.params.spaceId : ''
+        if (spaceId) navigate(paths.conversationSpace(spaceId, 'decisions'))
+        else navigate(paths.conversationSpaces())
+      },
+    },
+    {
+      id: 'conversation-quick-note', label: '创建速记 / 打开速记', contexts: ['conversation-space', 'conversation-live'],
+      keywords: 'quick note 速记 笔记',
+      run: () => os.setQuickNotes(true),
+    },
+    {
+      id: 'conversation-quiet', label: '暂停主动建议（Quiet）', contexts: ['conversation-live'],
+      keywords: 'pause quiet suggestions 暂停 建议 安静',
+      run: async () => {
+        const sessionId = route.name === 'conversation-live' ? route.params.sessionId : ''
+        if (!sessionId) { toast('当前不在 Conversation Live'); return }
+        await conversationApi.patchSession(sessionId, { assistance_mode: 'QUIET' })
+        toast('已切换为 Quiet；直接 Ask 仍可使用')
+      },
+    },
+    {
+      id: 'conversation-balanced', label: '恢复主动建议（Balanced）', contexts: ['conversation-live'],
+      keywords: 'resume balanced suggestions 恢复 建议',
+      run: async () => {
+        const sessionId = route.name === 'conversation-live' ? route.params.sessionId : ''
+        if (!sessionId) { toast('当前不在 Conversation Live'); return }
+        await conversationApi.patchSession(sessionId, { assistance_mode: 'BALANCED' })
+        toast('已恢复 Balanced')
+      },
+    },
     // --- Me ---
     { id: 'confirm-facts', label: '确认事实（待确认）', contexts: ['me', 'home'], keywords: 'fact inbox 事实 确认', run: () => navigate(paths.me('inbox')) },
     { id: 'create-story', label: '创建 Story', contexts: ['me'], keywords: 'story 故事', run: () => navigate(paths.me('stories')) },
@@ -121,6 +200,7 @@ export function buildCommands(goalId: string | null): Command[] {
     { id: 'nav-practice', label: '去练习', contexts: ['global'], keywords: 'practice 练习', run: () => navigate(paths.practice()) },
     { id: 'nav-library', label: '去资料库', contexts: ['global'], keywords: 'library 资料 题库 知识库', run: () => navigate(paths.library()) },
     { id: 'nav-history', label: '去历史', contexts: ['global'], keywords: 'history 历史 复盘', run: () => navigate(paths.history()) },
+    { id: 'nav-conversation', label: '去对话 Beta', contexts: ['global'], keywords: 'conversation 对话 beta', run: () => navigate(paths.conversationHome()) },
     { id: 'nav-settings', label: '打开设置', contexts: ['global'], keywords: 'settings 设置 ctrl+,', run: () => navigate(paths.settings()) },
   ]
 }

@@ -56,6 +56,14 @@ def reconcile_relation(provisional: str, final: str) -> str:
     return "replaced"
 
 
+def _conversation_capture_active() -> bool:
+    try:
+        from services.product import conversation_capture
+        return conversation_capture.is_active()
+    except Exception:
+        return False
+
+
 class AssistAsrStateMachine:
     def __init__(
         self,
@@ -391,7 +399,8 @@ class AssistAsrStateMachine:
         pub = transcription_for_publish(merged_raw, min_sig)
         if not pub:
             return
-        session.add_transcription(pub)
+        if not _conversation_capture_active():
+            session.add_transcription(pub)
         self.broadcast({"type": "transcription", "text": pub})
         if is_auto_answer_enabled(cfg):
             source = (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PauseCircle, Pin, Square, Volume2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
-import type { AssistanceMode, ConversationContinue, ConversationGuidance, ConversationItemType } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationContinue, ConversationGuidance, ConversationItem, ConversationItemType } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 

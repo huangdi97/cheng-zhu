@@ -3,12 +3,12 @@ import sqlite3
 
 import pytest
 
-from services.product import conversations, materials
+from services.product import conversation_capture, conversations, materials
 from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 2
+    assert store.schema_version() == 3
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -23,6 +23,7 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_open_thread",
         "conversation_guidance_event",
         "conversation_draft_action",
+        "conversation_transcript_segment",
     } <= tables
 
 
@@ -290,3 +291,88 @@ def test_adhoc_session_and_reviewed_followup_draft_never_claim_external_send(pro
     assert approved["status"] == "APPROVED"
     assert "sent" not in approved
     assert conversations.list_draft_actions(started["space"]["id"])[0]["id"] == draft["id"]
+
+
+def test_conversation_capture_isolated_transcription_only_bridge(product_env, monkeypatch):
+    import api.assist.pipeline as pipeline
+    import core.config as config_module
+    from core.session import get_session
+
+    # The test never opens real audio. It verifies the exact ownership and
+    # policy boundary around the reused pipeline.
+    calls = []
+    monkeypatch.setattr(pipeline, "start_nonblocking", lambda device, candidate=None: calls.append(("start", device, candidate)))
+    monkeypatch.setattr(pipeline, "stop_interview_loop", lambda: calls.append(("stop",)))
+    monkeypatch.setattr(pipeline, "pause_interview", lambda: calls.append(("pause",)))
+    monkeypatch.setattr(pipeline, "unpause_interview", lambda device=None, candidate=None: calls.append(("resume", device, candidate)))
+
+    previous = config_module.session_overlay()
+    legacy = get_session()
+    legacy.is_recording = False
+
+    space = conversations.create_space("Captured Review", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"], capture_mode="TRANSCRIPT", processing_mode="LOCAL", consent_ack=True,
+    )
+    conversations.start_session(session["id"])
+
+    started = conversation_capture.start(session["id"], 1001, 1002)
+    assert started["active"] is True and started["owns_requested_session"] is True
+    overlay = config_module.session_overlay()
+    assert overlay["assist_auto_answer_mode"] == "off"
+    assert overlay["auto_detect"] is False
+    assert overlay["intelligence_early_cue"] is False
+    assert overlay["review_enabled"] is False
+    assert calls[0] == ("start", 1001, 1002)
+
+    row = conversation_capture.record_transcription(
+        "offline migration 继续使用 v2",
+        channel="PRIMARY_AUDIO",
+        provider="whisper",
+        source="SYSTEM_LOOPBACK",
+    )
+    assert row and row["session_id"] == session["id"] and row["channel"] == "PRIMARY_AUDIO"
+    assert conversation_capture.transcript(session["id"])[0]["text"] == "offline migration 继续使用 v2"
+
+    conversation_capture.pause(session["id"])
+    conversation_capture.resume(session["id"])
+    stopped = conversation_capture.stop(session["id"])
+    assert stopped["active"] is False
+    assert calls[-3:] == [("pause",), ("resume", 1001, 1002), ("stop",)]
+    assert config_module.session_overlay() == previous
+
+
+def test_conversation_capture_refuses_to_steal_live_interview_audio(product_env):
+    from core.session import get_session
+    legacy = get_session()
+    legacy.is_recording = True
+    try:
+        space = conversations.create_space("No Steal", "PROJECT_SYNC")
+        session = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
+        conversations.start_session(session["id"])
+        with pytest.raises(ValueError, match="不会抢占"):
+            conversation_capture.start(session["id"], 1001)
+    finally:
+        legacy.is_recording = False
+
+
+def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_env):
+    space = conversations.create_space("Continuity", "DESIGN_REVIEW")
+    old = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(old["id"])
+    decision = conversations.add_item(
+        old["id"], item_type="Decision", title="offline migration 使用 v2",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "excerpt": "明确用 v2"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(old["id"])
+
+    live = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(live["id"])
+    first = conversations.guidance_from_transcript(live["id"], "我们回到 offline migration")
+    assert first and first["kind"] == "RECALL" and first["reason"] == "TRANSCRIPT_TOPIC_RECALL"
+    assert conversations.guidance_from_transcript(live["id"], "offline migration 再说一下") is None
+
+    conversations.update_session(live["id"], {"assistance_mode": "QUIET"})
+    assert conversations.guidance_from_transcript(live["id"], "offline migration") is None

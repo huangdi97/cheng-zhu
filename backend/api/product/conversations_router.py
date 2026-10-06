@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.product.common import domain_errors
-from services.product import conversations
+from services.product import conversation_capture, conversations
 
 router = APIRouter(prefix="/conversation", tags=["product-conversation"])
 
@@ -171,6 +171,48 @@ def ask_session(session_id: str, body: AskBody):
         return conversations.ask(session_id, body.question)
 
 
+class CaptureStart(BaseModel):
+    device_id: int
+    candidate_mic_device_id: Optional[int] = None
+
+
+@router.get("/sessions/{session_id}/capture")
+def capture_status(session_id: str):
+    with domain_errors():
+        conversations.require_session(session_id)
+        return conversation_capture.status(session_id)
+
+
+@router.post("/sessions/{session_id}/capture/start")
+def capture_start(session_id: str, body: CaptureStart):
+    with domain_errors():
+        return conversation_capture.start(session_id, body.device_id, body.candidate_mic_device_id)
+
+
+@router.post("/sessions/{session_id}/capture/pause")
+def capture_pause(session_id: str):
+    with domain_errors():
+        return conversation_capture.pause(session_id)
+
+
+@router.post("/sessions/{session_id}/capture/resume")
+def capture_resume(session_id: str):
+    with domain_errors():
+        return conversation_capture.resume(session_id)
+
+
+@router.post("/sessions/{session_id}/capture/stop")
+def capture_stop(session_id: str):
+    with domain_errors():
+        return conversation_capture.stop(session_id)
+
+
+@router.get("/sessions/{session_id}/transcript")
+def transcript(session_id: str, limit: int = 100):
+    with domain_errors():
+        return {"items": conversation_capture.transcript(session_id, limit)}
+
+
 @router.get("/sessions/{session_id}/preflight")
 def preflight(session_id: str):
     with domain_errors():
@@ -294,6 +336,12 @@ def evaluate_guidance(session_id: str, body: GuidanceBody):
 
 class GuidanceAction(BaseModel):
     action: str
+
+
+@router.get("/sessions/{session_id}/guidance")
+def guidance_history(session_id: str, limit: int = 30):
+    with domain_errors():
+        return {"items": conversations.guidance_history(session_id, limit)}
 
 
 @router.post("/guidance/{guidance_id}/status")

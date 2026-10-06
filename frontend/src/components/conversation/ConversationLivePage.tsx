@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
-import { PauseCircle, Pin, Square, Volume2 } from 'lucide-react'
+import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
+import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
-import type { AssistanceMode, ConversationContinue, ConversationGuidance, ConversationItem, ConversationItemType } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItem, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
+type AudioDevice = { id: number; name: string; is_loopback?: boolean }
+type DevicePayload = { devices?: AudioDevice[] }
+
 export default function ConversationLivePage({ sessionId }: { sessionId: string }) {
   const session = useAsync(() => conversationApi.session(sessionId), [sessionId])
+  const devices = useAsync(async () => (await api.getDevices()) as DevicePayload, [])
   const [topic, setTopic] = useState('')
   const [question, setQuestion] = useState('')
   const [candidate, setCandidate] = useState('')
@@ -23,14 +28,86 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [mode, setMode] = useState<AssistanceMode>('BALANCED')
   const [askText, setAskText] = useState('')
   const [askResult, setAskResult] = useState<{ answer: string; matches: ConversationItem[]; grounded: boolean } | null>(null)
+  const [capture, setCapture] = useState<ConversationCaptureStatus | null>(null)
+  const [segments, setSegments] = useState<ConversationTranscriptSegment[]>([])
+  const [primaryDevice, setPrimaryDevice] = useState('')
+  const [selfMic, setSelfMic] = useState('')
+  const [captureBusy, setCaptureBusy] = useState(false)
 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
   }, [session.data?.assistance_mode])
 
+  useEffect(() => {
+    const all = devices.data?.devices ?? []
+    if (!primaryDevice && all.length) {
+      const preferred = all.find((d) => d.is_loopback) ?? all[0]
+      setPrimaryDevice(String(preferred.id))
+    }
+  }, [devices.data, primaryDevice])
+
+  useEffect(() => {
+    let alive = true
+    const poll = async () => {
+      try {
+        const [nextCapture, transcript, history] = await Promise.all([
+          conversationApi.captureStatus(sessionId),
+          conversationApi.transcript(sessionId, 80),
+          conversationApi.guidanceHistory(sessionId, 12),
+        ])
+        if (!alive) return
+        setCapture(nextCapture)
+        setSegments(transcript.items)
+        const latest = history.items.find((x) => x.status === 'SHOWN' && x.user_action !== 'DISMISSED')
+        if (latest) setGuidance((current) => current?.id === latest.id ? current : latest)
+      } catch {
+        // Capture/timeline polling is additive. Manual Conversation Live stays usable
+        // even if an older backend does not expose the v2 endpoints yet.
+      }
+    }
+    void poll()
+    const timer = window.setInterval(() => void poll(), 1200)
+    return () => { alive = false; window.clearInterval(timer) }
+  }, [sessionId])
+
   if (session.loading) return <Page><Loading /></Page>
   if (session.error || !session.data) return <Page><ErrorState message={session.error ?? '会话不存在'} onRetry={session.reload} /></Page>
   const s = session.data
+
+  const startCapture = async () => {
+    if (!primaryDevice) {
+      setError('请选择主音频设备')
+      return
+    }
+    setCaptureBusy(true); setError('')
+    try {
+      const next = await conversationApi.captureStart(
+        sessionId,
+        Number(primaryDevice),
+        selfMic ? Number(selfMic) : null,
+      )
+      setCapture(next)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setCaptureBusy(false) }
+  }
+
+  const toggleCapturePause = async () => {
+    setCaptureBusy(true); setError('')
+    try {
+      const next = capture?.paused
+        ? await conversationApi.captureResume(sessionId)
+        : await conversationApi.capturePause(sessionId)
+      setCapture(next)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setCaptureBusy(false) }
+  }
+
+  const stopCapture = async () => {
+    setCaptureBusy(true); setError('')
+    try { setCapture(await conversationApi.captureStop(sessionId)) }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setCaptureBusy(false) }
+  }
 
   const evaluate = async () => {
     setBusy(true); setError('')
@@ -88,7 +165,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
   const end = async () => {
     setBusy(true); setError('')
-    try { setSummary(await conversationApi.end(sessionId)); await session.reload() }
+    try {
+      if (capture?.owns_requested_session) setCapture(await conversationApi.captureStop(sessionId))
+      setSummary(await conversationApi.end(sessionId)); await session.reload()
+    }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
   }
@@ -117,6 +197,23 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />我正在连续表达</label>
               </div>
             </div>
+            {s.capture_mode === 'TRANSCRIPT' ? (
+              <div className="mt-4 rounded-xl border border-bg-tertiary bg-bg-primary/55 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-accent-blue" /><span className="text-xs font-semibold text-text-primary">真实转写</span>{capture?.owns_requested_session ? <StatusBadge tone="ok">{capture.paused ? 'PAUSED' : 'CAPTURING'}</StatusBadge> : <StatusBadge tone="muted">OFF</StatusBadge>}</div>
+                    <p className="mt-1 text-[11px] text-text-muted">只复用 Audio/VAD/STT；不会启动 Interview 自动答题、Fast Cue 或 Interview Review。</p>
+                  </div>
+                  {capture?.owns_requested_session ? <div className="flex gap-2"><SecondaryButton disabled={captureBusy} onClick={toggleCapturePause} icon={capture.paused ? <Play className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}>{capture.paused ? '继续' : '暂停'}</SecondaryButton><SecondaryButton disabled={captureBusy} onClick={stopCapture}>停止转写</SecondaryButton></div> : <PrimaryButton disabled={captureBusy || !primaryDevice} onClick={startCapture} icon={<Mic className="h-3.5 w-3.5" />}>{captureBusy ? '启动中…' : '开始转写'}</PrimaryButton>}
+                </div>
+                {!capture?.owns_requested_session ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <Field label="主音频（优先系统/会议音频）"><select className={inputCls} value={primaryDevice} onChange={(e) => setPrimaryDevice(e.target.value)}><option value="">请选择</option>{(devices.data?.devices ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}{d.is_loopback ? ' · loopback' : ''}</option>)}</select></Field>
+                  <Field label="我的麦克风（可选）"><select className={inputCls} value={selfMic} onChange={(e) => setSelfMic(e.target.value)}><option value="">不单独采集</option>{(devices.data?.devices ?? []).filter((d) => String(d.id) !== primaryDevice).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+                </div> : null}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-bg-tertiary px-3 py-2 text-[11px] text-text-muted">本场 Preflight 选择的是 {s.capture_mode}；不会启动音频转写。结构化事项与 Manual Ask 仍可使用。</div>
+            )}
             <div className="mt-4 grid gap-3">
               <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
               <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
@@ -141,6 +238,11 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <p className="mt-1 text-xs text-text-muted">{suppressed ? `SILENT · ${suppressed}` : 'Direct Question > Critical Risk > Recall / Opportunity > Question > Delivery'}</p>
               </div>
             )}
+          </div>
+
+          <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/20 p-4">
+            <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-text-primary">Live Transcript</h2><span className="text-[11px] text-text-muted">{segments.length} final segments</span></div>
+            {segments.length ? <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">{segments.slice(-20).map((seg) => <div key={seg.id} className="rounded-xl bg-bg-primary/65 px-3 py-2"><div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">{seg.channel === 'SELF_MIC' ? '我的麦克风' : '主音频'} · {seg.provider || 'ASR'}</div><p className="mt-1 text-xs leading-relaxed text-text-primary">{seg.text}</p></div>)}</div> : <p className="mt-3 text-xs text-text-muted">还没有最终转写。开启真实转写后，这里只显示 Conversation 自己的 timeline。</p>}
           </div>
         </div>
 

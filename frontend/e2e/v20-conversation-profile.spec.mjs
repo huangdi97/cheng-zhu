@@ -217,7 +217,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByLabel('来源 / 依据').fill('Benchmark Note · confirmed')
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
     await expect(page.getByText('CONTRIBUTION_OPPORTUNITY')).toBeVisible()
-    await expect(page.getByText('Q4 benchmark 已覆盖 10x data scale')).toBeVisible()
+    await expect(page.getByRole('paragraph').filter({ hasText: 'Q4 benchmark 已覆盖 10x data scale' })).toBeVisible()
 
     await testInfo.attach('v2-live-guidance', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
@@ -243,6 +243,82 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
     await expect(page.getByText('这一次选择不打扰你')).toBeVisible()
     await expect(page.getByText('SILENT · USER_SPEAKING')).toBeVisible()
+  })
+
+  test('Transcript mode uses Conversation-owned capture controls instead of Interview answering', async ({ context, page }) => {
+    const base = mocks()
+    let capture = {
+      active: false,
+      session_id: '',
+      owns_requested_session: false,
+      device_id: null,
+      candidate_mic_device_id: null,
+      mode: 'IDLE',
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/devices') return {
+          devices: [
+            { id: 1001, name: '会议软件系统音频', is_loopback: true },
+            { id: 1002, name: '我的麦克风', is_loopback: false },
+          ],
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') {
+          return { ...SESSION, capture_mode: 'TRANSCRIPT' }
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/capture` && method === 'GET') return capture
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/capture/start` && method === 'POST') {
+          const body = request.postDataJSON()
+          capture = {
+            active: true,
+            session_id: SESSION.id,
+            owns_requested_session: true,
+            device_id: body.device_id,
+            candidate_mic_device_id: body.candidate_mic_device_id ?? null,
+            mode: 'TRANSCRIPTION_ONLY',
+            paused: false,
+          }
+          return capture
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/capture/pause`) {
+          capture = { ...capture, paused: true }
+          return capture
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/capture/resume`) {
+          capture = { ...capture, paused: false }
+          return capture
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/capture/stop`) {
+          capture = { ...capture, active: false, owns_requested_session: false, mode: 'IDLE', paused: false }
+          return capture
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/transcript`) return {
+          items: capture.active ? [{
+            id: 'cts-1', space_id: SPACE.id, session_id: SESSION.id,
+            channel: 'PRIMARY_AUDIO', text: '我们回到 offline migration',
+            provider: 'whisper', source: 'SYSTEM_LOOPBACK', is_final: true, created_at: 2,
+          }] : [],
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/guidance`) return { items: [] }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect(page.getByText('真实转写')).toBeVisible()
+    await expect(page.getByLabel('主音频（优先系统/会议音频）')).toHaveValue('1001')
+    await page.getByLabel('我的麦克风（可选）').selectOption('1002')
+    await page.getByRole('button', { name: '开始转写' }).click()
+    await expect(page.getByText('CAPTURING')).toBeVisible()
+    await expect(page.getByText('只复用 Audio/VAD/STT；不会启动 Interview 自动答题、Fast Cue 或 Interview Review。')).toBeVisible()
+    await expect.poll(async () => page.getByText('我们回到 offline migration').count()).toBeGreaterThan(0)
+    await page.getByRole('button', { name: '暂停' }).click()
+    await expect(page.getByText('PAUSED')).toBeVisible()
+    await page.getByRole('button', { name: '继续' }).click()
+    await page.getByRole('button', { name: '停止转写' }).click()
+    await expect(page.getByText('OFF')).toBeVisible()
   })
 
   test('Conversation surfaces remain usable at 390px', async ({ context, page }) => {

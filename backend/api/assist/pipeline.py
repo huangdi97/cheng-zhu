@@ -99,8 +99,28 @@ _commit_lock = threading.Lock()
 
 _recent_asr_turn_monos: list[float] = []
 _knowledge_worker: Optional[BoundedTaskWorker] = None
+def _broadcast_asr_event(data: dict[str, Any]) -> None:
+    """Broadcast legacy ASR events and, when explicitly owned by Conversation,
+    mirror final interviewer transcription into the Conversation namespace."""
+    broadcast(data)
+    if data.get("type") != "transcription":
+        return
+    try:
+        from services.product import conversation_capture
+        session = get_session()
+        conversation_capture.record_transcription(
+            str(data.get("text") or ""),
+            channel="PRIMARY_AUDIO",
+            provider=str(getattr(get_config(), "stt_provider", "") or ""),
+            source="SYSTEM_LOOPBACK" if bool(getattr(session, "capture_is_loopback", False)) else "PRIMARY_INPUT",
+            is_final=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _elog.warning("conversation primary transcript mirror failed: %s", exc)
+
+
 _asr_state = AssistAsrStateMachine(
-    broadcast=lambda data: broadcast(data),
+    broadcast=_broadcast_asr_event,
     submit_answer_task=lambda task: submit_answer_task(task),
     begin_asr_turn=lambda: _begin_asr_turn(),
     record_asr_turn=lambda now_mono: _record_asr_turn(now_mono),
@@ -2152,6 +2172,29 @@ def _publish_candidate_transcription(
     cleaned = (text or "").strip()
     if not cleaned:
         return
+    try:
+        from services.product import conversation_capture
+        if conversation_capture.is_active():
+            conversation_capture.record_transcription(
+                cleaned,
+                channel="SELF_MIC",
+                provider=provider,
+                source="CANDIDATE_MIC_COMPAT",
+                is_final=is_final,
+            )
+            broadcast({
+                "type": "candidate_transcription",
+                "scope": "conversation",
+                "text": cleaned,
+                "qa_id": "",
+                "provider": provider,
+                "segment_id": segment_id,
+                "is_final": is_final,
+            })
+            return
+    except Exception as exc:  # noqa: BLE001
+        _elog.warning("conversation candidate isolation failed: %s", exc)
+
     recent_interviewer = session.transcription_history[-3:]
     for item in recent_interviewer:
         interviewer_text = (item or "").strip()

@@ -229,3 +229,25 @@ export interface ConversationDraftAction {
   created_at: number
   updated_at: number
 }
+
+export interface ConversationTranscriptSegment {
+  id: string
+  space_id: string
+  session_id: string
+  channel: 'PRIMARY_AUDIO' | 'SELF_MIC' | string
+  text: string
+  provider: string
+  source: string
+  is_final: boolean
+  created_at: number
+}
+
+export interface ConversationCaptureStatus {
+  active: boolean
+  session_id: string
+  owns_requested_session: boolean
+  device_id: number | null
+  candidate_mic_device_id: number | null
+  mode: 'TRANSCRIPTION_ONLY' | 'IDLE'
+  paused?: boolean
+}

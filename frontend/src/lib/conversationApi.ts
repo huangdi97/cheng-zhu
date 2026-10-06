@@ -2,6 +2,7 @@ import { apiRequest as request } from './api'
 import type {
   AssistanceMode,
   CaptureMode,
+  ConversationCaptureStatus,
   ConversationContinue,
   ConversationDraftAction,
   ConversationGuidance,
@@ -12,6 +13,7 @@ import type {
   ConversationPrepare,
   ConversationProfile,
   ConversationSession,
+  ConversationTranscriptSegment,
   ConversationSpace,
   ConversationSpaceDetail,
   ConversationTemplate,
@@ -64,6 +66,23 @@ export const conversationApi = {
     request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),
   ask: (id: string, question: string) =>
     request<{ answer: string; matches: ConversationItem[]; grounded: boolean }>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
+  captureStatus: (id: string) =>
+    request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture`),
+  captureStart: (id: string, device_id: number, candidate_mic_device_id?: number | null) =>
+    request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture/start`, json('POST', {
+      device_id,
+      ...(candidate_mic_device_id != null ? { candidate_mic_device_id } : {}),
+    })),
+  capturePause: (id: string) =>
+    request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture/pause`, json('POST')),
+  captureResume: (id: string) =>
+    request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture/resume`, json('POST')),
+  captureStop: (id: string) =>
+    request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture/stop`, json('POST')),
+  transcript: (id: string, limit = 100) =>
+    request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/transcript?limit=${limit}`).then((p) => list<ConversationTranscriptSegment>(p)),
+  guidanceHistory: (id: string, limit = 30) =>
+    request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/guidance?limit=${limit}`).then((p) => list<ConversationGuidance>(p)),
   preflight: (id: string) => request<ConversationPreflight>(`${B}/sessions/${encodeURIComponent(id)}/preflight`),
   start: (id: string) => request<{ session: ConversationSession; pack: Record<string, unknown> }>(`${B}/sessions/${encodeURIComponent(id)}/start`, json('POST')),
   end: (id: string) => request<ConversationContinue>(`${B}/sessions/${encodeURIComponent(id)}/end`, json('POST')),

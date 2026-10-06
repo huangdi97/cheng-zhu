@@ -708,6 +708,53 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return {"guidance": None, "suppressed": "NO_HIGH_VALUE_GUIDANCE", "event": event}
 
 
+def guidance_from_transcript(session_id: str, text: str) -> Optional[dict[str, Any]]:
+    """Conservative automatic guidance from final Conversation ASR text."""
+    session = require_session(session_id)
+    if session["status"] != "ACTIVE":
+        return None
+    state = dict(session.get("state") or {})
+    state["current_topic"] = str(text or "").strip()[:500]
+    store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
+    if str(session.get("assistance_mode") or "BALANCED").upper() == "QUIET":
+        return None
+    recall = _recall_for_topic(session["space_id"], state["current_topic"])
+    if not recall:
+        return None
+    refs = list(recall.get("source_refs") or [])
+    if not refs:
+        return None
+    recent = store.select(
+        "conversation_guidance_event",
+        where="session_id = ? AND kind = 'RECALL' AND text = ? AND created_at >= ?",
+        params=(session_id, recall["title"], store.now() - 45.0),
+        order="created_at DESC",
+        limit=1,
+    )
+    if recent:
+        return None
+    return _persist_guidance(
+        session_id,
+        kind="RECALL",
+        action=ExpressionAction.RECALL.value,
+        text=recall["title"],
+        source_refs=refs,
+        status="SHOWN",
+        reason="TRANSCRIPT_TOPIC_RECALL",
+    )
+
+
+def guidance_history(session_id: str, limit: int = 30) -> list[dict[str, Any]]:
+    require_session(session_id)
+    return store.select(
+        "conversation_guidance_event",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at DESC",
+        limit=max(1, min(100, int(limit))),
+    )
+
+
 def set_guidance_action(guidance_id: str, action: str) -> dict[str, Any]:
     row = store.get("conversation_guidance_event", guidance_id)
     if not row:

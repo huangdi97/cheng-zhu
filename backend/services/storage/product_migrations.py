@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 2
+LATEST_SCHEMA_VERSION = 3
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -488,22 +488,6 @@ _V2_TABLES: tuple[str, ...] = (
     )
     """,
     """
-    CREATE TABLE IF NOT EXISTS conversation_draft_action (
-        id TEXT PRIMARY KEY,
-        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
-        session_id TEXT REFERENCES conversation_session(id) ON DELETE CASCADE,
-        kind TEXT NOT NULL,
-        title TEXT NOT NULL DEFAULT '',
-        content TEXT NOT NULL DEFAULT '',
-        target TEXT NOT NULL DEFAULT '',
-        payload_json TEXT NOT NULL DEFAULT '{}',
-        source_refs_json TEXT NOT NULL DEFAULT '[]',
-        status TEXT NOT NULL DEFAULT 'DRAFT',
-        created_at REAL NOT NULL,
-        updated_at REAL NOT NULL
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS conversation_guidance_event (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
@@ -532,7 +516,47 @@ _V2_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_item_session ON conversation_item(session_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_conversation_thread_space ON conversation_open_thread(space_id, status, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_conversation_guidance_session ON conversation_guidance_event(session_id, created_at)",
+)
+
+# --- v2.0 runtime closure: post-core additive tables ---
+# Kept as a separate migration because early v2 development builds may already
+# have PRAGMA user_version=2. Never silently assume those databases rerun v2.
+_V3_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_draft_action (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT REFERENCES conversation_session(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        target TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_transcript_segment (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL,
+        text TEXT NOT NULL,
+        provider TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL DEFAULT '',
+        is_final INTEGER NOT NULL DEFAULT 1,
+        created_at REAL NOT NULL
+    )
+    """,
+)
+
+_V3_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_draft_space ON conversation_draft_action(space_id, status, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_transcript_session ON conversation_transcript_segment(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_transcript_space ON conversation_transcript_segment(space_id, created_at)",
 )
 
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
@@ -543,6 +567,7 @@ def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> 
 _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "v1.3 goal-centered product layer"),
     2: (lambda conn: _apply_statements(conn, _V2_TABLES + _V2_INDEXES), "v2.0 personal conversation intelligence"),
+    3: (lambda conn: _apply_statements(conn, _V3_TABLES + _V3_INDEXES), "v2.0 conversation runtime closure"),
 }
 
 

@@ -229,7 +229,6 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                   <option value="PRESENTATION">Presentation</option>
                   <option value="ONE_ON_ONE">1:1</option>
                 </select>
-                <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />我正在连续表达</label>
               </div>
             </div>
             {s.capture_mode === 'TRANSCRIPT' ? (
@@ -249,32 +248,39 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
             ) : (
               <div className="mt-4 rounded-xl border border-bg-tertiary px-3 py-2 text-[11px] text-text-muted">本场 Preflight 选择的是 {s.capture_mode}；不会启动音频转写。结构化事项与 Manual Ask 仍可使用。</div>
             )}
-            <div className="mt-4 grid gap-3">
-              <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
-              <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
-              <Field label="高价值 Opportunity 候选（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale；必须有来源，是否显示由 Arbiter 决定。" /></Field>
-              <Field label="明确 Talking Point（如有）"><textarea className={inputCls} rows={2} value={talkingPoint} onChange={(e) => setTalkingPoint(e.target.value)} placeholder="你明确希望组织成 talking point 的内容；仍要求来源且受 Profile 允许项约束。" /></Field>
-              <Field label="Delivery / 表达重点（如有）"><textarea className={inputCls} rows={2} value={deliveryFocus} onChange={(e) => setDeliveryFocus(e.target.value)} placeholder="例如：控制在 45 秒；先回答 CTO 的 rollback concern。只改表达结构，不改事实。" /></Field>
-              <Field label="已知关键风险（如有）"><textarea className={inputCls} rows={2} value={criticalRisk} onChange={(e) => setCriticalRisk(e.target.value)} placeholder="仅填写有明确来源、需要优先提醒的事实 / 承诺 / 冲突风险。" /></Field>
-              <Field label="来源 / 依据"><textarea className={inputCls} rows={2} value={source} onChange={(e) => setSource(e.target.value)} placeholder="主动 Contribution Opportunity 必须有来源；没有来源会被抑制。" /></Field>
-              <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3">
-                <div className="text-xs font-semibold text-text-secondary">Stakeholder-aware Expression · 只用明确信息</div>
-                <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。优先级：Direct Question &gt; Critical Risk &gt; Talking Point / Delivery explicit request &gt; proactive Opportunity / Recall / Question。</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <select className={inputCls} value={audienceParticipantId} onChange={(e) => setAudienceParticipantId(e.target.value)} aria-label="当前受众">
-                    <option value="">不绑定已知参与者</option>
-                    {(liveContext.data?.participants ?? []).map((participant) => <option key={participant.id} value={participant.id}>{participant.display_name || '未命名'}{participant.role ? ` · ${participant.role}` : ''}</option>)}
-                  </select>
-                  <input className={inputCls} value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="对方明确角色，例如 CTO / 客户" />
-                  <input className={inputCls} value={decisionAuthority} onChange={(e) => setDecisionAuthority(e.target.value)} placeholder="明确决策权限（可选）" />
-                  <input className={inputCls} value={audiencePriority} onChange={(e) => setAudiencePriority(e.target.value)} placeholder="对方明确优先级" />
-                  <input className={inputCls} value={audienceConcern} onChange={(e) => setAudienceConcern(e.target.value)} placeholder="对方明确 concern" />
-                  <input className={inputCls} value={relationshipContext} onChange={(e) => setRelationshipContext(e.target.value)} placeholder="关系上下文，例如客户技术负责人" />
-                </div>
-                {audienceParticipantId ? <p className="mt-2 text-[10px] text-text-muted">已从 Frozen Session Pack 带入该参与者的 explicit state；你可以在本场覆盖表达上下文，但不会改写长期 Counterparty State。</p> : null}
+            <details className="mt-4 rounded-xl border border-bg-tertiary/70 bg-bg-primary/35 p-3" data-testid="manual-guidance-lab">
+              <summary className="cursor-pointer text-xs font-semibold text-text-secondary">高级 / 手动 Guidance 验证</summary>
+              <p className="mt-2 text-[11px] text-text-muted">正常 TRANSCRIPT 会自动驱动 Direct Question / Recall / Opportunity。这里保留给 dogfood、无音频模拟和边界验证，不是主交互。</p>
+              <div className="mt-3">
+                <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />模拟：我正在连续表达</label>
               </div>
-            </div>
-            <div className="mt-4"><PrimaryButton disabled={busy || s.status !== 'ACTIVE'} onClick={evaluate} icon={<Volume2 className="h-3.5 w-3.5" />}>评估当前 Guidance</PrimaryButton></div>
+            <div className="mt-4 grid gap-3">
+                <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
+                <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
+                <Field label="高价值 Opportunity 候选（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale；必须有来源，是否显示由 Arbiter 决定。" /></Field>
+                <Field label="明确 Talking Point（如有）"><textarea className={inputCls} rows={2} value={talkingPoint} onChange={(e) => setTalkingPoint(e.target.value)} placeholder="你明确希望组织成 talking point 的内容；仍要求来源且受 Profile 允许项约束。" /></Field>
+                <Field label="Delivery / 表达重点（如有）"><textarea className={inputCls} rows={2} value={deliveryFocus} onChange={(e) => setDeliveryFocus(e.target.value)} placeholder="例如：控制在 45 秒；先回答 CTO 的 rollback concern。只改表达结构，不改事实。" /></Field>
+                <Field label="已知关键风险（如有）"><textarea className={inputCls} rows={2} value={criticalRisk} onChange={(e) => setCriticalRisk(e.target.value)} placeholder="仅填写有明确来源、需要优先提醒的事实 / 承诺 / 冲突风险。" /></Field>
+                <Field label="来源 / 依据"><textarea className={inputCls} rows={2} value={source} onChange={(e) => setSource(e.target.value)} placeholder="主动 Contribution Opportunity 必须有来源；没有来源会被抑制。" /></Field>
+                <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3">
+                  <div className="text-xs font-semibold text-text-secondary">Stakeholder-aware Expression · 只用明确信息</div>
+                  <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。优先级：Direct Question &gt; Critical Risk &gt; Talking Point / Delivery explicit request &gt; proactive Opportunity / Recall / Question。</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <select className={inputCls} value={audienceParticipantId} onChange={(e) => setAudienceParticipantId(e.target.value)} aria-label="当前受众">
+                      <option value="">不绑定已知参与者</option>
+                      {(liveContext.data?.participants ?? []).map((participant) => <option key={participant.id} value={participant.id}>{participant.display_name || '未命名'}{participant.role ? ` · ${participant.role}` : ''}</option>)}
+                    </select>
+                    <input className={inputCls} value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="对方明确角色，例如 CTO / 客户" />
+                    <input className={inputCls} value={decisionAuthority} onChange={(e) => setDecisionAuthority(e.target.value)} placeholder="明确决策权限（可选）" />
+                    <input className={inputCls} value={audiencePriority} onChange={(e) => setAudiencePriority(e.target.value)} placeholder="对方明确优先级" />
+                    <input className={inputCls} value={audienceConcern} onChange={(e) => setAudienceConcern(e.target.value)} placeholder="对方明确 concern" />
+                    <input className={inputCls} value={relationshipContext} onChange={(e) => setRelationshipContext(e.target.value)} placeholder="关系上下文，例如客户技术负责人" />
+                  </div>
+                  {audienceParticipantId ? <p className="mt-2 text-[10px] text-text-muted">已从 Frozen Session Pack 带入该参与者的 explicit state；你可以在本场覆盖表达上下文，但不会改写长期 Counterparty State。</p> : null}
+                </div>
+              </div>
+              <div className="mt-4"><PrimaryButton disabled={busy || s.status !== 'ACTIVE'} onClick={evaluate} icon={<Volume2 className="h-3.5 w-3.5" />}>评估当前 Guidance</PrimaryButton></div>
+            </details>
           </div>
 
           <div className="min-h-[160px] rounded-2xl border border-accent-blue/20 bg-bg-primary p-5">

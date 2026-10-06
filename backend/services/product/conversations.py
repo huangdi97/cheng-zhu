@@ -1592,6 +1592,21 @@ def diagnostics() -> dict[str, Any]:
     approved_drafts = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_draft_action WHERE status = 'APPROVED'"
     ) or 0)
+    adopted_guidance = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SHOWN' "
+        "AND user_action IN ('USED','PINNED','EXPANDED')"
+    ) or 0)
+    dismissed_guidance = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event WHERE user_action = 'DISMISSED'"
+    ) or 0)
+    duplicate_suppressed = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED' "
+        "AND reason = 'DUPLICATE_GUIDANCE'"
+    ) or 0)
+    policy_suppressed = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED' "
+        "AND reason IN ('POLICY_AI_FORBIDDEN','SOURCE_VISIBILITY_BLOCKED','SOCIAL_RISK','STALE_CONTEXT','SUGGESTION_BUDGET')"
+    ) or 0)
     capture = conversation_capture.status()
     return {
         "contract": "v2.0-R1",
@@ -1611,6 +1626,34 @@ def diagnostics() -> dict[str, Any]:
             "sourced_guidance_shown": sourced_shown,
             "draft_actions": drafts,
             "approved_drafts": approved_drafts,
+            "guidance_adopted": adopted_guidance,
+            "guidance_dismissed": dismissed_guidance,
+            "duplicate_suppressed": duplicate_suppressed,
+            "policy_suppressed": policy_suppressed,
+        },
+        "evaluation": {
+            "observed_proxies": {
+                "source_attribution_coverage": (sourced_shown / shown) if shown else None,
+                "guidance_adoption_rate": (adopted_guidance / shown) if shown else None,
+                "guidance_dismissal_rate": (dismissed_guidance / shown) if shown else None,
+                "suppression_rate": (suppressed / (shown + suppressed)) if (shown + suppressed) else None,
+                "duplicate_suppression_count": duplicate_suppressed,
+                "review_queue_size": pending_items,
+                "approved_draft_rate": (approved_drafts / drafts) if drafts else None,
+            },
+            "requires_human_labels": [
+                "recall_precision",
+                "source_attribution_accuracy",
+                "direct_question_detection",
+                "decision_commitment_state_precision",
+                "opportunity_precision",
+                "interruption_regret",
+                "useful_silence_rate",
+                "continue_writeback_accuracy",
+                "real_cross_session_value",
+                "real_user_cognitive_load",
+            ],
+            "interpretation": "Observed proxies are runtime telemetry on this local device; they are not precision/quality/PMF claims.",
         },
         "health": {
             "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",
@@ -1618,6 +1661,9 @@ def diagnostics() -> dict[str, Any]:
             "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
             "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
             "external_connectors": "NOT_CONFIGURED",
+            "conversation_screen_context": "BLOCKED_NOT_WIRED",
+            "conversation_human_coach": "BLOCKED_NOT_WIRED",
+            "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
         "evidence": {
             "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
@@ -1628,6 +1674,8 @@ def diagnostics() -> dict[str, Any]:
             "remote_telemetry": "OFF",
             "auto_external_writeback": "OFF",
             "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF",
         },
     }
 

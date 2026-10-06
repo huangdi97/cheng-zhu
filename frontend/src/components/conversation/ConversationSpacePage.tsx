@@ -257,9 +257,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   }
 
   const deleteSpace = async () => {
-    if (!window.confirm('删除这个对话空间？其中的 Session、Guidance 与派生事项会一起删除；Interview 数据不会受影响。')) return
+    if (!window.confirm('彻底删除这个对话空间？这是 complete erase：Session、confirmed/candidate items、Session Packs、Guidance、Drafts 与 provenance tombstones 都会一起删除，无法再用于 Recall。若只是暂时不用，请选择“归档”。Interview 数据不受影响。')) return
     setSessionBusy(true); setSessionError('')
-    try { await conversationApi.deleteSpace(spaceId); navigate(paths.conversationSpaces()) }
+    try { await conversationApi.deleteSpace(spaceId, true); navigate(paths.conversationSpaces()) }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)); setSessionBusy(false) }
   }
 

@@ -511,6 +511,55 @@ def add_participant(
     return store.get("conversation_participant", row["id"]) or row
 
 
+def update_participant(participant_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    participant = store.get("conversation_participant", participant_id)
+    if not participant:
+        raise ValueError("Conversation Participant 不存在")
+
+    clean: dict[str, Any] = {}
+    for key, limit in (("display_name", 160), ("role", 160), ("organization", 160)):
+        if key in patch:
+            clean[key] = str(patch.get(key) or "")[:limit]
+
+    state = dict(participant.get("counterparty_state") or {})
+    known = dict(state.get("known_explicit") or {})
+    mapping = {
+        "explicit_priority": ("priority", 800),
+        "explicit_concern": ("concern", 1200),
+        "stated_position": ("stated_position", 1600),
+        "decision_authority": ("decision_authority", 500),
+        "relationship_context": ("relationship_context", 800),
+    }
+    changed_explicit = False
+    for incoming, (stored, limit) in mapping.items():
+        if incoming not in patch:
+            continue
+        changed_explicit = True
+        value = str(patch.get(incoming) or "")[:limit].strip()
+        if value:
+            known[stored] = value
+        else:
+            known.pop(stored, None)
+
+    if changed_explicit or "source_refs" in patch:
+        refs = list(patch.get("source_refs") or state.get("source_refs") or [])
+        rebuilt = _counterparty_state(
+            explicit_priority=str(known.get("priority") or ""),
+            explicit_concern=str(known.get("concern") or ""),
+            stated_position=str(known.get("stated_position") or ""),
+            decision_authority=str(known.get("decision_authority") or ""),
+            relationship_context=str(known.get("relationship_context") or ""),
+            source_refs=refs,
+        )
+        clean["counterparty_state"] = rebuilt
+
+    if "display_name" in clean:
+        clean["identity_confidence"] = 1.0 if clean["display_name"] else 0.0
+    clean["updated_at"] = store.now()
+    store.update("conversation_participant", participant_id, clean)
+    return store.get("conversation_participant", participant_id) or participant
+
+
 def create_session(
     space_id: str,
     *,

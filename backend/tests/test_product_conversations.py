@@ -278,6 +278,62 @@ def test_continue_contains_what_changed_and_pinned_guidance(product_env):
     assert [x["id"] for x in summary["pins"]] == [shown["id"]]
 
 
+
+
+def test_unreviewed_open_question_stays_in_review_queue_not_longitudinal_continuity(product_env):
+    space = conversations.create_space("Continuity Guard", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], title="Sync", consent_ack=True)
+    conversations.start_session(session["id"])
+
+    candidate = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 rollback drill？",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "excerpt": "谁负责 rollback drill？"}],
+        epistemic_status="OBSERVED",
+    )
+
+    # The candidate is visible for review, but must not escape into Home,
+    # Prepare, summary counts or Next Focus before explicit review.
+    detail = conversations.space_detail(space["id"])
+    assert [x["id"] for x in detail["open_questions"]] == [candidate["id"]]
+    assert detail["threads"] == []
+
+    prepared = conversations.prepare_space(space["id"])
+    assert prepared["open_questions"] == []
+    assert prepared["open_threads"] == []
+    assert "谁负责 rollback drill？" not in prepared["agenda"]
+    assert "谁负责 rollback drill？" not in prepared["expected_questions"]
+
+    home = conversations.home_summary()
+    assert home["open_questions"] == []
+    assert home["next_focus"] is None
+
+    summaries = conversations.list_space_summaries("")
+    row = next(x for x in summaries if x["id"] == space["id"])
+    assert row["open_questions_count"] == 0
+
+    before_review = conversations.continue_summary(session["id"])
+    assert before_review["review_required"] == 1
+    assert before_review["next_focus"] is None
+
+    reviewed = conversations.review_item(candidate["id"], "CONFIRM")
+    assert reviewed["review_status"] == "USER_CONFIRMED"
+
+    prepared_after = conversations.prepare_space(space["id"])
+    assert [x["id"] for x in prepared_after["open_questions"]] == [candidate["id"]]
+    assert prepared_after["open_threads"]
+    assert "谁负责 rollback drill？" in prepared_after["agenda"]
+
+    home_after = conversations.home_summary()
+    assert [x["id"] for x in home_after["open_questions"]] == [candidate["id"]]
+    assert home_after["next_focus"]["kind"] == "OPEN_QUESTION"
+
+    after_review = conversations.continue_summary(session["id"])
+    assert after_review["next_focus"]["kind"] == "OPEN_QUESTION"
+    assert after_review["next_focus"]["source_ref"] == candidate["id"]
+
+
 def test_conversation_history_is_profile_native_and_counted(product_env):
     space = conversations.create_space("History Space", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], title="Review #1", consent_ack=True)
@@ -302,7 +358,7 @@ def test_conversation_history_is_profile_native_and_counted(product_env):
     assert history[0]["space_title"] == "History Space"
     assert history[0]["space_profile"] == "DESIGN_REVIEW"
     assert history[0]["decisions_count"] == 1
-    assert history[0]["open_questions_count"] == 1
+    assert history[0]["open_questions_count"] == 0
     assert history[0]["review_required"] == 1
 
 
@@ -1701,10 +1757,11 @@ def test_space_summaries_grouping_inputs_include_upcoming_and_open_counts(produc
     )
     active = conversations.create_session(space["id"], title="Today", consent_ack=True)
     conversations.start_session(active["id"])
-    conversations.add_item(
+    question = conversations.add_item(
         active["id"], item_type="OpenQuestion", title="launch date?",
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
+    conversations.review_item(question["id"], "CONFIRM")
     summaries = conversations.list_space_summaries("")
     row = next(x for x in summaries if x["id"] == space["id"])
     assert row["next_session"]["title"] == "Tomorrow"

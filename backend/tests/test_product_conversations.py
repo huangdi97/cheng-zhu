@@ -1344,7 +1344,9 @@ def test_delete_space_cascades_conversation_runtime_only(product_env):
         session["id"], item_type="OpenQuestion", title="rollback owner 是谁？",
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
-    assert conversations.delete_space(space["id"]) is True
+    with pytest.raises(ValueError, match="明确确认"):
+        conversations.delete_space(space["id"])
+    assert conversations.delete_space(space["id"], confirm=True) is True
     assert store.get("conversation_session", session["id"]) is None
     assert store.select("goal") == []  # v1 Interview store remains independent
 
@@ -1387,12 +1389,13 @@ def test_session_context_is_minimal_and_frozen_at_start(product_env):
 
     prior = conversations.create_session(space["id"], title="Prior", consent_ack=True)
     conversations.start_session(prior["id"])
-    conversations.add_item(
+    prior_question = conversations.add_item(
         prior["id"],
         item_type="OpenQuestion",
         title="确认 rollback owner",
         source_refs=[{"kind": "USER_NOTE", "excerpt": "owner 仍未确认"}],
     )
+    conversations.review_item(prior_question["id"], "CONFIRM")
     conversations.end_session(prior["id"])
 
     live = conversations.create_session(space["id"], title="Live", consent_ack=True)

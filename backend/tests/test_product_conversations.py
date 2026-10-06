@@ -425,6 +425,59 @@ def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
         )
 
 
+
+
+def test_reviewed_open_items_project_into_longitudinal_threads_and_resolve(product_env):
+    space = conversations.create_space("Threads", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    source = [{"kind": "USER_NOTE", "excerpt": "明确提出 rollback owner 仍未知"}]
+
+    question = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 rollback drill？",
+        source_refs=source,
+    )
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+    confirmed = conversations.review_item(question["id"], "CONFIRM")
+    assert confirmed["review_status"] == "USER_CONFIRMED"
+    threads = conversations.space_detail(space["id"])["threads"]
+    assert len(threads) == 1
+    thread = threads[0]
+    assert thread["kind"] == "OpenQuestion"
+    assert thread["text"] == "谁负责 rollback drill？"
+    assert thread["status"] == "OPEN"
+    assert thread["source_refs"][0]["kind"] == "CONVERSATION_ITEM"
+    assert thread["source_refs"][0]["id"] == question["id"]
+
+    prepared = conversations.prepare_space(space["id"])
+    assert prepared["open_threads"][0]["id"] == thread["id"]
+    assert "谁负责 rollback drill？" in prepared["agenda"]
+
+    resolved = conversations.review_item(question["id"], "RESOLVE")
+    assert resolved["state"] == "DONE"
+    assert conversations.space_detail(space["id"])["threads"] == []
+    raw = store.get("conversation_open_thread", thread["id"])
+    assert raw["status"] == "RESOLVED"
+    assert raw["resolved_at"] is not None
+
+
+def test_rejected_candidate_never_becomes_longitudinal_thread(product_env):
+    space = conversations.create_space("Rejected Thread", "CLIENT_CALL")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    risk = conversations.add_item(
+        session["id"],
+        item_type="Risk",
+        title="可能延期",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "excerpt": "可能会晚"}],
+    )
+    conversations.review_item(risk["id"], "REJECT")
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+
 def test_guidance_arbiter_prefers_direct_question_and_can_stay_silent(product_env):
     space = conversations.create_space("Design Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")

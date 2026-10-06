@@ -9,6 +9,14 @@ vi.mock('@/lib/productApi', () => ({
   track: vi.fn(),
 }))
 
+vi.mock('@/lib/conversationApi', () => ({
+  conversationApi: {
+    home: vi.fn(async () => ({ next_session: { space_id: 'cs-next' }, next_focus: null })),
+    adhoc: vi.fn(async () => ({ session: { id: 'cv-adhoc' } })),
+    patchSession: vi.fn(async () => ({})),
+  },
+}))
+
 vi.mock('@/lib/api', () => ({
   api: { askFromServerScreen: vi.fn(async () => ({})), ask: vi.fn(async () => ({})), stop: vi.fn(async () => ({})), intelSessionClaims: vi.fn(async () => []), intelResolveSessionClaim: vi.fn() },
 }))
@@ -28,6 +36,18 @@ describe('Command Palette', () => {
     expect(rankCommands(cmds, '', 'me')[0].id).toBe('confirm-facts')
     expect(rankCommands(cmds, 'pin', 'goal').map((c) => c.id)).toContain('pin')
     expect(contextOf(parsePath('#/goals/g1/prepare'))).toBe('goal')
+    expect(contextOf(parsePath('#/conversation'))).toBe('conversation-home')
+    expect(contextOf(parsePath('#/conversation/spaces/cs-1'))).toBe('conversation-space')
+    expect(contextOf(parsePath('#/conversation/live/cv-1'))).toBe('conversation-live')
+  })
+
+  it('ranks Conversation commands in Conversation contexts', () => {
+    const route = parsePath('#/conversation/live/cv-1')
+    const cmds = buildCommands(null, route)
+    const live = rankCommands(cmds, '', 'conversation-live').slice(0, 4).map((c) => c.id)
+    expect(live).toContain('conversation-quiet')
+    expect(live).toContain('conversation-balanced')
+    expect(live).toContain('conversation-quick-note')
   })
 
   it('executes real actions, not a search demo', async () => {
@@ -44,5 +64,13 @@ describe('Command Palette', () => {
     expect(useOsStore.getState().pinDialogOpen).toBe(true)
     await executeCommand(cmds.find((c) => c.id === 'nav-settings')!, 'global')
     expect(useRouter.getState().route.name).toBe('settings')
+
+    const conversationRoute = parsePath('#/conversation')
+    const conversationCommands = buildCommands(null, conversationRoute)
+    await executeCommand(conversationCommands.find((c) => c.id === 'conversation-adhoc')!, 'conversation-home')
+    expect(useRouter.getState().route).toMatchObject({ name: 'conversation-live', params: { sessionId: 'cv-adhoc' } })
+    useRouter.setState({ route: parsePath('#/conversation') })
+    await executeCommand(conversationCommands.find((c) => c.id === 'conversation-prepare-next')!, 'conversation-home')
+    expect(useRouter.getState().route).toMatchObject({ name: 'conversation', params: { spaceId: 'cs-next', tab: 'prepare' } })
   })
 })

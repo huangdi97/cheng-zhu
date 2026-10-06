@@ -307,7 +307,7 @@ test.describe('v2.0 Conversation Profile', () => {
     })
 
     await page.goto(`/#/conversation/live/${SESSION.id}`)
-    await expect(page.getByText('真实转写')).toBeVisible()
+    await expect(page.getByText('真实转写', { exact: true })).toBeVisible()
     await expect(page.getByLabel('主音频（优先系统/会议音频）')).toHaveValue('1001')
     await page.getByLabel('我的麦克风（可选）').selectOption('1002')
     await page.getByRole('button', { name: '开始转写' }).click()

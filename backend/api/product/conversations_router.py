@@ -47,6 +47,11 @@ def home():
     return conversations.home_summary()
 
 
+@router.get("/diagnostics")
+def diagnostics():
+    return conversations.diagnostics()
+
+
 class AdhocCreate(BaseModel):
     title: str = Field(default="临时对话", max_length=160)
     profile: str = "PROJECT_SYNC"

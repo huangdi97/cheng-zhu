@@ -962,6 +962,76 @@ def followup_draft(session_id: str) -> dict[str, Any]:
     )
 
 
+def diagnostics() -> dict[str, Any]:
+    """Local-only Conversation runtime health and engineering evidence.
+
+    Counts describe this device only. They are deliberately not interpreted
+    as product-market fit or real-user validation.
+    """
+    from services.product import conversation_capture
+    from services.storage.product_migrations import LATEST_SCHEMA_VERSION
+
+    spaces = int(store.scalar("SELECT COUNT(*) FROM conversation_space") or 0)
+    sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session") or 0)
+    active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
+    ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
+    transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
+    confirmed_items = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
+    ) or 0)
+    pending_items = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_item WHERE review_status = 'AI_EXTRACTED'"
+    ) or 0)
+    shown = int(store.scalar("SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SHOWN'") or 0)
+    suppressed = int(store.scalar("SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED'") or 0)
+    sourced_shown = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event "
+        "WHERE status = 'SHOWN' AND source_refs_json NOT IN ('[]','null','')"
+    ) or 0)
+    drafts = int(store.scalar("SELECT COUNT(*) FROM conversation_draft_action") or 0)
+    approved_drafts = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_draft_action WHERE status = 'APPROVED'"
+    ) or 0)
+    capture = conversation_capture.status()
+    return {
+        "contract": "v2.0-R1",
+        "schema_version": store.schema_version(),
+        "expected_schema_version": LATEST_SCHEMA_VERSION,
+        "capture": capture,
+        "runtime": {
+            "spaces": spaces,
+            "sessions": sessions,
+            "active_sessions": active_sessions,
+            "ended_sessions": ended_sessions,
+            "transcript_segments": transcripts,
+            "confirmed_items": confirmed_items,
+            "pending_review_items": pending_items,
+            "guidance_shown": shown,
+            "guidance_suppressed": suppressed,
+            "sourced_guidance_shown": sourced_shown,
+            "draft_actions": drafts,
+            "approved_drafts": approved_drafts,
+        },
+        "health": {
+            "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",
+            "capture": "AVAILABLE" if not capture["active"] else "IN_USE",
+            "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
+            "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
+            "external_connectors": "NOT_CONFIGURED",
+        },
+        "evidence": {
+            "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
+            "real_conversation_user_evidence": "REAL_CONVERSATION_USER_EVIDENCE_PENDING",
+            "pmf": "PMF_PROVEN_FALSE",
+        },
+        "privacy": {
+            "remote_telemetry": "OFF",
+            "auto_external_writeback": "OFF",
+            "speaker_biometric_identity": "OFF",
+        },
+    }
+
+
 def export_space(space_id: str) -> dict[str, Any]:
     detail = space_detail(space_id)
     return {

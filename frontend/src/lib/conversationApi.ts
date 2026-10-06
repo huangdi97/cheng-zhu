@@ -32,6 +32,7 @@ function list<T>(payload: unknown): { items: T[] } {
 export const conversationApi = {
   templates: () => request<unknown>(`${B}/templates`).then((p) => list<ConversationTemplate>(p)),
   home: () => request<ConversationHome>(`${B}/home`),
+  diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
   adhoc: (body: { title?: string; profile?: ConversationProfile; assistance_mode?: AssistanceMode } = {}) =>
     request<{ space: ConversationSpace; session: ConversationSession; pack: Record<string, unknown> }>(`${B}/adhoc`, json('POST', body)),
   spaces: () => request<unknown>(`${B}/spaces`).then((p) => list<ConversationSpace>(p)),

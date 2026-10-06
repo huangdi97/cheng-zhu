@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { navigate, paths } from '@/lib/router'
 import { api } from '@/lib/api'
+import { conversationApi } from '@/lib/conversationApi'
 import { updateConfigAndRefresh } from '@/lib/configSync'
 import { productApi, type SettingLayer } from '@/lib/productApi'
 import { useInterviewStore } from '@/stores/configStore'
@@ -263,6 +264,7 @@ function DiagnosticsGroup() {
   const kb = useKbStore((s) => s.status)
   const diag = useAsync(() => api.intelDiagnostics(), [])
   const validation = useAsync(() => productApi.validation(), [])
+  const conversationDiag = useAsync(() => conversationApi.diagnostics(), [])
   const cpu = (diag.data as { cpu?: { percent?: number } } | null)?.cpu?.percent
   return (
     <div className="space-y-3">
@@ -276,6 +278,38 @@ function DiagnosticsGroup() {
         <summary className="cursor-pointer text-text-secondary">运行诊断（v1.2 Core）</summary>
         <pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-bg-tertiary/50 p-2 text-[11px]">{JSON.stringify(diag.data, null, 2)}</pre>
       </details>
+      <section aria-label="Conversation Beta 诊断" className="rounded-2xl border border-bg-hover/60 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Conversation Beta</h3>
+            <p className="text-[11px] text-text-muted">本机 runtime / capture / continuity 健康；不把 synthetic/local 信号解释成真实用户验证。</p>
+          </div>
+          {conversationDiag.loading ? <StatusBadge tone="busy">检查中</StatusBadge> : null}
+        </div>
+        {conversationDiag.error ? <div className="mt-2"><ErrorState message={conversationDiag.error} onRetry={conversationDiag.reload} /></div> : null}
+        {conversationDiag.data ? (() => {
+          const d = asRecord(conversationDiag.data)
+          const health = asRecord(d.health)
+          const runtime = asRecord(d.runtime)
+          const evidence = asRecord(d.evidence)
+          return <div className="mt-3 space-y-3" data-testid="conversation-diagnostics">
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge tone={health.database === 'AVAILABLE' ? 'ok' : 'risk'}>数据库：{String(health.database ?? '—')}</StatusBadge>
+              <StatusBadge tone={health.capture === 'AVAILABLE' ? 'ok' : 'busy'}>音频采集：{String(health.capture ?? '—')}</StatusBadge>
+              <StatusBadge tone={health.review_queue === 'NEEDS_ACTION' ? 'warn' : 'ok'}>审核队列：{String(health.review_queue ?? '—')}</StatusBadge>
+              <StatusBadge tone="muted">外部连接：{String(health.external_connectors ?? '—')}</StatusBadge>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-xl bg-bg-tertiary/30 p-2.5"><div className="text-lg font-semibold text-text-primary">{metric(runtime.spaces, '0')}</div><div className="text-[10px] text-text-muted">Spaces</div></div>
+              <div className="rounded-xl bg-bg-tertiary/30 p-2.5"><div className="text-lg font-semibold text-text-primary">{metric(runtime.sessions, '0')}</div><div className="text-[10px] text-text-muted">Sessions</div></div>
+              <div className="rounded-xl bg-bg-tertiary/30 p-2.5"><div className="text-lg font-semibold text-text-primary">{metric(runtime.pending_review_items, '0')}</div><div className="text-[10px] text-text-muted">待确认事项</div></div>
+            </div>
+            <p className="text-[11px] text-text-muted">{String(evidence.real_conversation_user_evidence ?? 'REAL_CONVERSATION_USER_EVIDENCE_PENDING')} · {String(evidence.pmf ?? 'PMF_PROVEN_FALSE')}</p>
+            <details className="text-xs"><summary className="cursor-pointer text-text-secondary">查看 Conversation 原始诊断</summary><pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-bg-tertiary/50 p-2 text-[11px]">{JSON.stringify(d, null, 2)}</pre></details>
+          </div>
+        })() : null}
+      </section>
+
       <section aria-label="产品循环验证（v1.4）" className="rounded-2xl border border-bg-hover/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>

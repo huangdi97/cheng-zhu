@@ -376,3 +376,21 @@ def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_
 
     conversations.update_session(live["id"], {"assistance_mode": "QUIET"})
     assert conversations.guidance_from_transcript(live["id"], "offline migration") is None
+
+
+def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env):
+    space = conversations.create_space("Diagnostic Space", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    conversations.add_item(
+        session["id"], item_type="OpenQuestion", title="owner?",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
+    )
+    diag = conversations.diagnostics()
+    assert diag["schema_version"] == 3
+    assert diag["runtime"]["spaces"] == 1
+    assert diag["runtime"]["sessions"] == 1
+    assert diag["runtime"]["pending_review_items"] == 1
+    assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
+    assert diag["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
+    assert diag["privacy"]["auto_external_writeback"] == "OFF"

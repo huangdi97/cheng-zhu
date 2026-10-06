@@ -6,7 +6,8 @@ import { useOsStore } from '@/stores/osStore'
 import { buildCommands, contextOf, executeCommand, rankCommands, type CommandContext } from './commands'
 
 const CONTEXT_LABEL: Record<CommandContext, string> = {
-  home: '首页', goal: '求职目标', live: '上场', me: '我的成竹', practice: '练习', global: '全局',
+  home: '首页', goal: '求职目标', live: '上场', me: '我的成竹', practice: '练习',
+  'conversation-home': '对话首页', 'conversation-space': '对话空间', 'conversation-live': '对话 Live', global: '全局',
 }
 
 export default function CommandPalette() {
@@ -19,7 +20,7 @@ export default function CommandPalette() {
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const context = contextOf(route)
-  const commands = useMemo(() => (open ? rankCommands(buildCommands(goalId), query, context) : []), [open, goalId, query, context])
+  const commands = useMemo(() => (open ? rankCommands(buildCommands(goalId, route), query, context) : []), [open, goalId, route, query, context])
 
   useEffect(() => {
     if (open) {

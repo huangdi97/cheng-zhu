@@ -1,4 +1,5 @@
 """v2.0 Conversation Profile: real persistence, truth state, pack and guidance loop."""
+import asyncio
 import sqlite3
 
 import pytest
@@ -367,6 +368,17 @@ def test_conversation_capture_refuses_to_steal_live_interview_audio(product_env)
     finally:
         legacy.is_recording = False
 
+
+
+
+def test_interview_start_refuses_to_preempt_active_conversation_capture(product_env, monkeypatch):
+    from api.assist.routes import api_start
+
+    monkeypatch.setattr(conversation_capture, "is_active", lambda: True)
+    with pytest.raises(Exception) as exc_info:
+        asyncio.run(api_start({}))
+    assert getattr(exc_info.value, "status_code", None) == 409
+    assert "Conversation" in str(getattr(exc_info.value, "detail", ""))
 
 def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_env):
     space = conversations.create_space("Continuity", "DESIGN_REVIEW")

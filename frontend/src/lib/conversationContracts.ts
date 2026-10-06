@@ -381,6 +381,8 @@ export interface ConversationSessionContext {
   session_id: string
   space: { id: string; profile?: ConversationProfile; title?: string }
   brief: {
+    title?: string
+    scheduled_at?: number | null
     goal?: string
     goals?: Array<{ id: string; title: string; outcome_definition: string; priority: number }>
     agenda?: string[]

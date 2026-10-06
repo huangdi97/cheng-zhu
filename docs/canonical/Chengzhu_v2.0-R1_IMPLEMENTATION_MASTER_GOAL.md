@@ -462,6 +462,7 @@ Preflight 是产品面，不是免责文字。
 - Processing Mode；
 - transcript retention；
 - participant consent status（用户报告）；
+- participant transparency plan（用户报告）；
 - selected sources；
 - connector permissions；
 - screen context；
@@ -480,6 +481,7 @@ No auto-create external task
 No biometric identity
 No emotion/sentiment profiling
 No hidden-intent claims
+No claim that participants were automatically notified
 ```
 
 ## 13.1 Runtime truth

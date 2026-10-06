@@ -208,6 +208,13 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
+  const makeDerivedDraft = async (targetSessionId: string, kind: 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT') => {
+    setSessionBusy(true); setSessionError('')
+    try { setDraft(await conversationApi.derivedDraft(targetSessionId, kind)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
   const reviewDraft = async (action: 'APPROVE' | 'DISMISS') => {
     if (!draft) return
     setSessionBusy(true); setSessionError('')
@@ -396,9 +403,14 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {continueData.what_changed?.length ? <div className="mt-3"><div className="text-xs font-semibold text-text-secondary">What changed</div><div className="mt-1 space-y-1">{continueData.what_changed.map((item) => <div key={item.id} className="text-xs text-text-primary">• {item.title} · {item.state}</div>)}</div></div> : null}
             {continueData.pins?.length ? <div className="mt-3"><div className="text-xs font-semibold text-text-secondary">Pins</div><div className="mt-1 space-y-1">{continueData.pins.map((pin) => <div key={pin.id} className="text-xs text-text-primary">• {pin.text || pin.kind}</div>)}</div></div> : null}
             {continueData.next_focus ? <p className="mt-3 text-sm text-text-primary">Next Focus · {continueData.next_focus.title}</p> : null}
-            <div className="mt-3"><SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF'} onClick={() => makeFollowupDraft(continueData.session.id)}>生成 Follow-up Draft</SecondaryButton></div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF'} onClick={() => makeFollowupDraft(continueData.session.id)}>Follow-up Draft</SecondaryButton>
+              <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.commitments.length} onClick={() => makeDerivedDraft(continueData.session.id, 'CREATE_TASK_DRAFT')}>Task Draft</SecondaryButton>
+              <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.open_questions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'CREATE_ISSUE_DRAFT')}>Issue Draft</SecondaryButton>
+              <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.decisions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'UPDATE_DECISION_LOG_DRAFT')}>Decision Log Draft</SecondaryButton>
+            </div>
             {continueData.session.policy?.external_writeback === 'OFF' ? <p className="mt-2 text-[11px] text-text-muted">本场 External Write-back = OFF，因此不会生成 follow-up / task / issue 草稿。</p> : null}
-            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件或写入外部系统。</p></div> : null}
+            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件、创建 task / issue 或写入 decision log。真正的 connector execution 尚未接线。</p></div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

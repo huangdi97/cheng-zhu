@@ -421,7 +421,16 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {preflight ? <div className="mt-4 rounded-2xl border border-bg-tertiary p-3">
               <div className="space-y-1">{preflight.items.map((x) => <div key={x.key} className="flex items-center justify-between gap-3 text-xs"><span className="text-text-muted">{x.label}</span><span className={x.ok ? 'text-status-direct' : 'text-status-risk'}>{x.ok ? '✓ ' : '! '}{String(x.value)}</span></div>)}</div>
               <div className="mt-3 rounded-xl bg-bg-secondary/35 p-3 text-[11px] text-text-muted">
-                Runtime data path · STT {preflight.processing_runtime.configured_stt_provider} · {preflight.processing_runtime.main_audio_remote_possible ? 'remote path possible' : 'local-only path'}
+                <div className="font-semibold text-text-secondary">Resolved Data Path</div>
+                <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                  <span>Capture · {preflight.processing_runtime.data_path.capture}</span>
+                  <span>STT · {preflight.processing_runtime.data_path.stt} ({preflight.processing_runtime.configured_stt_provider})</span>
+                  <span>Inference · {preflight.processing_runtime.data_path.inference}</span>
+                  <span>Retention · {preflight.processing_runtime.data_path.retention}</span>
+                  <span>Write-back · {preflight.processing_runtime.data_path.writeback}</span>
+                  <span>Audio retention · {preflight.processing_runtime.data_path.audio_retention}</span>
+                </div>
+                <p className="mt-2">“Local”不会把 capture / STT / inference / retention / write-back 混成一个标签；任何一段与 policy 不一致都会 fail-closed。</p>
               </div>
               {preflight.blockers.map((x) => <div key={x.key} className="mt-2 text-xs text-status-risk">{x.message}</div>)}
               {preflight.warnings.map((x, index) => <div key={`${x.key}:${index}`} className="mt-2 text-xs text-status-inferred">提醒 · {x.message}</div>)}
@@ -435,7 +444,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Confirmed items {preflight.pack_preview.confirmed_items_count}</span>
                   <span>Expression {Object.keys(preflight.pack_preview.expression_profile ?? {}).length ? '已冻结' : '默认'}</span>
                   <span>AI {preflight.pack_preview.policy.ai_assistance}</span>
-                  <span>STT {preflight.pack_preview.processing_runtime.configured_stt_provider}</span>
+                  <span>STT {preflight.pack_preview.processing_runtime.data_path.stt}</span>
+                  <span>Inference {preflight.pack_preview.processing_runtime.data_path.inference}</span>
+                  <span>Write-back {preflight.pack_preview.processing_runtime.data_path.writeback}</span>
                 </div>
                 {preflight.pack_preview.sources.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen sources</div>

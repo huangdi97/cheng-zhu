@@ -230,6 +230,7 @@ export interface ConversationPrepare {
   selected_sources: string[]
   selected_quick_notes: string[]
   brief: { last_change: ConversationItem | null; unresolved_count: number; known_participants: number }
+  agenda: string[]
   expected_questions: string[]
   contribution_candidates: Array<{ text: string; source_refs: SourceRef[]; kind: string }>
 }

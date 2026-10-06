@@ -57,12 +57,19 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
             <Field label="空间名称"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：PDIG · Android Architecture" autoFocus /></Field>
             <Field label="场景模板">
               <select className={inputCls} value={profile} onChange={(e) => setProfile(e.target.value as ConversationProfile)}>
-                {(templates.data?.items ?? []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+                {(templates.data?.items ?? []).map((item) => <option key={item.key} value={item.key}>{item.label}{item.launch_wedge ? ' · 首发验证' : ' · 共享 runtime'}</option>)}
               </select>
             </Field>
           </div>
           <div className="mt-3"><Field label="希望持续达成什么（可选）"><input className={inputCls} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="例如：把 conflict merge strategy 做成明确 Decision" /></Field></div>
-          <div className="mt-3 text-[11px] text-text-muted">默认帮助方式：{templateMap.get(profile)?.default_mode ?? 'BALANCED'}。后续每场 Preflight 可单独选择。</div>
+          <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/25 p-3 text-[11px] text-text-muted">
+            <div>默认帮助方式：{templateMap.get(profile)?.default_mode ?? 'BALANCED'}。后续每场 Preflight 可单独选择。</div>
+            {templateMap.get(profile)?.launch_wedge ? (
+              <div className="mt-1 text-text-secondary">成熟度 · BETA_WEDGE：这是当前首发验证楔子；runtime 可用，但 stable release / real-user validation 仍未成立。</div>
+            ) : (
+              <div className="mt-1 text-text-secondary">成熟度 · SHARED_RUNTIME_TEMPLATE：共享 Conversation runtime 可用，但该场景的 specialized behavior 尚未单独验证。</div>
+            )}
+          </div>
           {saveError ? <div className="mt-3"><ErrorState message={saveError} /></div> : null}
           <div className="mt-4 flex gap-2"><PrimaryButton onClick={create} disabled={saving || !title.trim()}>{saving ? '创建中…' : '创建'}</PrimaryButton><SecondaryButton onClick={() => setShowCreate(false)}>取消</SecondaryButton></div>
         </div>

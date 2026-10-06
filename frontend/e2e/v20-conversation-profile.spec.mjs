@@ -305,6 +305,42 @@ function mocks() {
       what_changed: [DECISION], pins: [],
       next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, source_ref: OPEN.id }, review_required: 1,
     }
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/derived-draft` && method === 'POST') {
+      const kind = request.postDataJSON().kind
+      const title = kind === 'UPDATE_DECISION_LOG_DRAFT' ? 'Architecture Review · Decision Log Draft'
+        : kind === 'CREATE_ISSUE_DRAFT' ? 'Architecture Review · Issue Draft'
+          : 'Architecture Review · Task Draft'
+      return {
+        id: 'cda-derived',
+        space_id: SPACE.id,
+        session_id: SESSION.id,
+        kind,
+        title,
+        content: kind === 'UPDATE_DECISION_LOG_DRAFT' ? '- offline migration 采用 v2 · state=AGREED' : '- draft item',
+        target: '',
+        payload: { derived_item_ids: [DECISION.id], execution: 'LOCAL_REVIEW_ONLY', external_execution: false },
+        source_refs: DECISION.source_refs,
+        status: 'DRAFT',
+        created_at: 3,
+        updated_at: 3,
+      }
+    }
+    if (pathname === '/api/product/conversation/draft-actions/cda-derived/review' && method === 'POST') {
+      return {
+        id: 'cda-derived',
+        space_id: SPACE.id,
+        session_id: SESSION.id,
+        kind: 'UPDATE_DECISION_LOG_DRAFT',
+        title: 'Architecture Review · Decision Log Draft',
+        content: '- offline migration 采用 v2 · state=AGREED',
+        target: '',
+        payload: { derived_item_ids: [DECISION.id], execution: 'LOCAL_REVIEW_ONLY', external_execution: false },
+        source_refs: DECISION.source_refs,
+        status: request.postDataJSON().action === 'APPROVE' ? 'APPROVED' : 'DISMISSED',
+        created_at: 3,
+        updated_at: 4,
+      }
+    }
     if (pathname.startsWith('/api/product/conversation/items/') && pathname.endsWith('/review')) return { ...OPEN, review_status: 'USER_CONFIRMED' }
     if (pathname.startsWith('/api/product/conversation/guidance/')) return { id: 'ge-1', user_action: request.postDataJSON().action }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/export`) return { kind: 'CONVERSATION_SPACE', contract: 'v2.0-R1', space: SPACE }
@@ -512,6 +548,24 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '停止转写' }).click()
     await expect(page.getByText('OFF', { exact: true })).toBeVisible()
   })
+
+  test('Continue exposes reviewed local write-back drafts without claiming connector execution', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByText('这场之后')).toBeVisible()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await expect(page.getByText('Architecture Review · Decision Log Draft')).toBeVisible()
+    await expect(page.getByText('- offline migration 采用 v2 · state=AGREED')).toBeVisible()
+    await expect(page.getByText(/不代表已发送邮件、创建 task \/ issue 或写入 decision log/)).toBeVisible()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await expect(page.getByText('APPROVED')).toBeVisible()
+  })
+
 
   test('Conversation History stays inside Conversation Profile and returns to the same Space', async ({ context, page }) => {
     await installMocks(context, {

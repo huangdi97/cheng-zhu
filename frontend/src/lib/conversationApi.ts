@@ -6,6 +6,7 @@ import type {
   ConversationContinue,
   ConversationDraftAction,
   ConversationGuidance,
+  ConversationHistoryItem,
   ConversationHome,
   ConversationItem,
   ConversationItemType,
@@ -32,6 +33,7 @@ function list<T>(payload: unknown): { items: T[] } {
 export const conversationApi = {
   templates: () => request<unknown>(`${B}/templates`).then((p) => list<ConversationTemplate>(p)),
   home: () => request<ConversationHome>(`${B}/home`),
+  history: (limit = 100) => request<{ items: ConversationHistoryItem[] }>(`${B}/history?limit=${limit}`),
   diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
@@ -69,8 +71,17 @@ export const conversationApi = {
 
   addGoal: (id: string, body: { title: string; outcome_definition?: string; priority?: number }) =>
     request(`${B}/spaces/${encodeURIComponent(id)}/goals`, json('POST', body)),
-  addParticipant: (id: string, body: { display_name?: string; role?: string; organization?: string }) =>
-    request(`${B}/spaces/${encodeURIComponent(id)}/participants`, json('POST', body)),
+  addParticipant: (id: string, body: {
+    display_name?: string
+    role?: string
+    organization?: string
+    explicit_priority?: string
+    explicit_concern?: string
+    stated_position?: string
+    decision_authority?: string
+    relationship_context?: string
+    source_refs?: Array<Record<string, unknown>>
+  }) => request(`${B}/spaces/${encodeURIComponent(id)}/participants`, json('POST', body)),
   createSession: (id: string, body: {
     title?: string
     goal_ids?: string[]
@@ -79,12 +90,13 @@ export const conversationApi = {
     processing_mode: ProcessingMode
     assistance_mode: AssistanceMode
     consent_ack: boolean
+    policy?: Partial<ConversationSession['policy']>
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>
     request<{ deleted: boolean; session_id: string; provenance_tombstones: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
 
-  patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack'>>) =>
+  patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack' | 'policy'>>) =>
     request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),
   ask: (id: string, question: string) =>
     request<{ answer: string; matches: ConversationItem[]; grounded: boolean }>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),

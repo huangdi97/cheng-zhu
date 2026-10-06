@@ -2,6 +2,7 @@ import { apiRequest as request } from './api'
 import type {
   AssistanceMode,
   CaptureMode,
+  ConversationAskResult,
   ConversationCaptureStatus,
   ConversationContinue,
   ConversationDraftAction,
@@ -99,7 +100,7 @@ export const conversationApi = {
   patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack' | 'policy'>>) =>
     request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),
   ask: (id: string, question: string) =>
-    request<{ answer: string; matches: ConversationItem[]; grounded: boolean }>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
+    request<ConversationAskResult>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
   captureStatus: (id: string) =>
     request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture`),
   captureStart: (id: string, device_id: number, candidate_mic_device_id?: number | null) =>

@@ -16,6 +16,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [topic, setTopic] = useState('')
   const [question, setQuestion] = useState('')
   const [candidate, setCandidate] = useState('')
+  const [talkingPoint, setTalkingPoint] = useState('')
+  const [deliveryFocus, setDeliveryFocus] = useState('')
   const [criticalRisk, setCriticalRisk] = useState('')
   const [source, setSource] = useState('')
   const [audienceRole, setAudienceRole] = useState('')
@@ -123,6 +125,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         current_topic: topic,
         direct_question: question,
         critical_risk: criticalRisk,
+        talking_point: talkingPoint,
+        delivery_focus: deliveryFocus,
         candidate_text: candidate,
         source_refs: refs,
         user_speaking: speaking,
@@ -228,12 +232,14 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
             <div className="mt-4 grid gap-3">
               <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
               <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
-              <Field label="值得补充的候选内容（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale" /></Field>
+              <Field label="高价值 Opportunity 候选（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale；必须有来源，是否显示由 Arbiter 决定。" /></Field>
+              <Field label="明确 Talking Point（如有）"><textarea className={inputCls} rows={2} value={talkingPoint} onChange={(e) => setTalkingPoint(e.target.value)} placeholder="你明确希望组织成 talking point 的内容；仍要求来源且受 Profile 允许项约束。" /></Field>
+              <Field label="Delivery / 表达重点（如有）"><textarea className={inputCls} rows={2} value={deliveryFocus} onChange={(e) => setDeliveryFocus(e.target.value)} placeholder="例如：控制在 45 秒；先回答 CTO 的 rollback concern。只改表达结构，不改事实。" /></Field>
               <Field label="已知关键风险（如有）"><textarea className={inputCls} rows={2} value={criticalRisk} onChange={(e) => setCriticalRisk(e.target.value)} placeholder="仅填写有明确来源、需要优先提醒的事实 / 承诺 / 冲突风险。" /></Field>
               <Field label="来源 / 依据"><textarea className={inputCls} rows={2} value={source} onChange={(e) => setSource(e.target.value)} placeholder="主动 Contribution Opportunity 必须有来源；没有来源会被抑制。" /></Field>
               <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3">
                 <div className="text-xs font-semibold text-text-secondary">Stakeholder-aware Expression · 只用明确信息</div>
-                <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。</p>
+                <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。优先级：Direct Question &gt; Critical Risk &gt; Talking Point / Delivery explicit request &gt; proactive Opportunity / Recall / Question。</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <input className={inputCls} value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="对方明确角色，例如 CTO / 客户" />
                   <input className={inputCls} value={decisionAuthority} onChange={(e) => setDecisionAuthority(e.target.value)} placeholder="明确决策权限（可选）" />

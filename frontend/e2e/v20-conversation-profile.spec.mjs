@@ -133,9 +133,17 @@ function mocks() {
         id: 'cp-1', space_id: SPACE.id, session_id: null, display_name: 'Alex', role: 'Backend',
         organization: '', identity_confidence: 1, identity_source: 'USER', visibility: 'PRIVATE', observations: [],
         counterparty_state: {
-          known_explicit: { priority: '迁移稳定性', concern: '回滚风险' },
+          known_explicit: {
+            priority: '迁移稳定性',
+            concern: '回滚风险',
+            stated_position: '先灰度再全量',
+            decision_authority: '架构方案批准人',
+            relationship_context: '客户技术负责人',
+          },
           source_refs: [{ kind: 'USER_NOTE', excerpt: 'Alex 明确关注回滚风险' }],
-          temporary_inferences: [], unknown: [],
+          confidence: 1,
+          temporary_inferences: [],
+          unknown: [],
         },
       }],
       decisions: [DECISION],
@@ -241,7 +249,25 @@ function mocks() {
         is_personal_evidence: true,
       }],
       quick_notes: [],
-      participants: [],
+      participants: [{
+        id: 'cp-1',
+        display_name: 'Alex',
+        role: 'Backend',
+        organization: '',
+        counterparty_state: {
+          known_explicit: {
+            priority: '迁移稳定性',
+            concern: '回滚风险',
+            stated_position: '先灰度再全量',
+            decision_authority: '架构方案批准人',
+            relationship_context: '客户技术负责人',
+          },
+          source_refs: [{ kind: 'USER_NOTE', excerpt: 'Alex 明确关注回滚风险' }],
+          confidence: 1,
+          temporary_inferences: [],
+          unknown: [],
+        },
+      }],
       expression_profile: { conclusion_first: true, target_seconds: 60, shape: 'bullet' },
       processing_runtime: {
         mode: 'LOCAL',
@@ -450,6 +476,12 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(SPACE.default_goal)).toBeVisible()
     await expect(page.getByText('PACK abcdef12')).toBeVisible()
     await expect(page.getByText('Data path · LOCAL / STT whisper')).toBeVisible()
+    await expect(page.getByLabel('当前受众')).toHaveValue('cp-1')
+    await expect(page.getByPlaceholder('对方明确角色，例如 CTO / 客户')).toHaveValue('Backend')
+    await expect(page.getByPlaceholder('对方明确优先级')).toHaveValue('迁移稳定性')
+    await expect(page.getByPlaceholder('对方明确 concern')).toHaveValue('回滚风险')
+    await expect(page.getByPlaceholder('明确决策权限（可选）')).toHaveValue('架构方案批准人')
+    await expect(page.getByPlaceholder('关系上下文，例如客户技术负责人')).toHaveValue('客户技术负责人')
 
     await page.getByLabel('当前话题').fill('offline migration')
     await page.getByLabel('高价值 Opportunity 候选（如有）').fill('Q4 benchmark 已覆盖 10x data scale')

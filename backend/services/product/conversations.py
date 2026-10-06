@@ -638,6 +638,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
         "expression_profile": _expression_profile(),
+        "processing_runtime": processing_runtime_status(session),
         "policy": {
             **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],
@@ -1136,7 +1137,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     budget_exhausted = _suggestion_budget_exhausted(session_id, mode)
     if mode != "QUIET" and not budget_exhausted and recall:
         refs = list(recall.get("source_refs") or [])
-        if refs:
+        if refs and _source_visibility_allows_guidance(refs):
             event = _persist_guidance(
                 session_id, kind="RECALL", action=ExpressionAction.RECALL.value,
                 text=recall["title"], source_refs=refs, status="SHOWN", reason="TOPIC_RECALL",
@@ -1150,11 +1151,13 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     )
     if mode != "QUIET" and not budget_exhausted and open_questions:
         item = open_questions[0]
-        event = _persist_guidance(
-            session_id, kind="QUESTION", action=ExpressionAction.ASK_QUESTION.value,
-            text=item["title"], source_refs=item.get("source_refs") or [], status="SHOWN", reason="OPEN_QUESTION",
-        )
-        return {"guidance": event, "suppressed": None}
+        refs = list(item.get("source_refs") or [])
+        if refs and _source_visibility_allows_guidance(refs):
+            event = _persist_guidance(
+                session_id, kind="QUESTION", action=ExpressionAction.ASK_QUESTION.value,
+                text=item["title"], source_refs=refs, status="SHOWN", reason="OPEN_QUESTION",
+            )
+            return {"guidance": event, "suppressed": None}
 
     reason = "SUGGESTION_BUDGET" if budget_exhausted and mode != "QUIET" else "NO_HIGH_VALUE_GUIDANCE"
     event = _persist_guidance(
@@ -1181,7 +1184,10 @@ def guidance_from_transcript(session_id: str, text: str) -> Optional[dict[str, A
     if not recall:
         return None
     refs = list(recall.get("source_refs") or [])
-    if not refs:
+    if not refs or not _source_visibility_allows_guidance(refs):
+        return None
+    mode = str(session.get("assistance_mode") or "BALANCED").upper()
+    if _suggestion_budget_exhausted(session_id, mode):
         return None
     recent = store.select(
         "conversation_guidance_event",

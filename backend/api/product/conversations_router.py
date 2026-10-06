@@ -12,6 +12,25 @@ from services.product import conversation_capture, conversations
 router = APIRouter(prefix="/conversation", tags=["product-conversation"])
 
 
+def _stop_capture_for_session(session_id: str) -> None:
+    state = conversation_capture.status(session_id)
+    if state.get("owns_requested_session"):
+        conversation_capture.stop(session_id)
+
+
+def _stop_capture_for_space(space_id: str) -> None:
+    state = conversation_capture.status()
+    active_session_id = str(state.get("session_id") or "")
+    if not active_session_id:
+        return
+    try:
+        session = conversations.require_session(active_session_id)
+    except ValueError:
+        return
+    if session.get("space_id") == space_id:
+        conversation_capture.stop(active_session_id)
+
+
 class SpaceCreate(BaseModel):
     title: str = Field(max_length=160)
     profile: str = "PROJECT_SYNC"
@@ -95,6 +114,7 @@ def patch_space(space_id: str, body: SpacePatch):
 @router.delete("/spaces/{space_id}")
 def delete_space(space_id: str):
     with domain_errors():
+        _stop_capture_for_space(space_id)
         return {"deleted": conversations.delete_space(space_id)}
 
 
@@ -181,6 +201,7 @@ class SessionDelete(BaseModel):
 @router.post("/sessions/{session_id}/delete")
 def delete_session(session_id: str, body: SessionDelete):
     with domain_errors():
+        _stop_capture_for_session(session_id)
         return conversations.delete_session(session_id, confirmed_policy=body.confirmed_policy)
 
 
@@ -264,6 +285,7 @@ def start_session(session_id: str):
 @router.post("/sessions/{session_id}/end")
 def end_session(session_id: str):
     with domain_errors():
+        _stop_capture_for_session(session_id)
         return conversations.end_session(session_id)
 
 

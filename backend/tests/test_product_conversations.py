@@ -378,6 +378,9 @@ def test_unwired_share_privacy_and_connector_permissions_block_preflight(product
     check = conversations.preflight(session["id"])
     keys = {x["key"] for x in check["blockers"]}
     assert {"share_privacy_runtime", "connector_runtime"} <= keys
+    item_state = {x["key"]: x["ok"] for x in check["items"]}
+    assert item_state["share"] is False
+    assert item_state["connectors"] is False
 
 
 def test_processing_off_requires_no_transcript_and_ai_forbidden(product_env):
@@ -905,6 +908,53 @@ def test_thirty_session_continuity_stays_bounded_and_traceable(product_env):
     pack = conversations.start_session(latest["id"])["pack"]
     assert len(pack["payload"]["confirmed_items"]) == 6
     assert all(row["source_refs"] for row in pack["payload"]["confirmed_items"])
+
+
+
+
+def test_preflight_warns_and_skips_selected_source_that_is_not_ready(product_env):
+    broken = materials.create_material(
+        "Broken Source",
+        kind="PROJECT",
+        usage="FACTS",
+        text="x",
+    )
+    assert broken["lifecycle"]["state"] == "FAILED"
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_source_ids=[broken["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    check = conversations.preflight(session["id"])
+
+    assert check["blockers"] == []
+    assert any(w["key"] == "source_not_ready" for w in check["warnings"])
+    source_item = next(x for x in check["items"] if x["key"] == "sources")
+    assert source_item["ok"] is False
+    assert source_item["value"] == "0/1 Ready"
+    assert check["pack_preview"]["sources"] == []
+    assert check["pack_preview"]["skipped_sources"][0]["id"] == broken["id"]
+
+    started = conversations.start_session(session["id"])
+    assert started["pack"]["payload"]["sources"] == []
+    assert started["pack"]["payload"]["skipped_sources"][0]["id"] == broken["id"]
+
+
+def test_transcript_preflight_surfaces_unrecorded_participant_consent_as_warning(product_env):
+    space = conversations.create_space("Consent State", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={"participant_consent_status": "NOT_RECORDED"},
+    )
+    check = conversations.preflight(session["id"])
+    assert not any(x["key"] == "consent" for x in check["blockers"])
+    assert any(x["key"] == "participant_consent_not_recorded" for x in check["warnings"])
+    participant_item = next(x for x in check["items"] if x["key"] == "participant_consent")
+    assert participant_item["ok"] is False
 
 
 def test_session_pack_freezes_ready_material_version_and_user_notes(product_env):

@@ -229,7 +229,7 @@ def _counterparty_state(
         "source_refs": refs,
         "confidence": 1.0 if known else 0.0,
         "temporary_inferences": [],
-        "unknown": [],
+        "unknown": [key for key, value in explicit.items() if not value],
     }
 
 ITEM_TYPES = {t.value for t in ConversationItemType}
@@ -1248,6 +1248,7 @@ def _score(body: dict[str, Any]) -> OpportunityScore:
         str(body.get("audience_priority") or ""),
         str(body.get("audience_concern") or ""),
         str(body.get("decision_authority") or ""),
+        str(body.get("relationship_context") or ""),
     ]
     audience_text = " ".join(part for part in audience_parts if part).strip().lower()
     candidate_text = " ".join([
@@ -1414,6 +1415,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         "explicit_priority": str(body.get("audience_priority") or "")[:800],
         "explicit_concern": str(body.get("audience_concern") or "")[:1200],
         "decision_authority": str(body.get("decision_authority") or "")[:500],
+        "relationship_context": str(body.get("relationship_context") or "")[:800],
     }
     if any(audience_context.values()):
         state["audience_context"] = {k: v for k, v in audience_context.items() if v}

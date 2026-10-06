@@ -88,6 +88,13 @@ SCREEN_CONTEXT_POLICIES = {"OFF", "MANUAL", "AUTO"}
 SHARE_PRIVACY_POLICIES = {"OFF", "PRIVATE_OVERLAY"}
 EXTERNAL_WRITEBACK_POLICIES = {"OFF", "REVIEW_REQUIRED"}
 PARTICIPANT_CONSENT_STATUSES = {"NOT_RECORDED", "USER_REPORTS_ALLOWED", "USER_REPORTS_CONSENTED", "NOT_APPLICABLE"}
+PARTICIPANT_TRANSPARENCY_PLANS = {
+    "NOT_RECORDED",
+    "USER_WILL_NOTIFY_VERBALLY",
+    "USER_WILL_NOTIFY_IN_CHAT",
+    "USER_REPORTS_ALREADY_NOTIFIED",
+    "NOT_APPLICABLE",
+}
 DEFAULT_SESSION_POLICY: dict[str, Any] = {
     "transcript_retention": "SPACE_POLICY",
     "screen_context": "OFF",
@@ -96,6 +103,7 @@ DEFAULT_SESSION_POLICY: dict[str, Any] = {
     "share_privacy": "OFF",
     "external_writeback": "REVIEW_REQUIRED",
     "participant_consent_status": "NOT_RECORDED",
+    "participant_transparency_plan": "NOT_RECORDED",
     "connector_permissions": [],
     "speaker_biometric_identity": "OFF",
     "emotion_sentiment_profiling": "OFF",
@@ -114,6 +122,11 @@ def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict
         str(source.get("participant_consent_status") or "NOT_RECORDED"),
         PARTICIPANT_CONSENT_STATUSES,
         "参与者同意状态",
+    )
+    source["participant_transparency_plan"] = _require_choice(
+        str(source.get("participant_transparency_plan") or "NOT_RECORDED"),
+        PARTICIPANT_TRANSPARENCY_PLANS,
+        "参与者透明告知计划",
     )
     source["transcript_retention"] = str(source.get("transcript_retention") or "SPACE_POLICY")[:80]
     source["connector_permissions"] = [str(x)[:160] for x in (source.get("connector_permissions") or [])][:50]
@@ -616,6 +629,12 @@ def preflight(session_id: str) -> dict[str, Any]:
             "label": "参与者同意状态",
             "message": "你已确认当前场景允许转写，但尚未记录参与者同意状态；成竹不会自行推断或验证该状态。",
         })
+    if session["capture_mode"] == "TRANSCRIPT" and policy["participant_transparency_plan"] == "NOT_RECORDED":
+        warnings.append({
+            "key": "participant_transparency_not_recorded",
+            "label": "透明告知计划",
+            "message": "尚未记录你将如何让参与者知道正在使用转写/辅助。成竹当前不会自动发送 chat notice 或添加 watermark。",
+        })
 
     selected_source_count = len(space.get("selected_source_ids") or [])
     ready_source_count = len(pack_inputs["sources"])
@@ -624,6 +643,10 @@ def preflight(session_id: str) -> dict[str, Any]:
     participant_consent_ok = (
         session["capture_mode"] != "TRANSCRIPT"
         or policy["participant_consent_status"] != "NOT_RECORDED"
+    )
+    participant_transparency_ok = (
+        session["capture_mode"] != "TRANSCRIPT"
+        or policy["participant_transparency_plan"] != "NOT_RECORDED"
     )
     ai_ok = not (
         session["processing_mode"] == "OFF"
@@ -643,6 +666,7 @@ def preflight(session_id: str) -> dict[str, Any]:
         {"key": "quick_notes", "label": "Quick Notes", "value": f"{ready_note_count}/{selected_note_count} available", "ok": ready_note_count == selected_note_count},
         {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
+        {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
         {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": screen_ok},
         {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": ai_ok},
         {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": human_ok},
@@ -693,7 +717,7 @@ def preflight(session_id: str) -> dict[str, Any]:
                 "assistance_mode": session["assistance_mode"],
             },
         },
-        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；参与者同意状态仅来自用户报告，成竹不会自行验证或推断；也不会自动共享、自动发送或自动写入外部系统。",
+        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；参与者同意状态与透明告知计划仅来自用户报告，成竹不会自行验证、推断或自动通知其他参与者；也不会自动共享、自动发送或自动写入外部系统。",
     }
 
 def _confirmed_context_items(space_id: str) -> list[dict[str, Any]]:

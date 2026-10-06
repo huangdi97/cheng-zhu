@@ -313,14 +313,7 @@ export interface ConversationPreflight {
     participants_count: number
     confirmed_items_count: number
     expression_profile: Record<string, unknown>
-    processing_runtime: {
-      mode: ProcessingMode
-      capture_mode: CaptureMode
-      configured_stt_provider: string
-      main_audio_remote_possible: boolean
-      self_mic_remote_possible: boolean
-      blockers: string[]
-    }
+    processing_runtime: ConversationProcessingRuntime
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
   privacy_note: string

@@ -164,6 +164,19 @@ def add_goal(space_id: str, body: GoalCreate):
         return conversations.create_goal(space_id, **body.model_dump())
 
 
+class GoalPatch(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=240)
+    outcome_definition: Optional[str] = Field(default=None, max_length=2000)
+    priority: Optional[int] = Field(default=None, ge=0, le=100)
+    status: Optional[str] = None
+
+
+@router.patch("/goals/{goal_id}")
+def patch_goal(goal_id: str, body: GoalPatch):
+    with domain_errors():
+        return conversations.update_goal(goal_id, body.model_dump(exclude_unset=True))
+
+
 class ParticipantCreate(BaseModel):
     display_name: str = Field(default="", max_length=160)
     role: str = Field(default="", max_length=160)

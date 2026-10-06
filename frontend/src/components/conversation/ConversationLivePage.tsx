@@ -341,7 +341,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
             <p className="mt-1 text-[11px] text-text-muted">检索开始时冻结的 Ready sources / Quick Notes、已确认历史，以及本场当前 transcript。每条结果标明 authority；观察和笔记不会冒充 confirmed truth。</p>
             <div className="mt-3 space-y-2">
               <textarea className={inputCls} rows={2} value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="例如：之前为什么用 v2？Q4 benchmark 说了什么？刚才是否提到 rollback？" />
-              <SecondaryButton disabled={busy || !askText.trim()} onClick={ask}>查本场可用来源</SecondaryButton>
+              <SecondaryButton disabled={busy || !askText.trim() || s.policy?.ai_assistance === 'AI_FORBIDDEN'} onClick={ask}>查本场可用来源</SecondaryButton>
+              {s.policy?.ai_assistance === 'AI_FORBIDDEN' ? <p className="text-[11px] text-status-inferred">本场 AI Assistance = AI_FORBIDDEN；Manual Ask 已禁用。冻结来源仍保留在 Pack 中，但不会由成竹检索回答。</p> : null}
             </div>
             {askResult ? <div className="mt-3 rounded-xl bg-bg-secondary/45 p-3">
               <p className="text-xs text-text-primary">{askResult.answer}</p>

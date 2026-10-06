@@ -127,7 +127,7 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
             "ai_assistance": "AI_FORBIDDEN",
             "human_assistance": "HUMAN_FORBIDDEN",
             "screen_context": "OFF",
-            "share_privacy": "PRIVATE_OVERLAY",
+            "share_privacy": "OFF",
             "external_writeback": "OFF",
             "participant_consent_status": "USER_REPORTS_CONSENTED",
             "speaker_biometric_identity": "ON",
@@ -140,7 +140,7 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
     policy = check["policy"]
     assert policy["ai_assistance"] == "AI_FORBIDDEN"
     assert policy["human_assistance"] == "HUMAN_FORBIDDEN"
-    assert policy["share_privacy"] == "PRIVATE_OVERLAY"
+    assert policy["share_privacy"] == "OFF"
     assert policy["external_writeback"] == "OFF"
     assert policy["participant_consent_status"] == "USER_REPORTS_CONSENTED"
     assert check["pack_preview"]["participants_count"] == 0
@@ -151,7 +151,7 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
 
     started = conversations.start_session(session["id"])
     assert started["pack"]["payload"]["policy"]["ai_assistance"] == "AI_FORBIDDEN"
-    assert started["pack"]["payload"]["policy"]["share_privacy"] == "PRIVATE_OVERLAY"
+    assert started["pack"]["payload"]["policy"]["share_privacy"] == "OFF"
 
     suppressed = conversations.evaluate_guidance(session["id"], {
         "direct_question": "现在要不要补充？",

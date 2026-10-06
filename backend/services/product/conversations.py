@@ -1429,7 +1429,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         # presentation layer while preserving their audit trail.
         for prior in store.select(
             "conversation_guidance_event",
-            where="session_id = ? AND status = 'SHOWN' AND kind = 'CONTRIBUTION_OPPORTUNITY' "
+            where="session_id = ? AND status = 'SHOWN' AND kind IN ('CONTRIBUTION_OPPORTUNITY','TALKING_POINT') "
                   "AND user_action = 'NONE' AND created_at >= ?",
             params=(session_id, store.now() - 120.0),
             order="created_at DESC",

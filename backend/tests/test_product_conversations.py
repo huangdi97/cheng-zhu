@@ -1,6 +1,7 @@
 """v2.0 Conversation Profile: real persistence, truth state, pack and guidance loop."""
 import asyncio
 import sqlite3
+import threading
 
 import pytest
 
@@ -400,6 +401,56 @@ def test_conversation_capture_reports_self_mic_degraded_state(product_env, monke
     assert status["active"] is True
     assert status["candidate_mic_device_id"] is None
     conversation_capture.stop(session["id"])
+
+
+
+def test_conversation_capture_stop_allows_final_asr_callback_to_reenter(product_env, monkeypatch):
+    import api.assist.pipeline as pipeline
+    from core.session import get_session
+
+    legacy = get_session()
+    legacy.is_recording = False
+    legacy.is_paused = False
+
+    def fake_start(device, candidate=None):
+        legacy.is_recording = True
+        legacy.last_device_id = int(device)
+        legacy.last_candidate_mic_device_id = 0
+
+    callback_finished = threading.Event()
+
+    def fake_stop():
+        worker = threading.Thread(
+            target=lambda: (
+                conversation_capture.record_transcription(
+                    "最后一句必须落盘",
+                    channel="PRIMARY_AUDIO",
+                    provider="test",
+                    source="TEST_DRAIN",
+                ),
+                callback_finished.set(),
+            ),
+            daemon=True,
+        )
+        worker.start()
+        worker.join(timeout=1.0)
+        assert callback_finished.is_set(), "final ASR callback was blocked by Conversation capture lock"
+        legacy.is_recording = False
+
+    monkeypatch.setattr(pipeline, "start_nonblocking", fake_start)
+    monkeypatch.setattr(pipeline, "stop_interview_loop", fake_stop)
+
+    space = conversations.create_space("Drain Safety", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"], capture_mode="TRANSCRIPT", processing_mode="LOCAL", consent_ack=True,
+    )
+    conversations.start_session(session["id"])
+    conversation_capture.start(session["id"], 1001)
+    stopped = conversation_capture.stop(session["id"])
+
+    assert stopped["active"] is False
+    rows = conversation_capture.transcript(session["id"])
+    assert rows[-1]["text"] == "最后一句必须落盘"
 
 def test_conversation_capture_transport_never_owns_interview_review_lifecycle(product_env, monkeypatch):
     import api.assist.pipeline as pipeline

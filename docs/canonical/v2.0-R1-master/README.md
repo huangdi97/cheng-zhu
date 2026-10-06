@@ -10,7 +10,8 @@
 4. `03_Conversation_Intelligence_Architecture.md` — Conversation State / Expression Planner / Opportunity / Arbiter；
 5. `04_UIUX_Conversation_Profile.md` — Profile Shell / Room / Prepare / Live / Continue；
 6. `05_Privacy_Integrations_Evaluation.md` — consent / connector / MCP / eval / rollout；
-7. `../../goals/CHENGZHU_V2_0_IMPLEMENTATION_MASTER_GOAL.md` — 后续全量工程执行规范。
+7. `06_Onboarding_Operations_Business_Acceptance.md` — upgrade / onboarding / notification / i18n / diagnostics / business boundary / final acceptance；
+8. `../../goals/CHENGZHU_V2_0_IMPLEMENTATION_MASTER_GOAL.md` — 后续全量工程执行规范。
 
 ## Truth boundary
 

@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 4
+LATEST_SCHEMA_VERSION = 5
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -583,6 +583,19 @@ _V4_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_tombstone_original ON conversation_provenance_tombstone(original_item_id)",
 )
 
+# --- v2.0 design closure: explicit session policy + safe counterparty state ---
+# These remain JSON envelopes because the policy/state vocabularies evolve
+# faster than the stable Conversation entities. Migration is additive and
+# keeps existing v2 databases readable.
+def _apply_v5(conn: sqlite3.Connection) -> None:
+    session_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_session)").fetchall()}
+    if "policy_json" not in session_cols:
+        conn.execute("ALTER TABLE conversation_session ADD COLUMN policy_json TEXT NOT NULL DEFAULT '{}'")
+
+    participant_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_participant)").fetchall()}
+    if "counterparty_state_json" not in participant_cols:
+        conn.execute("ALTER TABLE conversation_participant ADD COLUMN counterparty_state_json TEXT NOT NULL DEFAULT '{}'")
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -593,6 +606,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     2: (lambda conn: _apply_statements(conn, _V2_TABLES + _V2_INDEXES), "v2.0 personal conversation intelligence"),
     3: (lambda conn: _apply_statements(conn, _V3_TABLES + _V3_INDEXES), "v2.0 conversation runtime closure"),
     4: (lambda conn: _apply_statements(conn, _V4_TABLES + _V4_INDEXES), "v2.0 deletion provenance tombstones"),
+    5: (_apply_v5, "v2.0 explicit session policy and counterparty state"),
 }
 
 

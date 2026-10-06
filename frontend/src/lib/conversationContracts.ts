@@ -251,6 +251,14 @@ export interface ConversationPreflight {
   items: Array<{ key: string; label: string; value: string | number | boolean; ok: boolean }>
   blockers: Array<{ key: string; label: string; message: string }>
   policy: ConversationSessionPolicy
+  processing_runtime: {
+    mode: ProcessingMode
+    capture_mode: CaptureMode
+    configured_stt_provider: string
+    main_audio_remote_possible: boolean
+    self_mic_remote_possible: boolean
+    blockers: string[]
+  }
   pack_preview: {
     goal_ids: string[]
     selected_source_ids: string[]

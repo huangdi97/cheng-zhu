@@ -83,6 +83,19 @@ const OPEN = {
   review_status: 'AI_EXTRACTED',
 }
 
+const COMMITMENT_CANDIDATE = {
+  ...DECISION,
+  id: 'ci-commitment',
+  type: 'Commitment',
+  state: 'PROPOSED',
+  title: '补 rollout plan',
+  owner_id: '',
+  source_refs: [{ kind: 'TRANSCRIPT_SEGMENT', id: 'cts-primary', excerpt: '我来补 rollout plan' }],
+  source_excerpt: '我来补 rollout plan',
+  epistemic_status: 'INFERRED',
+  review_status: 'AI_EXTRACTED',
+}
+
 function mocks() {
   let session = { ...SESSION }
   return async (pathname, method, request) => {
@@ -633,6 +646,49 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '停止转写' }).click()
     await expect(page.getByText('OFF', { exact: true })).toBeVisible()
   })
+
+  test('Review Queue never silently assigns unknown commitment owner to me', async ({ context, page }) => {
+    const base = mocks()
+    let reviewed = false
+    let reviewBody = null
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) {
+          return {
+            session: { ...SESSION, status: 'ENDED', ended_at: 3 },
+            decisions: [DECISION],
+            commitments: reviewed ? [{ ...COMMITMENT_CANDIDATE, state: 'COMMITTED', owner_id: 'Alex', review_status: 'USER_CONFIRMED' }] : [],
+            open_questions: [],
+            candidates: reviewed ? [] : [COMMITMENT_CANDIDATE],
+            what_changed: reviewed ? [{ ...COMMITMENT_CANDIDATE, state: 'COMMITTED', owner_id: 'Alex', review_status: 'USER_CONFIRMED' }] : [DECISION],
+            pins: [],
+            next_focus: null,
+            review_required: reviewed ? 0 : 1,
+          }
+        }
+        if (pathname === `/api/product/conversation/items/${COMMITMENT_CANDIDATE.id}/review` && method === 'POST') {
+          reviewBody = request.postDataJSON()
+          reviewed = true
+          return { ...COMMITMENT_CANDIDATE, state: 'COMMITTED', owner_id: reviewBody.patch.owner_id, review_status: 'USER_CONFIRMED' }
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByText('补 rollout plan')).toBeVisible()
+    const confirm = page.getByRole('button', { name: '确认' }).last()
+    await expect(confirm).toBeDisabled()
+    await expect(page.getByText(/不要把主音频里的“我”自动当成当前用户/)).toBeVisible()
+    await page.getByLabel('确认 Owner').fill('Alex')
+    await expect(confirm).toBeEnabled()
+    await confirm.click()
+    await expect.poll(() => reviewBody?.patch?.owner_id ?? '').toBe('Alex')
+    await expect(page.getByText('没有未确认事项。')).toBeVisible()
+  })
+
 
   test('Decision supersession is explicit, directional, and preserves the old Decision', async ({ context, page }) => {
     const base = mocks()

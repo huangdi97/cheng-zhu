@@ -15,6 +15,7 @@ import type {
   ConversationPrepare,
   ConversationProfile,
   ConversationSession,
+  ConversationSessionContext,
   ConversationTranscriptSegment,
   ConversationSpace,
   ConversationSpaceDetail,
@@ -94,6 +95,7 @@ export const conversationApi = {
     policy?: Partial<ConversationSession['policy']>
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
+  sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>
     request<{ deleted: boolean; session_id: string; provenance_tombstones: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
 

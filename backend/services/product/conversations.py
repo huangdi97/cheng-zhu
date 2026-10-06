@@ -1107,6 +1107,9 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     upgraded into confirmed truth.
     """
     session = require_session(session_id)
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["ai_assistance"] == "AI_FORBIDDEN":
+        raise ValueError("本场 AI Assistance 已禁用；Manual Ask 不可用")
     question = str(question or "").strip()
     if not question:
         raise ValueError("问题不能为空")

@@ -74,6 +74,32 @@ def test_active_conversation_goals_default_into_new_session_and_old_pack_stays_f
     assert reopened["resolved_at"] is None
 
 
+
+
+def test_manual_scheduling_drives_next_session_without_calendar_connector(product_env, monkeypatch):
+    clock = [2_000_000_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+    space = conversations.create_space("Manual Schedule", "PROJECT_SYNC")
+    scheduled = conversations.create_session(
+        space["id"],
+        title="Tomorrow sync",
+        scheduled_at=clock[0] + 3600,
+        consent_ack=True,
+    )
+
+    summaries = conversations.list_space_summaries("")
+    row = next(x for x in summaries if x["id"] == space["id"])
+    assert row["next_session"]["id"] == scheduled["id"]
+    assert row["next_session"]["title"] == "Tomorrow sync"
+
+    check = conversations.preflight(scheduled["id"])
+    schedule_item = next(x for x in check["items"] if x["key"] == "schedule")
+    assert schedule_item["value"] == clock[0] + 3600
+    started = conversations.start_session(scheduled["id"])
+    assert started["pack"]["payload"]["session_brief"]["title"] == "Tomorrow sync"
+    assert started["pack"]["payload"]["session_brief"]["scheduled_at"] == clock[0] + 3600
+
+
 def test_space_prepare_session_pack_continue_real_loop(product_env):
     space = conversations.create_space(
         "PDIG · Android Architecture",

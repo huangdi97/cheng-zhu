@@ -86,6 +86,7 @@ HUMAN_ASSISTANCE_POLICIES = {"HUMAN_FORBIDDEN", "HUMAN_PRACTICE_ONLY", "HUMAN_AL
 SCREEN_CONTEXT_POLICIES = {"OFF", "MANUAL", "AUTO"}
 SHARE_PRIVACY_POLICIES = {"OFF", "PRIVATE_OVERLAY"}
 EXTERNAL_WRITEBACK_POLICIES = {"OFF", "REVIEW_REQUIRED"}
+PARTICIPANT_CONSENT_STATUSES = {"NOT_RECORDED", "USER_REPORTS_ALLOWED", "USER_REPORTS_CONSENTED", "NOT_APPLICABLE"}
 DEFAULT_SESSION_POLICY: dict[str, Any] = {
     "transcript_retention": "SPACE_POLICY",
     "screen_context": "OFF",
@@ -93,6 +94,7 @@ DEFAULT_SESSION_POLICY: dict[str, Any] = {
     "human_assistance": "HUMAN_PRACTICE_ONLY",
     "share_privacy": "OFF",
     "external_writeback": "REVIEW_REQUIRED",
+    "participant_consent_status": "NOT_RECORDED",
     "connector_permissions": [],
     "speaker_biometric_identity": "OFF",
     "emotion_sentiment_profiling": "OFF",
@@ -107,6 +109,11 @@ def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict
     source["human_assistance"] = _require_choice(str(source.get("human_assistance") or "HUMAN_PRACTICE_ONLY"), HUMAN_ASSISTANCE_POLICIES, "Human Assistance")
     source["share_privacy"] = _require_choice(str(source.get("share_privacy") or "OFF"), SHARE_PRIVACY_POLICIES, "Share Privacy")
     source["external_writeback"] = _require_choice(str(source.get("external_writeback") or "REVIEW_REQUIRED"), EXTERNAL_WRITEBACK_POLICIES, "外部写回")
+    source["participant_consent_status"] = _require_choice(
+        str(source.get("participant_consent_status") or "NOT_RECORDED"),
+        PARTICIPANT_CONSENT_STATUSES,
+        "参与者同意状态",
+    )
     source["transcript_retention"] = str(source.get("transcript_retention") or "SPACE_POLICY")[:80]
     source["connector_permissions"] = [str(x)[:160] for x in (source.get("connector_permissions") or [])][:50]
     # These three policy guarantees are deliberately not user-relaxable in v2.
@@ -132,9 +139,14 @@ def _counterparty_state(
         "decision_authority": str(decision_authority or "")[:500],
         "relationship_context": str(relationship_context or "")[:800],
     }
+    known = {k: v for k, v in explicit.items() if v}
+    refs = list(source_refs or [])[:20]
+    if known and not refs:
+        refs = [{"kind": "USER_INPUT", "excerpt": "用户明确录入的 Counterparty State"}]
     return {
-        "known_explicit": {k: v for k, v in explicit.items() if v},
-        "source_refs": list(source_refs or [])[:20],
+        "known_explicit": known,
+        "source_refs": refs,
+        "confidence": 1.0 if known else 0.0,
         "temporary_inferences": [],
         "unknown": [],
     }
@@ -457,6 +469,7 @@ def preflight(session_id: str) -> dict[str, Any]:
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": len(space.get("selected_source_ids") or []), "ok": True},
         {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": True},
+        {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": True},
         {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": True},
         {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": True},
         {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": True},
@@ -469,7 +482,23 @@ def preflight(session_id: str) -> dict[str, Any]:
         "items": items,
         "blockers": blockers,
         "policy": policy,
-        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；成竹不会把点击开始当作其他参与者的同意，也不会自动共享、自动发送或自动写入外部系统。",
+        "pack_preview": {
+            "goal_ids": list(session.get("goal_ids") or []),
+            "selected_source_ids": list(space.get("selected_source_ids") or []),
+            "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "participants_count": int(store.scalar(
+                "SELECT COUNT(*) FROM conversation_participant WHERE space_id = ?",
+                (space["id"],),
+            ) or 0),
+            "confirmed_items_count": len(_confirmed_context_items(space["id"])),
+            "policy": {
+                **policy,
+                "capture_mode": session["capture_mode"],
+                "processing_mode": session["processing_mode"],
+                "assistance_mode": session["assistance_mode"],
+            },
+        },
+        "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；参与者同意状态仅来自用户报告，成竹不会自行验证或推断；也不会自动共享、自动发送或自动写入外部系统。",
     }
 
 
@@ -646,6 +675,8 @@ def add_item(
     review_status = _require_choice(review_status, REVIEW_STATUSES, "审核状态")
     epistemic_status = _require_choice(epistemic_status, EPISTEMIC_STATUSES, "认知状态")
     refs = list(source_refs or [])
+    if item_type == "Deadline" and not refs:
+        raise ValueError("Deadline 必须带来源")
     if state == "AGREED" and not (refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
         raise ValueError("Decision 升级为 AGREED 需要来源与明确确认")
     if state == "COMMITTED" and not (owner_id and refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
@@ -1008,14 +1039,36 @@ def space_detail(space_id: str) -> dict[str, Any]:
     participants = store.select("conversation_participant", where="space_id = ?", params=(space_id,), order="created_at ASC")
     items = store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at DESC", limit=200)
     threads = store.select("conversation_open_thread", where="space_id = ? AND status = 'OPEN'", params=(space_id,), order="created_at DESC")
+    decisions = [i for i in items if i["type"] == "Decision"]
+    commitments = [i for i in items if i["type"] in {"Commitment", "Task"}]
+    open_questions = [i for i in items if i["type"] == "OpenQuestion"]
+    objections = [i for i in items if i["type"] == "Objection"]
+    upcoming = [s for s in sessions if s["status"] == "UPCOMING"]
+    upcoming.sort(key=lambda s: s.get("scheduled_at") or float("inf"))
+    ended = [s for s in sessions if s["status"] == "ENDED"]
+    ended.sort(key=lambda s: s.get("ended_at") or 0, reverse=True)
+    last_delta = None
+    if ended:
+        last = continue_summary(ended[0]["id"])
+        last_delta = {
+            "session_id": ended[0]["id"],
+            "title": ended[0]["title"],
+            "what_changed": last["what_changed"],
+            "pins": last["pins"],
+            "review_required": last["review_required"],
+        }
     return {
         **space,
         "goals": goals,
         "sessions": sessions,
         "participants": participants,
-        "decisions": [i for i in items if i["type"] == "Decision"],
-        "commitments": [i for i in items if i["type"] in {"Commitment", "Task"}],
-        "open_questions": [i for i in items if i["type"] == "OpenQuestion"],
+        "decisions": decisions,
+        "commitments": commitments,
+        "open_questions": open_questions,
+        "objections": objections,
+        "next_session": upcoming[0] if upcoming else None,
+        "recent_decisions": [i for i in decisions if i["state"] == "AGREED"][:5],
+        "last_session_delta": last_delta,
         "threads": threads,
     }
 

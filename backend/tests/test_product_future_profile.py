@@ -1,40 +1,60 @@
 from services.product.future_profile import (
+    AssistanceMode,
+    CONVERSATION_CONTRACT_VERSION,
+    ConversationItem,
     ConversationItemState,
     ConversationItemType,
     ConversationProfileKind,
+    EpistemicStatus,
+    ExpressionAction,
     GuidanceKind,
+    OpportunityScore,
     PROFILES,
+    ReviewStatus,
+    SourceKind,
+    SourceRef,
+    can_promote_item,
     interview_goal_as_conversation_goal,
     profile,
 )
 
 
-def test_future_conversation_profile_contract_is_complete_but_not_productized():
+def test_v2_conversation_profile_contract_is_complete_but_not_falsely_productized():
     expected = {
         ConversationProfileKind.INTERVIEW,
-        ConversationProfileKind.MEETING,
+        ConversationProfileKind.PROJECT_SYNC,
+        ConversationProfileKind.DESIGN_REVIEW,
         ConversationProfileKind.PRESENTATION_QA,
         ConversationProfileKind.ONE_ON_ONE,
-        ConversationProfileKind.DESIGN_REVIEW,
         ConversationProfileKind.CLIENT_CALL,
         ConversationProfileKind.NEGOTIATION,
+        ConversationProfileKind.MEETING,
     }
+    assert CONVERSATION_CONTRACT_VERSION == "v2.0-R1"
     assert {item.key for item in PROFILES} == expected
     assert [item.key for item in PROFILES if item.productized] == [ConversationProfileKind.INTERVIEW]
+    assert all(item.design_complete for item in PROFILES)
 
-    interview = profile(ConversationProfileKind.INTERVIEW)
-    assert GuidanceKind.ANSWER_CUE in interview.guidance_kinds
-    assert GuidanceKind.RISK in interview.guidance_kinds
-
-    for kind in expected - {ConversationProfileKind.INTERVIEW}:
-        future = profile(kind)
-        assert future.productized is False
-        # The future contract preserves the full seven-kind design without
-        # creating Meeting routes/tables/UI in v1.x.
-        assert set(future.guidance_kinds) == set(GuidanceKind)
+    assert profile(ConversationProfileKind.PROJECT_SYNC).default_mode is AssistanceMode.BALANCED
+    assert profile(ConversationProfileKind.PRESENTATION_QA).default_mode is AssistanceMode.PRESENTATION
+    assert profile(ConversationProfileKind.ONE_ON_ONE).default_mode is AssistanceMode.ONE_ON_ONE
 
 
-def test_future_conversation_fact_taxonomy_preserves_state_semantics():
+def test_guidance_and_expression_support_silence_and_opportunity():
+    assert set(GuidanceKind) == {
+        GuidanceKind.RECALL,
+        GuidanceKind.TALKING_POINT,
+        GuidanceKind.ANSWER_CUE,
+        GuidanceKind.QUESTION,
+        GuidanceKind.RISK,
+        GuidanceKind.DELIVERY,
+        GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+    }
+    assert ExpressionAction.SILENT in set(ExpressionAction)
+    assert ExpressionAction.COMMIT_NEXT_STEP in set(ExpressionAction)
+
+
+def test_conversation_fact_taxonomy_preserves_state_semantics():
     assert {item.value for item in ConversationItemType} == {
         "Decision",
         "Commitment",
@@ -58,7 +78,62 @@ def test_future_conversation_fact_taxonomy_preserves_state_semantics():
     }
 
 
-def test_interview_goal_maps_into_general_conversation_contract():
+def test_decision_cannot_be_promoted_to_agreed_from_model_extraction_alone():
+    source = SourceRef(id="s1", kind=SourceKind.TRANSCRIPT_SEGMENT, excerpt="Let's use v2")
+    item = ConversationItem(
+        id="i1",
+        item_type=ConversationItemType.DECISION,
+        state=ConversationItemState.PROPOSED,
+        title="Use v2",
+        source_refs=[source],
+        epistemic_status=EpistemicStatus.OBSERVED,
+        review_status=ReviewStatus.AI_EXTRACTED,
+    )
+    assert can_promote_item(item, ConversationItemState.AGREED) is False
+
+    item.review_status = ReviewStatus.USER_CONFIRMED
+    assert can_promote_item(item, ConversationItemState.AGREED) is True
+
+
+def test_commitment_requires_owner_source_and_confirmation():
+    source = SourceRef(id="s1", kind=SourceKind.TRANSCRIPT_SEGMENT, excerpt="I will send it Friday")
+    item = ConversationItem(
+        id="c1",
+        item_type=ConversationItemType.COMMITMENT,
+        state=ConversationItemState.PROPOSED,
+        title="Send benchmark",
+        source_refs=[source],
+        review_status=ReviewStatus.USER_CONFIRMED,
+    )
+    assert can_promote_item(item, ConversationItemState.COMMITTED) is False
+    item.owner_id = "me"
+    assert can_promote_item(item, ConversationItemState.COMMITTED) is True
+
+
+def test_opportunity_score_penalizes_interruption_uncertainty_and_staleness():
+    strong = OpportunityScore(
+        relevance=1,
+        novelty=1,
+        provenance_strength=1,
+        role_relevance=1,
+        goal_relevance=1,
+        decision_impact=1,
+    )
+    risky = OpportunityScore(
+        relevance=1,
+        novelty=1,
+        provenance_strength=1,
+        role_relevance=1,
+        goal_relevance=1,
+        decision_impact=1,
+        interruption_cost=1,
+        uncertainty=1,
+        stale_context_risk=1,
+    )
+    assert strong.value > risky.value
+
+
+def test_interview_goal_still_maps_into_general_contract():
     mapped = interview_goal_as_conversation_goal(
         {
             "id": "g-1",

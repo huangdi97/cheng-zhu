@@ -378,6 +378,7 @@ export interface ConversationSessionContext {
   space: { id: string; profile?: ConversationProfile; title?: string }
   brief: {
     goal?: string
+    goals?: Array<{ id: string; title: string; outcome_definition: string; priority: number }>
     agenda?: string[]
     expected_questions?: string[]
     unresolved_count?: number

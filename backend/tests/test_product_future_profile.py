@@ -34,6 +34,13 @@ def test_v2_conversation_profile_contract_is_complete_but_not_falsely_productize
     assert {item.key for item in PROFILES} == expected
     assert [item.key for item in PROFILES if item.productized] == [ConversationProfileKind.INTERVIEW]
     assert all(item.design_complete for item in PROFILES)
+    assert all(item.runtime_available for item in PROFILES)
+    assert {item.key for item in PROFILES if item.launch_wedge} == {
+        ConversationProfileKind.PROJECT_SYNC,
+        ConversationProfileKind.DESIGN_REVIEW,
+    }
+    assert profile(ConversationProfileKind.INTERVIEW).specialized_behavior_validated is True
+    assert profile(ConversationProfileKind.PROJECT_SYNC).specialized_behavior_validated is False
 
     assert profile(ConversationProfileKind.PROJECT_SYNC).default_mode is AssistanceMode.BALANCED
     assert profile(ConversationProfileKind.PRESENTATION_QA).default_mode is AssistanceMode.PRESENTATION

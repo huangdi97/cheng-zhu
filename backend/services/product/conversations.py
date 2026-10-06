@@ -1904,6 +1904,61 @@ def followup_draft(session_id: str) -> dict[str, Any]:
     )
 
 
+def derived_writeback_draft(session_id: str, kind: str) -> dict[str, Any]:
+    """Build a local review-only action draft from structured Continue state.
+
+    This does not execute a connector.  It preserves each source reference and,
+    for Open Questions, visibly carries review status so an AI-extracted
+    question cannot masquerade as a confirmed organizational fact.
+    """
+    summary = continue_summary(session_id)
+    requested = str(kind or "").upper()
+    if requested == "CREATE_TASK_DRAFT":
+        items = list(summary["commitments"])
+        label = "Task Draft"
+        lines = [
+            f"- {item['title']}"
+            + (f" · owner={item.get('owner_id')}" if item.get("owner_id") else "")
+            + (f" · due={item.get('due_at')}" if item.get("due_at") else "")
+            for item in items
+        ]
+    elif requested == "CREATE_ISSUE_DRAFT":
+        items = list(summary["open_questions"])
+        label = "Issue Draft"
+        lines = [
+            f"- {item['title']} · review={item.get('review_status') or 'UNKNOWN'}"
+            for item in items
+        ]
+    elif requested == "UPDATE_DECISION_LOG_DRAFT":
+        items = list(summary["decisions"])
+        label = "Decision Log Draft"
+        lines = [
+            f"- {item['title']} · state={item.get('state') or 'UNKNOWN'}"
+            for item in items
+        ]
+    else:
+        raise ValueError("只支持 CREATE_TASK_DRAFT / CREATE_ISSUE_DRAFT / UPDATE_DECISION_LOG_DRAFT")
+
+    if not items:
+        raise ValueError(f"当前没有可生成 {label} 的结构化事项")
+
+    sources: list[dict[str, Any]] = []
+    for item in items:
+        sources.extend(item.get("source_refs") or [])
+    return create_draft_action(
+        session_id,
+        kind=requested,
+        title=f"{summary['session']['title']} · {label}",
+        content="\n".join(lines),
+        source_refs=sources,
+        payload={
+            "derived_item_ids": [item["id"] for item in items],
+            "execution": "LOCAL_REVIEW_ONLY",
+            "external_execution": False,
+        },
+    )
+
+
 def synthetic_demo() -> dict[str, Any]:
     """Deterministic onboarding dry run; never persisted and never real evidence."""
     return {

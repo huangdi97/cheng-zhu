@@ -440,6 +440,31 @@ def create_goal(space_id: str, title: str, outcome_definition: str = "", priorit
     return store.get("conversation_goal", row["id"]) or row
 
 
+def update_goal(goal_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    goal = store.get("conversation_goal", goal_id)
+    if not goal:
+        raise ValueError("Conversation Goal 不存在")
+    clean: dict[str, Any] = {}
+    if "title" in patch:
+        title = str(patch.get("title") or "").strip()
+        if not title:
+            raise ValueError("对话目标不能为空")
+        clean["title"] = title[:240]
+    if "outcome_definition" in patch:
+        clean["outcome_definition"] = str(patch.get("outcome_definition") or "")[:2000]
+    if "priority" in patch:
+        clean["priority"] = max(0, min(100, int(patch.get("priority") or 0)))
+    if "status" in patch:
+        status = str(patch.get("status") or "").upper()
+        if status not in {"ACTIVE", "RESOLVED"}:
+            raise ValueError("Conversation Goal 状态只支持 ACTIVE / RESOLVED")
+        clean["status"] = status
+        clean["resolved_at"] = store.now() if status == "RESOLVED" else None
+    if clean:
+        store.update("conversation_goal", goal_id, clean)
+    return store.get("conversation_goal", goal_id) or goal
+
+
 def add_participant(
     space_id: str,
     *,
@@ -502,10 +527,32 @@ def create_session(
     processing = _require_choice(processing_mode, PROCESSING_MODES, "处理方式")
     mode = _require_choice(assistance_mode or space["default_mode"], ASSISTANCE_MODES, "帮助方式")
     ts = store.now()
+    resolved_goal_ids = list(goal_ids or [])
+    if not resolved_goal_ids:
+        resolved_goal_ids = [
+            goal["id"] for goal in store.select(
+                "conversation_goal",
+                where="space_id = ? AND status = 'ACTIVE'",
+                params=(space_id,),
+                order="priority DESC, created_at ASC",
+            )
+        ]
+    else:
+        valid_ids = {
+            goal["id"] for goal in store.select(
+                "conversation_goal",
+                where="space_id = ?",
+                params=(space_id,),
+                order="created_at ASC",
+            )
+        }
+        unknown = [goal_id for goal_id in resolved_goal_ids if goal_id not in valid_ids]
+        if unknown:
+            raise ValueError("Session Goal 必须属于当前 Conversation Space")
     row = {
         "id": store.new_id("cv_"),
         "space_id": space_id,
-        "goal_ids": list(goal_ids or []),
+        "goal_ids": resolved_goal_ids,
         "template": space["profile"],
         "title": (str(title or "").strip() or space["title"])[:200],
         "scheduled_at": scheduled_at,
@@ -767,6 +814,21 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "participants": participants,
         "session_brief": {
             "goal": space.get("default_goal") or "",
+            "goals": [
+                {
+                    "id": goal["id"],
+                    "title": goal["title"],
+                    "outcome_definition": goal.get("outcome_definition") or "",
+                    "priority": goal.get("priority") or 0,
+                }
+                for goal in store.select(
+                    "conversation_goal",
+                    where="space_id = ?",
+                    params=(space["id"],),
+                    order="priority DESC, created_at ASC",
+                )
+                if goal["id"] in set(session.get("goal_ids") or [])
+            ],
             "agenda": list(prepared.get("agenda") or []),
             "expected_questions": list(prepared.get("expected_questions") or []),
             "unresolved_count": int((prepared.get("brief") or {}).get("unresolved_count") or 0),

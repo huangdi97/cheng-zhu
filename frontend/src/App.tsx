@@ -197,6 +197,14 @@ export default function App() {
     navigate(paths.home())
   }, [])
 
+  const startConversation = useCallback(() => {
+    if (route.name === 'conversation' && route.params.spaceId) {
+      navigate(paths.conversationSpace(route.params.spaceId, 'prepare'))
+      return
+    }
+    navigate(paths.conversationSpaces(undefined, { new: '1' }))
+  }, [route.name, route.params])
+
   useEffect(() => {
     document.documentElement.lang = uiLanguage
   }, [uiLanguage])
@@ -440,6 +448,12 @@ export default function App() {
             <button type="button" onClick={() => openGoLive()} data-testid="go-live"
               className="btn-primary inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold min-h-[32px]">
               <Radio className="h-3.5 w-3.5" aria-hidden /> {t('action.goLive')}
+            </button>
+          ) : null}
+          {!inConversationLive && productProfile === 'conversation' ? (
+            <button type="button" onClick={startConversation} data-testid="start-conversation"
+              className="btn-primary inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold min-h-[32px]">
+              <Radio className="h-3.5 w-3.5" aria-hidden /> 开始
             </button>
           ) : null}
           {window.electronAPI && (

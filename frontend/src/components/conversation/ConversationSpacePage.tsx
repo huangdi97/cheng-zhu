@@ -346,22 +346,33 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <div className="mt-4 flex gap-2"><PrimaryButton disabled={sessionBusy} onClick={makePreflight} icon={<ShieldCheck className="h-3.5 w-3.5" />}>{sessionBusy ? '检查中…' : '生成本场并检查'}</PrimaryButton>{preflight && !preflight.blockers.length ? <PrimaryButton disabled={sessionBusy} onClick={start}>开始会话</PrimaryButton> : null}</div>
             {sessionError ? <div className="mt-3"><ErrorState message={sessionError} /></div> : null}
             {preflight ? <div className="mt-4 rounded-2xl border border-bg-tertiary p-3">
-              <div className="space-y-1">{preflight.items.map((x) => <div key={x.key} className="flex items-center justify-between text-xs"><span className="text-text-muted">{x.label}</span><span className="text-text-primary">{String(x.value)}</span></div>)}</div>
+              <div className="space-y-1">{preflight.items.map((x) => <div key={x.key} className="flex items-center justify-between gap-3 text-xs"><span className="text-text-muted">{x.label}</span><span className={x.ok ? 'text-status-direct' : 'text-status-risk'}>{x.ok ? '✓ ' : '! '}{String(x.value)}</span></div>)}</div>
               <div className="mt-3 rounded-xl bg-bg-secondary/35 p-3 text-[11px] text-text-muted">
                 Runtime data path · STT {preflight.processing_runtime.configured_stt_provider} · {preflight.processing_runtime.main_audio_remote_possible ? 'remote path possible' : 'local-only path'}
               </div>
               {preflight.blockers.map((x) => <div key={x.key} className="mt-2 text-xs text-status-risk">{x.message}</div>)}
+              {preflight.warnings.map((x, index) => <div key={`${x.key}:${index}`} className="mt-2 text-xs text-status-inferred">提醒 · {x.message}</div>)}
               <div className="mt-3 rounded-xl bg-bg-secondary/40 p-3">
                 <div className="text-xs font-semibold text-text-secondary">Session Pack Preview</div>
                 <div className="mt-2 grid gap-1 text-[11px] text-text-muted sm:grid-cols-2">
                   <span>Goals {preflight.pack_preview.goal_ids.length}</span>
-                  <span>Sources {preflight.pack_preview.selected_source_ids.length}</span>
-                  <span>Quick Notes {preflight.pack_preview.selected_quick_note_ids.length}</span>
+                  <span>Ready Sources {preflight.pack_preview.sources.length}/{preflight.pack_preview.selected_source_ids.length}</span>
+                  <span>Quick Notes {preflight.pack_preview.quick_notes.length}/{preflight.pack_preview.selected_quick_note_ids.length}</span>
                   <span>Participants {preflight.pack_preview.participants_count}</span>
                   <span>Confirmed items {preflight.pack_preview.confirmed_items_count}</span>
                   <span>Expression {Object.keys(preflight.pack_preview.expression_profile ?? {}).length ? '已冻结' : '默认'}</span>
                   <span>AI {preflight.pack_preview.policy.ai_assistance}</span>
+                  <span>STT {preflight.pack_preview.processing_runtime.configured_stt_provider}</span>
                 </div>
+                {preflight.pack_preview.sources.length ? <div className="mt-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen sources</div>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.sources.map((source) => <div key={source.version_id || source.material_id} className="flex flex-wrap items-center gap-1 text-[11px] text-text-secondary"><span>• {source.title}</span><span className="text-text-muted">{source.kind} · {source.usage} · v {source.version_id.slice(0, 8)} · {source.is_personal_evidence ? 'personal evidence' : 'reference'}</span></div>)}</div>
+                </div> : null}
+                {preflight.pack_preview.quick_notes.length ? <div className="mt-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen Quick Notes · 非证据</div>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.quick_notes.map((note) => <div key={note.id} className="text-[11px] text-text-secondary">• {note.title || note.id}</div>)}</div>
+                </div> : null}
+                {preflight.pack_preview.skipped_sources.length ? <div className="mt-3 text-[11px] text-status-inferred">Skipped Sources · {preflight.pack_preview.skipped_sources.map((x) => x.title || x.id).join(' · ')}</div> : null}
                 <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、我的表达与 policy 会被冻结进 Session Pack；后续资料或表达偏好变化不会静默改写本场。</p>
               </div>
               <p className="mt-3 text-[11px] text-text-muted">{preflight.privacy_note}</p>

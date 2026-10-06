@@ -509,14 +509,16 @@ PDIG · Android Architecture
 第一视觉层只允许当前最高价值 Guidance：
 
 ```text
-Current Topic
+Listening / Capture
 ↓
 One Guidance
 ↓
 Source / Confidence / Warning
 ```
 
-其余 transcript、notes、history、references 后置。
+真实 TRANSCRIPT 正常路径自动驱动 Direct Question / Recall / Opportunity。用户不应为了让系统工作而手工填写 candidate / score；这类输入只作为折叠的高级 dogfood / manual validation surface。
+
+其余 transcript、Session Pulse、notes、history、references 后置。
 
 ## After — Continue
 
@@ -699,6 +701,27 @@ SOURCE_CONFIRMED
 - Deadline 必须带来源；
 - 冲突的新 Decision 通过 SUPERSEDED 连接旧 Decision，不直接删除；
 - item 的 owner、speaker、due、state 均可独立不确定。
+
+当前 Beta 的 transcript candidate extraction 使用本地 deterministic explicit-language rules，只识别明显的 Decision / Commitment / Deadline / Risk / OpenQuestion 表达：
+
+```text
+final transcript
+→ deterministic candidate extraction
+→ PROPOSED + AI_EXTRACTED + INFERRED
+→ Continue review queue
+→ explicit review
+→ confirmed longitudinal truth
+```
+
+硬边界：
+
+- extractor 不得直接生成 AGREED / COMMITTED；
+- PRIMARY_AUDIO 中的“我”不能自动映射 owner/speaker；
+- 只有 SELF_MIC 的明确第一人称 commitment candidate 才可暂记 `owner=me`，仍需 review；
+- AI_FORBIDDEN / AI_LIMITED 不自动运行 extraction；
+- source 必须指回原 transcript segment；
+- 重跑 extraction 必须幂等去重；
+- 未来即使换成模型 extraction，也不得改变上述 authority boundary。
 
 ---
 

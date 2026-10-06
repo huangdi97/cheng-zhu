@@ -194,3 +194,56 @@ def test_topic_recall_and_live_mode_update(product_env):
     assert updated["assistance_mode"] == "QUIET"
     quiet = conversations.evaluate_guidance(s2["id"], {"current_topic": "offline migration"})
     assert quiet["guidance"] is None
+
+
+@pytest.mark.parametrize("profile", [
+    "PROJECT_SYNC", "DESIGN_REVIEW", "PRESENTATION_QA",
+    "ONE_ON_ONE", "CLIENT_CALL", "NEGOTIATION",
+])
+def test_all_profile_templates_share_one_runtime_without_cross_space_leak(product_env, profile):
+    space = conversations.create_space(f"{profile} Space", profile)
+    first = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(first["id"])
+    item = conversations.add_item(
+        first["id"], item_type="OpenQuestion", title=f"{profile} unresolved",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": profile}],
+        epistemic_status="OBSERVED",
+    )
+    assert item["space_id"] == space["id"]
+    conversations.end_session(first["id"])
+
+    second = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(second["id"])
+    result = conversations.evaluate_guidance(second["id"], {})
+    # Quiet negotiation may stay silent; all other profiles can surface the
+    # unresolved question through the same shared runtime.
+    if conversations.require_space(space["id"])["default_mode"] == "QUIET":
+        assert result["guidance"] is None
+    else:
+        assert result["guidance"]["kind"] == "QUESTION"
+
+    detail = conversations.space_detail(space["id"])
+    assert all(row["space_id"] == space["id"] for row in detail["open_questions"])
+
+
+def test_thirty_session_continuity_stays_bounded_and_traceable(product_env):
+    space = conversations.create_space("Long-running project", "PROJECT_SYNC")
+    for index in range(30):
+        session = conversations.create_session(space["id"], title=f"Sync {index}", consent_ack=True)
+        conversations.start_session(session["id"])
+        if index % 5 == 0:
+            item = conversations.add_item(
+                session["id"], item_type="Decision", title=f"Decision {index}",
+                source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "excerpt": f"decide {index}"}],
+                epistemic_status="OBSERVED",
+            )
+            conversations.review_item(item["id"], "CONFIRM")
+        conversations.end_session(session["id"])
+
+    detail = conversations.space_detail(space["id"])
+    assert len(detail["sessions"]) == 30
+    assert len([x for x in detail["decisions"] if x["state"] == "AGREED"]) == 6
+    latest = conversations.create_session(space["id"], title="Sync 30", consent_ack=True)
+    pack = conversations.start_session(latest["id"])["pack"]
+    assert len(pack["payload"]["confirmed_items"]) == 6
+    assert all(row["source_refs"] for row in pack["payload"]["confirmed_items"])

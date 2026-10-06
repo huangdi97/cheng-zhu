@@ -489,7 +489,7 @@ def test_interview_start_refuses_to_preempt_active_conversation_capture(product_
 
 
 def test_conversation_router_lifecycle_exit_stops_owned_capture(product_env, monkeypatch):
-    from api.product import conversations_router
+    from api.product.conversations_router import _stop_capture_for_session, _stop_capture_for_space
 
     space = conversations.create_space("Lifecycle", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
@@ -507,11 +507,11 @@ def test_conversation_router_lifecycle_exit_stops_owned_capture(product_env, mon
     )
     monkeypatch.setattr(conversation_capture, "stop", lambda session_id: stopped.append(session_id) or {"active": False})
 
-    conversations_router._stop_capture_for_session(session["id"])
+    _stop_capture_for_session(session["id"])
     assert stopped == [session["id"]]
 
     stopped.clear()
-    conversations_router._stop_capture_for_space(space["id"])
+    _stop_capture_for_space(space["id"])
     assert stopped == [session["id"]]
 
 def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_env):
@@ -625,7 +625,10 @@ def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(p
     })
     conversations.evaluate_guidance(session["id"], {"user_speaking": True})
     draft = conversations.create_draft_action(session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="draft")
-    clock[0] += 10
+    # MINIMUM intentionally keeps guidance/drafts for 7 days while
+    # transcript_days=0. Advance beyond the longest configured window so this
+    # test validates all three destructive categories against the real contract.
+    clock[0] += 8 * 24 * 60 * 60
 
     preview = conversations.retention_preview(space["id"])
     assert preview["would_delete"]["transcript_segments"] == 1

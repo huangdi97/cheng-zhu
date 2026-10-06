@@ -114,10 +114,12 @@ Conversation Home
 - Profile-aware Conversation Home / Spaces / History；
 - Project Sync / Design Review 等共享模板；
 - source-aware Manual Ask 与 cross-session Recall；
-- Conversation Item truth/review model；
+- Conversation Goal lifecycle（active / resolved / reopen）与 frozen session membership；
+- Conversation Item truth/review model、atomic Decision supersession 与 reviewed longitudinal Open Threads；
 - Contribution Opportunity + Guidance Arbiter + SILENT；
-- explicit Counterparty State；
-- Session Pack 冻结来源、Quick Notes、confirmed items、participants、我的表达、policy 与 resolved processing data path；
+- explicit Counterparty State 与 stakeholder-aware expression；
+- Participant consent status + transparency plan（均为用户报告，不声称系统自动通知）；
+- Session Pack 冻结来源、Quick Notes、confirmed items、Goals、participants、我的表达、policy 与 resolved processing data path；
 - Conversation-owned TRANSCRIPT capture；
 - retention / export / deletion provenance；
 - reviewed local DraftActions。

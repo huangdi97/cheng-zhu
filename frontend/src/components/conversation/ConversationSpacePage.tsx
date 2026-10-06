@@ -6,18 +6,38 @@ import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDra
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
-function ItemRow({ item, onChanged }: { item: ConversationItem; onChanged: () => void }) {
+function ItemRow({ item, onChanged, supersedeOptions = [] }: { item: ConversationItem; onChanged: () => void; supersedeOptions?: ConversationItem[] }) {
   const [busy, setBusy] = useState(false)
-  const review = async (action: 'CONFIRM' | 'REJECT' | 'DONE' | 'RESOLVE') => {
-    setBusy(true)
-    try { await conversationApi.reviewItem(item.id, action, item.owner_id ? {} : { owner_id: 'me' }); onChanged() } finally { setBusy(false) }
+  const [supersedesId, setSupersedesId] = useState('')
+  const [rowError, setRowError] = useState('')
+  const review = async (action: 'CONFIRM' | 'REJECT' | 'DONE' | 'RESOLVE' | 'SUPERSEDE') => {
+    setBusy(true); setRowError('')
+    try {
+      let patch: Record<string, unknown> = {}
+      if (action === 'SUPERSEDE') patch = { supersedes_id: supersedesId }
+      else if (action === 'CONFIRM' && ['Commitment', 'Task'].includes(item.type) && !item.owner_id) patch = { owner_id: 'me' }
+      await conversationApi.reviewItem(item.id, action, patch)
+      onChanged()
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : String(e))
+    } finally { setBusy(false) }
   }
   const tone = item.state === 'AGREED' || item.state === 'COMMITTED' || item.state === 'DONE' ? 'ok' : item.review_status === 'AI_EXTRACTED' ? 'warn' : 'muted'
   return (
     <div className="rounded-xl border border-bg-tertiary/70 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-text-primary">{item.title}</span><StatusBadge tone={tone}>{item.state}</StatusBadge>{item.review_status === 'AI_EXTRACTED' ? <StatusBadge tone="warn">待确认</StatusBadge> : null}</div>
-      <div className="mt-1 text-[11px] text-text-muted">来源 {item.source_refs.length ? item.source_refs.map((s) => s.kind).join(' · ') : '未附来源'}{item.speaker_id ? ` · speaker ${item.speaker_id}` : ''}{item.owner_id ? ` · owner ${item.owner_id}` : ''}{item.due_at ? ` · due ${item.due_at}` : ''}{item.supersedes_id ? ` · supersession → ${item.supersedes_id}` : ''}</div>
-      {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex gap-2"><SecondaryButton disabled={busy} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : ['OpenQuestion', 'Risk', 'Objection'].includes(item.type) && !['DONE', 'SUPERSEDED', 'UNKNOWN'].includes(item.state) ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('RESOLVE')}>标记已解决</SecondaryButton></div> : null}
+      <div className="mt-1 text-[11px] text-text-muted">来源 {item.source_refs.length ? item.source_refs.map((s) => s.kind).join(' · ') : '未附来源'}{item.speaker_id ? ` · speaker ${item.speaker_id}` : ''}{item.owner_id ? ` · owner ${item.owner_id}` : ''}{item.due_at ? ` · due ${item.due_at}` : ''}{item.supersedes_id ? ` · supersedes ${item.supersedes_id}` : ''}</div>
+      {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex flex-wrap gap-2"><SecondaryButton disabled={busy} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : ['OpenQuestion', 'Risk', 'Objection'].includes(item.type) && !['DONE', 'SUPERSEDED', 'UNKNOWN'].includes(item.state) ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('RESOLVE')}>标记已解决</SecondaryButton></div> : null}
+      {item.type === 'Decision' && item.state === 'PROPOSED' && item.review_status === 'AI_EXTRACTED' && supersedeOptions.length ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-bg-secondary/35 p-2">
+          <select aria-label="要替代的旧 Decision" className={inputCls} value={supersedesId} onChange={(e) => setSupersedesId(e.target.value)}>
+            <option value="">选择旧 Decision（可选）</option>
+            {supersedeOptions.filter((x) => x.id !== item.id && x.state === 'AGREED').map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+          </select>
+          <SecondaryButton disabled={busy || !supersedesId || !item.source_refs.length} onClick={() => review('SUPERSEDE')}>确认并替代旧 Decision</SecondaryButton>
+        </div>
+      ) : null}
+      {rowError ? <div className="mt-2 text-[11px] text-status-risk">{rowError}</div> : null}
     </div>
   )
 }
@@ -434,7 +454,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
         <div className="pt-3">
           <Section title="Decision Timeline / Supersession">
             <p className="mb-3 text-[11px] text-text-muted">按时间保留 Proposed / Agreed / Superseded；冲突的新 Decision 通过 supersession 链保留旧事实，不直接删除。</p>
-            {space.decisions.length ? <div className="space-y-2">{space.decisions.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <EmptyState title="还没有 Decision" body="会中抽取默认只是 Proposed；只有有来源且确认后才会升级为 Agreed。" />}
+            {space.decisions.length ? <div className="space-y-2">{space.decisions.map((x) => <ItemRow key={x.id} item={x} supersedeOptions={space.decisions.filter((d) => d.state === 'AGREED')} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <EmptyState title="还没有 Decision" body="会中抽取默认只是 Proposed；只有有来源且确认后才会升级为 Agreed。" />}
           </Section>
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Related Objections">

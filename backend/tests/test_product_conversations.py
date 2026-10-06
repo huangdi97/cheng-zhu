@@ -407,6 +407,83 @@ def test_processing_off_requires_no_transcript_and_ai_forbidden(product_env):
     assert conversations.preflight(safe["id"])["blockers"] == []
 
 
+
+
+def test_decision_supersession_direction_preserves_old_truth_and_confirms_new(product_env):
+    space = conversations.create_space("Decision Chain", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    refs = [{"kind": "USER_NOTE", "excerpt": "明确方案变化", "visibility": "PRIVATE"}]
+
+    old = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="采用方案 A",
+        source_refs=refs,
+        epistemic_status="OBSERVED",
+    )
+    old = conversations.review_item(old["id"], "CONFIRM")
+    assert old["state"] == "AGREED"
+
+    new = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="采用方案 B",
+        source_refs=refs,
+        epistemic_status="OBSERVED",
+    )
+    replacement = conversations.review_item(
+        new["id"],
+        "SUPERSEDE",
+        {"supersedes_id": old["id"]},
+    )
+    previous = conversations.require_item(old["id"])
+
+    assert replacement["state"] == "AGREED"
+    assert replacement["review_status"] == "USER_CONFIRMED"
+    assert replacement["supersedes_id"] == old["id"]
+    assert previous["state"] == "SUPERSEDED"
+    assert previous["supersedes_id"] == ""
+    assert conversations.require_item(old["id"])["title"] == "采用方案 A"
+
+
+def test_decision_supersession_rejects_cross_space_self_and_unsourced_replacement(product_env):
+    left = conversations.create_space("Left", "DESIGN_REVIEW")
+    right = conversations.create_space("Right", "DESIGN_REVIEW")
+    left_session = conversations.create_session(left["id"], consent_ack=True)
+    right_session = conversations.create_session(right["id"], consent_ack=True)
+    conversations.start_session(left_session["id"])
+    conversations.start_session(right_session["id"])
+
+    old = conversations.add_item(
+        left_session["id"],
+        item_type="Decision",
+        title="Left A",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "A"}],
+    )
+    old = conversations.review_item(old["id"], "CONFIRM")
+
+    cross = conversations.add_item(
+        right_session["id"],
+        item_type="Decision",
+        title="Right B",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "B"}],
+    )
+    with pytest.raises(ValueError, match="同一 Conversation Space"):
+        conversations.review_item(cross["id"], "SUPERSEDE", {"supersedes_id": old["id"]})
+
+    unsourced = conversations.add_item(
+        left_session["id"],
+        item_type="Decision",
+        title="Left B without source",
+    )
+    with pytest.raises(ValueError, match="需要来源"):
+        conversations.review_item(unsourced["id"], "SUPERSEDE", {"supersedes_id": old["id"]})
+
+    with pytest.raises(ValueError, match="不同的旧 Decision"):
+        conversations.review_item(unsourced["id"], "SUPERSEDE", {"supersedes_id": unsourced["id"]})
+
+
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
     space = conversations.create_space("Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

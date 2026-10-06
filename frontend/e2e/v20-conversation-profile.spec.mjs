@@ -108,7 +108,7 @@ function mocks() {
     }
     if (pathname === '/api/product/conversation/history') return {
       items: [{
-        ...SESSION, status: 'ENDED', ended_at: 3,
+        ...SESSION, title: 'Review #1', status: 'ENDED', ended_at: 3,
         space_title: SPACE.title, space_profile: SPACE.profile,
         decisions_count: 1, commitments_count: 0, open_questions_count: 1, review_required: 1,
       }],

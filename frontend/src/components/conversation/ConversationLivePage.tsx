@@ -11,6 +11,7 @@ type DevicePayload = { devices?: AudioDevice[] }
 
 export default function ConversationLivePage({ sessionId }: { sessionId: string }) {
   const session = useAsync(() => conversationApi.session(sessionId), [sessionId])
+  const liveContext = useAsync(() => conversationApi.sessionContext(sessionId), [sessionId])
   const devices = useAsync(async () => (await api.getDevices()) as DevicePayload, [])
   const [topic, setTopic] = useState('')
   const [question, setQuestion] = useState('')
@@ -268,6 +269,32 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         </div>
 
         <aside className="space-y-4">
+          {liveContext.data ? <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/20 p-4" data-testid="conversation-session-pulse">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">Session Pulse</h2>
+                <p className="mt-1 text-[11px] text-text-muted">来自开始时冻结的 Session Pack，不随会中资料替换静默变化。</p>
+              </div>
+              <StatusBadge tone="muted">PACK {liveContext.data.pack_digest ? liveContext.data.pack_digest.slice(0, 8) : '—'}</StatusBadge>
+            </div>
+            {liveContext.data.brief.goal ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Goal</div><p className="mt-1 text-xs text-text-primary">{liveContext.data.brief.goal}</p></div> : null}
+            {(liveContext.data.brief.agenda?.length ?? 0) > 0 ? <div className="mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Agenda</div>
+              <div className="mt-1 space-y-1">{liveContext.data.brief.agenda!.slice(0, 5).map((item, index) => <div key={`${index}:${item}`} className="text-[11px] text-text-secondary">{index + 1}. {item}</div>)}</div>
+            </div> : null}
+            {(liveContext.data.brief.expected_questions?.length ?? 0) > 0 ? <div className="mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Expected Questions</div>
+              <div className="mt-1 space-y-1">{liveContext.data.brief.expected_questions!.slice(0, 3).map((item) => <div key={item} className="text-[11px] text-text-secondary">• {item}</div>)}</div>
+            </div> : null}
+            <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] text-text-muted">
+              <span>Sources {liveContext.data.sources.length}</span>
+              <span>Quick Notes {liveContext.data.quick_notes.length}</span>
+              <span>Participants {liveContext.data.participants.length}</span>
+              <span>Open {liveContext.data.brief.unresolved_count ?? 0}</span>
+            </div>
+            <div className="mt-2 text-[10px] text-text-muted">Data path · {liveContext.data.processing_runtime.mode ?? s.processing_mode} / STT {liveContext.data.processing_runtime.configured_stt_provider ?? '—'}</div>
+          </div> : null}
+
           <div className="rounded-2xl border border-bg-tertiary p-4">
             <h2 className="text-sm font-semibold text-text-primary">问成竹 · 本场可追溯上下文</h2>
             <p className="mt-1 text-[11px] text-text-muted">检索开始时冻结的 Ready sources / Quick Notes、已确认历史，以及本场当前 transcript。每条结果标明 authority；观察和笔记不会冒充 confirmed truth。</p>

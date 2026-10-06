@@ -352,6 +352,47 @@ export interface ConversationAskResult {
   truth_confirmed: boolean
 }
 
+export interface ConversationSessionContext {
+  session_id: string
+  space: { id: string; profile?: ConversationProfile; title?: string }
+  brief: {
+    goal?: string
+    agenda?: string[]
+    expected_questions?: string[]
+    unresolved_count?: number
+    known_participants?: number
+    contribution_candidates?: Array<{ text: string; source_refs: SourceRef[]; kind: string }>
+  }
+  sources: Array<{
+    material_id: string
+    version_id: string
+    title: string
+    kind: string
+    usage: string
+    content_hash: string
+    is_personal_evidence: boolean
+  }>
+  quick_notes: Array<{ id: string; title: string }>
+  participants: Array<{
+    id: string
+    display_name: string
+    role: string
+    organization: string
+    counterparty_state: CounterpartyState | Record<string, unknown>
+  }>
+  expression_profile: Record<string, unknown>
+  processing_runtime: {
+    mode?: ProcessingMode
+    capture_mode?: CaptureMode
+    configured_stt_provider?: string
+    main_audio_remote_possible?: boolean
+    self_mic_remote_possible?: boolean
+    blockers?: string[]
+  }
+  policy: ConversationSessionPolicy
+  pack_digest: string
+}
+
 export interface ConversationCaptureStatus {
   active: boolean
   session_id: string

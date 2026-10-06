@@ -1929,6 +1929,33 @@ def test_synthetic_demo_is_non_persistent_and_explicitly_labeled(product_env):
     assert before == after
 
 
+
+
+def test_space_complete_erase_requires_explicit_confirm_and_removes_tombstones(product_env):
+    space = conversations.create_space("Erase Boundary", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    item = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="temporary confirmed truth",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "confirmed"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(session["id"])
+    conversations.delete_session(session["id"], confirmed_policy="TOMBSTONE")
+    assert store.select("conversation_provenance_tombstone", where="space_id = ?", params=(space["id"],))
+
+    with pytest.raises(ValueError, match="明确确认"):
+        conversations.delete_space(space["id"])
+    assert store.get("conversation_space", space["id"]) is not None
+
+    assert conversations.delete_space(space["id"], confirm=True) is True
+    assert store.get("conversation_space", space["id"]) is None
+    assert store.select("conversation_provenance_tombstone", where="space_id = ?", params=(space["id"],)) == []
+
+
 def test_session_delete_requires_tombstone_for_confirmed_truth(product_env):
     space = conversations.create_space("Delete Safety", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

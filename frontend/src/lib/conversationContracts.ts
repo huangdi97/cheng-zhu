@@ -379,7 +379,7 @@ export interface ConversationSessionContext {
     display_name: string
     role: string
     organization: string
-    counterparty_state: CounterpartyState | Record<string, unknown>
+    counterparty_state: CounterpartyState
   }>
   expression_profile: Record<string, unknown>
   processing_runtime: {

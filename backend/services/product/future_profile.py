@@ -380,6 +380,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
         ),
         productized=False,
+        runtime_available=True,
     ),
     ConversationProfile(
         ConversationProfileKind.MEETING,

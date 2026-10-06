@@ -1,0 +1,230 @@
+"""v2.0 Conversation Profile API, mounted under /api/product/conversation."""
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
+
+from api.product.common import domain_errors
+from services.product import conversations
+
+router = APIRouter(prefix="/conversation", tags=["product-conversation"])
+
+
+class SpaceCreate(BaseModel):
+    title: str = Field(max_length=160)
+    profile: str = "PROJECT_SYNC"
+    description: str = Field(default="", max_length=4000)
+    default_goal: str = Field(default="", max_length=1000)
+    default_mode: str = ""
+    project_id: str = Field(default="", max_length=200)
+    relationship_key: str = Field(default="", max_length=200)
+    selected_source_ids: list[str] = Field(default_factory=list)
+    selected_quick_note_ids: list[str] = Field(default_factory=list)
+
+
+class SpacePatch(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=160)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    status: Optional[str] = None
+    default_goal: Optional[str] = Field(default=None, max_length=1000)
+    default_mode: Optional[str] = None
+    project_id: Optional[str] = Field(default=None, max_length=200)
+    relationship_key: Optional[str] = Field(default=None, max_length=200)
+    selected_source_ids: Optional[list[str]] = None
+    selected_quick_note_ids: Optional[list[str]] = None
+    retention_policy: Optional[dict[str, Any]] = None
+
+
+@router.get("/templates")
+def templates():
+    return {"items": conversations.templates()}
+
+
+@router.get("/home")
+def home():
+    return conversations.home_summary()
+
+
+@router.get("/spaces")
+def spaces(status: str = "ACTIVE"):
+    return {"items": conversations.list_spaces(status)}
+
+
+@router.post("/spaces")
+def create_space(body: SpaceCreate):
+    with domain_errors():
+        return conversations.create_space(**body.model_dump())
+
+
+@router.get("/spaces/{space_id}")
+def get_space(space_id: str):
+    with domain_errors():
+        return conversations.space_detail(space_id)
+
+
+@router.patch("/spaces/{space_id}")
+def patch_space(space_id: str, body: SpacePatch):
+    with domain_errors():
+        return conversations.update_space(space_id, body.model_dump(exclude_unset=True))
+
+
+@router.delete("/spaces/{space_id}")
+def delete_space(space_id: str):
+    with domain_errors():
+        return {"deleted": conversations.delete_space(space_id)}
+
+
+@router.get("/spaces/{space_id}/prepare")
+def prepare(space_id: str):
+    with domain_errors():
+        return conversations.prepare_space(space_id)
+
+
+@router.get("/spaces/{space_id}/export")
+def export_space(space_id: str):
+    with domain_errors():
+        return conversations.export_space(space_id)
+
+
+class GoalCreate(BaseModel):
+    title: str = Field(max_length=240)
+    outcome_definition: str = Field(default="", max_length=2000)
+    priority: int = Field(default=50, ge=0, le=100)
+
+
+@router.post("/spaces/{space_id}/goals")
+def add_goal(space_id: str, body: GoalCreate):
+    with domain_errors():
+        return conversations.create_goal(space_id, **body.model_dump())
+
+
+class ParticipantCreate(BaseModel):
+    display_name: str = Field(default="", max_length=160)
+    role: str = Field(default="", max_length=160)
+    organization: str = Field(default="", max_length=160)
+    session_id: str = ""
+    identity_source: str = "USER"
+
+
+@router.post("/spaces/{space_id}/participants")
+def add_participant(space_id: str, body: ParticipantCreate):
+    with domain_errors():
+        return conversations.add_participant(space_id, **body.model_dump())
+
+
+class SessionCreate(BaseModel):
+    title: str = Field(default="", max_length=200)
+    goal_ids: list[str] = Field(default_factory=list)
+    scheduled_at: Optional[float] = None
+    capture_mode: str = "NOTES_ONLY"
+    processing_mode: str = "LOCAL"
+    assistance_mode: str = ""
+    consent_ack: bool = False
+
+
+@router.post("/spaces/{space_id}/sessions")
+def create_session(space_id: str, body: SessionCreate):
+    with domain_errors():
+        return conversations.create_session(space_id, **body.model_dump())
+
+
+@router.get("/sessions/{session_id}")
+def get_session(session_id: str):
+    with domain_errors():
+        return conversations.require_session(session_id)
+
+
+@router.get("/sessions/{session_id}/preflight")
+def preflight(session_id: str):
+    with domain_errors():
+        return conversations.preflight(session_id)
+
+
+@router.post("/sessions/{session_id}/start")
+def start_session(session_id: str):
+    with domain_errors():
+        return conversations.start_session(session_id)
+
+
+@router.post("/sessions/{session_id}/end")
+def end_session(session_id: str):
+    with domain_errors():
+        return conversations.end_session(session_id)
+
+
+@router.get("/sessions/{session_id}/continue")
+def continue_session(session_id: str):
+    with domain_errors():
+        return conversations.continue_summary(session_id)
+
+
+class ItemCreate(BaseModel):
+    item_type: str
+    title: str = Field(max_length=1000)
+    state: str = "PROPOSED"
+    detail: str = Field(default="", max_length=5000)
+    owner_id: str = Field(default="", max_length=120)
+    speaker_id: str = Field(default="", max_length=120)
+    due_at: str = Field(default="", max_length=120)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
+    source_excerpt: str = Field(default="", max_length=3000)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    epistemic_status: str = "UNKNOWN"
+    review_status: str = "AI_EXTRACTED"
+    supersedes_id: str = ""
+
+
+@router.post("/sessions/{session_id}/items")
+def add_item(session_id: str, body: ItemCreate):
+    with domain_errors():
+        return conversations.add_item(session_id, **body.model_dump())
+
+
+class ReviewBody(BaseModel):
+    action: str
+    patch: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/items/{item_id}/review")
+def review_item(item_id: str, body: ReviewBody):
+    with domain_errors():
+        return conversations.review_item(item_id, body.action, body.patch)
+
+
+class GuidanceBody(BaseModel):
+    current_topic: str = Field(default="", max_length=500)
+    direct_question: str = Field(default="", max_length=1200)
+    answer_cue: str = Field(default="", max_length=1200)
+    candidate_text: str = Field(default="", max_length=1200)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
+    user_speaking: bool = False
+    relevance: float = 0
+    novelty: float = 0
+    provenance_strength: float = 0
+    role_relevance: float = 0
+    goal_relevance: float = 0
+    urgency: float = 0
+    decision_impact: float = 0
+    interruption_cost: float = 0
+    already_mentioned: float = 0
+    uncertainty: float = 0
+    social_risk: float = 0
+    stale_context_risk: float = 0
+
+
+@router.post("/sessions/{session_id}/guidance/evaluate")
+def evaluate_guidance(session_id: str, body: GuidanceBody):
+    with domain_errors():
+        return conversations.evaluate_guidance(session_id, body.model_dump())
+
+
+class GuidanceAction(BaseModel):
+    action: str
+
+
+@router.post("/guidance/{guidance_id}/status")
+def guidance_action(guidance_id: str, body: GuidanceAction):
+    with domain_errors():
+        return conversations.set_guidance_action(guidance_id, body.action)

@@ -5,12 +5,14 @@ from api.product.goals_router import router as goals_router
 from api.product.insights_router import router as insights_router
 from api.product.library_router import router as library_router
 from api.product.session_router import router as session_router
+from api.product.conversations_router import router as conversations_router
 
 router = APIRouter()
 router.include_router(goals_router)
 router.include_router(library_router)
 router.include_router(session_router)
 router.include_router(insights_router)
+router.include_router(conversations_router)
 
 
 def init_product_layer() -> dict:

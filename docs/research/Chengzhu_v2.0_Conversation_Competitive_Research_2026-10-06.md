@@ -258,6 +258,37 @@ No silent connector write
 Draft → Review → Explicit Action
 ```
 
+### 8.5 Botless sidecar 必须把 participant transparency 做成一等 Preflight 状态
+
+Granola 的公开透明性设计明确承认 botless/local app 的一个 trade-off：不像 meeting bot 那样天然出现在参会列表，用户需要其他机制让参与者知道正在转写。Granola 提供 verbal heads-up、meeting chat notice、watermark 等路径。
+
+官方来源：
+
+- https://www.granola.ai/transparency
+- https://www.granola.ai/blog/why-granola-doesnt-use-a-bot
+
+Chengzhu 当前没有 Conversation chat connector / watermark runtime，因此不应伪装“已自动通知”。v2 冻结：
+
+```text
+participant consent status
+!=
+participant transparency plan
+!=
+system verified consent
+```
+
+Preflight 需要记录用户报告的 transparency plan：
+- verbal heads-up；
+- chat notice；
+- already notified；
+- not applicable；
+- not recorded。
+
+没有记录时：
+- 给 warning；
+- 不替用户做法律判断；
+- 不把 warning 偷换成“其他参与者已同意”。
+
 ### 8.5 Evaluation 不能用 adoption 偷换 precision
 
 本地可直接观测：

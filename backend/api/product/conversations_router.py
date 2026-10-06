@@ -207,6 +207,12 @@ def get_session(session_id: str):
         return conversations.require_session(session_id)
 
 
+@router.get("/sessions/{session_id}/context")
+def get_session_context(session_id: str):
+    with domain_errors():
+        return conversations.session_context(session_id)
+
+
 class SessionDelete(BaseModel):
     confirmed_policy: str = "BLOCK"
 

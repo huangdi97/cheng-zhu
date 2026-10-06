@@ -142,6 +142,8 @@ export const conversationApi = {
     direct_question?: string
     answer_cue?: string
     critical_risk?: string
+    talking_point?: string
+    delivery_focus?: string
     candidate_text?: string
     source_refs?: SourceRef[]
     user_speaking?: boolean

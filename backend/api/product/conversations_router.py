@@ -164,6 +164,12 @@ class ParticipantCreate(BaseModel):
     organization: str = Field(default="", max_length=160)
     session_id: str = ""
     identity_source: str = "USER"
+    explicit_priority: str = Field(default="", max_length=800)
+    explicit_concern: str = Field(default="", max_length=1200)
+    stated_position: str = Field(default="", max_length=1600)
+    decision_authority: str = Field(default="", max_length=500)
+    relationship_context: str = Field(default="", max_length=800)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 @router.post("/spaces/{space_id}/participants")
@@ -180,6 +186,7 @@ class SessionCreate(BaseModel):
     processing_mode: str = "LOCAL"
     assistance_mode: str = ""
     consent_ack: bool = False
+    policy: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/spaces/{space_id}/sessions")
@@ -210,6 +217,7 @@ class SessionPatch(BaseModel):
     capture_mode: Optional[str] = None
     processing_mode: Optional[str] = None
     consent_ack: Optional[bool] = None
+    policy: Optional[dict[str, Any]] = None
 
 
 @router.patch("/sessions/{session_id}")
@@ -384,6 +392,10 @@ class GuidanceBody(BaseModel):
     uncertainty: float = 0
     social_risk: float = 0
     stale_context_risk: float = 0
+    audience_role: str = Field(default="", max_length=240)
+    audience_priority: str = Field(default="", max_length=800)
+    audience_concern: str = Field(default="", max_length=1200)
+    decision_authority: str = Field(default="", max_length=500)
 
 
 @router.post("/sessions/{session_id}/guidance/evaluate")

@@ -866,6 +866,39 @@ def _persist_guidance(
     return saved
 
 
+def _source_visibility_allows_guidance(source_refs: list[dict[str, Any]]) -> bool:
+    blocked = {"BLOCKED", "NO_GUIDANCE", "HIDDEN"}
+    return not any(str(ref.get("visibility") or "").upper() in blocked for ref in source_refs)
+
+
+def _suggestion_budget_exhausted(session_id: str, mode: str, now: Optional[float] = None) -> bool:
+    budgets = {"QUIET": 0, "BALANCED": 3, "ACTIVE": 6, "PRESENTATION": 4, "ONE_ON_ONE": 3}
+    budget = budgets.get(mode, 3)
+    if budget <= 0:
+        return True
+    cutoff = float(now if now is not None else store.now()) - 60.0
+    shown = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event "
+        "WHERE session_id = ? AND status = 'SHOWN' AND created_at >= ? "
+        "AND reason NOT IN ('DIRECT_QUESTION','CRITICAL_RISK')",
+        (session_id, cutoff),
+    ) or 0)
+    return shown >= budget
+
+
+def _recent_duplicate_guidance(session_id: str, text: str, seconds: float = 90.0) -> bool:
+    text = str(text or "").strip()
+    if not text:
+        return False
+    return bool(store.select(
+        "conversation_guidance_event",
+        where="session_id = ? AND status = 'SHOWN' AND text = ? AND created_at >= ?",
+        params=(session_id, text, store.now() - seconds),
+        order="created_at DESC",
+        limit=1,
+    ))
+
+
 def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     session = require_session(session_id)
     if session["status"] != "ACTIVE":
@@ -900,6 +933,17 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     source_refs = list(body.get("source_refs") or [])
     direct_question = str(body.get("direct_question") or "").strip()
     if direct_question:
+        # A new direct question supersedes stale proactive opportunities in the
+        # presentation layer while preserving their audit trail.
+        for prior in store.select(
+            "conversation_guidance_event",
+            where="session_id = ? AND status = 'SHOWN' AND kind = 'CONTRIBUTION_OPPORTUNITY' "
+                  "AND user_action = 'NONE' AND created_at >= ?",
+            params=(session_id, store.now() - 120.0),
+            order="created_at DESC",
+            limit=10,
+        ):
+            store.update("conversation_guidance_event", prior["id"], {"user_action": "CANCELLED_BY_DIRECT_QUESTION"})
         event = _persist_guidance(
             session_id,
             kind="ANSWER_CUE",
@@ -908,6 +952,30 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
             source_refs=source_refs,
             status="SHOWN",
             reason="DIRECT_QUESTION",
+        )
+        return {"guidance": event, "suppressed": None}
+
+    critical_risk = str(body.get("critical_risk") or "").strip()
+    if critical_risk:
+        if not source_refs or not _source_visibility_allows_guidance(source_refs):
+            event = _persist_guidance(
+                session_id,
+                kind="RISK",
+                action=ExpressionAction.SILENT.value,
+                text="",
+                source_refs=source_refs,
+                status="SUPPRESSED",
+                reason="RISK_WITHOUT_ALLOWED_SOURCE",
+            )
+            return {"guidance": None, "suppressed": "RISK_WITHOUT_ALLOWED_SOURCE", "event": event}
+        event = _persist_guidance(
+            session_id,
+            kind="RISK",
+            action=ExpressionAction.FLAG_RISK.value,
+            text=critical_risk[:1200],
+            source_refs=source_refs,
+            status="SHOWN",
+            reason="CRITICAL_RISK",
         )
         return {"guidance": event, "suppressed": None}
 
@@ -921,6 +989,36 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     mode = str(session.get("assistance_mode") or "BALANCED").upper()
     candidate_text = str(body.get("candidate_text") or "").strip()
     if candidate_text:
+        if not _source_visibility_allows_guidance(source_refs):
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="SOURCE_VISIBILITY_BLOCKED",
+            )
+            return {"guidance": None, "suppressed": "SOURCE_VISIBILITY_BLOCKED", "event": event}
+        if _recent_duplicate_guidance(session_id, candidate_text):
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="DUPLICATE_GUIDANCE",
+            )
+            return {"guidance": None, "suppressed": "DUPLICATE_GUIDANCE", "event": event}
+        if float(body.get("social_risk") or 0.0) >= 1.5:
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="SOCIAL_RISK",
+            )
+            return {"guidance": None, "suppressed": "SOCIAL_RISK", "event": event}
+        if float(body.get("stale_context_risk") or 0.0) >= 1.5:
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="STALE_CONTEXT",
+            )
+            return {"guidance": None, "suppressed": "STALE_CONTEXT", "event": event}
+        if _suggestion_budget_exhausted(session_id, mode):
+            event = _persist_guidance(
+                session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
+                text="", source_refs=source_refs, status="SUPPRESSED", reason="SUGGESTION_BUDGET",
+            )
+            return {"guidance": None, "suppressed": "SUGGESTION_BUDGET", "event": event>
         if not source_refs:
             event = _persist_guidance(
                 session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
@@ -942,7 +1040,8 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         return {"guidance": event, "suppressed": None}
 
     recall = _recall_for_topic(session["space_id"], state.get("current_topic") or "")
-    if mode != "QUIET" and recall:
+    budget_exhausted = _suggestion_budget_exhausted(session_id, mode)
+    if mode != "QUIET" and not budget_exhausted and recall:
         refs = list(recall.get("source_refs") or [])
         if refs:
             event = _persist_guidance(
@@ -956,7 +1055,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         where="space_id = ? AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
         params=(session["space_id"],), order="created_at DESC", limit=1,
     )
-    if mode != "QUIET" and open_questions:
+    if mode != "QUIET" and not budget_exhausted and open_questions:
         item = open_questions[0]
         event = _persist_guidance(
             session_id, kind="QUESTION", action=ExpressionAction.ASK_QUESTION.value,
@@ -964,11 +1063,12 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         )
         return {"guidance": event, "suppressed": None}
 
+    reason = "SUGGESTION_BUDGET" if budget_exhausted and mode != "QUIET" else "NO_HIGH_VALUE_GUIDANCE"
     event = _persist_guidance(
         session_id, kind="RECALL", action=ExpressionAction.SILENT.value,
-        text="", source_refs=[], status="SUPPRESSED", reason="NO_HIGH_VALUE_GUIDANCE",
+        text="", source_refs=[], status="SUPPRESSED", reason=reason,
     )
-    return {"guidance": None, "suppressed": "NO_HIGH_VALUE_GUIDANCE", "event": event}
+    return {"guidance": None, "suppressed": reason, "event": event}
 
 
 def guidance_from_transcript(session_id: str, text: str) -> Optional[dict[str, Any]]:

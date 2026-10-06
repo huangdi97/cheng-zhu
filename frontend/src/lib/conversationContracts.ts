@@ -247,6 +247,8 @@ export interface ConversationContinue {
   commitments: ConversationItem[]
   open_questions: ConversationItem[]
   candidates: ConversationItem[]
+  what_changed: ConversationItem[]
+  pins: ConversationGuidance[]
   next_focus: null | { kind: string; title: string; source_ref: string }
   review_required: number
 }

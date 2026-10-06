@@ -18,6 +18,7 @@ export interface ConversationSessionPolicy {
   human_assistance: 'HUMAN_FORBIDDEN' | 'HUMAN_PRACTICE_ONLY' | 'HUMAN_ALLOWED'
   share_privacy: 'OFF' | 'PRIVATE_OVERLAY'
   external_writeback: 'OFF' | 'REVIEW_REQUIRED'
+  participant_consent_status: 'NOT_RECORDED' | 'USER_REPORTS_ALLOWED' | 'USER_REPORTS_CONSENTED' | 'NOT_APPLICABLE'
   connector_permissions: string[]
   speaker_biometric_identity: 'OFF'
   emotion_sentiment_profiling: 'OFF'
@@ -33,6 +34,7 @@ export interface CounterpartyState {
     relationship_context?: string
   }
   source_refs: SourceRef[]
+  confidence: number
   temporary_inferences: Array<Record<string, unknown>>
   unknown: string[]
 }
@@ -204,6 +206,16 @@ export interface ConversationSpaceDetail extends ConversationSpace {
   decisions: ConversationItem[]
   commitments: ConversationItem[]
   open_questions: ConversationItem[]
+  objections: ConversationItem[]
+  next_session: ConversationSession | null
+  recent_decisions: ConversationItem[]
+  last_session_delta: null | {
+    session_id: string
+    title: string
+    what_changed: ConversationItem[]
+    pins: ConversationGuidance[]
+    review_required: number
+  }
   threads: Array<Record<string, unknown>>
 }
 
@@ -238,6 +250,14 @@ export interface ConversationPreflight {
   items: Array<{ key: string; label: string; value: string | number | boolean; ok: boolean }>
   blockers: Array<{ key: string; label: string; message: string }>
   policy: ConversationSessionPolicy
+  pack_preview: {
+    goal_ids: string[]
+    selected_source_ids: string[]
+    selected_quick_note_ids: string[]
+    participants_count: number
+    confirmed_items_count: number
+    policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
+  }
   privacy_note: string
 }
 

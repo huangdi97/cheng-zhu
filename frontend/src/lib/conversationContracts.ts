@@ -257,6 +257,7 @@ export interface ConversationPreflight {
     selected_quick_note_ids: string[]
     participants_count: number
     confirmed_items_count: number
+    expression_profile: Record<string, unknown>
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
   privacy_note: string

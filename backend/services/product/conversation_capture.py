@@ -22,6 +22,7 @@ from services.storage import product as store
 
 _lock = threading.RLock()
 _active_session_id = ""
+_stopping_session_id = ""
 _previous_overlay: dict[str, Any] = {}
 _device_id: Optional[int] = None
 _candidate_mic_device_id: Optional[int] = None
@@ -45,6 +46,7 @@ def status(session_id: str = "") -> dict[str, Any]:
             "candidate_mic_device_id": _candidate_mic_device_id,
             "mode": "TRANSCRIPTION_ONLY" if active else "IDLE",
             "paused": bool(getattr(legacy, "is_paused", False)) if active else False,
+            "stopping": bool(_stopping_session_id and _stopping_session_id == _active_session_id),
         }
 
 
@@ -137,44 +139,62 @@ def pause(session_id: str) -> dict[str, Any]:
     with _lock:
         if session_id != _active_session_id:
             raise ValueError("这场 Conversation 没有正在运行的音频采集")
-        from api.assist.pipeline import pause_interview
-        pause_interview()
-        _session_state(session_id, paused=True)
-        return {**status(session_id), "paused": True}
+        if _stopping_session_id == session_id:
+            raise ValueError("这场 Conversation 正在停止音频采集")
+    from api.assist.pipeline import pause_interview
+    pause_interview()
+    _session_state(session_id, paused=True)
+    return {**status(session_id), "paused": True}
 
 
 def resume(session_id: str) -> dict[str, Any]:
     with _lock:
         if session_id != _active_session_id:
             raise ValueError("这场 Conversation 没有正在运行的音频采集")
-        from api.assist.pipeline import unpause_interview
-        unpause_interview(_device_id, _candidate_mic_device_id)
-        _session_state(session_id, paused=False)
-        return {**status(session_id), "paused": False}
+        if _stopping_session_id == session_id:
+            raise ValueError("这场 Conversation 正在停止音频采集")
+        device_id = _device_id
+        candidate_mic_device_id = _candidate_mic_device_id
+    from api.assist.pipeline import unpause_interview
+    unpause_interview(device_id, candidate_mic_device_id)
+    _session_state(session_id, paused=False)
+    return {**status(session_id), "paused": False}
 
 
 def stop(session_id: str) -> dict[str, Any]:
-    global _active_session_id, _previous_overlay, _device_id, _candidate_mic_device_id, _legacy_snapshot
+    global _active_session_id, _stopping_session_id, _previous_overlay, _device_id, _candidate_mic_device_id, _legacy_snapshot
     with _lock:
         if session_id != _active_session_id:
             return status(session_id)
+        if _stopping_session_id == session_id:
+            return status(session_id)
+        _stopping_session_id = session_id
         previous = dict(_previous_overlay)
-        try:
-            from api.assist.pipeline import stop_interview_loop
-            stop_interview_loop()
-        finally:
-            set_session_overlay(previous)
-            legacy = get_session()
-            with conversation_lock:
-                for key, value in _legacy_snapshot.items():
-                    setattr(legacy, key, value)
-            _session_state(session_id, active=False, paused=False)
-            _active_session_id = ""
-            _previous_overlay = {}
-            _device_id = None
-            _candidate_mic_device_id = None
-            _legacy_snapshot = {}
-        return status(session_id)
+        legacy_snapshot = dict(_legacy_snapshot)
+
+    # Do not hold the Conversation lock while draining shared ASR workers:
+    # their final transcription callback re-enters record_transcription(), which
+    # needs this lock. Keeping the lock here can deadlock stop↔worker and lose
+    # the last utterance.
+    try:
+        from api.assist.pipeline import stop_interview_loop
+        stop_interview_loop()
+    finally:
+        set_session_overlay(previous)
+        legacy = get_session()
+        with conversation_lock:
+            for key, value in legacy_snapshot.items():
+                setattr(legacy, key, value)
+        _session_state(session_id, active=False, paused=False)
+        with _lock:
+            if _active_session_id == session_id:
+                _active_session_id = ""
+                _previous_overlay = {}
+                _device_id = None
+                _candidate_mic_device_id = None
+                _legacy_snapshot = {}
+            _stopping_session_id = ""
+    return status(session_id)
 
 
 def record_transcription(

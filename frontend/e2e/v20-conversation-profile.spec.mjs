@@ -260,18 +260,29 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/guidance/evaluate` && method === 'POST') {
       const body = request.postDataJSON()
-      if (body.user_speaking) return { guidance: null, suppressed: 'USER_SPEAKING', event: { id: 'ge-silent', expression_action: 'SILENT' } }
+      const kind = body.direct_question ? 'ANSWER_CUE'
+        : body.critical_risk ? 'RISK'
+          : body.talking_point ? 'TALKING_POINT'
+            : body.delivery_focus ? 'DELIVERY'
+              : 'CONTRIBUTION_OPPORTUNITY'
+      const action = kind === 'ANSWER_CUE' ? 'ANSWER'
+        : kind === 'RISK' ? 'FLAG_RISK'
+          : kind === 'DELIVERY' ? 'CLARIFY'
+            : 'ADD_TALKING_POINT'
+      if (!body.direct_question && !body.critical_risk && !body.talking_point && !body.delivery_focus && body.user_speaking) {
+        return { guidance: null, suppressed: 'USER_SPEAKING', event: { id: 'ge-silent', expression_action: 'SILENT' } }
+      }
       return {
         guidance: {
           id: 'ge-1',
           session_id: SESSION.id,
           candidate_id: 'gc-1',
-          kind: 'CONTRIBUTION_OPPORTUNITY',
-          expression_action: 'ADD_TALKING_POINT',
-          text: body.candidate_text || 'Q4 benchmark 已覆盖 10x data scale',
+          kind,
+          expression_action: action,
+          text: body.answer_cue || body.critical_risk || body.talking_point || body.delivery_focus || body.candidate_text || 'Q4 benchmark 已覆盖 10x data scale',
           source_refs: body.source_refs || [],
           status: 'SHOWN',
-          reason: 'HIGH_VALUE_OPPORTUNITY',
+          reason: kind === 'DELIVERY' ? 'EXPRESSION_PLANNER' : kind === 'TALKING_POINT' ? 'MANUAL_TALKING_POINT' : kind === 'RISK' ? 'CRITICAL_RISK' : kind === 'ANSWER_CUE' ? 'DIRECT_QUESTION' : 'HIGH_VALUE_OPPORTUNITY',
           score: { value: 5 },
           user_action: 'NONE',
           rendered_at: 2,
@@ -441,7 +452,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Data path · LOCAL / STT whisper')).toBeVisible()
 
     await page.getByLabel('当前话题').fill('offline migration')
-    await page.getByLabel('值得补充的候选内容（如有）').fill('Q4 benchmark 已覆盖 10x data scale')
+    await page.getByLabel('高价值 Opportunity 候选（如有）').fill('Q4 benchmark 已覆盖 10x data scale')
     await page.getByLabel('来源 / 依据').fill('Benchmark Note · confirmed')
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
     await expect(page.getByText('CONTRIBUTION_OPPORTUNITY')).toBeVisible()
@@ -453,6 +464,23 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('这场之后')).toBeVisible()
     await expect(page.getByText('Next Focus · rollback owner 还没有明确')).toBeVisible()
   })
+
+  test('Live exposes explicit Talking Point and Delivery planner lanes', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect(page.getByLabel('明确 Talking Point（如有）')).toBeVisible()
+    await expect(page.getByLabel('Delivery / 表达重点（如有）')).toBeVisible()
+    await page.getByLabel('明确 Talking Point（如有）').fill('先明确 rollback owner 再谈 release window')
+    await page.getByLabel('来源 / 依据').fill('Architecture decision note')
+    await page.getByRole('button', { name: '评估当前 Guidance' }).click()
+    await expect(page.getByText('TALKING_POINT')).toBeVisible()
+    await expect(page.getByRole('paragraph').filter({ hasText: '先明确 rollback owner 再谈 release window' })).toBeVisible()
+  })
+
 
   test('Manual Ask is source-aware and user speaking produces SILENT', async ({ context, page }) => {
     await installMocks(context, {
@@ -467,7 +495,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('CONFIRMED_TRUTH')).toBeVisible()
 
     await page.getByText('我正在连续表达').click()
-    await page.getByLabel('值得补充的候选内容（如有）').fill('应该补充 benchmark')
+    await page.getByLabel('高价值 Opportunity 候选（如有）').fill('应该补充 benchmark')
     await page.getByLabel('来源 / 依据').fill('benchmark source')
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
     await expect(page.getByText('这一次选择不打扰你')).toBeVisible()

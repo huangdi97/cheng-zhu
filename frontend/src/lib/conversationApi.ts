@@ -73,6 +73,8 @@ export const conversationApi = {
 
   addGoal: (id: string, body: { title: string; outcome_definition?: string; priority?: number }) =>
     request(`${B}/spaces/${encodeURIComponent(id)}/goals`, json('POST', body)),
+  patchGoal: (id: string, body: { title?: string; outcome_definition?: string; priority?: number; status?: 'ACTIVE' | 'RESOLVED' }) =>
+    request(`${B}/goals/${encodeURIComponent(id)}`, json('PATCH', body)),
   addParticipant: (id: string, body: {
     display_name?: string
     role?: string

@@ -694,38 +694,184 @@ def update_session(session_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     return require_session(session_id)
 
 
+def _frozen_pack_payload(session: dict[str, Any]) -> dict[str, Any]:
+    pack_id = str(session.get("pack_id") or "")
+    row = store.get("conversation_session_pack", pack_id) if pack_id else None
+    if row is None:
+        rows = store.select(
+            "conversation_session_pack",
+            where="session_id = ?",
+            params=(session["id"],),
+            order="created_at DESC",
+            limit=1,
+        )
+        row = rows[0] if rows else None
+    payload = (row or {}).get("payload") if row else None
+    return dict(payload) if isinstance(payload, dict) else {}
+
+
+def _query_tokens(text: str) -> set[str]:
+    normalized = str(text or "").strip().lower()
+    if not normalized:
+        return set()
+    for ch in "？?，,。；;：:/\\|()（）[]【】":
+        normalized = normalized.replace(ch, " ")
+    tokens = {x for x in normalized.split() if len(x) >= 2}
+    if len(normalized.replace(" ", "")) >= 2:
+        tokens.add(normalized.replace(" ", ""))
+    return tokens
+
+
+def _text_match_score(question: str, haystack: str) -> int:
+    q = str(question or "").strip().lower()
+    h = str(haystack or "").lower()
+    if not q or not h:
+        return 0
+    score = 4 if q in h else 0
+    for token in _query_tokens(q):
+        if token and token in h:
+            score += 1
+    return score
+
+
 def ask(session_id: str, question: str) -> dict[str, Any]:
-    """Source-aware local recall. It never invents an answer when no source matches."""
+    """Deterministic, source-aware Manual Ask over this session's frozen context.
+
+    Ranking intentionally distinguishes authority:
+    confirmed cross-session state > frozen Ready sources > frozen Quick Notes >
+    current-session transcript.  Source-backed context is not automatically
+    upgraded into confirmed truth.
+    """
     session = require_session(session_id)
     question = str(question or "").strip()
     if not question:
         raise ValueError("问题不能为空")
-    tokens = {x.lower() for x in question.replace("？", " ").replace("?", " ").replace("，", " ").split() if len(x) >= 2}
-    confirmed = _confirmed_context_items(session["space_id"])
-    ranked: list[tuple[int, dict[str, Any]]] = []
-    for item in confirmed:
+
+    ranked: list[tuple[int, float, dict[str, Any]]] = []
+    pack = _frozen_pack_payload(session)
+
+    # 1) Confirmed state: highest authority and strongest ranking boost.
+    for item in pack.get("confirmed_items") or _confirmed_context_items(session["space_id"]):
         haystack = " ".join([
             str(item.get("title") or ""),
             str(item.get("detail") or ""),
             str(item.get("source_excerpt") or ""),
-        ]).lower()
-        score = sum(1 for token in tokens if token in haystack)
-        if score:
-            ranked.append((score, item))
-    ranked.sort(key=lambda pair: (pair[0], pair[1].get("updated_at") or 0), reverse=True)
-    matches = [item for _, item in ranked[:5]]
+        ])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            ranked.append((lexical + 8, float(item.get("updated_at") or 0), {
+                "id": item.get("id") or "",
+                "kind": "CONFIRMED_ITEM",
+                "authority": "CONFIRMED_TRUTH",
+                "title": str(item.get("title") or "")[:1000],
+                "excerpt": str(item.get("source_excerpt") or item.get("detail") or item.get("title") or "")[:500],
+                "item_type": item.get("type") or "",
+                "state": item.get("state") or "",
+                "review_status": item.get("review_status") or "",
+                "source_refs": list(item.get("source_refs") or []),
+            }))
+
+    # 2) Ready source versions frozen when the session started.
+    for source in pack.get("sources") or []:
+        text_value = str(source.get("text") or "")
+        haystack = " ".join([str(source.get("title") or ""), text_value])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            q_lower = question.lower()
+            pos = text_value.lower().find(q_lower)
+            excerpt_start = max(0, pos - 120) if pos >= 0 else 0
+            excerpt = text_value[excerpt_start:excerpt_start + 500]
+            ranked.append((lexical + 5, 0.0, {
+                "id": str(source.get("material_id") or source.get("version_id") or ""),
+                "kind": "FROZEN_SOURCE",
+                "authority": "PERSONAL_EVIDENCE" if source.get("is_personal_evidence") else "REFERENCE_SOURCE",
+                "title": str(source.get("title") or "本场来源")[:300],
+                "excerpt": excerpt,
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "DOCUMENT",
+                    "id": str(source.get("material_id") or ""),
+                    "version_id": str(source.get("version_id") or ""),
+                    "content_hash": str(source.get("content_hash") or ""),
+                    "visibility": "PRIVATE",
+                }],
+            }))
+
+    # 3) User-authored frozen notes are usable context, but explicitly not evidence.
+    for note in pack.get("quick_notes") or []:
+        haystack = " ".join([str(note.get("title") or ""), str(note.get("content") or "")])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            ranked.append((lexical + 3, 0.0, {
+                "id": str(note.get("id") or ""),
+                "kind": "QUICK_NOTE",
+                "authority": "USER_NOTE_NOT_EVIDENCE",
+                "title": str(note.get("title") or "Quick Note")[:300],
+                "excerpt": str(note.get("content") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
+            }))
+
+    # 4) The current-session transcript supports catch-up, but remains observation.
+    transcript = store.select(
+        "conversation_transcript_segment",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at DESC",
+        limit=120,
+    )
+    for seg in transcript:
+        lexical = _text_match_score(question, str(seg.get("text") or ""))
+        if lexical:
+            ranked.append((lexical + 1, float(seg.get("created_at") or 0), {
+                "id": seg.get("id") or "",
+                "kind": "TRANSCRIPT_SEGMENT",
+                "authority": "OBSERVED_NOT_CONFIRMED",
+                "title": "本场转写",
+                "excerpt": str(seg.get("text") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "TRANSCRIPT_SEGMENT",
+                    "id": seg.get("id") or "",
+                    "session_id": session_id,
+                    "timestamp": seg.get("created_at"),
+                    "visibility": "PRIVATE",
+                }],
+            }))
+
+    ranked.sort(key=lambda pair: (pair[0], pair[1]), reverse=True)
+    matches = [match for _, _, match in ranked[:6]]
     if not matches:
         return {
-            "answer": "没有找到足够可靠、已确认且与当前问题直接相关的历史记录。",
+            "answer": "没有在本场冻结来源、已确认历史或当前转写中找到足够直接的可追溯内容。",
             "matches": [],
             "grounded": False,
+            "truth_confirmed": False,
         }
+
+    top = matches[0]
+    prefix = {
+        "CONFIRMED_TRUTH": "已确认历史",
+        "PERSONAL_EVIDENCE": "本场个人证据",
+        "REFERENCE_SOURCE": "本场参考来源",
+        "USER_NOTE_NOT_EVIDENCE": "本场 Quick Note",
+        "OBSERVED_NOT_CONFIRMED": "本场转写观察",
+    }.get(top["authority"], "可追溯来源")
+    answer = f"{prefix}：{top['title']}"
+    if top.get("excerpt") and top["excerpt"] != top["title"]:
+        answer += f" — {top['excerpt']}"
     return {
-        "answer": "找到可追溯的相关记录：" + "；".join(item["title"] for item in matches[:3]),
+        "answer": answer[:1800],
         "matches": matches,
         "grounded": True,
+        "truth_confirmed": top["authority"] == "CONFIRMED_TRUTH",
     }
-
 
 def _recall_for_topic(space_id: str, topic: str) -> Optional[dict[str, Any]]:
     """Small deterministic retrieval fallback for local/offline runtime."""

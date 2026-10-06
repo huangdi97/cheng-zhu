@@ -550,6 +550,100 @@ def test_direct_question_cancels_stale_opportunity(product_env):
     assert old["user_action"] == "CANCELLED_BY_DIRECT_QUESTION"
 
 
+
+
+def test_proactive_recall_and_open_question_require_allowed_source_visibility(product_env):
+    space = conversations.create_space("Visibility", "PROJECT_SYNC")
+
+    prior = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(prior["id"])
+    hidden = conversations.add_item(
+        prior["id"],
+        item_type="Decision",
+        title="hidden migration fact",
+        source_refs=[{"kind": "DOCUMENT", "id": "secret", "visibility": "NO_GUIDANCE"}],
+    )
+    conversations.review_item(hidden["id"], "CONFIRM")
+    conversations.end_session(prior["id"])
+
+    live = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(live["id"])
+    result = conversations.evaluate_guidance(live["id"], {"current_topic": "hidden migration"})
+    assert result["guidance"] is None
+
+    open_item = conversations.add_item(
+        live["id"],
+        item_type="OpenQuestion",
+        title="hidden owner question",
+        source_refs=[{"kind": "DOCUMENT", "id": "secret-q", "visibility": "HIDDEN"}],
+    )
+    assert open_item["review_status"] == "AI_EXTRACTED"
+    result2 = conversations.evaluate_guidance(live["id"], {"current_topic": "unrelated"})
+    assert result2["guidance"] is None
+
+
+def test_transcript_recall_obeys_visibility_and_suggestion_budget(product_env):
+    space = conversations.create_space("Transcript Guard", "PROJECT_SYNC")
+    prior = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(prior["id"])
+
+    allowed = conversations.add_item(
+        prior["id"],
+        item_type="Decision",
+        title="allowed architecture decision",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确决定", "visibility": "PRIVATE"}],
+    )
+    conversations.review_item(allowed["id"], "CONFIRM")
+    hidden = conversations.add_item(
+        prior["id"],
+        item_type="Decision",
+        title="hidden pricing decision",
+        source_refs=[{"kind": "DOCUMENT", "id": "hidden", "visibility": "NO_GUIDANCE"}],
+    )
+    conversations.review_item(hidden["id"], "CONFIRM")
+    conversations.end_session(prior["id"])
+
+    live = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")
+    conversations.start_session(live["id"])
+    assert conversations.guidance_from_transcript(live["id"], "hidden pricing") is None
+
+    # Fill the Balanced proactive budget with three distinct manual opportunities.
+    for i in range(3):
+        shown = conversations.evaluate_guidance(live["id"], {
+            "candidate_text": f"budget item {i}",
+            "source_refs": [{"kind": "DOCUMENT", "id": f"b-{i}", "visibility": "PRIVATE"}],
+            "relevance": 1, "novelty": 1, "provenance_strength": 1,
+        })
+        assert shown["guidance"] is not None
+    assert conversations.guidance_from_transcript(live["id"], "allowed architecture") is None
+
+
+def test_frozen_pack_records_resolved_processing_route(product_env, monkeypatch):
+    from core import config as core_config
+
+    class Cfg:
+        stt_provider = "whisper"
+        doubao_stt_api_key = ""
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+
+    monkeypatch.setattr(core_config, "get_config", lambda: Cfg())
+    space = conversations.create_space("Pack Privacy", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        processing_mode="LOCAL",
+        consent_ack=True,
+    )
+    started = conversations.start_session(session["id"])
+    runtime = started["pack"]["payload"]["processing_runtime"]
+    assert runtime["mode"] == "LOCAL"
+    assert runtime["configured_stt_provider"] == "whisper"
+    assert runtime["main_audio_remote_possible"] is False
+    assert runtime["blockers"] == []
+
+
 def test_opportunity_needs_source_and_threshold(product_env):
     space = conversations.create_space("Sync", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")

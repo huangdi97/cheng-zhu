@@ -400,6 +400,8 @@ class GuidanceBody(BaseModel):
     direct_question: str = Field(default="", max_length=1200)
     answer_cue: str = Field(default="", max_length=1200)
     critical_risk: str = Field(default="", max_length=1200)
+    talking_point: str = Field(default="", max_length=1200)
+    delivery_focus: str = Field(default="", max_length=1200)
     candidate_text: str = Field(default="", max_length=1200)
     source_refs: list[dict[str, Any]] = Field(default_factory=list)
     user_speaking: bool = False

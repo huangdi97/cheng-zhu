@@ -4,7 +4,7 @@
 
 成竹（Chengzhu）是一个从简历启动、但不受简历限制的开放世界实时面试智能体：通过 Candidate Representation 理解候选人的真实经历，通过 Evidence Graph 与 Truth Boundary 保证个人事实不被模型随意改写，通过 Interview State 理解当前面试正在发生什么，通过 Context Compiler 为每一问选择最小充分上下文，通过 Answer Planner 决定以何种结构和深度回答，并利用通用知识与开放世界推理处理个人材料之外的新问题。
 
-> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [GitHub Latest](https://github.com/huangdi97/cheng-zhu/releases/latest)。v1.4.0 已完成完整 CI、Windows packaged replay、SHA256、download-back 并正式发布；v1.4.x 只接受验证/摩擦/可靠性类收口，不再扩一级产品。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
+> 当前产品 Canonical：[v1.3-R2 Goal-centered Interview OS](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md)；当前验证/硬化增量：[v1.4-R1 Product Validation Hardening](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md)；Frozen Verified Core = [v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)；Current Stable Release = [GitHub Latest](https://github.com/huangdi97/cheng-zhu/releases/latest)。v1.4.2 已完成完整 CI、Windows packaged replay、runtime UI evidence、clean-install replay、SHA256、download-back 与 release provenance gate 并正式发布；v1.4.x 只接受验证/摩擦/可靠性类收口，不再扩一级产品。历史文档（DESIGN.md / PRODUCT.md / v1.0-R1）仅作来源。
 
 v1.3 将成竹组织成一个 **Goal-centered Interview OS**：用户不是在“简历 / 题库 / 实时辅助 / 复盘”几个模块之间来回切换，而是围绕一个具体的公司 × 岗位持续推进。
 
@@ -32,7 +32,7 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 <p align="center">
   <img src="docs/screenshots/action-home.png" alt="成竹 v1.4 Action Home：围绕当前求职目标展示下一场、下一步重点与待处理事项" width="100%" />
   <br />
-  <sub>截图来自 v1.4.0 正式 Windows packaged release 的 runtime evidence。当前产品从 Goal 开始，而不是从“打开实时辅助”开始。</sub>
+  <sub>截图来自 v1.4.2 正式 Windows packaged release 的 runtime evidence。当前产品从 Goal 开始，而不是从“打开实时辅助”开始。</sub>
 </p>
 
 <table>
@@ -261,7 +261,7 @@ canonical（当前最高优先级设计）：[v1.3-R2](docs/canonical/Chengzhu_v
 | 隐私 | [Privacy 与 Policy](docs/privacy/PRIVACY_AND_POLICY.md) |
 ## README 素材更新
 
-README 主视觉必须和当前 Goal-centered 产品一致。当前公开截图来自 v1.4.0 正式 packaged runtime evidence：
+README 主视觉必须和当前 Goal-centered 产品一致。当前公开截图来自 v1.4.2 正式 packaged runtime evidence：
 
 - `action-home.png`
 - `goal-room.png`

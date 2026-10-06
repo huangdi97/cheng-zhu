@@ -324,7 +324,16 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <span>Participants {liveContext.data.participants.length}</span>
               <span>Open {liveContext.data.brief.unresolved_count ?? 0}</span>
             </div>
-            <div className="mt-2 text-[10px] text-text-muted">Data path · {liveContext.data.processing_runtime.mode ?? s.processing_mode} / STT {liveContext.data.processing_runtime.configured_stt_provider ?? '—'}</div>
+            <div className="mt-3 rounded-lg bg-bg-primary/55 px-2.5 py-2 text-[10px] text-text-muted">
+              <div className="font-semibold text-text-secondary">Frozen data path</div>
+              <div className="mt-1 grid gap-1">
+                <span>Capture · {liveContext.data.processing_runtime.data_path?.capture ?? '—'}</span>
+                <span>STT · {liveContext.data.processing_runtime.data_path?.stt ?? '—'} / {liveContext.data.processing_runtime.configured_stt_provider ?? '—'}</span>
+                <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
+                <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
+                <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
+              </div>
+            </div>
           </div> : null}
 
           <div className="rounded-2xl border border-bg-tertiary p-4">

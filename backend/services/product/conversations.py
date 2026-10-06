@@ -539,10 +539,9 @@ def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
         else:
             missing_note_ids.append(str(note_id))
     return {
-        "sources": pack_inputs["sources"],
-        "skipped_sources": pack_inputs["skipped_sources"],
-        "quick_notes": pack_inputs["quick_notes"],
-        "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
+        "sources": selected_sources,
+        "skipped_sources": skipped_sources,
+        "quick_notes": selected_notes,
         "missing_quick_note_ids": missing_note_ids,
     }
 
@@ -722,9 +721,10 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "space": {"id": space["id"], "profile": space["profile"], "title": space["title"]},
         "goal_ids": session.get("goal_ids") or [],
         "selected_source_ids": space.get("selected_source_ids") or [],
-        "sources": selected_sources,
-        "skipped_sources": skipped_sources,
-        "quick_notes": selected_notes,
+        "sources": pack_inputs["sources"],
+        "skipped_sources": pack_inputs["skipped_sources"],
+        "quick_notes": pack_inputs["quick_notes"],
+        "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
         "expression_profile": _expression_profile(),

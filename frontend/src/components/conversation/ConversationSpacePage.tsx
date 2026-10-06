@@ -48,6 +48,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const materials = useAsync(() => productApi.materials(), [])
   const quickNotes = useAsync(() => productApi.quickNotes(), [])
   const retention = useAsync(() => conversationApi.retentionPreview(spaceId), [spaceId])
+  const [sessionTitle, setSessionTitle] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
   const [capture, setCapture] = useState<CaptureMode>('NOTES_ONLY')
   const [processing, setProcessing] = useState<ProcessingMode>('LOCAL')
   const [mode, setMode] = useState<AssistanceMode>('BALANCED')
@@ -94,6 +96,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try {
       const session = await conversationApi.createSession(spaceId, {
+        title: sessionTitle.trim() || undefined,
+        scheduled_at: scheduledAt ? new Date(scheduledAt).getTime() / 1000 : null,
         capture_mode: capture,
         processing_mode: processing,
         assistance_mode: mode,
@@ -402,6 +406,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本与所选 Quick Notes；后续替换资料不会静默改写这场的 Pack。</p>
           </Section>
           <Section title="Preflight">
+            <div className="mb-3 grid gap-3 md:grid-cols-2">
+              <Field label="本场标题"><input className={inputCls} value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder={space.title} /></Field>
+              <Field label="人工排期（可选）"><input type="datetime-local" className={inputCls} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></Field>
+            </div>
+            <p className="mb-3 text-[11px] text-text-muted">没有 Calendar connector 也可以人工排期；有时间的 UPCOMING Session 会进入 Home / Room 的 Next Session。</p>
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="记录方式"><select className={inputCls} value={capture} onChange={(e) => setCapture(e.target.value as CaptureMode)}><option value="NOTES_ONLY">仅结构化笔记</option><option value="TRANSCRIPT">转写</option><option value="NO_CAPTURE">不记录</option></select></Field>
               <Field label="处理方式"><select className={inputCls} value={processing} onChange={(e) => setProcessing(e.target.value as ProcessingMode)}><option value="LOCAL">Local</option><option value="CLOUD">Cloud allowed</option><option value="OFF">Off（TRANSCRIPT / AI 会被阻止）</option></select></Field>

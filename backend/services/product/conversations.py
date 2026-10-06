@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any, Optional
 
 from services.product import materials
@@ -1469,6 +1470,128 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
     return saved
 
 
+def _candidate_kinds_from_sentence(sentence: str) -> list[str]:
+    text = str(sentence or "").strip()
+    lower = text.lower()
+    kinds: list[str] = []
+
+    question_markers = (
+        "为什么", "怎么", "如何", "是否", "能不能", "有没有", "谁", "什么时候",
+        "哪一个", "哪个", "what ", "why ", "how ", "who ", "when ", "which ",
+    )
+    if (
+        "?" in text or "？" in text
+        or any(lower.startswith(marker) for marker in question_markers)
+    ):
+        kinds.append("OpenQuestion")
+
+    decision_markers = (
+        "决定", "就按", "确定采用", "确认采用", "最终采用", "we decided",
+        "we'll use", "we will use", "go with ", "decision is ",
+    )
+    if any(marker in lower for marker in decision_markers):
+        kinds.append("Decision")
+
+    commitment_markers = (
+        "我来", "我负责", "我会", "我去", "我今天", "我明天",
+        "i'll ", "i will ", "i can own ", "i'll own ",
+    )
+    if any(marker in lower for marker in commitment_markers):
+        kinds.append("Commitment")
+
+    deadline_markers = (
+        "截止", "之前完成", "前完成", "周一前", "周二前", "周三前", "周四前", "周五前", "周六前", "周日前",
+        "deadline", " by monday", " by tuesday", " by wednesday", " by thursday", " by friday",
+    )
+    if any(marker in lower for marker in deadline_markers):
+        kinds.append("Deadline")
+
+    risk_markers = (
+        "明确风险", "风险是", "主要风险", "blocker", "is blocked", "blocking issue",
+    )
+    if any(marker in lower for marker in risk_markers):
+        kinds.append("Risk")
+
+    # One sentence may legitimately encode a commitment plus deadline. Preserve
+    # distinct candidate types, but do not duplicate a type.
+    return list(dict.fromkeys(kinds))
+
+
+def extract_transcript_candidates(session_id: str) -> list[dict[str, Any]]:
+    """Extract conservative review-only candidates from final transcript.
+
+    Current beta uses deterministic explicit-language rules so inference stays
+    local and auditable. Future model extraction may replace/augment this, but
+    it must preserve the same PROPOSED + AI_EXTRACTED review boundary.
+    """
+    session = require_session(session_id)
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["ai_assistance"] not in {"AI_ALLOWED", "AI_EXPECTED"}:
+        return []
+
+    segments = store.select(
+        "conversation_transcript_segment",
+        where="session_id = ? AND is_final = 1",
+        params=(session_id,),
+        order="created_at ASC",
+        limit=1000,
+    )
+    existing = {
+        (str(item.get("type") or ""), str(item.get("title") or "").strip())
+        for item in store.select(
+            "conversation_item",
+            where="session_id = ?",
+            params=(session_id,),
+            order="created_at ASC",
+        )
+    }
+    created: list[dict[str, Any]] = []
+
+    for seg in segments:
+        raw = str(seg.get("text") or "").strip()
+        if not raw:
+            continue
+        sentences = [
+            part.strip(" \t\r\n。！？!?")
+            for part in re.split(r"(?<=[。！？!?])\s*|\n+", raw)
+            if part.strip()
+        ]
+        for sentence in sentences[:20]:
+            if len(sentence) < 4:
+                continue
+            for item_type in _candidate_kinds_from_sentence(sentence):
+                key = (item_type, sentence[:1000])
+                if key in existing:
+                    continue
+                ref = {
+                    "kind": "TRANSCRIPT_SEGMENT",
+                    "id": seg.get("id") or "",
+                    "session_id": session_id,
+                    "timestamp": seg.get("created_at"),
+                    "channel": seg.get("channel") or "",
+                    "visibility": "PRIVATE",
+                    "excerpt": sentence[:500],
+                }
+                owner_id = ""
+                if item_type == "Commitment" and str(seg.get("channel") or "").upper() == "SELF_MIC":
+                    owner_id = "me"
+                saved = add_item(
+                    session_id,
+                    item_type=item_type,
+                    title=sentence[:1000],
+                    state="PROPOSED",
+                    owner_id=owner_id,
+                    source_refs=[ref],
+                    source_excerpt=sentence[:500],
+                    confidence=0.85,
+                    epistemic_status="INFERRED",
+                    review_status="AI_EXTRACTED",
+                )
+                created.append(saved)
+                existing.add(key)
+    return created
+
+
 def continue_summary(session_id: str) -> dict[str, Any]:
     session = require_session(session_id)
     items = store.select("conversation_item", where="session_id = ?", params=(session_id,), order="created_at ASC")
@@ -1522,6 +1645,9 @@ def end_session(session_id: str) -> dict[str, Any]:
     session = require_session(session_id)
     ts = store.now()
     if session["status"] != "ENDED":
+        # Candidate extraction runs while transcript/source provenance is still
+        # available. It is idempotent and never upgrades truth state.
+        extract_transcript_candidates(session_id)
         store.update("conversation_session", session_id, {"status": "ENDED", "ended_at": ts, "updated_at": ts})
     return continue_summary(session_id)
 

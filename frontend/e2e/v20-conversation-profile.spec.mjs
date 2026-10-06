@@ -180,6 +180,7 @@ function mocks() {
         selected_quick_note_ids: [],
         participants_count: 1,
         confirmed_items_count: 1,
+        expression_profile: { conclusion_first: true, target_seconds: 60, shape: 'bullet' },
         policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
       },
       privacy_note: '记录规则依场景与组织政策而异。',

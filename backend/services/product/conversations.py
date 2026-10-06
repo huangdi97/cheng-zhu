@@ -2566,7 +2566,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "export_manifest": {
             "categories": [
                 "transcript", "notes", "confirmed_items", "unconfirmed_candidates",
-                "guidance", "source_manifest", "draft_actions", "provenance_tombstones",
+                "guidance", "source_manifest", "draft_actions", "session_packs", "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -2585,5 +2585,6 @@ def export_space(space_id: str) -> dict[str, Any]:
         "provenance_tombstones": tombstones,
         "items": items,
         "threads": detail["threads"],
+        "session_packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
         "packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
     }

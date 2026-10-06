@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationItem, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -71,6 +71,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [participantPosition, setParticipantPosition] = useState('')
   const [participantAuthority, setParticipantAuthority] = useState('')
   const [participantRelationship, setParticipantRelationship] = useState('')
+  const [editingParticipantId, setEditingParticipantId] = useState('')
   const [goalTitle, setGoalTitle] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
@@ -114,11 +115,29 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
+  const resetParticipantEditor = () => {
+    setEditingParticipantId('')
+    setParticipantName(''); setParticipantRole(''); setParticipantPriority(''); setParticipantConcern('')
+    setParticipantPosition(''); setParticipantAuthority(''); setParticipantRelationship('')
+  }
+
+  const editParticipant = (participant: ConversationParticipant) => {
+    const known = participant.counterparty_state?.known_explicit ?? {}
+    setEditingParticipantId(participant.id)
+    setParticipantName(participant.display_name || '')
+    setParticipantRole(participant.role || '')
+    setParticipantPriority(known.priority || '')
+    setParticipantConcern(known.concern || '')
+    setParticipantPosition(known.stated_position || '')
+    setParticipantAuthority(known.decision_authority || '')
+    setParticipantRelationship(known.relationship_context || '')
+  }
+
   const addParticipant = async () => {
     if (!participantName.trim() && !participantRole.trim()) return
     setSessionBusy(true); setSessionError('')
     try {
-      await conversationApi.addParticipant(spaceId, {
+      const body = {
         display_name: participantName.trim(),
         role: participantRole.trim(),
         explicit_priority: participantPriority.trim(),
@@ -126,9 +145,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
         stated_position: participantPosition.trim(),
         decision_authority: participantAuthority.trim(),
         relationship_context: participantRelationship.trim(),
-      })
-      setParticipantName(''); setParticipantRole(''); setParticipantPriority(''); setParticipantConcern('')
-      setParticipantPosition(''); setParticipantAuthority(''); setParticipantRelationship('')
+      }
+      if (editingParticipantId) await conversationApi.patchParticipant(editingParticipantId, body)
+      else await conversationApi.addParticipant(spaceId, body)
+      resetParticipantEditor()
       await detail.reload(); await prepare.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -315,7 +335,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {space.participants.length ? <div className="space-y-2">{space.participants.map((p) => {
               const known = p.counterparty_state?.known_explicit ?? {}
               return <div key={p.id} className="rounded-xl border border-bg-tertiary/70 px-3 py-2">
-                <div className="text-xs font-medium text-text-primary">{p.display_name || '未命名'}{p.role ? ` · ${p.role}` : ''}</div>
+                <div className="flex items-center justify-between gap-2"><div className="text-xs font-medium text-text-primary">{p.display_name || '未命名'}{p.role ? ` · ${p.role}` : ''}</div><SecondaryButton disabled={sessionBusy} onClick={() => editParticipant(p)}>修正</SecondaryButton></div>
                 <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Known / Explicit · confidence {Math.round((p.counterparty_state?.confidence ?? 0) * 100)}%</div>
                 {known.priority ? <div className="mt-1 text-[11px] text-text-muted">明确优先级：{known.priority}</div> : null}
                 {known.concern ? <div className="mt-1 text-[11px] text-text-muted">明确关注：{known.concern}</div> : null}
@@ -326,7 +346,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               </div>
             })}</div> : <p className="text-xs text-text-muted">还没有明确参与者；系统不会凭声音自动建立长期身份，也不会推断情绪、人格或隐藏意图。</p>}
             <div className="mt-3 grid gap-2 sm:grid-cols-2"><input className={inputCls} value={participantName} onChange={(e) => setParticipantName(e.target.value)} placeholder="姓名 / 昵称（可选）" /><input className={inputCls} value={participantRole} onChange={(e) => setParticipantRole(e.target.value)} placeholder="明确角色，例如 Backend / CTO" /><input className={inputCls} value={participantPriority} onChange={(e) => setParticipantPriority(e.target.value)} placeholder="对方明确说过的优先级（可选）" /><input className={inputCls} value={participantConcern} onChange={(e) => setParticipantConcern(e.target.value)} placeholder="对方明确表达的 concern（可选）" /><input className={inputCls} value={participantPosition} onChange={(e) => setParticipantPosition(e.target.value)} placeholder="对方明确立场，例如先灰度再全量" /><input className={inputCls} value={participantAuthority} onChange={(e) => setParticipantAuthority(e.target.value)} placeholder="明确决策权限，例如架构方案批准人" /><input className={inputCls} value={participantRelationship} onChange={(e) => setParticipantRelationship(e.target.value)} placeholder="关系上下文，例如客户技术负责人 / 跨组协作者" /></div>
-            <div className="mt-2"><SecondaryButton onClick={addParticipant} disabled={sessionBusy || (!participantName.trim() && !participantRole.trim())} icon={<Plus className="h-3.5 w-3.5" />}>添加明确信息</SecondaryButton></div>
+            <div className="mt-2 flex gap-2"><SecondaryButton onClick={addParticipant} disabled={sessionBusy || (!participantName.trim() && !participantRole.trim())} icon={<Plus className="h-3.5 w-3.5" />}>{editingParticipantId ? '保存修正' : '添加明确信息'}</SecondaryButton>{editingParticipantId ? <SecondaryButton disabled={sessionBusy} onClick={resetParticipantEditor}>取消</SecondaryButton> : null}</div>
           </Section>
           <Section title="Conversation Goals">
             {space.goals.length ? <div className="space-y-2">{space.goals.map((g) => <div key={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-tertiary/70 px-3 py-2">

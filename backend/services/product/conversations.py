@@ -360,7 +360,8 @@ def list_space_summaries(status: str = "") -> list[dict[str, Any]]:
         ) or 0)
         open_questions = int(store.scalar(
             "SELECT COUNT(*) FROM conversation_item WHERE space_id = ? "
-            "AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+            "AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED','UNKNOWN') "
+            "AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
             (space["id"],),
         ) or 0)
         out.append({
@@ -1384,7 +1385,8 @@ def continue_summary(session_id: str) -> dict[str, Any]:
     items = store.select("conversation_item", where="session_id = ?", params=(session_id,), order="created_at ASC")
     decisions = [i for i in items if i["type"] == "Decision" and i["state"] == "AGREED"]
     commitments = [i for i in items if i["type"] in {"Commitment", "Task"} and i["state"] in {"COMMITTED", "DONE"}]
-    open_questions = [i for i in items if i["type"] == "OpenQuestion" and i["state"] not in {"DONE", "SUPERSEDED"}]
+    open_questions = [i for i in items if i["type"] == "OpenQuestion" and i["state"] not in {"DONE", "SUPERSEDED", "UNKNOWN"}]
+    reviewed_open_questions = [i for i in open_questions if i["review_status"] in THREAD_CONFIRMED_REVIEW]
     candidates = [i for i in items if i["review_status"] == "AI_EXTRACTED"]
     what_changed = [
         i for i in items
@@ -1398,12 +1400,22 @@ def continue_summary(session_id: str) -> dict[str, Any]:
         order="created_at ASC",
     )
     next_focus = None
-    if open_questions:
-        next_focus = {"kind": "OPEN_QUESTION", "title": open_questions[0]["title"], "source_ref": open_questions[0]["id"]}
+    if reviewed_open_questions:
+        next_focus = {"kind": "OPEN_QUESTION", "title": reviewed_open_questions[0]["title"], "source_ref": reviewed_open_questions[0]["id"]}
     else:
-        owed = [i for i in commitments if i["state"] == "COMMITTED" and i.get("owner_id") in {"me", "SELF", "我"}]
-        if owed:
-            next_focus = {"kind": "COMMITMENT", "title": owed[0]["title"], "source_ref": owed[0]["id"]}
+        space_threads = store.select(
+            "conversation_open_thread",
+            where="space_id = ? AND status = 'OPEN'",
+            params=(session["space_id"],),
+            order="created_at DESC",
+            limit=1,
+        )
+        if space_threads:
+            next_focus = {"kind": "OPEN_THREAD", "title": space_threads[0]["text"], "source_ref": space_threads[0]["id"]}
+        else:
+            owed = [i for i in commitments if i["state"] == "COMMITTED" and i.get("owner_id") in {"me", "SELF", "我"}]
+            if owed:
+                next_focus = {"kind": "COMMITMENT", "title": owed[0]["title"], "source_ref": owed[0]["id"]}
     return {
         "session": session,
         "decisions": decisions,
@@ -2037,8 +2049,15 @@ def space_detail(space_id: str) -> dict[str, Any]:
 def prepare_space(space_id: str) -> dict[str, Any]:
     detail = space_detail(space_id)
     active = [i for i in detail["commitments"] if i["state"] not in {"DONE", "SUPERSEDED"}]
-    unresolved = [i for i in detail["open_questions"] if i["state"] not in {"DONE", "SUPERSEDED"}]
-    decisions = [i for i in detail["decisions"] if i["state"] == "AGREED"]
+    unresolved = [
+        i for i in detail["open_questions"]
+        if i["state"] not in {"DONE", "SUPERSEDED", "UNKNOWN"}
+        and i["review_status"] in THREAD_CONFIRMED_REVIEW
+    ]
+    decisions = [
+        i for i in detail["decisions"]
+        if i["state"] == "AGREED" and i["review_status"] in THREAD_CONFIRMED_REVIEW
+    ]
     next_sessions = [s for s in detail["sessions"] if s["status"] == "UPCOMING"]
     next_sessions.sort(key=lambda s: s.get("scheduled_at") or float("inf"))
     return {
@@ -2053,7 +2072,7 @@ def prepare_space(space_id: str) -> dict[str, Any]:
         "selected_sources": detail.get("selected_source_ids") or [],
         "selected_quick_notes": detail.get("selected_quick_note_ids") or [],
         "brief": {
-            "last_change": detail["decisions"][0] if detail["decisions"] else None,
+            "last_change": decisions[0] if decisions else None,
             "unresolved_count": len(active) + len(detail["threads"]),
             "known_participants": len(detail["participants"]),
         },
@@ -2089,7 +2108,8 @@ def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
             (session_id,),
         ) or 0)
         row["open_questions_count"] = int(store.scalar(
-            "SELECT COUNT(*) FROM conversation_item WHERE session_id = ? AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+            "SELECT COUNT(*) FROM conversation_item WHERE session_id = ? AND type = 'OpenQuestion' "
+            "AND state NOT IN ('DONE','SUPERSEDED','UNKNOWN') AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
             (session_id,),
         ) or 0)
         row["review_required"] = int(store.scalar(
@@ -2120,7 +2140,8 @@ def home_summary() -> dict[str, Any]:
     )
     open_questions = store.select(
         "conversation_item",
-        where="type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+        where="type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED','UNKNOWN') "
+              "AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
         order="created_at DESC", limit=8,
     )
     changes = store.select(

@@ -16,6 +16,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [question, setQuestion] = useState('')
   const [candidate, setCandidate] = useState('')
   const [source, setSource] = useState('')
+  const [audienceRole, setAudienceRole] = useState('')
+  const [audiencePriority, setAudiencePriority] = useState('')
+  const [audienceConcern, setAudienceConcern] = useState('')
+  const [decisionAuthority, setDecisionAuthority] = useState('')
   const [speaking, setSpeaking] = useState(false)
   const [guidance, setGuidance] = useState<ConversationGuidance | null>(null)
   const [suppressed, setSuppressed] = useState('')
@@ -126,6 +130,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         goal_relevance: 0.8,
         decision_impact: 0.8,
         interruption_cost: speaking ? 2 : 0,
+        audience_role: audienceRole,
+        audience_priority: audiencePriority,
+        audience_concern: audienceConcern,
+        decision_authority: decisionAuthority,
       })
       setGuidance(result.guidance); setSuppressed(result.suppressed ?? '')
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -175,7 +183,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
   return (
     <Page wide testId="conversation-live">
-      <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode}`}
+      <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode} · AI ${s.policy?.ai_assistance ?? 'AI_ALLOWED'} · Human ${s.policy?.human_assistance ?? 'HUMAN_PRACTICE_ONLY'}`}
         actions={<PrimaryButton disabled={busy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>} />
 
       {error ? <ErrorState message={error} /> : null}
@@ -219,6 +227,16 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
               <Field label="值得补充的候选内容（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale" /></Field>
               <Field label="来源 / 依据"><textarea className={inputCls} rows={2} value={source} onChange={(e) => setSource(e.target.value)} placeholder="主动 Contribution Opportunity 必须有来源；没有来源会被抑制。" /></Field>
+              <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3">
+                <div className="text-xs font-semibold text-text-secondary">Stakeholder-aware Expression · 只用明确信息</div>
+                <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <input className={inputCls} value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="对方明确角色，例如 CTO / 客户" />
+                  <input className={inputCls} value={decisionAuthority} onChange={(e) => setDecisionAuthority(e.target.value)} placeholder="明确决策权限（可选）" />
+                  <input className={inputCls} value={audiencePriority} onChange={(e) => setAudiencePriority(e.target.value)} placeholder="对方明确优先级" />
+                  <input className={inputCls} value={audienceConcern} onChange={(e) => setAudienceConcern(e.target.value)} placeholder="对方明确 concern" />
+                </div>
+              </div>
             </div>
             <div className="mt-4"><PrimaryButton disabled={busy || s.status !== 'ACTIVE'} onClick={evaluate} icon={<Volume2 className="h-3.5 w-3.5" />}>评估当前 Guidance</PrimaryButton></div>
           </div>

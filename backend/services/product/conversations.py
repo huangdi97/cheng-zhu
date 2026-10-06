@@ -124,6 +124,59 @@ def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict
     return source
 
 
+def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool = False) -> dict[str, Any]:
+    """Resolve whether the shared STT transport satisfies this Session policy.
+
+    LOCAL is fail-closed because the mature shared pipeline may auto-open
+    Doubao streaming when credentials exist even when stt_provider=whisper.
+    Capture start calls this again so a config change after Preflight cannot
+    silently violate the frozen policy.
+    """
+    from core.config import get_config
+
+    cfg = get_config()
+    mode = str(session.get("processing_mode") or "LOCAL").upper()
+    capture_mode = str(session.get("capture_mode") or "NOTES_ONLY").upper()
+    policy = _normalize_session_policy(session.get("policy"))
+    provider = str(getattr(cfg, "stt_provider", "whisper") or "whisper").strip().lower()
+    has_doubao = bool(
+        getattr(cfg, "doubao_stt_api_key", "")
+        or getattr(cfg, "doubao_stt_access_token", "")
+    )
+    main_remote_possible = provider in {"doubao", "generic"} or (provider == "whisper" and has_doubao)
+
+    candidate_provider = str(getattr(cfg, "candidate_stt_provider", "whisper") or "whisper").strip().lower()
+    candidate_remote_enabled = bool(getattr(cfg, "candidate_remote_stt_enabled", False))
+    self_mic_remote_possible = include_self_mic and (
+        candidate_remote_enabled or candidate_provider in {"doubao", "generic"}
+    )
+
+    blockers: list[str] = []
+    if mode == "OFF":
+        if capture_mode == "TRANSCRIPT":
+            blockers.append("Processing=OFF 时不能启用 TRANSCRIPT")
+        if policy["ai_assistance"] != "AI_FORBIDDEN":
+            blockers.append("Processing=OFF 时 AI Assistance 必须为 AI_FORBIDDEN")
+    elif mode == "LOCAL":
+        if capture_mode == "TRANSCRIPT" and main_remote_possible:
+            blockers.append(
+                "Local Processing 要求主音频 STT 确定留在设备；当前共享 STT 配置存在远程路径"
+            )
+        if self_mic_remote_possible:
+            blockers.append(
+                "Local Processing 下所选自麦路径存在远程 ASR；请关闭远程候选人 ASR 或改用本地 Whisper"
+            )
+
+    return {
+        "mode": mode,
+        "capture_mode": capture_mode,
+        "configured_stt_provider": provider,
+        "main_audio_remote_possible": main_remote_possible,
+        "self_mic_remote_possible": self_mic_remote_possible,
+        "blockers": blockers,
+    }
+
+
 def _expression_profile() -> dict[str, Any]:
     """Reuse the user's existing '我的表达' preferences for Conversation.
 
@@ -464,6 +517,25 @@ def preflight(session_id: str) -> dict[str, Any]:
         blockers.append({"key": "consent", "label": "转写确认", "message": "开启转写前，请确认当前场景允许记录/转写。"})
     policy = _normalize_session_policy(session.get("policy"))
     retention = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
+    processing_runtime = processing_runtime_status(session)
+    for message in processing_runtime["blockers"]:
+        blockers.append({
+            "key": "processing_runtime",
+            "label": "处理方式",
+            "message": message,
+        })
+    if policy.get("connector_permissions"):
+        blockers.append({
+            "key": "connector_runtime",
+            "label": "连接器权限",
+            "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
+        })
+    if policy["share_privacy"] != "OFF":
+        blockers.append({
+            "key": "share_privacy_runtime",
+            "label": "屏幕共享保护",
+            "message": "现有 Private Overlay 仍属于 Interview Live 路径；Conversation 还没有独立 runtime 证明，因此当前必须保持 OFF。",
+        })
     if policy["screen_context"] != "OFF":
         blockers.append({
             "key": "screen_context_runtime",
@@ -480,7 +552,10 @@ def preflight(session_id: str) -> dict[str, Any]:
         {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
         {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
         {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": not blockers},
-        {"key": "processing", "label": "处理方式", "value": session["processing_mode"], "ok": True},
+        {"key": "processing", "label": "处理方式", "value": session["processing_mode"], "ok": not processing_runtime["blockers"]},
+        {"key": "stt_route", "label": "当前 STT 数据路径", "value": (
+            "REMOTE_POSSIBLE" if processing_runtime["main_audio_remote_possible"] else "LOCAL_ONLY"
+        ), "ok": not (session["processing_mode"] == "LOCAL" and processing_runtime["main_audio_remote_possible"])},
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": len(space.get("selected_source_ids") or []), "ok": True},
         {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": True},
@@ -497,6 +572,7 @@ def preflight(session_id: str) -> dict[str, Any]:
         "items": items,
         "blockers": blockers,
         "policy": policy,
+        "processing_runtime": processing_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),

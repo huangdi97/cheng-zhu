@@ -31,6 +31,18 @@ const SESSION = {
   processing_mode: 'LOCAL',
   assistance_mode: 'BALANCED',
   consent_ack: true,
+  policy: {
+    transcript_retention: 'SPACE_POLICY',
+    screen_context: 'OFF',
+    ai_assistance: 'AI_ALLOWED',
+    human_assistance: 'HUMAN_PRACTICE_ONLY',
+    share_privacy: 'OFF',
+    external_writeback: 'REVIEW_REQUIRED',
+    connector_permissions: [],
+    speaker_biometric_identity: 'OFF',
+    emotion_sentiment_profiling: 'OFF',
+    hidden_intent_claims: 'OFF',
+  },
   pack_id: 'cpack-v2',
   status: 'ACTIVE',
   state: { current_topic: '', open_threads: [], last_guidance_id: '' },
@@ -93,6 +105,13 @@ function mocks() {
         { key: 'ONE_ON_ONE', label: '1:1', default_mode: 'ONE_ON_ONE', guidance: ['RECALL', 'QUESTION'] },
       ],
     }
+    if (pathname === '/api/product/conversation/history') return {
+      items: [{
+        ...SESSION, status: 'ENDED', ended_at: 3,
+        space_title: SPACE.title, space_profile: SPACE.profile,
+        decisions_count: 1, commitments_count: 0, open_questions_count: 1, review_required: 1,
+      }],
+    }
     if (pathname === '/api/product/conversation/home') return {
       state: 'ACTIVE',
       spaces: [SPACE],
@@ -108,7 +127,15 @@ function mocks() {
       ...SPACE,
       goals: [{ id: 'cg-1', space_id: SPACE.id, title: SPACE.default_goal, outcome_definition: '', status: 'ACTIVE', priority: 50, source: { kind: 'USER' }, created_at: 1, resolved_at: null }],
       sessions: [{ ...session, status: 'ENDED', ended_at: 3 }],
-      participants: [{ id: 'cp-1', space_id: SPACE.id, session_id: null, display_name: 'Alex', role: 'Backend', organization: '', identity_confidence: 1, identity_source: 'USER', visibility: 'PRIVATE', observations: [] }],
+      participants: [{
+        id: 'cp-1', space_id: SPACE.id, session_id: null, display_name: 'Alex', role: 'Backend',
+        organization: '', identity_confidence: 1, identity_source: 'USER', visibility: 'PRIVATE', observations: [],
+        counterparty_state: {
+          known_explicit: { priority: '迁移稳定性', concern: '回滚风险' },
+          source_refs: [{ kind: 'USER_NOTE', excerpt: 'Alex 明确关注回滚风险' }],
+          temporary_inferences: [], unknown: [],
+        },
+      }],
       decisions: [DECISION],
       commitments: [],
       open_questions: [OPEN],
@@ -124,6 +151,9 @@ function mocks() {
       participants: [],
       selected_sources: ['benchmark-note'],
       selected_quick_notes: [],
+      brief: { last_change: DECISION, unresolved_count: 1, known_participants: 1 },
+      expected_questions: [OPEN.title],
+      contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
@@ -141,6 +171,7 @@ function mocks() {
         { key: 'mode', label: '帮助方式', value: 'BALANCED', ok: true },
       ],
       blockers: [],
+      policy: SESSION.policy,
       privacy_note: '记录规则依场景与组织政策而异。',
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/start` && method === 'POST') {
@@ -181,17 +212,22 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/end` && method === 'POST') {
       session = { ...session, status: 'ENDED', ended_at: 3 }
-      return { session, decisions: [DECISION], commitments: [], open_questions: [OPEN], candidates: [OPEN], next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, source_ref: OPEN.id }, review_required: 1 }
+      return { session, decisions: [DECISION], commitments: [], open_questions: [OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, source_ref: OPEN.id }, review_required: 1 }
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) return {
       session: { ...session, status: 'ENDED', ended_at: 3 },
       decisions: [DECISION], commitments: [], open_questions: [OPEN], candidates: [OPEN],
+      what_changed: [DECISION], pins: [],
       next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, source_ref: OPEN.id }, review_required: 1,
     }
     if (pathname.startsWith('/api/product/conversation/items/') && pathname.endsWith('/review')) return { ...OPEN, review_status: 'USER_CONFIRMED' }
     if (pathname.startsWith('/api/product/conversation/guidance/')) return { id: 'ge-1', user_action: request.postDataJSON().action }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/export`) return { kind: 'CONVERSATION_SPACE', contract: 'v2.0-R1', space: SPACE }
-    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/participants`) return { id: 'cp-2', display_name: 'Lei', role: 'Product' }
+    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/participants`) return {
+      id: 'cp-2', display_name: 'Lei', role: 'Product', counterparty_state: {
+        known_explicit: request.postDataJSON(), source_refs: [], temporary_inferences: [], unknown: [],
+      },
+    }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/goals`) return { id: 'cg-2', title: '确认 owner' }
     return undefined
   }
@@ -362,6 +398,23 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '继续' }).click()
     await page.getByRole('button', { name: '停止转写' }).click()
     await expect(page.getByText('OFF', { exact: true })).toBeVisible()
+  })
+
+  test('Conversation History stays inside Conversation Profile and returns to the same Space', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto('/#/conversation')
+    await page.getByRole('button', { name: /历史/ }).first().click()
+    await expect(page).toHaveURL(/#\/history/)
+    await expect(page.getByTestId('conversation-history')).toBeVisible()
+    await expect(page.getByText('Review #1')).toBeVisible()
+    await expect(page.getByText('1 Decisions')).toBeVisible()
+    await page.getByRole('button', { name: /Review #1/ }).click()
+    await expect(page).toHaveURL(new RegExp(`#/conversation/spaces/${SPACE.id}/sessions`))
+    await expect(page.getByTestId('conversation-space')).toBeVisible()
   })
 
   test('Conversation surfaces remain usable at 390px', async ({ context, page }) => {

@@ -702,6 +702,57 @@ def test_source_aware_ask_does_not_promote_unconfirmed_items(product_env):
 
 
 
+
+
+def test_session_context_is_minimal_and_frozen_at_start(product_env):
+    material = materials.create_material(
+        "Architecture Brief",
+        kind="PROJECT",
+        usage="FACTS",
+        text=("Architecture source says rollback owner is unresolved and offline migration uses v2. " * 3),
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        default_goal="决定 conflict merge strategy",
+        selected_source_ids=[material["id"]],
+    )
+
+    prior = conversations.create_session(space["id"], title="Prior", consent_ack=True)
+    conversations.start_session(prior["id"])
+    conversations.add_item(
+        prior["id"],
+        item_type="OpenQuestion",
+        title="确认 rollback owner",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "owner 仍未确认"}],
+    )
+    conversations.end_session(prior["id"])
+
+    live = conversations.create_session(space["id"], title="Live", consent_ack=True)
+    started = conversations.start_session(live["id"])
+    digest = started["pack"]["digest"]
+    frozen_version = started["pack"]["payload"]["sources"][0]["version_id"]
+
+    context = conversations.session_context(live["id"])
+    assert context["brief"]["goal"] == "决定 conflict merge strategy"
+    assert "确认 rollback owner" in context["brief"]["agenda"]
+    assert context["pack_digest"] == digest
+    assert context["sources"][0]["version_id"] == frozen_version
+    assert "text" not in context["sources"][0]
+
+    # Mutate the Space and source after start; the Live read model stays pinned
+    # to the frozen Session Pack.
+    conversations.update_space(space["id"], {"default_goal": "新目标不应进入旧会话"})
+    materials.replace_material(
+        material["id"],
+        text=("Replacement source says a completely different architecture and owner. " * 3),
+    )
+    later = conversations.session_context(live["id"])
+    assert later["brief"]["goal"] == "决定 conflict merge strategy"
+    assert later["sources"][0]["version_id"] == frozen_version
+    assert later["pack_digest"] == digest
+
+
 def test_manual_ask_uses_frozen_ready_sources_not_latest_material(product_env):
     material = materials.create_material(
         "Q4 Benchmark",

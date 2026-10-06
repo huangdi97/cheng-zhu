@@ -84,6 +84,8 @@ export interface SourceRef {
   timestamp?: number
   excerpt?: string
   visibility?: string
+  version_id?: string
+  content_hash?: string
 }
 
 export interface ConversationTemplate {
@@ -308,6 +310,25 @@ export interface ConversationTranscriptSegment {
   source: string
   is_final: boolean
   created_at: number
+}
+
+export interface ConversationAskMatch {
+  id: string
+  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'QUICK_NOTE' | 'TRANSCRIPT_SEGMENT'
+  authority: 'CONFIRMED_TRUTH' | 'PERSONAL_EVIDENCE' | 'REFERENCE_SOURCE' | 'USER_NOTE_NOT_EVIDENCE' | 'OBSERVED_NOT_CONFIRMED'
+  title: string
+  excerpt: string
+  item_type: string
+  state: string
+  review_status: string
+  source_refs: SourceRef[]
+}
+
+export interface ConversationAskResult {
+  answer: string
+  matches: ConversationAskMatch[]
+  grounded: boolean
+  truth_confirmed: boolean
 }
 
 export interface ConversationCaptureStatus {

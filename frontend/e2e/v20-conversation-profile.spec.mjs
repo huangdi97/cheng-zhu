@@ -174,6 +174,14 @@ function mocks() {
       ],
       blockers: [],
       policy: SESSION.policy,
+      processing_runtime: {
+        mode: 'LOCAL',
+        capture_mode: 'NOTES_ONLY',
+        configured_stt_provider: 'whisper',
+        main_audio_remote_possible: false,
+        self_mic_remote_possible: false,
+        blockers: [],
+      },
       pack_preview: {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],

@@ -1,34 +1,35 @@
-# Chengzhu v1.4.0 — Final Reality Report
+# Chengzhu v1.4.2 — Final Reality Report
 
 > **Status:** RELEASE_READY_WITH_EXTERNAL_BLOCKERS
 >
-> v1.4.0 is publicly released and its required engineering/release gates are closed.
-> This report distinguishes engineering evidence from real-user evidence. Synthetic / local signals must not be described as PMF or real-interview transfer.
+> v1.4.2 is the current public Windows release and the final reproducible baseline for the v1.3-R2 → v1.4 design-convergence cycle.
+> This report distinguishes engineering/release evidence from real-user evidence. Synthetic/local evidence must not be described as PMF or real-interview transfer.
 
 ## 1. Final release facts
 
 ```text
-main merge commit:
-31c920ba159eb99d6c687b34aa282fe2b7062e6f
-
-authoritative PR:
-#11
-feat/chengzhu-v1.4-final-hardening
-merged = true
+authoritative main / public tag / binary source:
+ce72eb4068408fd22be8eb421503e7b1b59dc856
 
 main CI:
-run 37315468179
+run 37409763712
 conclusion = success
 
 release publish / download-back workflow:
-run 37316020206
+run 37410110368
+conclusion = success
+
+release dispatcher:
+publish-v1.4.2-on-green-main
+run 37410098878
 conclusion = success
 
 tag:
-v1.4.0
+v1.4.2
+tag SHA = ce72eb4068408fd22be8eb421503e7b1b59dc856
 
 GitHub Release:
-published 2026-10-05T13:37:12Z
+published 2026-10-06T04:00:04Z
 ```
 
 Public assets:
@@ -39,16 +40,24 @@ Chengzhu-Portable-x64.zip
 SHA256SUMS.txt
 LICENSE.txt
 THIRD_PARTY_NOTICES.md
-RELEASE_NOTES_v1.4.0.md
+RELEASE_NOTES_v1.4.2.md
 ```
 
-The release workflow completed the release replay/download-back path rather than treating the local build directory as release evidence.
+Release workflow artifacts:
+
+```text
+chengzhu-windows-release
+chengzhu-runtime-ui-evidence
+chengzhu-download-back-verification
+```
+
+The public v1.4.2 tag resolves to the exact same SHA used by the green main CI and release build. This closes the moving-main provenance defect discovered in v1.4.1.
 
 ---
 
 ## 2. Product baseline
 
-v1.4.0 hardens the released v1.3 Goal-centered Interview OS.
+v1.4.2 contains the complete released v1.3 Goal-centered Interview OS plus v1.4 Product Validation Hardening and the final v1.4.x product-craft/release-provenance closure.
 
 Frozen product loop:
 
@@ -63,9 +72,7 @@ Goal
 → Next Focus
 ```
 
-v1.4 does not add another top-level product.
-
-Top-level IA remains:
+Top-level IA:
 
 ```text
 首页
@@ -79,23 +86,22 @@ Top-level IA remains:
                          [上场]
 ```
 
+No Meeting / Presentation / 1:1 top-level product is introduced in v1.4.2.
+
 ---
 
-## 3. Product/UI status
+## 3. v1.3-R2 product design status
 
 ### Studio
 
-- Action Home: PRODUCT_COMPLETE
-- Goal Room: PRODUCT_COMPLETE
-- Goal Prepare: PRODUCT_COMPLETE
-- Goal Interviews / Offer: PRODUCT_COMPLETE
-- Person Workspace: PRODUCT_COMPLETE
-- Fact Inbox: PRODUCT_COMPLETE
-- Stories / Skills / Expression: PRODUCT_COMPLETE
+- Action Home: PRODUCT_COMPLETE / CI-PROVEN / PACKAGED-PROVEN
+- Goal Room: PRODUCT_COMPLETE / CI-PROVEN / PACKAGED-PROVEN
+- Goal Prepare / Interviews / Offer: PRODUCT_COMPLETE
+- Person Workspace / Fact Inbox / Stories / Skills / Expression: PRODUCT_COMPLETE
 - Materials / Quick Notes / Question Banks: PRODUCT_COMPLETE
-- Command Palette: PRODUCT_COMPLETE
-- Settings 3.0: PRODUCT_COMPLETE
+- Command Palette: PRODUCT_COMPLETE / PACKAGED-PROVEN
 - History / Reflection: PRODUCT_COMPLETE
+- Settings 3.0 / local validation UI: PRODUCT_COMPLETE
 - Goal progress trends: PRODUCT_COMPLETE without hire/readiness scores
 
 ### Practice
@@ -113,7 +119,6 @@ Top-level IA remains:
 - Preflight 3.0: PRODUCT_COMPLETE
 - Question → Fast Cue → Source/Warning hierarchy: PRODUCT_COMPLETE
 - Deep Answer secondary layer: PRODUCT_COMPLETE
-- previous-turn disclosure: PRODUCT_COMPLETE
 - Quick Notes: PRODUCT_COMPLETE
 - Pin Moment: PRODUCT_COMPLETE
 - Nudge / Open Thread: PRODUCT_COMPLETE
@@ -121,6 +126,7 @@ Top-level IA remains:
 - Overlay 3.0: PRODUCT_COMPLETE within hosted-runner limits
 - Human Coach policy boundary: PRODUCT_COMPLETE
 - Share Privacy default OFF: PRODUCT_COMPLETE
+- formal Live stop → product live/end → Reflection: PRODUCT_COMPLETE since v1.4.1
 
 ### Onboarding
 
@@ -131,9 +137,11 @@ Top-level IA remains:
 
 ---
 
-## 4. Six v1.4 validation questions
+## 4. v1.4 validation hardening status
 
-| Question | Engineering path | Final v1.4 truth |
+Six core validation questions:
+
+| Question | Engineering path | Final truth |
 | --- | --- | --- |
 | A · Goal reused over time? | local ProductEvent + longitudinal synthetic continuity | ENGINEERING_PROVEN / REAL_USER_PENDING |
 | B · Reflection changes next Prepare? | ReflectionAction → NextFocus → Goal/Practice | ENGINEERING_PROVEN |
@@ -142,27 +150,7 @@ Top-level IA remains:
 | E · Fact Inbox burden? | backlog / resolve / dismiss / reopen / time signals | INSTRUMENTED / REAL_USER_PENDING |
 | F · Quick Notes / Pin valuable? | Pack use + Reflection write-back + Pin conversion | ENGINEERING_PROVEN / REAL_USER_PENDING |
 
-Required truth label:
-
-```text
-REAL_USER_EVIDENCE_PENDING
-```
-
-Not allowed:
-
-```text
-PMF_PROVEN
-REAL_INTERVIEW_TRANSFER_PROVEN
-V1_4_REAL_VALIDATION_COMPLETE
-```
-
-until real participant evidence exists.
-
----
-
-## 5. Engineering validation
-
-v1.4 includes deterministic evidence for:
+Engineering continuity evidence includes:
 
 ```text
 7-day synthetic continuity
@@ -176,143 +164,102 @@ provider-failure recovery
 bounded state / latency history
 ```
 
-These prove engineering continuity only.
-
-They do **not** simulate:
-
-- real sleep/wake behavior;
-- real audio-device switching;
-- real network/provider incidents;
-- human fatigue;
-- real 3-hour interview participation;
-- real longitudinal retention.
-
-Those remain external evidence.
+These are engineering proofs only.
 
 ---
 
-## 6. Local-first validation / privacy
+## 5. Frozen Verified Core
 
-ProductEvent is local-first.
+v1.4.2 preserves the authoritative v1.2/v1.3 core:
 
-Allowed event content is bounded metadata such as:
-
-- IDs;
-- counts;
-- booleans;
-- durations;
-- bounded categories.
-
-Rejected from validation events:
-
-- full resume;
-- raw audio;
-- API keys;
-- full transcript;
-- full evidence documents;
-- arbitrary high-risk free text.
-
-Remote telemetry remains opt-in and is not required for engineering completion.
-
----
-
-## 7. Frozen Verified Core
-
-v1.4.0 preserves the v1.2/v1.3 Verified Core:
-
+- Candidate/Person factual boundary;
+- Provenance / User Assertion / Session Statement separation;
 - frozen InterviewPack;
 - Context Compiler authority;
-- Provenance / Assertion / Session Statement separation;
-- Question Routing;
+- Question Understanding / Routing / Follow-up resolution;
 - Fast Cue before Deep;
 - Stream Truth Guard;
 - Session Claim boundary;
-- Human Assistance policy;
+- Human Assistance Policy;
 - Share Privacy boundary;
-- packaged Windows sidecar.
+- Windows packaged backend sidecar.
 
-Main CI and packaged release replay closed without weakening these gates.
+No final-design work weakened these contracts.
 
 ---
 
-## 8. Release engineering
+## 6. Release engineering
 
-Version-bearing surfaces agree on v1.4.0:
+v1.4.2 closes the complete Windows release chain:
 
-```text
-frontend/package.json
-frontend/package-lock.json
-desktop/package.json
-desktop/package-lock.json
-backend/sidecar.py APP_VERSION
-docs/RELEASE_NOTES_v1.4.0.md
-```
-
-Required release evidence is closed:
-
-- backend suite: PASS
-- frontend unit/typecheck/build: PASS
-- desktop suite: PASS
+- backend / frontend / desktop tests: PASS
+- typecheck/build: PASS
 - functional Playwright: PASS
 - visual regression: PASS
 - accessibility/e2e gates: PASS
 - packaged smoke: PASS
 - Windows installer + portable: PASS
+- runtime UI evidence: PASS
 - clean-install replay: PASS
-- release SHA256 generation: PASS
+- SHA256 generation: PASS
 - GitHub Release: PASS
-- release download-back verification: PASS
+- public download-back verification: PASS
+- public tag SHA == release source SHA: PASS
+
+The v1.4.1 moving-main race is explicitly superseded by v1.4.2 as the reproducible baseline.
 
 ---
 
-## 9. Friction audit and v1.4.1 patch
+## 7. Release provenance invariant
 
-After v1.4.0 release, a final interaction-path audit found one real product-loop defect:
-
-```text
-Live stop
-→ Verified realtime core stopped
-→ product-layer live/end was not guaranteed
-→ Reflection routing / live_completed / session linkage could be missed
-```
-
-This does **not** invalidate the v1.4.0 release engineering evidence, but it is a product-loop defect and is being closed by:
+Required and now proven for v1.4.2:
 
 ```text
-PR #12
-fix/v1.4-live-reflection-closure
-target v1.4.1
+green main CI head SHA
+==
+release source_sha
+==
+release checkout SHA
+==
+installer / portable source SHA
+==
+draft Release target SHA
+==
+public tag SHA
 ```
 
-The patch makes the formal stop action:
+Concrete value:
 
 ```text
-POST /api/stop
-→ productApi.liveEnd(session_id)
-→ close Goal/session linkage
-→ clear session overrides
-→ record live_completed
-→ obtain reflection_ref
-→ open Reflection
+ce72eb4068408fd22be8eb421503e7b1b59dc856
 ```
 
-Until v1.4.1 is published, v1.4.0 remains the current stable release.
+This invariant is now part of the release workflow contract.
 
 ---
 
-## 10. External blockers / non-claims
+## 8. Public product truth
 
-Not required for the Windows engineering release:
+README, current public screenshots and product docs are aligned to the Goal-centered Interview OS.
 
-- code-signing certificate;
-- macOS signing / notarization;
-- public Human Coach relay;
-- real paid-provider quality / latency / cost matrix;
-- native multi-monitor Overlay proof on an interactive Windows desktop;
-- real longitudinal users;
-- real multi-hour human sessions.
+Public screenshots represent the current product surfaces:
 
-Therefore the correct release statement is:
+- Action Home
+- Goal Room
+- Practice
+- Preflight
+- Live Fast Cue
+- Reflection
+- Command Palette
+- 390px Goal Prepare
+
+Legacy module-first screenshots remain historical only and are not allowed to overwrite current product media.
+
+---
+
+## 9. Product-validation truth boundary
+
+Strongest valid claims:
 
 ```text
 V1_4_ENGINEERING_COMPLETE
@@ -321,14 +268,42 @@ RELEASE_READY_WITH_EXTERNAL_BLOCKERS
 REAL_USER_EVIDENCE_PENDING
 ```
 
+Not allowed without real participant evidence:
+
+```text
+PMF_PROVEN
+REAL_INTERVIEW_TRANSFER_PROVEN
+V1_4_REAL_VALIDATION_COMPLETE
+```
+
+---
+
+## 10. Remaining external / non-design evidence
+
+Not required for the Windows engineering release:
+
+- code-signing certificate;
+- macOS signing / notarization;
+- public Human Coach relay;
+- real paid-provider quality / latency / cost matrix;
+- interactive native multi-monitor Overlay proof;
+- real longitudinal users;
+- real multi-hour human sessions.
+
+These are not unfinished v1.3/v1.4 product-design tasks.
+
 ---
 
 ## 11. Personal Conversation Intelligence
 
-Future Conversation Profile remains canonical but is intentionally **not productized** in v1.4.
+The complete future Conversation Profile remains canonical and deliberately unproductized in v1.4.
 
-Retained concepts:
+Retained future concepts include:
 
+- Person Representation;
+- Conversation Goal / Conversation State;
+- Counterparty State;
+- Expression Planner;
 - Recall;
 - Talking Point;
 - Answer Cue;
@@ -336,25 +311,37 @@ Retained concepts:
 - Risk / Contradiction;
 - Delivery;
 - Contribution Opportunity;
-- Counterparty State;
-- Expression Planner;
-- Decision / Commitment / Task / OpenQuestion.
+- Decision / Commitment / Task / OpenQuestion;
+- Before / During / After;
+- Desktop Sidecar;
+- future Connector / MCP integration.
 
-No Meeting / Presentation / 1:1 top-level navigation is added.
+The correct current boundary remains:
+
+```text
+Interview = first proven product profile
+Conversation = future second profile
+```
 
 ---
 
 ## 12. Final verdict
 
 ```text
-v1.4.0 PUBLIC RELEASE = PASS
+v1.3-R2 GOAL-CENTERED INTERVIEW OS = IMPLEMENTED / RELEASED
+v1.4-R1 VALIDATION HARDENING = IMPLEMENTED / RELEASED
+v1.4.2 FINAL DESIGN CONVERGENCE = PUBLIC RELEASE / REPRODUCIBLE BASELINE
+
 MAIN CI = PASS
 WINDOWS PACKAGED RELEASE = PASS
+RUNTIME UI EVIDENCE = PASS
 DOWNLOAD-BACK = PASS
+PUBLIC TAG PROVENANCE = PASS
+
 V1_4_ENGINEERING_COMPLETE = PASS
 PRODUCT_VALIDATION_INFRA_COMPLETE = PASS
 REAL_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-A later v1.4.1 patch may improve product-loop closure, but it must preserve the same evidence boundary.
+Unless a new real defect is found, further Interview work should be evidence-led rather than feature-count-led.

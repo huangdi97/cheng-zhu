@@ -94,6 +94,12 @@ export interface ConversationTemplate {
   label: string
   default_mode: AssistanceMode
   guidance: GuidanceKind[]
+  runtime_available: boolean
+  launch_wedge: boolean
+  specialized_behavior_validated: boolean
+  stable_release: boolean
+  real_user_validated: boolean
+  maturity: 'BETA_WEDGE' | 'SHARED_RUNTIME_TEMPLATE'
 }
 
 export interface ConversationSpace {

@@ -88,6 +88,36 @@ def test_transcript_preflight_requires_explicit_ack(product_env):
 
 
 
+
+
+def test_conversation_pack_reuses_shared_expression_profile(product_env, monkeypatch):
+    monkeypatch.setattr(
+        conversations.intelligence_store,
+        "get_voice_profile",
+        lambda owner: {
+            "profile": {
+                "explicit_preferences": {
+                    "conclusion_first": True,
+                    "target_seconds": 45,
+                    "language": "zh-CN",
+                    "term_style": "keep_english_terms",
+                    "shape": "bullet",
+                    "banned_phrases": ["赋能"],
+                }
+            }
+        },
+    )
+    space = conversations.create_space("Expression", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    check = conversations.preflight(session["id"])
+    assert check["pack_preview"]["expression_profile"]["target_seconds"] == 45
+    started = conversations.start_session(session["id"])
+    expression = started["pack"]["payload"]["expression_profile"]
+    assert expression["conclusion_first"] is True
+    assert expression["shape"] == "bullet"
+    assert expression["banned_phrases"] == ["赋能"]
+
+
 def test_session_policy_is_normalized_frozen_and_enforced(product_env):
     space = conversations.create_space("Policy Review", "DESIGN_REVIEW")
     session = conversations.create_session(
@@ -853,6 +883,37 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
     assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
     assert diag["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
     assert diag["privacy"]["auto_external_writeback"] == "OFF"
+
+
+
+
+def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product_env):
+    space = conversations.create_space("Eval", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    shown = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "为什么？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "source"}],
+    })["guidance"]
+    conversations.set_guidance_action(shown["id"], "USED")
+    conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "没有来源的主动提示",
+        "source_refs": [],
+        "relevance": 1,
+        "novelty": 1,
+        "provenance_strength": 0,
+    })
+
+    diag = conversations.diagnostics()
+    assert diag["runtime"]["guidance_adopted"] == 1
+    assert diag["evaluation"]["observed_proxies"]["guidance_adoption_rate"] == 1.0
+    assert "opportunity_precision" in diag["evaluation"]["requires_human_labels"]
+    assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
+    assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
+    assert diag["health"]["conversation_screen_context"] == "BLOCKED_NOT_WIRED"
+    assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
+    assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
+    assert diag["privacy"]["hidden_intent_claims"] == "OFF"
 
 
 def test_space_summaries_grouping_inputs_include_upcoming_and_open_counts(product_env):

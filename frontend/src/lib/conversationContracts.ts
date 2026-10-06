@@ -252,6 +252,7 @@ export interface ConversationPreflight {
   space: ConversationSpace
   items: Array<{ key: string; label: string; value: string | number | boolean; ok: boolean }>
   blockers: Array<{ key: string; label: string; message: string }>
+  warnings: Array<{ key: string; label: string; message: string }>
   policy: ConversationSessionPolicy
   processing_runtime: {
     mode: ProcessingMode
@@ -265,9 +266,29 @@ export interface ConversationPreflight {
     goal_ids: string[]
     selected_source_ids: string[]
     selected_quick_note_ids: string[]
+    sources: Array<{
+      material_id: string
+      version_id: string
+      title: string
+      kind: string
+      usage: string
+      content_hash: string
+      is_personal_evidence: boolean
+    }>
+    skipped_sources: Array<{ id: string; title: string; reason: string }>
+    quick_notes: Array<{ id: string; title: string }>
+    missing_quick_note_ids: string[]
     participants_count: number
     confirmed_items_count: number
     expression_profile: Record<string, unknown>
+    processing_runtime: {
+      mode: ProcessingMode
+      capture_mode: CaptureMode
+      configured_stt_provider: string
+      main_audio_remote_possible: boolean
+      self_mic_remote_possible: boolean
+      blockers: string[]
+    }
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
   privacy_note: string

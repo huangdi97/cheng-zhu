@@ -135,7 +135,7 @@ export const conversationApi = {
     epistemic_status?: string
     review_status?: string
   }) => request<ConversationItem>(`${B}/sessions/${encodeURIComponent(id)}/items`, json('POST', body)),
-  reviewItem: (id: string, action: 'CONFIRM' | 'EDIT' | 'REJECT' | 'DONE' | 'SUPERSEDE', patch: Record<string, unknown> = {}) =>
+  reviewItem: (id: string, action: 'CONFIRM' | 'EDIT' | 'REJECT' | 'DONE' | 'RESOLVE' | 'SUPERSEDE', patch: Record<string, unknown> = {}) =>
     request<ConversationItem>(`${B}/items/${encodeURIComponent(id)}/review`, json('POST', { action, patch })),
   evaluateGuidance: (id: string, body: {
     current_topic?: string

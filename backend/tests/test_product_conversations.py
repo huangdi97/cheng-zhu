@@ -38,6 +38,42 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
     assert "counterparty_state_json" in participant_cols
 
 
+
+
+def test_active_conversation_goals_default_into_new_session_and_old_pack_stays_frozen(product_env):
+    space = conversations.create_space("Goal Continuity", "PROJECT_SYNC")
+    first_goal = conversations.create_goal(
+        space["id"], "决定 rollout strategy", outcome_definition="形成明确方案", priority=90,
+    )
+    second_goal = conversations.create_goal(
+        space["id"], "确认 rollback owner", outcome_definition="owner 明确", priority=80,
+    )
+
+    first_session = conversations.create_session(space["id"], consent_ack=True)
+    assert first_session["goal_ids"] == [first_goal["id"], second_goal["id"]]
+    first_pack = conversations.start_session(first_session["id"])["pack"]
+    frozen_ids = [g["id"] for g in first_pack["payload"]["session_brief"]["goals"]]
+    assert frozen_ids == [first_goal["id"], second_goal["id"]]
+
+    conversations.update_goal(first_goal["id"], {"status": "RESOLVED"})
+    resolved = store.get("conversation_goal", first_goal["id"])
+    assert resolved["status"] == "RESOLVED"
+    assert resolved["resolved_at"] is not None
+
+    # Existing Session Pack remains immutable.
+    existing = conversations.session_context(first_session["id"])
+    assert [g["id"] for g in existing["brief"]["goals"]] == frozen_ids
+
+    second_session = conversations.create_session(space["id"], consent_ack=True)
+    assert second_session["goal_ids"] == [second_goal["id"]]
+    second_pack = conversations.start_session(second_session["id"])["pack"]
+    assert [g["id"] for g in second_pack["payload"]["session_brief"]["goals"]] == [second_goal["id"]]
+
+    reopened = conversations.update_goal(first_goal["id"], {"status": "ACTIVE"})
+    assert reopened["status"] == "ACTIVE"
+    assert reopened["resolved_at"] is None
+
+
 def test_space_prepare_session_pack_continue_real_loop(product_env):
     space = conversations.create_space(
         "PDIG · Android Architecture",

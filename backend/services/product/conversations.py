@@ -1018,7 +1018,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
                 session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,
                 text="", source_refs=source_refs, status="SUPPRESSED", reason="SUGGESTION_BUDGET",
             )
-            return {"guidance": None, "suppressed": "SUGGESTION_BUDGET", "event": event>
+            return {"guidance": None, "suppressed": "SUGGESTION_BUDGET", "event": event}
         if not source_refs:
             event = _persist_guidance(
                 session_id, kind="CONTRIBUTION_OPPORTUNITY", action=ExpressionAction.SILENT.value,

@@ -1073,10 +1073,16 @@ def _text_match_score(question: str, haystack: str) -> int:
 
     q_tokens = _query_tokens(q)
     # Distinctive alphanumeric tokens such as 50x, v2, sha256, Q4 or 30%
-    # carry factual identity.  If the question contains one, a candidate that
-    # only shares generic words ("data scale") must not be called grounded.
+    # carry factual identity. Only use *real segmented tokens* here: _query_tokens
+    # also adds a compact no-space token for CJK substring matching, and treating
+    # that synthetic token as a required numeric identity would incorrectly
+    # reject legitimate queries such as "offline migration v2".
+    segmented = q
+    for ch in "？?，,。；;：:/\\|()（）[]【】":
+        segmented = segmented.replace(ch, " ")
+    base_tokens = {x for x in segmented.split() if len(x) >= 2}
     distinctive = {
-        token for token in q_tokens
+        token for token in base_tokens
         if any(ch.isdigit() for ch in token)
     }
     if distinctive and any(token not in h for token in distinctive):

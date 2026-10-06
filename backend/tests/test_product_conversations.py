@@ -380,6 +380,34 @@ def test_interview_start_refuses_to_preempt_active_conversation_capture(product_
     assert getattr(exc_info.value, "status_code", None) == 409
     assert "Conversation" in str(getattr(exc_info.value, "detail", ""))
 
+
+
+def test_conversation_router_lifecycle_exit_stops_owned_capture(product_env, monkeypatch):
+    from api.product import conversations_router
+
+    space = conversations.create_space("Lifecycle", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
+    conversations.start_session(session["id"])
+
+    stopped = []
+    monkeypatch.setattr(
+        conversation_capture,
+        "status",
+        lambda session_id="": {
+            "active": True,
+            "session_id": session["id"],
+            "owns_requested_session": session_id == session["id"] if session_id else False,
+        },
+    )
+    monkeypatch.setattr(conversation_capture, "stop", lambda session_id: stopped.append(session_id) or {"active": False})
+
+    conversations_router._stop_capture_for_session(session["id"])
+    assert stopped == [session["id"]]
+
+    stopped.clear()
+    conversations_router._stop_capture_for_space(space["id"])
+    assert stopped == [session["id"]]
+
 def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_env):
     space = conversations.create_space("Continuity", "DESIGN_REVIEW")
     old = conversations.create_session(space["id"], consent_ack=True)

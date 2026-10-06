@@ -219,6 +219,40 @@ function mocks() {
       return { session, pack: { id: 'cpack-v2', digest: 'abc' } }
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') return session
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') return {
+      session_id: SESSION.id,
+      space: { id: SPACE.id, profile: SPACE.profile, title: SPACE.title },
+      brief: {
+        goal: SPACE.default_goal,
+        agenda: [OPEN.title],
+        expected_questions: [OPEN.title],
+        unresolved_count: 1,
+        known_participants: 1,
+        contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
+      },
+      sources: [{
+        material_id: 'benchmark-note',
+        version_id: 'mv-benchmark-v1',
+        title: 'Q4 Benchmark',
+        kind: 'PROJECT',
+        usage: 'FACTS',
+        content_hash: 'sha256:fixture',
+        is_personal_evidence: true,
+      }],
+      quick_notes: [],
+      participants: [],
+      expression_profile: { conclusion_first: true, target_seconds: 60, shape: 'bullet' },
+      processing_runtime: {
+        mode: 'LOCAL',
+        capture_mode: 'NOTES_ONLY',
+        configured_stt_provider: 'whisper',
+        main_audio_remote_possible: false,
+        self_mic_remote_possible: false,
+        blockers: [],
+      },
+      policy: SESSION.policy,
+      pack_digest: 'abcdef1234567890',
+    }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'PATCH') {
       session = { ...session, ...request.postDataJSON() }
       return session
@@ -363,6 +397,11 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '开始会话' }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/live/${SESSION.id}`))
     await expect(page.getByTestId('conversation-live')).toBeVisible()
+    await expect(page.getByTestId('conversation-session-pulse')).toBeVisible()
+    await expect(page.getByText('Session Pulse')).toBeVisible()
+    await expect(page.getByText(SPACE.default_goal)).toBeVisible()
+    await expect(page.getByText('PACK abcdef12')).toBeVisible()
+    await expect(page.getByText('Data path · LOCAL / STT whisper')).toBeVisible()
 
     await page.getByLabel('当前话题').fill('offline migration')
     await page.getByLabel('值得补充的候选内容（如有）').fill('Q4 benchmark 已覆盖 10x data scale')

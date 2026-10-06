@@ -797,6 +797,7 @@ def preflight(session_id: str) -> dict[str, Any]:
 
     items = [
         {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
+        {"key": "schedule", "label": "人工排期", "value": session.get("scheduled_at") or "未排期", "ok": True},
         {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
         {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": consent_ok},
         {"key": "processing", "label": "处理方式", "value": session["processing_mode"], "ok": not processing_runtime["blockers"]},
@@ -895,6 +896,8 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
         "session_brief": {
+            "title": session.get("title") or space.get("title") or "",
+            "scheduled_at": session.get("scheduled_at"),
             "goal": space.get("default_goal") or "",
             "goals": [
                 {

@@ -304,6 +304,104 @@ def test_conversation_history_is_profile_native_and_counted(product_env):
     assert history[0]["review_required"] == 1
 
 
+
+
+def test_local_transcript_fails_closed_when_shared_stt_can_go_remote(product_env, monkeypatch):
+    from core import config as core_config
+
+    class Cfg:
+        stt_provider = "whisper"
+        doubao_stt_api_key = "configured"
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+
+    monkeypatch.setattr(core_config, "get_config", lambda: Cfg())
+    space = conversations.create_space("Private Local", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        processing_mode="LOCAL",
+        consent_ack=True,
+    )
+    check = conversations.preflight(session["id"])
+    assert any(x["key"] == "processing_runtime" for x in check["blockers"])
+    assert check["processing_runtime"]["main_audio_remote_possible"] is True
+    with pytest.raises(ValueError, match="Local Processing"):
+        conversations.start_session(session["id"])
+
+
+def test_capture_rechecks_processing_policy_after_preflight(product_env, monkeypatch):
+    from core import config as core_config
+
+    class LocalCfg:
+        stt_provider = "whisper"
+        doubao_stt_api_key = ""
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+
+    class RemoteCfg:
+        stt_provider = "doubao"
+        doubao_stt_api_key = "configured"
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+
+    current = {"cfg": LocalCfg()}
+    monkeypatch.setattr(core_config, "get_config", lambda: current["cfg"])
+    space = conversations.create_space("Config Change", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        processing_mode="LOCAL",
+        consent_ack=True,
+    )
+    assert conversations.preflight(session["id"])["blockers"] == []
+    conversations.start_session(session["id"])
+
+    current["cfg"] = RemoteCfg()
+    with pytest.raises(ValueError, match="Local Processing"):
+        conversation_capture.start(session["id"], 1001)
+
+
+def test_unwired_share_privacy_and_connector_permissions_block_preflight(product_env):
+    space = conversations.create_space("Privacy Truth", "CLIENT_CALL")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={
+            "share_privacy": "PRIVATE_OVERLAY",
+            "connector_permissions": ["calendar.read"],
+        },
+    )
+    check = conversations.preflight(session["id"])
+    keys = {x["key"] for x in check["blockers"]}
+    assert {"share_privacy_runtime", "connector_runtime"} <= keys
+
+
+def test_processing_off_requires_no_transcript_and_ai_forbidden(product_env):
+    space = conversations.create_space("Processing Off", "ONE_ON_ONE")
+    blocked = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        processing_mode="OFF",
+        consent_ack=True,
+        policy={"ai_assistance": "AI_ALLOWED"},
+    )
+    check = conversations.preflight(blocked["id"])
+    assert any("Processing=OFF" in x["message"] for x in check["blockers"])
+
+    safe = conversations.create_session(
+        space["id"],
+        capture_mode="NOTES_ONLY",
+        processing_mode="OFF",
+        consent_ack=True,
+        policy={"ai_assistance": "AI_FORBIDDEN"},
+    )
+    assert conversations.preflight(safe["id"])["blockers"] == []
+
+
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
     space = conversations.create_space("Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

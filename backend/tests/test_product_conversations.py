@@ -99,6 +99,7 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
             "screen_context": "OFF",
             "share_privacy": "PRIVATE_OVERLAY",
             "external_writeback": "OFF",
+            "participant_consent_status": "USER_REPORTS_CONSENTED",
             "speaker_biometric_identity": "ON",
             "emotion_sentiment_profiling": "ON",
             "hidden_intent_claims": "ON",
@@ -111,6 +112,9 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
     assert policy["human_assistance"] == "HUMAN_FORBIDDEN"
     assert policy["share_privacy"] == "PRIVATE_OVERLAY"
     assert policy["external_writeback"] == "OFF"
+    assert policy["participant_consent_status"] == "USER_REPORTS_CONSENTED"
+    assert check["pack_preview"]["participants_count"] == 0
+    assert check["pack_preview"]["policy"]["ai_assistance"] == "AI_FORBIDDEN"
     assert policy["speaker_biometric_identity"] == "OFF"
     assert policy["emotion_sentiment_profiling"] == "OFF"
     assert policy["hidden_intent_claims"] == "OFF"
@@ -311,6 +315,111 @@ def test_guidance_arbiter_prefers_direct_question_and_can_stay_silent(product_en
     assert silent["guidance"] is None
     assert silent["suppressed"] == "USER_SPEAKING"
     assert silent["event"]["expression_action"] == "SILENT"
+
+
+
+
+def test_deadline_requires_provenance(product_env):
+    space = conversations.create_space("Deadline Truth", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    with pytest.raises(ValueError, match="Deadline 必须带来源"):
+        conversations.add_item(
+            session["id"],
+            item_type="Deadline",
+            title="周五前上线",
+        )
+
+    deadline = conversations.add_item(
+        session["id"],
+        item_type="Deadline",
+        title="周五前上线",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确说周五前"}],
+    )
+    assert deadline["type"] == "Deadline"
+    assert deadline["source_refs"]
+
+
+def test_guidance_arbiter_critical_risk_visibility_duplicate_social_and_budget(product_env):
+    space = conversations.create_space("Arbiter", "DESIGN_REVIEW")
+
+    # Critical risk outranks user-speaking suppression when it has allowed provenance.
+    risk_session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(risk_session["id"])
+    risk = conversations.evaluate_guidance(risk_session["id"], {
+        "critical_risk": "当前承诺会破坏 rollback window",
+        "candidate_text": "普通补充",
+        "user_speaking": True,
+        "source_refs": [{"kind": "DOCUMENT", "id": "risk", "visibility": "PRIVATE"}],
+    })
+    assert risk["guidance"]["kind"] == "RISK"
+    assert risk["guidance"]["reason"] == "CRITICAL_RISK"
+
+    blocked_session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(blocked_session["id"])
+    blocked = conversations.evaluate_guidance(blocked_session["id"], {
+        "candidate_text": "只在隐藏来源里的信息",
+        "source_refs": [{"kind": "DOCUMENT", "id": "hidden", "visibility": "NO_GUIDANCE"}],
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+    })
+    assert blocked["suppressed"] == "SOURCE_VISIBILITY_BLOCKED"
+
+    social_session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(social_session["id"])
+    social = conversations.evaluate_guidance(social_session["id"], {
+        "candidate_text": "此刻不适合主动打断",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "context"}],
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+        "social_risk": 2,
+    })
+    assert social["suppressed"] == "SOCIAL_RISK"
+
+    dup_session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(dup_session["id"])
+    body = {
+        "candidate_text": "Q4 benchmark 证明 10x scale",
+        "source_refs": [{"kind": "DOCUMENT", "id": "bench"}],
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+    }
+    first = conversations.evaluate_guidance(dup_session["id"], body)
+    assert first["guidance"] is not None
+    duplicate = conversations.evaluate_guidance(dup_session["id"], body)
+    assert duplicate["suppressed"] == "DUPLICATE_GUIDANCE"
+
+    budget_session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")
+    conversations.start_session(budget_session["id"])
+    for index in range(3):
+        shown = conversations.evaluate_guidance(budget_session["id"], {
+            "candidate_text": f"独立建议 {index}",
+            "source_refs": [{"kind": "DOCUMENT", "id": f"src-{index}"}],
+            "relevance": 1, "novelty": 1, "provenance_strength": 1,
+        })
+        assert shown["guidance"] is not None
+    exhausted = conversations.evaluate_guidance(budget_session["id"], {
+        "candidate_text": "第四条独立建议",
+        "source_refs": [{"kind": "DOCUMENT", "id": "src-4"}],
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+    })
+    assert exhausted["suppressed"] == "SUGGESTION_BUDGET"
+
+
+def test_direct_question_cancels_stale_opportunity(product_env):
+    space = conversations.create_space("Priority", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    opportunity = conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "先补充 benchmark",
+        "source_refs": [{"kind": "DOCUMENT", "id": "bench"}],
+        "relevance": 1, "novelty": 1, "provenance_strength": 1,
+    })["guidance"]
+    assert opportunity
+
+    direct = conversations.evaluate_guidance(session["id"], {"direct_question": "为什么？"})
+    assert direct["guidance"]["kind"] == "ANSWER_CUE"
+    stored = conversations.guidance_history(session["id"], 10)
+    old = next(x for x in stored if x["id"] == opportunity["id"])
+    assert old["user_action"] == "CANCELLED_BY_DIRECT_QUESTION"
 
 
 def test_opportunity_needs_source_and_threshold(product_env):

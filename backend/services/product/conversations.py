@@ -509,12 +509,53 @@ def list_sessions(space_id: str) -> list[dict[str, Any]]:
     )
 
 
+def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the exact Ready sources and existing Quick Notes a new pack would freeze."""
+    selected_sources: list[dict[str, Any]] = []
+    skipped_sources: list[dict[str, str]] = []
+    for source_id in space.get("selected_source_ids") or []:
+        ready = materials.ready_text(str(source_id))
+        if ready:
+            selected_sources.append(ready)
+        else:
+            raw = store.get("material", str(source_id))
+            skipped_sources.append({
+                "id": str(source_id),
+                "title": str((raw or {}).get("title") or ""),
+                "reason": "NOT_READY_OR_MISSING",
+            })
+
+    selected_notes: list[dict[str, Any]] = []
+    missing_note_ids: list[str] = []
+    for note_id in space.get("selected_quick_note_ids") or []:
+        note = store.get("quick_note", str(note_id))
+        if note:
+            selected_notes.append({
+                "id": note["id"],
+                "title": note.get("title", ""),
+                "content": note.get("content", ""),
+                "kind": "USER_NOTE",
+            })
+        else:
+            missing_note_ids.append(str(note_id))
+    return {
+        "sources": pack_inputs["sources"],
+        "skipped_sources": pack_inputs["skipped_sources"],
+        "quick_notes": pack_inputs["quick_notes"],
+        "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
+        "missing_quick_note_ids": missing_note_ids,
+    }
+
+
 def preflight(session_id: str) -> dict[str, Any]:
     session = require_session(session_id)
     space = require_space(session["space_id"])
     blockers: list[dict[str, str]] = []
-    if session["capture_mode"] == "TRANSCRIPT" and not session["consent_ack"]:
+    warnings: list[dict[str, str]] = []
+    consent_ok = not (session["capture_mode"] == "TRANSCRIPT" and not session["consent_ack"])
+    if not consent_ok:
         blockers.append({"key": "consent", "label": "转写确认", "message": "开启转写前，请确认当前场景允许记录/转写。"})
+
     policy = _normalize_session_policy(session.get("policy"))
     retention = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
     processing_runtime = processing_runtime_status(session)
@@ -524,46 +565,89 @@ def preflight(session_id: str) -> dict[str, Any]:
             "label": "处理方式",
             "message": message,
         })
-    if policy.get("connector_permissions"):
+
+    connector_ok = not bool(policy.get("connector_permissions"))
+    if not connector_ok:
         blockers.append({
             "key": "connector_runtime",
             "label": "连接器权限",
             "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
         })
-    if policy["share_privacy"] != "OFF":
+
+    share_ok = policy["share_privacy"] == "OFF"
+    if not share_ok:
         blockers.append({
             "key": "share_privacy_runtime",
             "label": "屏幕共享保护",
             "message": "现有 Private Overlay 仍属于 Interview Live 路径；Conversation 还没有独立 runtime 证明，因此当前必须保持 OFF。",
         })
-    if policy["screen_context"] != "OFF":
+
+    screen_ok = policy["screen_context"] == "OFF"
+    if not screen_ok:
         blockers.append({
             "key": "screen_context_runtime",
             "label": "屏幕上下文",
             "message": "Conversation 的 Screen Context runtime 尚未接线；当前必须保持 OFF，不能把 policy 选择伪装成已生效功能。",
         })
-    if policy["human_assistance"] == "HUMAN_ALLOWED":
+
+    human_ok = policy["human_assistance"] != "HUMAN_ALLOWED"
+    if not human_ok:
         blockers.append({
             "key": "human_assistance_runtime",
             "label": "Human Assistance",
             "message": "Conversation Human Coach runtime 尚未接线；当前只能使用 HUMAN_FORBIDDEN 或 HUMAN_PRACTICE_ONLY。",
         })
+
+    pack_inputs = _pack_inputs(space)
+    for skipped in pack_inputs["skipped_sources"]:
+        warnings.append({
+            "key": "source_not_ready",
+            "label": "带入来源",
+            "message": f"“{skipped.get('title') or skipped['id']}” 当前不是 READY，本场 Session Pack 会明确跳过它。",
+        })
+    for note_id in pack_inputs["missing_quick_note_ids"]:
+        warnings.append({
+            "key": "quick_note_missing",
+            "label": "Quick Note",
+            "message": f"Quick Note {note_id} 已不存在，本场不会冻结它。",
+        })
+    if session["capture_mode"] == "TRANSCRIPT" and policy["participant_consent_status"] == "NOT_RECORDED":
+        warnings.append({
+            "key": "participant_consent_not_recorded",
+            "label": "参与者同意状态",
+            "message": "你已确认当前场景允许转写，但尚未记录参与者同意状态；成竹不会自行推断或验证该状态。",
+        })
+
+    selected_source_count = len(space.get("selected_source_ids") or [])
+    ready_source_count = len(pack_inputs["sources"])
+    selected_note_count = len(space.get("selected_quick_note_ids") or [])
+    ready_note_count = len(pack_inputs["quick_notes"])
+    participant_consent_ok = (
+        session["capture_mode"] != "TRANSCRIPT"
+        or policy["participant_consent_status"] != "NOT_RECORDED"
+    )
+    ai_ok = not (
+        session["processing_mode"] == "OFF"
+        and policy["ai_assistance"] != "AI_FORBIDDEN"
+    )
+
     items = [
         {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
         {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
-        {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": not blockers},
+        {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": consent_ok},
         {"key": "processing", "label": "处理方式", "value": session["processing_mode"], "ok": not processing_runtime["blockers"]},
         {"key": "stt_route", "label": "当前 STT 数据路径", "value": (
             "REMOTE_POSSIBLE" if processing_runtime["main_audio_remote_possible"] else "LOCAL_ONLY"
         ), "ok": not (session["processing_mode"] == "LOCAL" and processing_runtime["main_audio_remote_possible"])},
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
-        {"key": "sources", "label": "带入来源", "value": len(space.get("selected_source_ids") or []), "ok": True},
-        {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": True},
-        {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": True},
-        {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": True},
-        {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": True},
-        {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": True},
-        {"key": "share", "label": "屏幕共享保护", "value": policy["share_privacy"], "ok": True},
+        {"key": "sources", "label": "带入来源", "value": f"{ready_source_count}/{selected_source_count} Ready", "ok": ready_source_count == selected_source_count},
+        {"key": "quick_notes", "label": "Quick Notes", "value": f"{ready_note_count}/{selected_note_count} available", "ok": ready_note_count == selected_note_count},
+        {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
+        {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
+        {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": screen_ok},
+        {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": ai_ok},
+        {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": human_ok},
+        {"key": "share", "label": "屏幕共享保护", "value": policy["share_privacy"], "ok": share_ok},
         {"key": "writeback", "label": "外部写回", "value": policy["external_writeback"], "ok": True},
     ]
     return {
@@ -571,18 +655,38 @@ def preflight(session_id: str) -> dict[str, Any]:
         "space": space,
         "items": items,
         "blockers": blockers,
+        "warnings": warnings,
         "policy": policy,
         "processing_runtime": processing_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "sources": [
+                {
+                    "material_id": source.get("material_id") or "",
+                    "version_id": source.get("version_id") or "",
+                    "title": source.get("title") or "",
+                    "kind": source.get("kind") or "",
+                    "usage": source.get("usage") or "",
+                    "content_hash": source.get("content_hash") or "",
+                    "is_personal_evidence": bool(source.get("is_personal_evidence")),
+                }
+                for source in pack_inputs["sources"]
+            ],
+            "skipped_sources": list(pack_inputs["skipped_sources"]),
+            "quick_notes": [
+                {"id": note.get("id") or "", "title": note.get("title") or ""}
+                for note in pack_inputs["quick_notes"]
+            ],
+            "missing_quick_note_ids": list(pack_inputs["missing_quick_note_ids"]),
             "participants_count": int(store.scalar(
                 "SELECT COUNT(*) FROM conversation_participant WHERE space_id = ?",
                 (space["id"],),
             ) or 0),
             "confirmed_items_count": len(_confirmed_context_items(space["id"])),
             "expression_profile": _expression_profile(),
+            "processing_runtime": processing_runtime,
             "policy": {
                 **policy,
                 "capture_mode": session["capture_mode"],
@@ -592,7 +696,6 @@ def preflight(session_id: str) -> dict[str, Any]:
         },
         "privacy_note": "记录、转写与第三方数据应遵循当前场景、组织政策与适用规则；参与者同意状态仅来自用户报告，成竹不会自行验证或推断；也不会自动共享、自动发送或自动写入外部系统。",
     }
-
 
 def _confirmed_context_items(space_id: str) -> list[dict[str, Any]]:
     return store.select(
@@ -611,21 +714,8 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
     existing = store.select("conversation_session_pack", where="session_id = ?", params=(session_id,), limit=1)
     if existing:
         return existing[0]
-    selected_notes: list[dict[str, Any]] = []
-    for note_id in space.get("selected_quick_note_ids") or []:
-        note = store.get("quick_note", str(note_id))
-        if note:
-            selected_notes.append({"id": note["id"], "title": note.get("title", ""), "content": note.get("content", ""), "kind": "USER_NOTE"})
+    pack_inputs = _pack_inputs(space)
     participants = store.select("conversation_participant", where="space_id = ?", params=(space["id"],), order="created_at ASC")
-    selected_sources: list[dict[str, Any]] = []
-    skipped_sources: list[dict[str, str]] = []
-    for source_id in space.get("selected_source_ids") or []:
-        ready = materials.ready_text(str(source_id))
-        if ready:
-            selected_sources.append(ready)
-        else:
-            raw = store.get("material", str(source_id))
-            skipped_sources.append({"id": str(source_id), "title": (raw or {}).get("title", ""), "reason": "NOT_READY"})
 
     payload = {
         "contract": "v2.0-R1",

@@ -208,6 +208,19 @@ export interface ConversationGuidance {
   created_at: number
 }
 
+export interface ConversationOpenThread {
+  id: string
+  space_id: string
+  session_id: string | null
+  kind: 'OpenQuestion' | 'Risk' | 'Objection' | string
+  text: string
+  owner_id: string
+  status: 'OPEN' | 'RESOLVED' | string
+  source_refs: SourceRef[]
+  created_at: number
+  resolved_at: number | null
+}
+
 export interface ConversationSpaceDetail extends ConversationSpace {
   goals: ConversationGoal[]
   sessions: ConversationSession[]
@@ -225,7 +238,7 @@ export interface ConversationSpaceDetail extends ConversationSpace {
     pins: ConversationGuidance[]
     review_required: number
   }
-  threads: Array<Record<string, unknown>>
+  threads: ConversationOpenThread[]
 }
 
 export interface ConversationPrepare {
@@ -234,6 +247,7 @@ export interface ConversationPrepare {
   next_session: ConversationSession | null
   open_commitments: ConversationItem[]
   open_questions: ConversationItem[]
+  open_threads: ConversationOpenThread[]
   related_decisions: ConversationItem[]
   participants: ConversationParticipant[]
   selected_sources: string[]

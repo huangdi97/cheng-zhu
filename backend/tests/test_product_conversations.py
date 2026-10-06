@@ -343,6 +343,17 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
     assert config_module.session_overlay() == previous
 
 
+
+
+def test_conversation_capture_transport_never_owns_interview_review_lifecycle(product_env, monkeypatch):
+    import api.assist.pipeline as pipeline
+
+    monkeypatch.setattr(conversation_capture, "is_active", lambda: True)
+    assert pipeline._conversation_capture_owns_pipeline() is True
+
+    monkeypatch.setattr(conversation_capture, "is_active", lambda: False)
+    assert pipeline._conversation_capture_owns_pipeline() is False
+
 def test_conversation_capture_refuses_to_steal_live_interview_audio(product_env):
     from core.session import get_session
     legacy = get_session()

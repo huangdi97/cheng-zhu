@@ -118,10 +118,11 @@ def patch_space(space_id: str, body: SpacePatch):
 
 
 @router.delete("/spaces/{space_id}")
-def delete_space(space_id: str):
+def delete_space(space_id: str, confirm: bool = False):
     with domain_errors():
-        _stop_capture_for_space(space_id)
-        return {"deleted": conversations.delete_space(space_id)}
+        if confirm:
+            _stop_capture_for_space(space_id)
+        return {"deleted": conversations.delete_space(space_id, confirm=confirm)}
 
 
 @router.get("/spaces/{space_id}/prepare")

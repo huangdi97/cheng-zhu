@@ -706,16 +706,22 @@ SOURCE_CONFIRMED
 
 实时顺序不是固定“多卡并排”，而是动态 arbitration。
 
-硬优先级：
+硬优先级分两条 lane：
+
+**用户显式请求 lane**（Manual Ask / explicit Talking Point / Delivery request）视为用户主动命令，先经过 policy / Profile / provenance 检查，不与普通 proactive card 竞争。
+
+**自动 proactive lane**：
 
 ```text
 Direct Question / Answer Cue
 > Critical Risk
 > High-confidence Recall
-> High-value Contribution Opportunity
+> Profile-allowed Talking Point / Contribution Opportunity
 > Open Question
 > Delivery
 ```
+
+Direct Question 会取消仍未处理的旧 proactive Opportunity / Talking Point。
 
 抑制规则：
 
@@ -765,6 +771,19 @@ Botless / sidecar 的透明性必须单独处理：参与者同意状态与“�
 
 此外 Preflight 必须展示 **resolved runtime data path**。Capture locality、STT locality、inference locality、retention locality 与 write-back locality 不得混为一个“Local”标签。若用户选择的 policy 与真实 runtime path 不一致，必须 fail-closed；Capture start 还要二次校验，防止 Preflight 后配置变化。
 
+当前 Conversation runtime 的可审计路径应明确显示：
+
+```text
+Capture     = LOCAL_DEVICE_CAPTURE / STRUCTURED_NOTES_ONLY / NO_CAPTURE
+STT         = LOCAL_ONLY / REMOTE_POSSIBLE / NOT_USED
+Inference   = LOCAL_DETERMINISTIC
+Retention   = LOCAL_PRODUCT_DB
+Write-back  = LOCAL_REVIEWED_DRAFT_ONLY / DISABLED
+Audio store = OFF
+```
+
+这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
+
 当前未接线的 Conversation Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 必须显式阻断，不能把 policy 选择伪装成已生效能力。
 
 外部 action 先进入 Review Queue，再由用户确认。
@@ -775,16 +794,30 @@ Botless / sidecar 的透明性必须单独处理：参与者同意状态与“�
 
 ## Phase 1 — Desktop Sidecar
 
-优先复用：
+当前只复用已经证明不会串入 Interview 语义的共享基础设施：
 
 - system audio；
 - mic；
-- ASR；
-- overlay；
-- screenshot/screen context；
+- Audio/VAD/STT transport；
+- desktop lifecycle；
 - shortcuts。
 
-平台无关支持 Zoom / Teams / Meet / 腾讯会议 / 飞书等。
+平台层目标仍是跨 Zoom / Teams / Meet / 腾讯会议 / 飞书等工作，但 **不等于已针对每个平台分别验证**。
+
+以下能力不能因为 Interview 已有就直接复用：
+
+- overlay / Private Share；
+- screenshot / screen context。
+
+它们进入 Conversation 前必须同时满足：
+
+1. 独立 Conversation namespace，不写入 Interview state / history；
+2. 独立 Session Policy / source visibility；
+3. participant transparency / presenter-visible control；
+4. 可暂停 / off-the-record；
+5. runtime evidence 能证明没有静默捕获或共享。
+
+在这些条件满足前保持 Preflight blocked。
 
 ## Phase 2 — Read-only Context Connectors
 

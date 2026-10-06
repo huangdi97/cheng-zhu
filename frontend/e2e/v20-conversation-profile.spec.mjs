@@ -39,6 +39,7 @@ const SESSION = {
     share_privacy: 'OFF',
     external_writeback: 'REVIEW_REQUIRED',
     participant_consent_status: 'USER_REPORTS_ALLOWED',
+    participant_transparency_plan: 'USER_WILL_NOTIFY_VERBALLY',
     connector_permissions: [],
     speaker_biometric_identity: 'OFF',
     emotion_sentiment_profiling: 'OFF',

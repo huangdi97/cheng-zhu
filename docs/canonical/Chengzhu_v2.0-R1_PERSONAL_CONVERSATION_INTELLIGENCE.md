@@ -739,7 +739,8 @@ Conversation 比 Interview 涉及更多第三方数据，Preflight 必须明确�
 - Capture Mode；
 - Transcript retention；
 - Processing Mode：Local / Cloud / Off；
-- participants consent status（用户确认）；
+- participants consent status（用户报告）；
+- participant transparency plan（用户报告：口头告知 / chat 告知 / 已告知 / 不适用）；
 - selected sources；
 - connector permissions；
 - screen context；
@@ -759,6 +760,8 @@ No biometric identity
 No emotion/sentiment profiling
 No hidden-intent claims
 ```
+
+Botless / sidecar 的透明性必须单独处理：参与者同意状态与“如何告知参与者”不是同一个字段。当前成竹不会自动发送 chat notice 或 watermark，因此只能记录用户的 transparency plan / report，不能声称系统已经通知他人。
 
 此外 Preflight 必须展示 **resolved runtime data path**。Capture locality、STT locality、inference locality、retention locality 与 write-back locality 不得混为一个“Local”标签。若用户选择的 policy 与真实 runtime path 不一致，必须 fail-closed；Capture start 还要二次校验，防止 Preflight 后配置变化。
 

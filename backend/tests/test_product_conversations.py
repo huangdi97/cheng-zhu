@@ -217,11 +217,13 @@ def test_stakeholder_context_influences_score_without_hidden_inference(product_e
         "audience_priority": "迁移稳定性",
         "audience_concern": "回滚风险",
         "decision_authority": "架构方案批准人",
+        "relationship_context": "客户技术负责人",
     })
     assert result["guidance"] is not None
     assert result["guidance"]["score"]["role_relevance"] >= 1.0
     saved = conversations.require_session(session["id"])
     assert saved["state"]["audience_context"]["explicit_priority"] == "迁移稳定性"
+    assert saved["state"]["audience_context"]["relationship_context"] == "客户技术负责人"
     assert "emotion" not in saved["state"]["audience_context"]
     assert "hidden_intent" not in saved["state"]["audience_context"]
 

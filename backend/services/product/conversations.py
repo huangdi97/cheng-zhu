@@ -62,6 +62,25 @@ SPACE_PROFILES = {
 ASSISTANCE_MODES = {m.value for m in AssistanceMode}
 CAPTURE_MODES = {"TRANSCRIPT", "NOTES_ONLY", "NO_CAPTURE"}
 PROCESSING_MODES = {"LOCAL", "CLOUD", "OFF"}
+RETENTION_PRESETS: dict[str, dict[str, Any]] = {
+    "MINIMUM": {
+        "preset": "MINIMUM",
+        "transcript_days": 0,
+        "guidance_days": 7,
+        "draft_days": 7,
+        "confirmed_items": "KEEP",
+        "audio_retention": "OFF",
+    },
+    "STANDARD": {
+        "preset": "STANDARD",
+        "transcript_days": 30,
+        "guidance_days": 30,
+        "draft_days": 30,
+        "confirmed_items": "KEEP",
+        "audio_retention": "OFF",
+    },
+}
+
 ITEM_TYPES = {t.value for t in ConversationItemType}
 ITEM_STATES = {s.value for s in ConversationItemState}
 REVIEW_STATUSES = {"AI_EXTRACTED", "USER_CONFIRMED", "USER_EDITED", "USER_REJECTED", "SOURCE_CONFIRMED"}
@@ -133,7 +152,7 @@ def create_space(
         "default_mode": mode,
         "selected_source_ids": list(selected_source_ids or []),
         "selected_quick_note_ids": list(selected_quick_note_ids or []),
-        "retention_policy": {"preset": "STANDARD"},
+        "retention_policy": dict(RETENTION_PRESETS["STANDARD"]),
         "created_at": ts,
         "updated_at": ts,
     }
@@ -149,6 +168,45 @@ def list_spaces(status: str = "ACTIVE") -> list[dict[str, Any]]:
     if status:
         where, params = "status = ?", (status.upper(),)
     return store.select("conversation_space", where=where, params=params, order="updated_at DESC")
+
+
+def list_space_summaries(status: str = "") -> list[dict[str, Any]]:
+    rows = list_spaces(status)
+    now = store.now()
+    out: list[dict[str, Any]] = []
+    for space in rows:
+        upcoming = store.select(
+            "conversation_session",
+            where="space_id = ? AND status = 'UPCOMING' AND scheduled_at IS NOT NULL AND scheduled_at >= ?",
+            params=(space["id"], now),
+            order="scheduled_at ASC",
+            limit=1,
+        )
+        recent = store.select(
+            "conversation_session",
+            where="space_id = ?",
+            params=(space["id"],),
+            order="COALESCE(ended_at, started_at, scheduled_at, created_at) DESC",
+            limit=1,
+        )
+        open_commitments = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE space_id = ? "
+            "AND type IN ('Commitment','Task') AND state NOT IN ('DONE','SUPERSEDED')",
+            (space["id"],),
+        ) or 0)
+        open_questions = int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_item WHERE space_id = ? "
+            "AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+            (space["id"],),
+        ) or 0)
+        out.append({
+            **space,
+            "next_session": upcoming[0] if upcoming else None,
+            "last_session": recent[0] if recent else None,
+            "open_commitments_count": open_commitments,
+            "open_questions_count": open_questions,
+        })
+    return out
 
 
 def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
@@ -168,6 +226,25 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         clean["status"] = str(clean["status"]).upper()
         if clean["status"] not in {"ACTIVE", "ARCHIVED"}:
             raise ValueError("对话空间状态不支持")
+    if "retention_policy" in clean:
+        raw_policy = clean["retention_policy"] if isinstance(clean["retention_policy"], dict) else {}
+        preset = str(raw_policy.get("preset") or "CUSTOM").upper()
+        if preset in RETENTION_PRESETS:
+            clean["retention_policy"] = dict(RETENTION_PRESETS[preset])
+        else:
+            def _days(key: str, default: int) -> int:
+                try:
+                    return max(0, min(3650, int(raw_policy.get(key, default))))
+                except (TypeError, ValueError):
+                    return default
+            clean["retention_policy"] = {
+                "preset": "CUSTOM",
+                "transcript_days": _days("transcript_days", 30),
+                "guidance_days": _days("guidance_days", 30),
+                "draft_days": _days("draft_days", 30),
+                "confirmed_items": "KEEP",
+                "audio_retention": "OFF",
+            }
     clean["updated_at"] = store.now()
     if clean:
         store.update("conversation_space", space_id, clean)
@@ -880,6 +957,122 @@ def create_adhoc(
     return {"space": require_space(space["id"]), **started}
 
 
+def _retention_cutoff(days: int, now: float) -> float:
+    return now if days <= 0 else now - days * 86400.0
+
+
+def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, Any]:
+    space = require_space(space_id)
+    policy = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
+    now_value = float(now if now is not None else store.now())
+    transcript_days = int(policy.get("transcript_days", 30) or 0)
+    guidance_days = int(policy.get("guidance_days", 30) or 0)
+    draft_days = int(policy.get("draft_days", 30) or 0)
+    transcript_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_transcript_segment WHERE space_id = ? AND created_at <= ?",
+        (space_id, _retention_cutoff(transcript_days, now_value)),
+    ) or 0)
+    guidance_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_guidance_event g "
+        "JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? AND g.created_at <= ?",
+        (space_id, _retention_cutoff(guidance_days, now_value)),
+    ) or 0)
+    draft_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_draft_action WHERE space_id = ? AND created_at <= ?",
+        (space_id, _retention_cutoff(draft_days, now_value)),
+    ) or 0)
+    return {
+        "space_id": space_id,
+        "policy": policy,
+        "would_delete": {
+            "transcript_segments": transcript_count,
+            "guidance_events": guidance_count,
+            "draft_actions": draft_count,
+        },
+        "kept": {
+            "confirmed_items": "KEEP",
+            "session_packs": "KEEP",
+            "provenance_tombstones": "KEEP",
+        },
+        "destructive": any((transcript_count, guidance_count, draft_count)),
+    }
+
+
+def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
+    preview = retention_preview(space_id)
+    if preview["destructive"] and not confirm:
+        raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
+    policy = preview["policy"]
+    now_value = store.now()
+    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0}
+
+    transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
+    for row in store.select(
+        "conversation_transcript_segment",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    ):
+        deleted["transcript_segments"] += int(store.delete("conversation_transcript_segment", row["id"]))
+
+    guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
+    guidance_rows = store.rows(
+        "SELECT g.* FROM conversation_guidance_event g "
+        "JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? AND g.created_at <= ?",
+        (space_id, guidance_cutoff),
+    )
+    for row in guidance_rows:
+        deleted["guidance_events"] += int(store.delete("conversation_guidance_event", row["id"]))
+
+    draft_cutoff = _retention_cutoff(int(policy.get("draft_days", 30) or 0), now_value)
+    for row in store.select(
+        "conversation_draft_action",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, draft_cutoff),
+    ):
+        deleted["draft_actions"] += int(store.delete("conversation_draft_action", row["id"]))
+    return {"space_id": space_id, "deleted": deleted, "policy": policy}
+
+
+def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[str, Any]:
+    session = require_session(session_id)
+    if session["status"] == "ACTIVE":
+        raise ValueError("进行中的会话不能删除；请先结束")
+    confirmed = store.select(
+        "conversation_item",
+        where="session_id = ? AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    policy = str(confirmed_policy or "BLOCK").upper()
+    if confirmed and policy != "TOMBSTONE":
+        raise ValueError("这场包含已确认事项；删除前必须选择 TOMBSTONE 保留 provenance 标记")
+    tombstones = 0
+    if confirmed:
+        ts = store.now()
+        with store.connect() as conn:
+            for item in confirmed:
+                store.insert("conversation_provenance_tombstone", {
+                    "id": store.new_id("cpt_"),
+                    "original_item_id": item["id"],
+                    "space_id": session["space_id"],
+                    "deleted_session_id": session_id,
+                    "type": item["type"],
+                    "title": item["title"],
+                    "state": item["state"],
+                    "review_status": item["review_status"],
+                    "source_refs": item.get("source_refs") or [],
+                    "source_excerpt": item.get("source_excerpt") or "",
+                    "deleted_at": ts,
+                }, conn=conn)
+                tombstones += 1
+            conn.execute("DELETE FROM conversation_session WHERE id = ?", (session_id,))
+    else:
+        store.delete("conversation_session", session_id)
+    return {"deleted": True, "session_id": session_id, "provenance_tombstones": tombstones}
+
+
 def create_draft_action(
     session_id: str,
     *,
@@ -962,6 +1155,57 @@ def followup_draft(session_id: str) -> dict[str, Any]:
     )
 
 
+def synthetic_demo() -> dict[str, Any]:
+    """Deterministic onboarding dry run; never persisted and never real evidence."""
+    return {
+        "evidence": "SYNTHETIC_DEMO",
+        "scenario": "DESIGN_REVIEW",
+        "title": "Android Architecture Review · Dry Run",
+        "goal": "明确 offline migration 方案并确认 rollback owner",
+        "steps": [
+            {
+                "kind": "PROPOSAL",
+                "title": "Proposal ≠ Decision",
+                "input": "Alex：我建议 offline sync v2。",
+                "output": "建议被记录为 Proposal；没有共识证据，不会写成 AGREED。",
+                "state": "PROPOSED",
+            },
+            {
+                "kind": "RECALL",
+                "title": "跨场 Recall",
+                "input": "话题回到 offline migration。",
+                "output": "上次已确认：offline migration 采用 v2。",
+                "source": "Synthetic prior Design Review · confirmed",
+            },
+            {
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "title": "值得补充",
+                "input": "讨论数据规模时，你有一条已选来源。",
+                "output": "Q4 benchmark 已覆盖 10x data scale。",
+                "source": "Synthetic Benchmark Note",
+            },
+            {
+                "kind": "SILENT",
+                "title": "Stay Silent",
+                "input": "你正在连续表达，且没有新的高价值信息。",
+                "output": "SILENT · USER_SPEAKING",
+            },
+            {
+                "kind": "CONTINUE",
+                "title": "会后逐项确认",
+                "input": "模型提取：rollback owner = 未知。",
+                "output": "保留为 Open Question / 待确认；不会猜 owner，也不会自动写外部系统。",
+            },
+        ],
+        "privacy": {
+            "capture_default": "NOTES_ONLY",
+            "processing_default": "LOCAL",
+            "audio_retention": "OFF",
+            "external_writeback": "DRAFT_ONLY_REVIEW_REQUIRED",
+        },
+    }
+
+
 def diagnostics() -> dict[str, Any]:
     """Local-only Conversation runtime health and engineering evidence.
 
@@ -1034,20 +1278,70 @@ def diagnostics() -> dict[str, Any]:
 
 def export_space(space_id: str) -> dict[str, Any]:
     detail = space_detail(space_id)
+    items = store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at ASC")
+    transcript = store.select(
+        "conversation_transcript_segment", where="space_id = ?", params=(space_id,), order="created_at ASC"
+    )
+    guidance = store.rows(
+        "SELECT g.* FROM conversation_guidance_event g JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? ORDER BY g.created_at ASC",
+        (space_id,),
+    )
+    notes: list[dict[str, Any]] = []
+    for note_id in detail.get("selected_quick_note_ids") or []:
+        note = store.get("quick_note", str(note_id))
+        if note:
+            notes.append(note)
+    source_manifest: list[dict[str, Any]] = []
+    for material_id in detail.get("selected_source_ids") or []:
+        material = store.get("material", str(material_id))
+        if material:
+            source_manifest.append({
+                "id": material["id"],
+                "kind": material["kind"],
+                "usage": material["usage"],
+                "title": material["title"],
+                "active_version_id": material.get("active_version_id") or "",
+            })
+        else:
+            source_manifest.append({"id": str(material_id), "missing": True})
+    confirmed = [
+        item for item in items
+        if item["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
+    ]
+    candidates = [item for item in items if item["review_status"] == "AI_EXTRACTED"]
+    tombstones = store.select(
+        "conversation_provenance_tombstone",
+        where="space_id = ?",
+        params=(space_id,),
+        order="deleted_at ASC",
+    )
+    # Explicit categories are primary. Legacy aggregate keys stay for tooling
+    # compatibility but point to the same local data, not a second truth store.
     return {
         "kind": "CONVERSATION_SPACE",
         "contract": "v2.0-R1",
+        "export_manifest": {
+            "categories": [
+                "transcript", "notes", "confirmed_items", "unconfirmed_candidates",
+                "guidance", "source_manifest", "draft_actions", "provenance_tombstones",
+            ],
+            "privacy": "LOCAL_EXPORT",
+            "contains_external_secrets": False,
+        },
         "space": {k: v for k, v in detail.items() if k not in {"goals", "sessions", "participants", "decisions", "commitments", "open_questions", "threads"}},
         "goals": detail["goals"],
         "sessions": detail["sessions"],
         "participants": detail["participants"],
-        "items": store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at ASC"),
+        "transcript": transcript,
+        "notes": notes,
+        "confirmed_items": confirmed,
+        "unconfirmed_candidates": candidates,
+        "guidance": guidance,
+        "source_manifest": source_manifest,
+        "draft_actions": list_draft_actions(space_id),
+        "provenance_tombstones": tombstones,
+        "items": items,
         "threads": detail["threads"],
         "packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
-        "guidance": store.rows(
-            "SELECT g.* FROM conversation_guidance_event g JOIN conversation_session s ON s.id = g.session_id "
-            "WHERE s.space_id = ? ORDER BY g.created_at ASC",
-            (space_id,),
-        ),
-        "draft_actions": list_draft_actions(space_id),
     }

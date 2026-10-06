@@ -72,6 +72,20 @@ const OPEN = {
 function mocks() {
   let session = { ...SESSION }
   return async (pathname, method, request) => {
+    if (pathname === '/api/product/conversation/demo') return {
+      evidence: 'SYNTHETIC_DEMO',
+      scenario: 'DESIGN_REVIEW',
+      title: 'Android Architecture Review · Dry Run',
+      goal: '明确 offline migration 方案并确认 rollback owner',
+      steps: [
+        { kind: 'PROPOSAL', title: 'Proposal ≠ Decision', input: '建议 v2', output: '保持 PROPOSED', state: 'PROPOSED' },
+        { kind: 'RECALL', title: '跨场 Recall', input: '回到 migration', output: '上次已确认 v2', source: 'Synthetic prior Design Review' },
+        { kind: 'CONTRIBUTION_OPPORTUNITY', title: '值得补充', input: '讨论规模', output: '10x data scale', source: 'Synthetic Benchmark Note' },
+        { kind: 'SILENT', title: 'Stay Silent', input: '用户正在表达', output: 'SILENT · USER_SPEAKING' },
+        { kind: 'CONTINUE', title: '会后逐项确认', input: 'owner 未知', output: '保持 Open Question' },
+      ],
+      privacy: { capture_default: 'NOTES_ONLY', processing_default: 'LOCAL' },
+    }
     if (pathname === '/api/product/conversation/templates') return {
       items: [
         { key: 'PROJECT_SYNC', label: '项目同步', default_mode: 'BALANCED', guidance: ['RECALL', 'QUESTION'] },
@@ -177,6 +191,28 @@ function mocks() {
 }
 
 test.describe('v2.0 Conversation Profile', () => {
+  test('first opt-in runs an explicitly synthetic dry run before Conversation Home', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'interview' },
+      apiOverrides: mocks(),
+    })
+    await page.goto('/#/home')
+    await page.getByLabel('工作模式').selectOption('conversation')
+    await expect(page).toHaveURL(/#\/conversation\/onboarding/)
+    await expect(page.getByTestId('conversation-onboarding')).toBeVisible()
+    await expect(page.getByText('默认本地、私密、不开录音、不自动写外部系统。')).toBeVisible()
+    await page.getByRole('button', { name: '运行 30–60 秒等价 Dry Run' }).click()
+    await expect(page.getByTestId('conversation-dry-run')).toBeVisible()
+    await expect(page.getByText('SYNTHETIC_DEMO')).toBeVisible()
+    await expect(page.getByText('SILENT · USER_SPEAKING')).toBeVisible()
+    await page.getByRole('button', { name: '开启 Conversation Beta' }).click()
+    await expect(page).toHaveURL(/#\/conversation$/)
+    const optin = await page.evaluate(() => localStorage.getItem('chengzhu-conversation-optin'))
+    expect(optin).toBe('1')
+  })
+
+
   test('profile switcher opens a real Conversation Home and Space', async ({ context, page }, testInfo) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,

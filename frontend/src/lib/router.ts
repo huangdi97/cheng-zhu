@@ -23,6 +23,7 @@ export type RouteName =
   | 'settings'
   | 'live'
   | 'conversation-home'
+  | 'conversation-onboarding'
   | 'conversations'
   | 'conversation'
   | 'conversation-live'
@@ -71,6 +72,7 @@ export function parsePath(input: string): Route {
   const route = (name: RouteName, params: Record<string, string> = {}): Route => ({ name, path, params, query })
   switch (segs[0]) {
     case 'conversation':
+      if (segs[1] === 'onboarding') return route('conversation-onboarding')
       if (segs[1] === 'live' && segs[2]) return route('conversation-live', { sessionId: segs[2] })
       if (segs[1] === 'spaces') {
         if (segs[2]) {
@@ -118,6 +120,7 @@ export const paths = {
   settings: (group = 'general') => `/settings/${group}`,
   live: (sessionId?: string) => (sessionId ? `/live/${encodeURIComponent(sessionId)}` : '/live'),
   conversationHome: () => '/conversation',
+  conversationOnboarding: () => '/conversation/onboarding',
   conversationSpaces: (spaceId?: string, query?: Record<string, string>) =>
     withQuery(spaceId ? `/conversation/spaces/${encodeURIComponent(spaceId)}` : '/conversation/spaces', query),
   conversationSpace: (spaceId: string, tab: ConversationTab = 'overview') =>
@@ -152,6 +155,7 @@ export function legacyModeForRoute(route: Route): LegacyMode {
     case 'reflection':
       return 'review'
     case 'conversation-home':
+    case 'conversation-onboarding':
     case 'conversations':
     case 'conversation':
     case 'conversation-live':

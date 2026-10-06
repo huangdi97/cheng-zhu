@@ -3,7 +3,7 @@ import { ArrowRight, Plus } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import type { ConversationProfile } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
-import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
+import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, formatWhen, inputCls, useAsync } from '@/components/os/ui'
 
 export default function ConversationSpacesPage({ query = {} }: { query?: Record<string, string> }) {
   const spaces = useAsync(() => conversationApi.spaces(), [])
@@ -15,6 +15,23 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const templateMap = useMemo(() => new Map((templates.data?.items ?? []).map((x) => [x.key, x])), [templates.data])
+  const groups = useMemo(() => {
+    const now = Date.now() / 1000
+    const recentCutoff = now - 7 * 24 * 3600
+    const result: Array<{ key: string; label: string; items: NonNullable<typeof spaces.data>['items'] }> = [
+      { key: 'upcoming', label: 'Upcoming', items: [] },
+      { key: 'recent', label: '最近', items: [] },
+      { key: 'active', label: 'Active', items: [] },
+      { key: 'archived', label: 'Archived', items: [] },
+    ]
+    for (const space of spaces.data?.items ?? []) {
+      if (space.status === 'ARCHIVED') result[3].items.push(space)
+      else if (space.next_session?.scheduled_at && space.next_session.scheduled_at >= now) result[0].items.push(space)
+      else if ((space.last_session?.ended_at ?? space.updated_at) >= recentCutoff) result[1].items.push(space)
+      else result[2].items.push(space)
+    }
+    return result.filter((group) => group.items.length)
+  }, [spaces.data])
 
   const create = async () => {
     if (!title.trim()) return
@@ -54,19 +71,31 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
       {spaces.loading ? <Loading /> : spaces.error ? <ErrorState message={spaces.error} onRetry={spaces.reload} /> : (spaces.data?.items.length ?? 0) === 0 ? (
         <EmptyState title="还没有空间" body="推荐先用项目同步或设计评审验证真实价值。" action={<PrimaryButton onClick={() => setShowCreate(true)}>新建空间</PrimaryButton>} />
       ) : (
-        <div className="space-y-2">
-          {spaces.data!.items.map((space) => (
-            <button key={space.id} type="button" onClick={() => navigate(paths.conversationSpace(space.id))}
-              className="group flex w-full items-center justify-between rounded-2xl border border-bg-tertiary/70 bg-bg-secondary/30 px-4 py-3 text-left hover:bg-bg-hover/45">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-sm font-semibold text-text-primary">{space.title}</span>
-                  <StatusBadge tone="info">{templateMap.get(space.profile)?.label ?? space.profile}</StatusBadge>
-                </div>
-                <p className="mt-1 truncate text-xs text-text-muted">{space.default_goal || '尚未设置长期对话目标'} · {space.default_mode}</p>
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <section key={group.key} aria-label={group.label}>
+              <div className="mb-2 flex items-center gap-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{group.label}</h2>
+                <span className="text-[10px] text-text-muted">{group.items.length}</span>
               </div>
-              <ArrowRight className="h-4 w-4 flex-shrink-0 text-text-muted group-hover:text-text-primary" />
-            </button>
+              <div className="space-y-2">
+                {group.items.map((space) => (
+                  <button key={space.id} type="button" onClick={() => navigate(paths.conversationSpace(space.id))}
+                    className="group flex w-full items-center justify-between rounded-2xl border border-bg-tertiary/70 bg-bg-secondary/30 px-4 py-3 text-left hover:bg-bg-hover/45">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-text-primary">{space.title}</span>
+                        <StatusBadge tone={space.status === 'ARCHIVED' ? 'muted' : 'info'}>{templateMap.get(space.profile)?.label ?? space.profile}</StatusBadge>
+                        {space.next_session ? <StatusBadge tone="busy">{formatWhen(space.next_session.scheduled_at)}</StatusBadge> : null}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-text-muted">{space.default_goal || '尚未设置长期对话目标'} · {space.default_mode}</p>
+                      <p className="mt-1 text-[11px] text-text-muted">{space.open_commitments_count ?? 0} open commitments · {space.open_questions_count ?? 0} open questions</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 flex-shrink-0 text-text-muted group-hover:text-text-primary" />
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

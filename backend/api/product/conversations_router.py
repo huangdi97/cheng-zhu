@@ -52,6 +52,11 @@ def diagnostics():
     return conversations.diagnostics()
 
 
+@router.get("/demo")
+def demo():
+    return conversations.synthetic_demo()
+
+
 class AdhocCreate(BaseModel):
     title: str = Field(default="临时对话", max_length=160)
     profile: str = "PROJECT_SYNC"
@@ -65,8 +70,8 @@ def adhoc(body: AdhocCreate):
 
 
 @router.get("/spaces")
-def spaces(status: str = "ACTIVE"):
-    return {"items": conversations.list_spaces(status)}
+def spaces(status: str = ""):
+    return {"items": conversations.list_space_summaries(status)}
 
 
 @router.post("/spaces")
@@ -103,6 +108,22 @@ def prepare(space_id: str):
 def export_space(space_id: str):
     with domain_errors():
         return conversations.export_space(space_id)
+
+
+@router.get("/spaces/{space_id}/retention")
+def retention_preview(space_id: str):
+    with domain_errors():
+        return conversations.retention_preview(space_id)
+
+
+class RetentionApply(BaseModel):
+    confirm: bool = False
+
+
+@router.post("/spaces/{space_id}/retention/apply")
+def retention_apply(space_id: str, body: RetentionApply):
+    with domain_errors():
+        return conversations.apply_retention(space_id, confirm=body.confirm)
 
 
 class GoalCreate(BaseModel):
@@ -151,6 +172,16 @@ def create_session(space_id: str, body: SessionCreate):
 def get_session(session_id: str):
     with domain_errors():
         return conversations.require_session(session_id)
+
+
+class SessionDelete(BaseModel):
+    confirmed_policy: str = "BLOCK"
+
+
+@router.post("/sessions/{session_id}/delete")
+def delete_session(session_id: str, body: SessionDelete):
+    with domain_errors():
+        return conversations.delete_session(session_id, confirmed_policy=body.confirmed_policy)
 
 
 class SessionPatch(BaseModel):

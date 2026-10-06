@@ -45,6 +45,7 @@ const HistoryPage = lazy(() => import('@/components/os/HistoryPage'))
 const ReflectionPage = lazy(() => import('@/components/os/ReflectionPage'))
 const SettingsPage = lazy(() => import('@/components/os/SettingsPage'))
 const ConversationHome = lazy(() => import('@/components/conversation/ConversationHome'))
+const ConversationOnboardingPage = lazy(() => import('@/components/conversation/ConversationOnboardingPage'))
 const ConversationSpacesPage = lazy(() => import('@/components/conversation/ConversationSpacesPage'))
 const ConversationSpacePage = lazy(() => import('@/components/conversation/ConversationSpacePage'))
 const ConversationLivePage = lazy(() => import('@/components/conversation/ConversationLivePage'))
@@ -79,7 +80,7 @@ const INTERVIEW_NAV_ITEMS: NavItem[] = [
 ]
 
 const CONVERSATION_NAV_ITEMS: NavItem[] = [
-  { key: 'conversation-home', label: 'nav.conversationHome', Icon: Home, path: paths.conversationHome(), match: ['conversation-home'] },
+  { key: 'conversation-home', label: 'nav.conversationHome', Icon: Home, path: paths.conversationHome(), match: ['conversation-home', 'conversation-onboarding'] },
   { key: 'spaces', label: 'nav.spaces', Icon: MessageSquareText, path: paths.conversationSpaces(), match: ['conversations', 'conversation', 'conversation-live'] },
   { key: 'me', label: 'nav.me', Icon: FileText, path: paths.me(), match: ['me'] },
   { key: 'library', label: 'nav.library', Icon: Library, path: paths.library(), match: ['library'] },
@@ -173,7 +174,7 @@ export default function App() {
   // A profile is a work surface, not a separate account. Shared Me/Library/Settings
   // preserve the user's last choice; profile-specific routes are authoritative.
   useEffect(() => {
-    const conversationRoute = ['conversation-home', 'conversations', 'conversation', 'conversation-live'].includes(route.name)
+    const conversationRoute = ['conversation-home', 'conversation-onboarding', 'conversations', 'conversation', 'conversation-live'].includes(route.name)
     const interviewRoute = ['home', 'goals', 'goal', 'practice', 'history', 'reflection', 'live'].includes(route.name)
     const next: ProductProfile | null = conversationRoute ? 'conversation' : interviewRoute ? 'interview' : null
     if (next && next !== productProfile) {
@@ -185,7 +186,13 @@ export default function App() {
   const switchProfile = useCallback((next: ProductProfile) => {
     setProductProfile(next)
     try { window.localStorage.setItem('chengzhu-product-profile', next) } catch { /* localStorage unavailable */ }
-    navigate(next === 'conversation' ? paths.conversationHome() : paths.home())
+    if (next === 'conversation') {
+      let optedIn = false
+      try { optedIn = window.localStorage.getItem('chengzhu-conversation-optin') === '1' } catch { /* storage unavailable */ }
+      navigate(optedIn ? paths.conversationHome() : paths.conversationOnboarding())
+      return
+    }
+    navigate(paths.home())
   }, [])
 
   useEffect(() => {
@@ -462,6 +469,7 @@ export default function App() {
                 {route.name === 'reflection' ? <ReflectionPage kind={route.params.kind} sessionRef={route.params.ref} /> : null}
                 {route.name === 'settings' ? <SettingsPage group={route.params.group} query={route.query} /> : null}
                 {route.name === 'conversation-home' ? <ConversationHome /> : null}
+                {route.name === 'conversation-onboarding' ? <ConversationOnboardingPage /> : null}
                 {route.name === 'conversations' ? <ConversationSpacesPage query={route.query} /> : null}
                 {route.name === 'conversation' ? <ConversationSpacePage spaceId={route.params.spaceId} tab={route.params.tab as ConversationTab} /> : null}
                 {route.name === 'conversation-live' ? <ConversationLivePage sessionId={route.params.sessionId} /> : null}

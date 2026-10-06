@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 3
+LATEST_SCHEMA_VERSION = 4
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -559,6 +559,30 @@ _V3_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_transcript_space ON conversation_transcript_segment(space_id, created_at)",
 )
 
+# --- v2.0 lifecycle closure: deletion provenance ---
+_V4_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_provenance_tombstone (
+        id TEXT PRIMARY KEY,
+        original_item_id TEXT NOT NULL,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        deleted_session_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        state TEXT NOT NULL,
+        review_status TEXT NOT NULL,
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        source_excerpt TEXT NOT NULL DEFAULT '',
+        deleted_at REAL NOT NULL
+    )
+    """,
+)
+
+_V4_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_tombstone_space ON conversation_provenance_tombstone(space_id, deleted_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_tombstone_original ON conversation_provenance_tombstone(original_item_id)",
+)
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -568,6 +592,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     1: (lambda conn: _apply_statements(conn, _V1_TABLES + _V1_INDEXES), "v1.3 goal-centered product layer"),
     2: (lambda conn: _apply_statements(conn, _V2_TABLES + _V2_INDEXES), "v2.0 personal conversation intelligence"),
     3: (lambda conn: _apply_statements(conn, _V3_TABLES + _V3_INDEXES), "v2.0 conversation runtime closure"),
+    4: (lambda conn: _apply_statements(conn, _V4_TABLES + _V4_INDEXES), "v2.0 deletion provenance tombstones"),
 }
 
 

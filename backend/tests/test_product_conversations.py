@@ -8,7 +8,7 @@ from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 3
+    assert store.schema_version() == 4
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -24,6 +24,7 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_guidance_event",
         "conversation_draft_action",
         "conversation_transcript_segment",
+        "conversation_provenance_tombstone",
     } <= tables
 
 
@@ -387,10 +388,139 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 3
+    assert diag["schema_version"] == 4
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1
     assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
     assert diag["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
     assert diag["privacy"]["auto_external_writeback"] == "OFF"
+
+
+def test_space_summaries_grouping_inputs_include_upcoming_and_open_counts(product_env):
+    space = conversations.create_space("Roadmap", "PROJECT_SYNC")
+    conversations.create_session(
+        space["id"], title="Tomorrow", scheduled_at=store.now() + 86400,
+        capture_mode="NOTES_ONLY", consent_ack=True,
+    )
+    active = conversations.create_session(space["id"], title="Today", consent_ack=True)
+    conversations.start_session(active["id"])
+    conversations.add_item(
+        active["id"], item_type="OpenQuestion", title="launch date?",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
+    )
+    summaries = conversations.list_space_summaries("")
+    row = next(x for x in summaries if x["id"] == space["id"])
+    assert row["next_session"]["title"] == "Tomorrow"
+    assert row["open_questions_count"] == 1
+    assert row["open_commitments_count"] == 0
+
+
+def test_synthetic_demo_is_non_persistent_and_explicitly_labeled(product_env):
+    before = conversations.list_spaces("")
+    demo = conversations.synthetic_demo()
+    after = conversations.list_spaces("")
+    assert demo["evidence"] == "SYNTHETIC_DEMO"
+    assert [step["kind"] for step in demo["steps"]] == [
+        "PROPOSAL", "RECALL", "CONTRIBUTION_OPPORTUNITY", "SILENT", "CONTINUE",
+    ]
+    assert before == after
+
+
+def test_session_delete_requires_tombstone_for_confirmed_truth(product_env):
+    space = conversations.create_space("Delete Safety", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    item = conversations.add_item(
+        session["id"], item_type="Decision", title="采用 v2",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "excerpt": "就按 v2"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(session["id"])
+    with pytest.raises(ValueError, match="TOMBSTONE"):
+        conversations.delete_session(session["id"])
+    result = conversations.delete_session(session["id"], confirmed_policy="TOMBSTONE")
+    assert result["deleted"] is True and result["provenance_tombstones"] == 1
+    assert store.get("conversation_session", session["id"]) is None
+    tomb = store.select("conversation_provenance_tombstone", where="original_item_id = ?", params=(item["id"],))
+    assert tomb and tomb[0]["title"] == "采用 v2"
+    assert tomb[0]["source_refs"][0]["kind"] == "TRANSCRIPT_SEGMENT"
+
+
+def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(product_env, monkeypatch):
+    clock = [1_000_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+    space = conversations.create_space("Retention", "PROJECT_SYNC")
+    conversations.update_space(space["id"], {"retention_policy": {"preset": "MINIMUM"}})
+    session = conversations.create_session(space["id"], capture_mode="NOTES_ONLY", consent_ack=True)
+    conversations.start_session(session["id"])
+    item = conversations.add_item(
+        session["id"], item_type="Decision", title="Keep me",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "confirmed"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    store.insert("conversation_transcript_segment", {
+        "id": store.new_id("cts_"), "space_id": space["id"], "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO", "text": "temporary transcript", "provider": "test",
+        "source": "TEST", "is_final": True, "created_at": clock[0] - 1,
+    })
+    conversations.evaluate_guidance(session["id"], {"user_speaking": True})
+    draft = conversations.create_draft_action(session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="draft")
+    clock[0] += 10
+
+    preview = conversations.retention_preview(space["id"])
+    assert preview["would_delete"]["transcript_segments"] == 1
+    assert preview["would_delete"]["guidance_events"] == 1
+    assert preview["would_delete"]["draft_actions"] == 1
+    with pytest.raises(ValueError, match="明确确认"):
+        conversations.apply_retention(space["id"], confirm=False)
+    result = conversations.apply_retention(space["id"], confirm=True)
+    assert result["deleted"] == {"transcript_segments": 1, "guidance_events": 1, "draft_actions": 1}
+    assert store.get("conversation_item", item["id"]) is not None
+    assert store.get("conversation_draft_action", draft["id"]) is None
+
+
+def test_export_is_categorized_and_keeps_truth_classes_separate(product_env):
+    space = conversations.create_space("Export", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    confirmed = conversations.add_item(
+        session["id"], item_type="Decision", title="confirmed decision",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "yes"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(confirmed["id"], "CONFIRM")
+    candidate = conversations.add_item(
+        session["id"], item_type="OpenQuestion", title="candidate question",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "maybe"}],
+        epistemic_status="OBSERVED",
+    )
+    exported = conversations.export_space(space["id"])
+    assert "transcript" in exported and "source_manifest" in exported
+    assert [x["id"] for x in exported["confirmed_items"]] == [confirmed["id"]]
+    assert [x["id"] for x in exported["unconfirmed_candidates"]] == [candidate["id"]]
+    assert "confirmed_items" in exported["export_manifest"]["categories"]
+
+
+def test_one_hundred_session_state_reliability(product_env):
+    space = conversations.create_space("100 Session Continuity", "PROJECT_SYNC")
+    for index in range(100):
+        session = conversations.create_session(space["id"], title=f"S{index}", consent_ack=True)
+        conversations.start_session(session["id"])
+        if index in {0, 25, 50, 75, 99}:
+            item = conversations.add_item(
+                session["id"], item_type="Decision", title=f"checkpoint {index}",
+                source_refs=[{"kind": "USER_NOTE", "excerpt": f"checkpoint {index}"}],
+                epistemic_status="OBSERVED",
+            )
+            conversations.review_item(item["id"], "CONFIRM")
+        conversations.end_session(session["id"])
+    detail = conversations.space_detail(space["id"])
+    assert len(detail["sessions"]) == 100
+    assert len([x for x in detail["decisions"] if x["state"] == "AGREED"]) == 5
+    latest = conversations.create_session(space["id"], title="S100", consent_ack=True)
+    pack = conversations.start_session(latest["id"])["pack"]
+    ids = {x["id"] for x in pack["payload"]["confirmed_items"]}
+    assert len(ids) == 5

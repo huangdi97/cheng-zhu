@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Download, Play, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import { productApi } from '@/lib/productApi'
 import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationItem, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
@@ -27,6 +27,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const prepare = useAsync(() => conversationApi.prepare(spaceId), [spaceId])
   const materials = useAsync(() => productApi.materials(), [])
   const quickNotes = useAsync(() => productApi.quickNotes(), [])
+  const retention = useAsync(() => conversationApi.retentionPreview(spaceId), [spaceId])
   const [capture, setCapture] = useState<CaptureMode>('NOTES_ONLY')
   const [processing, setProcessing] = useState<ProcessingMode>('LOCAL')
   const [mode, setMode] = useState<AssistanceMode>('BALANCED')
@@ -41,6 +42,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [goalTitle, setGoalTitle] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
+  const [lifecycleMessage, setLifecycleMessage] = useState('')
 
   useEffect(() => { if (detail.data?.default_mode) setMode(detail.data.default_mode) }, [detail.data?.default_mode])
 
@@ -84,6 +86,51 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       await conversationApi.addGoal(spaceId, { title: goalTitle.trim() })
       setGoalTitle('')
       await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const setArchived = async (archived: boolean) => {
+    setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      await conversationApi.patchSpace(spaceId, { status: archived ? 'ARCHIVED' : 'ACTIVE' })
+      await detail.reload()
+      setLifecycleMessage(archived ? '已归档；历史与 provenance 保留。' : '已恢复为 Active。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const setRetentionPreset = async (preset: 'MINIMUM' | 'STANDARD') => {
+    setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      await conversationApi.patchSpace(spaceId, { retention_policy: { preset } })
+      await detail.reload(); await retention.reload()
+      setLifecycleMessage(`已切换为 ${preset}；这里只更新策略，不会立即删除。`)
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const applyRetention = async () => {
+    if (!retention.data) return
+    const counts = retention.data.would_delete
+    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}；已确认事项与 provenance 不删除。`)) return
+    setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.applyRetention(spaceId, true)
+      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0}`)
+      await retention.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const removeSession = async (id: string) => {
+    if (!window.confirm('删除这场会话？如果其中有已确认事项，会先保存 provenance tombstone；该事项将不再参与后续 Recall。')) return
+    setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.deleteSession(id, 'TOMBSTONE')
+      setLifecycleMessage(`已删除会话；保留 ${result.provenance_tombstones} 条 provenance tombstone。`)
+      setContinueData(null)
+      await detail.reload(); await prepare.reload(); await retention.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
@@ -158,11 +205,16 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       <button type="button" onClick={() => navigate(paths.conversationSpaces())} className="mb-3 inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary"><ArrowLeft className="h-3.5 w-3.5" /> 对话空间</button>
       <PageHeader eyebrow={space.profile} title={space.title} subtitle={space.description || space.default_goal || '持续保留 Decision、Commitment 与 Open Question。'}
         actions={<>
-          <SecondaryButton onClick={exportSpace} disabled={sessionBusy} icon={<Download className="h-3.5 w-3.5" />}>导出</SecondaryButton>
-          <SecondaryButton onClick={deleteSpace} disabled={sessionBusy} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton>
-          <PrimaryButton onClick={() => navigate(paths.conversationSpace(spaceId, 'prepare'))} icon={<Play className="h-3.5 w-3.5" />}>准备 / 开始</PrimaryButton>
+          <SecondaryButton onClick={exportSpace} disabled={sessionBusy} icon={<Download className="h-3.5 w-3.5" />}>分类导出</SecondaryButton>
+          <SecondaryButton onClick={() => setArchived(space.status !== 'ARCHIVED')} disabled={sessionBusy}
+            icon={space.status === 'ARCHIVED' ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}>
+            {space.status === 'ARCHIVED' ? '恢复' : '归档'}
+          </SecondaryButton>
+          <SecondaryButton onClick={deleteSpace} disabled={sessionBusy} icon={<Trash2 className="h-3.5 w-3.5" />}>删除 Space</SecondaryButton>
+          {space.status !== 'ARCHIVED' ? <PrimaryButton onClick={() => navigate(paths.conversationSpace(spaceId, 'prepare'))} icon={<Play className="h-3.5 w-3.5" />}>准备 / 开始</PrimaryButton> : null}
         </>} />
       <Tabs tabs={tabs} value={tab} label="对话空间" onChange={(v) => navigate(paths.conversationSpace(spaceId, v))} />
+      {lifecycleMessage ? <p role="status" className="mt-3 rounded-xl bg-bg-secondary/50 px-3 py-2 text-xs text-text-secondary">{lifecycleMessage}</p> : null}
 
       {tab === 'overview' ? (
         <div className="pt-3">
@@ -182,6 +234,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           <Section title="Conversation Goals">
             {space.goals.length ? <div className="space-y-1">{space.goals.map((g) => <div key={g.id} className="text-xs text-text-primary">• {g.title}</div>)}</div> : <p className="text-xs text-text-muted">可把本次需要形成 Decision / 明确 owner 等目标写在这里。</p>}
             <div className="mt-3 flex gap-2"><input className={inputCls} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="新增一个可验证的对话目标" /><SecondaryButton onClick={addGoal} disabled={sessionBusy || !goalTitle.trim()} icon={<Plus className="h-3.5 w-3.5" />}>添加</SecondaryButton></div>
+          </Section>
+          <Section title="数据保留与删除">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="info">{String(space.retention_policy?.preset ?? 'STANDARD')}</StatusBadge>
+              <SecondaryButton disabled={sessionBusy} onClick={() => setRetentionPreset('MINIMUM')}>Minimum</SecondaryButton>
+              <SecondaryButton disabled={sessionBusy} onClick={() => setRetentionPreset('STANDARD')}>Standard</SecondaryButton>
+            </div>
+            {retention.loading ? <div className="mt-2"><Loading /></div> : retention.data ? <div className="mt-3 rounded-xl bg-bg-secondary/40 p-3">
+              <p className="text-xs text-text-primary">当前策略若现在执行：transcript {retention.data.would_delete.transcript_segments} · guidance {retention.data.would_delete.guidance_events} · draft {retention.data.would_delete.draft_actions}</p>
+              <p className="mt-1 text-[11px] text-text-muted">已确认事项、Session Pack 与 provenance tombstone 始终保留；原始音频当前默认不长期保存。</p>
+              <div className="mt-3"><SecondaryButton disabled={sessionBusy || !retention.data.destructive} onClick={applyRetention}>预览后执行本地清理</SecondaryButton></div>
+            </div> : null}
           </Section>
         </div>
       ) : null}
@@ -236,7 +300,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           {space.sessions.length ? <div className="space-y-2">{space.sessions.map((s) => (
             <div key={s.id} className="rounded-xl border border-bg-tertiary/70 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-medium text-text-primary">{s.title}</div><div className="text-[11px] text-text-muted">{s.status} · {s.assistance_mode} · {s.capture_mode}</div></div>
-                <div className="flex gap-2">{s.status !== 'ENDED' ? <SecondaryButton onClick={() => navigate(paths.conversationLive(s.id))}>进入</SecondaryButton> : <SecondaryButton onClick={async () => setContinueData(await conversationApi.continue(s.id))}>Continue</SecondaryButton>}</div>
+                <div className="flex gap-2">{s.status !== 'ENDED' ? <SecondaryButton onClick={() => navigate(paths.conversationLive(s.id))}>进入</SecondaryButton> : <><SecondaryButton onClick={async () => setContinueData(await conversationApi.continue(s.id))}>Continue</SecondaryButton><SecondaryButton disabled={sessionBusy} onClick={() => removeSession(s.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton></>}</div>
               </div>
             </div>
           ))}</div> : <EmptyState title="还没有会话" body="从“准备”创建本场 Preflight。" />}

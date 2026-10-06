@@ -80,6 +80,10 @@ export interface ConversationSpace {
   retention_policy: Record<string, unknown>
   created_at: number
   updated_at: number
+  next_session?: ConversationSession | null
+  last_session?: ConversationSession | null
+  open_commitments_count?: number
+  open_questions_count?: number
 }
 
 export interface ConversationGoal {

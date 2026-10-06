@@ -715,6 +715,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         return existing[0]
     pack_inputs = _pack_inputs(space)
     participants = store.select("conversation_participant", where="space_id = ?", params=(space["id"],), order="created_at ASC")
+    prepared = prepare_space(space["id"])
 
     payload = {
         "contract": "v2.0-R1",
@@ -727,6 +728,14 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
+        "session_brief": {
+            "goal": space.get("default_goal") or "",
+            "agenda": list(prepared.get("agenda") or []),
+            "expected_questions": list(prepared.get("expected_questions") or []),
+            "unresolved_count": int((prepared.get("brief") or {}).get("unresolved_count") or 0),
+            "known_participants": int((prepared.get("brief") or {}).get("known_participants") or 0),
+            "contribution_candidates": list(prepared.get("contribution_candidates") or []),
+        },
         "expression_profile": _expression_profile(),
         "processing_runtime": processing_runtime_status(session),
         "policy": {
@@ -798,6 +807,55 @@ def _frozen_pack_payload(session: dict[str, Any]) -> dict[str, Any]:
         row = rows[0] if rows else None
     payload = (row or {}).get("payload") if row else None
     return dict(payload) if isinstance(payload, dict) else {}
+
+
+def session_context(session_id: str) -> dict[str, Any]:
+    """Small Live read model derived from the frozen Session Pack.
+
+    It deliberately omits full source bodies; Manual Ask can query them through
+    the backend without dumping the whole private pack into the renderer.
+    """
+    session = require_session(session_id)
+    payload = _frozen_pack_payload(session)
+    pack_row = store.get("conversation_session_pack", str(session.get("pack_id") or "")) if session.get("pack_id") else None
+    sources = [
+        {
+            "material_id": source.get("material_id") or "",
+            "version_id": source.get("version_id") or "",
+            "title": source.get("title") or "",
+            "kind": source.get("kind") or "",
+            "usage": source.get("usage") or "",
+            "content_hash": source.get("content_hash") or "",
+            "is_personal_evidence": bool(source.get("is_personal_evidence")),
+        }
+        for source in payload.get("sources") or []
+    ]
+    notes = [
+        {"id": note.get("id") or "", "title": note.get("title") or ""}
+        for note in payload.get("quick_notes") or []
+    ]
+    participants = [
+        {
+            "id": p.get("id") or "",
+            "display_name": p.get("display_name") or "",
+            "role": p.get("role") or "",
+            "organization": p.get("organization") or "",
+            "counterparty_state": p.get("counterparty_state") or {},
+        }
+        for p in payload.get("participants") or []
+    ]
+    return {
+        "session_id": session_id,
+        "space": payload.get("space") or {"id": session["space_id"]},
+        "brief": payload.get("session_brief") or {},
+        "sources": sources,
+        "quick_notes": notes,
+        "participants": participants,
+        "expression_profile": payload.get("expression_profile") or {},
+        "processing_runtime": payload.get("processing_runtime") or {},
+        "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
+        "pack_digest": str((pack_row or {}).get("digest") or ""),
+    }
 
 
 def _query_tokens(text: str) -> set[str]:

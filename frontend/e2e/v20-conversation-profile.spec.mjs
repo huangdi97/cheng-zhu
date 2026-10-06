@@ -173,6 +173,7 @@ function mocks() {
         { key: 'mode', label: '帮助方式', value: 'BALANCED', ok: true },
       ],
       blockers: [],
+      warnings: [],
       policy: SESSION.policy,
       processing_runtime: {
         mode: 'LOCAL',
@@ -186,9 +187,29 @@ function mocks() {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
         selected_quick_note_ids: [],
+        sources: [{
+          material_id: 'benchmark-note',
+          version_id: 'mv-benchmark-v1',
+          title: 'Q4 Benchmark',
+          kind: 'PROJECT',
+          usage: 'FACTS',
+          content_hash: 'sha256:fixture',
+          is_personal_evidence: true,
+        }],
+        skipped_sources: [],
+        quick_notes: [],
+        missing_quick_note_ids: [],
         participants_count: 1,
         confirmed_items_count: 1,
         expression_profile: { conclusion_first: true, target_seconds: 60, shape: 'bullet' },
+        processing_runtime: {
+          mode: 'LOCAL',
+          capture_mode: 'NOTES_ONLY',
+          configured_stt_provider: 'whisper',
+          main_audio_remote_possible: false,
+          self_mic_remote_possible: false,
+          blockers: [],
+        },
         policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
       },
       privacy_note: '记录规则依场景与组织政策而异。',
@@ -335,6 +356,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByRole('heading', { name: SPACE.title })).toBeVisible()
     await page.getByRole('button', { name: '生成本场并检查' }).click()
     await expect(page.getByText('Session Pack Preview')).toBeVisible()
+    await expect(page.getByText('Q4 Benchmark')).toBeVisible()
+    await expect(page.getByText(/Ready Sources 1\/1/)).toBeVisible()
     await expect(page.getByText('AI AI_ALLOWED')).toBeVisible()
     await expect(page.getByText('记录规则依场景与组织政策而异。')).toBeVisible()
     await page.getByRole('button', { name: '开始会话' }).click()

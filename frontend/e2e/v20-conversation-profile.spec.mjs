@@ -38,6 +38,7 @@ const SESSION = {
     human_assistance: 'HUMAN_PRACTICE_ONLY',
     share_privacy: 'OFF',
     external_writeback: 'REVIEW_REQUIRED',
+    participant_consent_status: 'USER_REPORTS_ALLOWED',
     connector_permissions: [],
     speaker_biometric_identity: 'OFF',
     emotion_sentiment_profiling: 'OFF',
@@ -152,6 +153,7 @@ function mocks() {
       selected_sources: ['benchmark-note'],
       selected_quick_notes: [],
       brief: { last_change: DECISION, unresolved_count: 1, known_participants: 1 },
+      agenda: [OPEN.title],
       expected_questions: [OPEN.title],
       contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
     }
@@ -172,6 +174,14 @@ function mocks() {
       ],
       blockers: [],
       policy: SESSION.policy,
+      pack_preview: {
+        goal_ids: [],
+        selected_source_ids: ['benchmark-note'],
+        selected_quick_note_ids: [],
+        participants_count: 1,
+        confirmed_items_count: 1,
+        policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
+      },
       privacy_note: '记录规则依场景与组织政策而异。',
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/start` && method === 'POST') {
@@ -256,6 +266,24 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('global Start follows Conversation Profile into the create/preflight flow', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: {
+        'ia-color-scheme': 'vscode-light-plus',
+        'chengzhu-product-profile': 'conversation',
+        'chengzhu-conversation-optin': '1',
+      },
+      apiOverrides: mocks(),
+    })
+    await page.goto('/#/conversation')
+    await page.getByTestId('start-conversation').click()
+    await expect(page).toHaveURL(/#\/conversation\/spaces\?new=1/)
+    await expect(page.getByLabel('空间名称')).toBeVisible()
+    await expect(page.getByText('希望持续达成什么（可选）')).toBeVisible()
+  })
+
+
   test('profile switcher opens a real Conversation Home and Space', async ({ context, page }, testInfo) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,
@@ -286,6 +314,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
     await expect(page.getByRole('heading', { name: SPACE.title })).toBeVisible()
     await page.getByRole('button', { name: '生成本场并检查' }).click()
+    await expect(page.getByText('Session Pack Preview')).toBeVisible()
+    await expect(page.getByText('AI AI_ALLOWED')).toBeVisible()
     await expect(page.getByText('记录规则依场景与组织政策而异。')).toBeVisible()
     await page.getByRole('button', { name: '开始会话' }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/live/${SESSION.id}`))

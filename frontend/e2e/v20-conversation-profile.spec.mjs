@@ -611,6 +611,59 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('OFF', { exact: true })).toBeVisible()
   })
 
+  test('Decision supersession is explicit, directional, and preserves the old Decision', async ({ context, page }) => {
+    const base = mocks()
+    let oldState = 'AGREED'
+    let nextState = 'PROPOSED'
+    let nextReview = 'AI_EXTRACTED'
+    let nextSupersedes = ''
+    const replacement = {
+      ...DECISION,
+      id: 'ci-decision-v3',
+      state: nextState,
+      title: 'offline migration 采用 v3',
+      review_status: nextReview,
+      supersedes_id: nextSupersedes,
+      created_at: 3,
+      updated_at: 3,
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'GET') {
+          const original = await base(pathname, method, request)
+          return {
+            ...original,
+            decisions: [
+              { ...DECISION, state: oldState },
+              { ...replacement, state: nextState, review_status: nextReview, supersedes_id: nextSupersedes },
+            ],
+          }
+        }
+        if (pathname === '/api/product/conversation/items/ci-decision-v3/review' && method === 'POST') {
+          const body = request.postDataJSON()
+          if (body.action === 'SUPERSEDE') {
+            oldState = 'SUPERSEDED'
+            nextState = 'AGREED'
+            nextReview = 'USER_CONFIRMED'
+            nextSupersedes = DECISION.id
+          }
+          return { ...replacement, state: nextState, review_status: nextReview, supersedes_id: nextSupersedes }
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/decisions`)
+    await expect(page.getByText('offline migration 采用 v3')).toBeVisible()
+    await page.getByLabel('要替代的旧 Decision').selectOption(DECISION.id)
+    await page.getByRole('button', { name: '确认并替代旧 Decision' }).click()
+    await expect(page.getByText(`supersedes ${DECISION.id}`)).toBeVisible()
+    await expect(page.getByText('SUPERSEDED')).toBeVisible()
+    await expect(page.getByText('AGREED')).toBeVisible()
+  })
+
+
   test('Continue exposes reviewed local write-back drafts without claiming connector execution', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,

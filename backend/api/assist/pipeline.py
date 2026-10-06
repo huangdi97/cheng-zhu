@@ -99,6 +99,21 @@ _commit_lock = threading.Lock()
 
 _recent_asr_turn_monos: list[float] = []
 _knowledge_worker: Optional[BoundedTaskWorker] = None
+
+def _conversation_capture_owns_pipeline() -> bool:
+    """True only while Conversation Profile explicitly borrows Assist transport.
+
+    This gate protects Interview-owned persistence/analytics from being invoked
+    by Conversation capture. Import stays lazy to avoid a product↔transport
+    import cycle during backend startup.
+    """
+    try:
+        from services.product import conversation_capture
+        return bool(conversation_capture.is_active())
+    except Exception:
+        return False
+
+
 def _broadcast_asr_event(data: dict[str, Any]) -> None:
     """Broadcast legacy ASR events and, when explicitly owned by Conversation,
     mirror final interviewer transcription into the Conversation namespace."""
@@ -1202,13 +1217,16 @@ def start_nonblocking(device_id: Optional[int] = None, candidate_mic_device_id: 
         reason = "disabled" if not bool(getattr(cfg, "candidate_asr_enabled", False)) else "missing_or_same_device"
         broadcast({"type": "candidate_asr_status", "loaded": False, "loading": False, "provider": "off", "reason": reason})
 
-    # 创建 review session（如果满足条件）
-    review_integration.on_assist_start(
-        interviewer_device_id=device_id,
-        candidate_device_id=review_candidate_device_id,
-        candidate_asr_enabled=bool(getattr(cfg, "candidate_asr_enabled", False)),
-        written_exam_mode=bool(getattr(cfg, "written_exam_mode", False)),
-    )
+    # Interview Review persistence belongs only to Interview Profile.
+    # Conversation may borrow audio/VAD/STT transport, but must never create
+    # rows in review.db or run Interview review analytics.
+    if not _conversation_capture_owns_pipeline():
+        review_integration.on_assist_start(
+            interviewer_device_id=device_id,
+            candidate_device_id=review_candidate_device_id,
+            candidate_asr_enabled=bool(getattr(cfg, "candidate_asr_enabled", False)),
+            written_exam_mode=bool(getattr(cfg, "written_exam_mode", False)),
+        )
 
 
 def stop_interview_loop():
@@ -1285,9 +1303,10 @@ def stop_interview_loop():
         _elog.warning("ANSWER_STOP_WAIT_TIMEOUT pending/inflight work will be cancelled")
     cancel_answer_work(reset_session_data=False)
 
-    # 结束 review session（如果存在）。必须在音频 worker 最后 flush、候选人 ASR final、
-    # 以及可等待的答案 commit 之后执行，否则关闭应用时复盘会漏掉末尾问题。
-    review_integration.on_assist_stop(session)
+    # Conversation transport reuse must not terminate or mutate an Interview
+    # Review lifecycle either. Its transcript/guidance is persisted separately.
+    if not _conversation_capture_owns_pipeline():
+        review_integration.on_assist_stop(session)
 
     with conversation_lock:
         session.is_recording = False

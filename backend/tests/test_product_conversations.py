@@ -585,6 +585,86 @@ def test_proactive_recall_and_open_question_require_allowed_source_visibility(pr
     assert result2["guidance"] is None
 
 
+
+
+def test_transcript_direct_question_is_first_class_even_in_quiet_and_self_mic_never_interrupts(product_env):
+    space = conversations.create_space("Quiet Questions", "PROJECT_SYNC")
+    prior = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(prior["id"])
+    decision = conversations.add_item(
+        prior["id"],
+        item_type="Decision",
+        title="offline migration 采用 v2",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确采用 v2", "visibility": "PRIVATE"}],
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(prior["id"])
+
+    live = conversations.create_session(space["id"], consent_ack=True, assistance_mode="QUIET")
+    conversations.start_session(live["id"])
+    cue = conversations.guidance_from_transcript(
+        live["id"],
+        "为什么之前选择 offline migration v2？",
+        channel="PRIMARY_AUDIO",
+    )
+    assert cue is not None
+    assert cue["kind"] == "ANSWER_CUE"
+    assert cue["reason"] == "TRANSCRIPT_DIRECT_QUESTION"
+    assert "已确认历史" in cue["text"]
+    assert cue["source_refs"]
+
+    self_mic = conversations.guidance_from_transcript(
+        live["id"],
+        "为什么之前选择 offline migration v2？",
+        channel="SELF_MIC",
+    )
+    assert self_mic is None
+
+
+def test_transcript_can_surface_frozen_source_as_contribution_opportunity_without_promoting_notes(product_env):
+    material = materials.create_material(
+        "Q4 Benchmark",
+        kind="PROJECT",
+        usage="FACTS",
+        text=("Q4 benchmark validated offline migration at 10x data scale with repeatable results. " * 3),
+    )
+    from services.product import quick_notes
+    note = quick_notes.create_note("Q4 benchmark 只是提醒，不是证据。", title="Private reminder")
+    space = conversations.create_space(
+        "Source Opportunity",
+        "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+        selected_quick_note_ids=[note["id"]],
+    )
+    live = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")
+    conversations.start_session(live["id"])
+
+    opportunity = conversations.guidance_from_transcript(
+        live["id"],
+        "现在讨论 Q4 benchmark data scale",
+        channel="PRIMARY_AUDIO",
+    )
+    assert opportunity is not None
+    assert opportunity["kind"] == "CONTRIBUTION_OPPORTUNITY"
+    assert opportunity["reason"] == "TRANSCRIPT_SOURCE_OPPORTUNITY"
+    assert opportunity["source_refs"][0]["version_id"]
+
+    # A Quick Note remains queryable manually but is not eligible for automatic
+    # proactive promotion.
+    note_only_space = conversations.create_space(
+        "Notes Only",
+        "DESIGN_REVIEW",
+        selected_quick_note_ids=[note["id"]],
+    )
+    note_session = conversations.create_session(note_only_space["id"], consent_ack=True)
+    conversations.start_session(note_session["id"])
+    assert conversations.guidance_from_transcript(
+        note_session["id"],
+        "Q4 benchmark 只是提醒",
+        channel="PRIMARY_AUDIO",
+    ) is None
+
+
 def test_transcript_recall_obeys_visibility_and_suggestion_budget(product_env):
     space = conversations.create_space("Transcript Guard", "PROJECT_SYNC")
     prior = conversations.create_session(space["id"], consent_ack=True)

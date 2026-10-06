@@ -19,6 +19,7 @@ export interface ConversationSessionPolicy {
   share_privacy: 'OFF' | 'PRIVATE_OVERLAY'
   external_writeback: 'OFF' | 'REVIEW_REQUIRED'
   participant_consent_status: 'NOT_RECORDED' | 'USER_REPORTS_ALLOWED' | 'USER_REPORTS_CONSENTED' | 'NOT_APPLICABLE'
+  participant_transparency_plan: 'NOT_RECORDED' | 'USER_WILL_NOTIFY_VERBALLY' | 'USER_WILL_NOTIFY_IN_CHAT' | 'USER_REPORTS_ALREADY_NOTIFIED' | 'NOT_APPLICABLE'
   connector_permissions: string[]
   speaker_biometric_identity: 'OFF'
   emotion_sentiment_profiling: 'OFF'

@@ -180,12 +180,44 @@ def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool
                 "Local Processing 下所选自麦路径存在远程 ASR；请关闭远程候选人 ASR 或改用本地 Whisper"
             )
 
+    if capture_mode == "TRANSCRIPT":
+        capture_path = "LOCAL_DEVICE_CAPTURE"
+        stt_path = "REMOTE_POSSIBLE" if main_remote_possible else "LOCAL_ONLY"
+    elif capture_mode == "NO_CAPTURE":
+        capture_path = "NO_CAPTURE"
+        stt_path = "NOT_USED"
+    else:
+        capture_path = "STRUCTURED_NOTES_ONLY"
+        stt_path = "NOT_USED"
+
+    # Current Conversation reasoning/arbiter/manual retrieval is deterministic
+    # inside the local backend. No LLM provider is invoked by this v2 runtime
+    # path. If/when cloud inference is introduced, this field must change based
+    # on the resolved provider rather than the requested policy label.
+    inference_path = "LOCAL_DETERMINISTIC"
+
+    retention_path = "LOCAL_PRODUCT_DB"
+    writeback_path = (
+        "DISABLED"
+        if policy["external_writeback"] == "OFF"
+        else "LOCAL_REVIEWED_DRAFT_ONLY"
+    )
+
     return {
         "mode": mode,
         "capture_mode": capture_mode,
         "configured_stt_provider": provider,
         "main_audio_remote_possible": main_remote_possible,
         "self_mic_remote_possible": self_mic_remote_possible,
+        "data_path": {
+            "capture": capture_path,
+            "stt": stt_path,
+            "inference": inference_path,
+            "retention": retention_path,
+            "writeback": writeback_path,
+            "audio_retention": "OFF",
+            "transcript_retention": policy["transcript_retention"],
+        },
         "blockers": blockers,
     }
 

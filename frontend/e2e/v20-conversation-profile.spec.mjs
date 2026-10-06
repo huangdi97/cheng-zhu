@@ -125,6 +125,13 @@ function mocks() {
       selected_sources: ['benchmark-note'],
       selected_quick_notes: [],
     }
+    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
+      space_id: SPACE.id,
+      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30 },
+      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0 },
+      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP' },
+      destructive: false,
+    }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/sessions` && method === 'POST') return { ...SESSION, status: 'UPCOMING', started_at: null, pack_id: '' }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/preflight`) return {
       session: { ...SESSION, status: 'UPCOMING', started_at: null },
@@ -354,7 +361,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('PAUSED')).toBeVisible()
     await page.getByRole('button', { name: '继续' }).click()
     await page.getByRole('button', { name: '停止转写' }).click()
-    await expect(page.getByText('OFF')).toBeVisible()
+    await expect(page.getByText('OFF', { exact: true })).toBeVisible()
   })
 
   test('Conversation surfaces remain usable at 390px', async ({ context, page }) => {

@@ -11,6 +11,32 @@ export type AssistanceMode = 'QUIET' | 'BALANCED' | 'ACTIVE' | 'PRESENTATION' | 
 export type CaptureMode = 'TRANSCRIPT' | 'NOTES_ONLY' | 'NO_CAPTURE'
 export type ProcessingMode = 'LOCAL' | 'CLOUD' | 'OFF'
 
+export interface ConversationSessionPolicy {
+  transcript_retention: string
+  screen_context: 'OFF' | 'MANUAL' | 'AUTO'
+  ai_assistance: 'AI_FORBIDDEN' | 'AI_LIMITED' | 'AI_ALLOWED' | 'AI_EXPECTED'
+  human_assistance: 'HUMAN_FORBIDDEN' | 'HUMAN_PRACTICE_ONLY' | 'HUMAN_ALLOWED'
+  share_privacy: 'OFF' | 'PRIVATE_OVERLAY'
+  external_writeback: 'OFF' | 'REVIEW_REQUIRED'
+  connector_permissions: string[]
+  speaker_biometric_identity: 'OFF'
+  emotion_sentiment_profiling: 'OFF'
+  hidden_intent_claims: 'OFF'
+}
+
+export interface CounterpartyState {
+  known_explicit: {
+    priority?: string
+    concern?: string
+    stated_position?: string
+    decision_authority?: string
+    relationship_context?: string
+  }
+  source_refs: SourceRef[]
+  temporary_inferences: Array<Record<string, unknown>>
+  unknown: string[]
+}
+
 export type GuidanceKind =
   | 'RECALL'
   | 'TALKING_POINT'
@@ -109,6 +135,7 @@ export interface ConversationParticipant {
   identity_source: string
   visibility: string
   observations: Array<Record<string, unknown>>
+  counterparty_state: CounterpartyState
 }
 
 export interface ConversationSession {
@@ -124,6 +151,7 @@ export interface ConversationSession {
   processing_mode: ProcessingMode
   assistance_mode: AssistanceMode
   consent_ack: boolean
+  policy: ConversationSessionPolicy
   pack_id: string
   status: 'UPCOMING' | 'ACTIVE' | 'ENDED'
   state: { current_topic?: string; open_threads?: string[]; last_guidance_id?: string }
@@ -189,6 +217,9 @@ export interface ConversationPrepare {
   participants: ConversationParticipant[]
   selected_sources: string[]
   selected_quick_notes: string[]
+  brief: { last_change: ConversationItem | null; unresolved_count: number; known_participants: number }
+  expected_questions: string[]
+  contribution_candidates: Array<{ text: string; source_refs: SourceRef[]; kind: string }>
 }
 
 export interface ConversationHome {
@@ -206,6 +237,7 @@ export interface ConversationPreflight {
   space: ConversationSpace
   items: Array<{ key: string; label: string; value: string | number | boolean; ok: boolean }>
   blockers: Array<{ key: string; label: string; message: string }>
+  policy: ConversationSessionPolicy
   privacy_note: string
 }
 
@@ -254,4 +286,13 @@ export interface ConversationCaptureStatus {
   candidate_mic_device_id: number | null
   mode: 'TRANSCRIPTION_ONLY' | 'IDLE'
   paused?: boolean
+}
+
+export interface ConversationHistoryItem extends ConversationSession {
+  space_title: string
+  space_profile: ConversationProfile
+  decisions_count: number
+  commitments_count: number
+  open_questions_count: number
+  review_required: number
 }

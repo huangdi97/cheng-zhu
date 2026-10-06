@@ -667,6 +667,121 @@ def test_decision_supersession_rejects_cross_space_self_and_unsourced_replacemen
         conversations.review_item(unsourced["id"], "SUPERSEDE", {"supersedes_id": unsourced["id"]})
 
 
+
+
+def test_end_session_extracts_only_review_candidates_from_explicit_transcript_language(product_env):
+    space = conversations.create_space("Extraction", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
+    conversations.start_session(session["id"])
+    now = store.now()
+    segments = [
+        ("PRIMARY_AUDIO", "那我们决定采用方案 B。谁负责 rollback drill？主要风险是 migration window 太短。"),
+        ("SELF_MIC", "我来补 rollout plan，周五前完成。"),
+    ]
+    for index, (channel, text_value) in enumerate(segments):
+        store.insert("conversation_transcript_segment", {
+            "id": f"cts_extract_{index}",
+            "space_id": space["id"],
+            "session_id": session["id"],
+            "channel": channel,
+            "text": text_value,
+            "provider": "test",
+            "source": "TEST",
+            "is_final": True,
+            "created_at": now + index,
+        })
+
+    summary = conversations.end_session(session["id"])
+    candidates = summary["candidates"]
+    kinds = {item["type"] for item in candidates}
+    assert {"Decision", "OpenQuestion", "Risk", "Commitment", "Deadline"} <= kinds
+    assert summary["decisions"] == []
+    assert summary["commitments"] == []
+    assert summary["next_focus"] is None
+
+    for item in candidates:
+        assert item["state"] == "PROPOSED"
+        assert item["review_status"] == "AI_EXTRACTED"
+        assert item["epistemic_status"] == "INFERRED"
+        assert item["source_refs"][0]["kind"] == "TRANSCRIPT_SEGMENT"
+
+    commitment = next(item for item in candidates if item["type"] == "Commitment")
+    assert commitment["owner_id"] == "me"
+    deadline = next(item for item in candidates if item["type"] == "Deadline")
+    assert deadline["source_refs"]
+
+    # Review is still the authority transition.
+    decision = next(item for item in candidates if item["type"] == "Decision")
+    confirmed = conversations.review_item(decision["id"], "CONFIRM")
+    assert confirmed["state"] == "AGREED"
+
+
+def test_transcript_candidate_extraction_is_idempotent_and_policy_gated(product_env):
+    space = conversations.create_space("Extraction Gate", "PROJECT_SYNC")
+    allowed = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
+    conversations.start_session(allowed["id"])
+    store.insert("conversation_transcript_segment", {
+        "id": "cts_once",
+        "space_id": space["id"],
+        "session_id": allowed["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我们决定采用 v2。",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    first = conversations.extract_transcript_candidates(allowed["id"])
+    second = conversations.extract_transcript_candidates(allowed["id"])
+    assert len(first) == 1
+    assert second == []
+    assert len(store.select("conversation_item", where="session_id = ?", params=(allowed["id"],))) == 1
+
+    forbidden = conversations.create_session(
+        space["id"],
+        capture_mode="TRANSCRIPT",
+        consent_ack=True,
+        policy={"ai_assistance": "AI_FORBIDDEN"},
+    )
+    conversations.start_session(forbidden["id"])
+    store.insert("conversation_transcript_segment", {
+        "id": "cts_forbidden",
+        "space_id": space["id"],
+        "session_id": forbidden["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我们决定采用 v3。",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    assert conversations.extract_transcript_candidates(forbidden["id"]) == []
+    conversations.end_session(forbidden["id"])
+    assert store.select("conversation_item", where="session_id = ?", params=(forbidden["id"],)) == []
+
+
+def test_primary_audio_commitment_does_not_infer_owner(product_env):
+    space = conversations.create_space("Unknown Speaker", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
+    conversations.start_session(session["id"])
+    store.insert("conversation_transcript_segment", {
+        "id": "cts_primary_commit",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我来补 benchmark。",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    extracted = conversations.extract_transcript_candidates(session["id"])
+    commitment = next(item for item in extracted if item["type"] == "Commitment")
+    assert commitment["owner_id"] == ""
+    with pytest.raises(ValueError, match="owner"):
+        conversations.review_item(commitment["id"], "CONFIRM")
+
+
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
     space = conversations.create_space("Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

@@ -8,7 +8,7 @@ import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton
 
 function ItemRow({ item, onChanged }: { item: ConversationItem; onChanged: () => void }) {
   const [busy, setBusy] = useState(false)
-  const review = async (action: 'CONFIRM' | 'REJECT' | 'DONE') => {
+  const review = async (action: 'CONFIRM' | 'REJECT' | 'DONE' | 'RESOLVE') => {
     setBusy(true)
     try { await conversationApi.reviewItem(item.id, action, item.owner_id ? {} : { owner_id: 'me' }); onChanged() } finally { setBusy(false) }
   }
@@ -17,7 +17,7 @@ function ItemRow({ item, onChanged }: { item: ConversationItem; onChanged: () =>
     <div className="rounded-xl border border-bg-tertiary/70 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-text-primary">{item.title}</span><StatusBadge tone={tone}>{item.state}</StatusBadge>{item.review_status === 'AI_EXTRACTED' ? <StatusBadge tone="warn">待确认</StatusBadge> : null}</div>
       <div className="mt-1 text-[11px] text-text-muted">来源 {item.source_refs.length ? item.source_refs.map((s) => s.kind).join(' · ') : '未附来源'}{item.speaker_id ? ` · speaker ${item.speaker_id}` : ''}{item.owner_id ? ` · owner ${item.owner_id}` : ''}{item.due_at ? ` · due ${item.due_at}` : ''}{item.supersedes_id ? ` · supersession → ${item.supersedes_id}` : ''}</div>
-      {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex gap-2"><SecondaryButton disabled={busy} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : null}
+      {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex gap-2"><SecondaryButton disabled={busy} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : ['OpenQuestion', 'Risk', 'Objection'].includes(item.type) && !['DONE', 'SUPERSEDED', 'UNKNOWN'].includes(item.state) ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('RESOLVE')}>标记已解决</SecondaryButton></div> : null}
     </div>
   )
 }
@@ -280,6 +280,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Open Commitments">{prepare.loading ? <Loading /> : prepare.data?.open_commitments.length ? <div className="space-y-2">{prepare.data.open_commitments.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无。</p>}</Section>
             <Section title="Open Questions">{prepare.loading ? <Loading /> : prepare.data?.open_questions.length ? <div className="space-y-2">{prepare.data.open_questions.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无。</p>}</Section>
+            <Section title="Open Threads">{prepare.loading ? <Loading /> : prepare.data?.open_threads?.length ? <div className="space-y-1">{prepare.data.open_threads.map((thread) => <div key={thread.id} className="rounded-xl border border-bg-tertiary/70 px-3 py-2"><div className="flex items-center gap-2"><StatusBadge tone="warn">{thread.kind}</StatusBadge><span className="text-xs text-text-primary">{thread.text}</span></div><div className="mt-1 text-[10px] text-text-muted">reviewed longitudinal thread · source refs {thread.source_refs.length}</div></div>)}</div> : <p className="text-xs text-text-muted">暂无已确认的跨场未解决 thread。</p>}</Section>
           </div>
           <Section title="参与者 / Counterparty State（只记录明确信息）">
             {space.participants.length ? <div className="space-y-2">{space.participants.map((p) => {
@@ -329,6 +330,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {prepare.data?.agenda?.length ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3"><div className="text-xs font-semibold text-text-secondary">Agenda</div><div className="mt-2 space-y-1">{(prepare.data.agenda ?? []).map((item) => <div key={item} className="text-xs text-text-primary">• {item}</div>)}</div></div> : null}
             {prepare.data?.expected_questions?.length ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3"><div className="text-xs font-semibold text-text-secondary">Expected Questions</div><div className="mt-2 space-y-1">{(prepare.data.expected_questions ?? []).map((q) => <div key={q} className="text-xs text-text-primary">• {q}</div>)}</div></div> : null}
             {prepare.data?.contribution_candidates?.length ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3"><div className="text-xs font-semibold text-text-secondary">Precomputed Contribution Candidates</div><div className="mt-2 space-y-1">{(prepare.data.contribution_candidates ?? []).map((x) => <div key={x.text} className="text-xs text-text-primary">• {x.text}</div>)}</div><p className="mt-2 text-[11px] text-text-muted">这里只是候选；Live 仍必须经过 provenance、novelty 与 interruption arbitration。</p></div> : null}
+            {prepare.data?.open_threads?.length ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3"><div className="text-xs font-semibold text-text-secondary">Open Threads · 已确认</div><div className="mt-2 space-y-1">{prepare.data.open_threads.slice(0, 6).map((thread) => <div key={thread.id} className="text-xs text-text-primary">• {thread.kind} · {thread.text}</div>)}</div></div> : null}
           </Section>
           <Section title="本场带入来源">
             <div className="grid gap-4 md:grid-cols-2">

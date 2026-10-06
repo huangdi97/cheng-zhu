@@ -260,11 +260,17 @@ jobs:
             --draft `
             --title "成竹 Chengzhu $tag" `
             --notes-file "dist/release/RELEASE_NOTES_v$version.md"
-          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
-          if ($tagSha -ne $sourceSha) {
-            throw "release tag $tag points to $tagSha but binaries were built from $sourceSha"
+
+          # Important GitHub behavior: a draft Release does not create the
+          # refs/tags/<tag> git ref yet. Therefore validating the git ref here
+          # will always 404. Validate the draft's target commit instead; the
+          # actual tag ref is created only when the verified draft is published
+          # and is checked immediately after publish below.
+          $draftTarget = (gh release view $tag --json targetCommitish --jq '.targetCommitish').Trim()
+          if ($draftTarget -ne $sourceSha) {
+            throw "draft release $tag targets $draftTarget but binaries were built from $sourceSha"
           }
-          Write-Host "release tag/source invariant: $tag -> $tagSha"
+          Write-Host "draft release target/source invariant: $tag -> $draftTarget"
 
       - name: Download-back verification from published GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
@@ -277,9 +283,15 @@ jobs:
           $tag = "${{ github.ref_name }}"
           if (-not $tag.StartsWith('v')) { $tag = "v$version" }
           $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
-          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
-          if ($tagSha -ne $sourceSha) {
-            throw "download-back refused: tag $tag points to $tagSha but release build source is $sourceSha"
+          # The Release is still a draft at this stage, so there is no git tag
+          # ref yet. Verify the authenticated draft Release points at the exact
+          # CI-proven source SHA, then download the assets from that draft.
+          $draftTarget = (gh release view $tag --json targetCommitish,isDraft --jq 'select(.isDraft == true) | .targetCommitish').Trim()
+          if (-not $draftTarget) {
+            throw "download-back refused: $tag is not the expected draft release"
+          }
+          if ($draftTarget -ne $sourceSha) {
+            throw "download-back refused: draft $tag targets $draftTarget but release build source is $sourceSha"
           }
           $download = Join-Path $env:RUNNER_TEMP "chengzhu-download-back-$version"
           if (Test-Path $download) { Remove-Item -Recurse -Force $download }
@@ -331,7 +343,8 @@ jobs:
             tag = $tag
             source = "GitHub Release download"
             source_sha = $sourceSha
-            tag_sha = $tagSha
+            draft_target_sha = $draftTarget
+            tag_sha = $null
             installer_sha256 = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
             portable_sha256 = (Get-FileHash (Join-Path $download "Chengzhu-Portable-x64.zip") -Algorithm SHA256).Hash.ToLower()
             smoke_passed = $smoke.passed
@@ -358,11 +371,30 @@ jobs:
           $tag = "${{ github.ref_name }}"
           if (-not $tag.StartsWith('v')) { $tag = "v$version" }
           $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
-          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
-          if ($tagSha -ne $sourceSha) {
-            throw "refusing to publish: tag $tag points to $tagSha but binaries were built from $sourceSha"
+          $draftTarget = (gh release view $tag --json targetCommitish,isDraft --jq 'select(.isDraft == true) | .targetCommitish').Trim()
+          if (-not $draftTarget) {
+            throw "refusing to publish: $tag is not the expected verified draft"
           }
-          gh release edit $tag --draft=false --latest
+          if ($draftTarget -ne $sourceSha) {
+            throw "refusing to publish: draft $tag targets $draftTarget but binaries were built from $sourceSha"
+          }
+
+          # Publishing the draft is the operation that materializes the git tag.
+          gh release edit $tag --draft=false --latest --target $sourceSha
           $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
           if ($isDraft -ne 'false') { throw "verified release $tag did not publish" }
-          Write-Host "published $tag from exact source $sourceSha"
+
+          $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
+          if ($tagSha -ne $sourceSha) {
+            throw "published release provenance failure: tag $tag points to $tagSha but binaries were built from $sourceSha"
+          }
+
+          # Rewrite the downloadable verification artifact with the now-real
+          # public tag SHA so downstream provenance can be audited directly.
+          $verificationPath = "dist/release/download-back-verification.json"
+          if (Test-Path $verificationPath) {
+            $verification = Get-Content $verificationPath -Raw | ConvertFrom-Json
+            $verification.tag_sha = $tagSha
+            $verification | ConvertTo-Json -Depth 6 | Set-Content $verificationPath -Encoding utf8
+          }
+          Write-Host "published release tag/source invariant: $tag -> $tagSha"

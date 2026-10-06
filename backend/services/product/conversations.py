@@ -239,7 +239,20 @@ EPISTEMIC_STATUSES = {"OBSERVED", "USER_CONFIRMED", "SOURCE_CONFIRMED", "INFERRE
 
 
 def templates() -> list[dict[str, Any]]:
-    return [{"key": key, **value} for key, value in SPACE_PROFILES.items()]
+    launch_wedges = {"PROJECT_SYNC", "DESIGN_REVIEW"}
+    return [
+        {
+            "key": key,
+            **value,
+            "runtime_available": True,
+            "launch_wedge": key in launch_wedges,
+            "specialized_behavior_validated": False,
+            "stable_release": False,
+            "real_user_validated": False,
+            "maturity": "BETA_WEDGE" if key in launch_wedges else "SHARED_RUNTIME_TEMPLATE",
+        }
+        for key, value in SPACE_PROFILES.items()
+    ]
 
 
 def _require_choice(value: str, allowed: set[str], label: str) -> str:

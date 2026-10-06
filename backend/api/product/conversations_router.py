@@ -197,6 +197,24 @@ def add_participant(space_id: str, body: ParticipantCreate):
         return conversations.add_participant(space_id, **body.model_dump())
 
 
+class ParticipantPatch(BaseModel):
+    display_name: Optional[str] = Field(default=None, max_length=160)
+    role: Optional[str] = Field(default=None, max_length=160)
+    organization: Optional[str] = Field(default=None, max_length=160)
+    explicit_priority: Optional[str] = Field(default=None, max_length=800)
+    explicit_concern: Optional[str] = Field(default=None, max_length=1200)
+    stated_position: Optional[str] = Field(default=None, max_length=1600)
+    decision_authority: Optional[str] = Field(default=None, max_length=500)
+    relationship_context: Optional[str] = Field(default=None, max_length=800)
+    source_refs: Optional[list[dict[str, Any]]] = None
+
+
+@router.patch("/participants/{participant_id}")
+def patch_participant(participant_id: str, body: ParticipantPatch):
+    with domain_errors():
+        return conversations.update_participant(participant_id, body.model_dump(exclude_unset=True))
+
+
 class SessionCreate(BaseModel):
     title: str = Field(default="", max_length=200)
     goal_ids: list[str] = Field(default_factory=list)

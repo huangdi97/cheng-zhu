@@ -736,8 +736,13 @@ PR 合并后至少要有：
 - Room / Prepare / Preflight / Live / Continue / History 对齐；
 - Session Pack 冻结 expression + policy + resolved data path；
 - Truth Model 硬规则有测试；
+- Decision supersession 方向与历史保留是原子的；
+- AI-extracted candidate 不进入长期 Home / History / Next Focus continuity；
+- reviewed OpenQuestion / Risk / Objection 才能投影为 longitudinal Open Thread，并可显式 resolve；
+- Conversation Goal lifecycle 与 Session frozen membership 有测试；
 - Guidance Arbiter priority / silence / visibility / budget 有测试；
 - Counterparty 不做隐藏心理事实化；
+- participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
 - unwired screen / coach / private overlay / connectors 明确 blocked；
 - diagnostics 分 observed proxy 与 human-label metrics；

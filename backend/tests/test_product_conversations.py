@@ -10,7 +10,7 @@ from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 4
+    assert store.schema_version() == 5
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -28,6 +28,14 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
     } <= tables
+    conn = sqlite3.connect(store.DB_PATH)
+    try:
+        session_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_session)")}
+        participant_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_participant)")}
+    finally:
+        conn.close()
+    assert "policy_json" in session_cols
+    assert "counterparty_state_json" in participant_cols
 
 
 def test_space_prepare_session_pack_continue_real_loop(product_env):
@@ -76,6 +84,190 @@ def test_transcript_preflight_requires_explicit_ack(product_env):
     assert check["blockers"] and check["blockers"][0]["key"] == "consent"
     with pytest.raises(ValueError, match="确认"):
         conversations.start_session(session["id"])
+
+
+
+
+def test_session_policy_is_normalized_frozen_and_enforced(product_env):
+    space = conversations.create_space("Policy Review", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={
+            "ai_assistance": "AI_FORBIDDEN",
+            "human_assistance": "HUMAN_FORBIDDEN",
+            "screen_context": "OFF",
+            "share_privacy": "PRIVATE_OVERLAY",
+            "external_writeback": "OFF",
+            "speaker_biometric_identity": "ON",
+            "emotion_sentiment_profiling": "ON",
+            "hidden_intent_claims": "ON",
+        },
+    )
+    check = conversations.preflight(session["id"])
+    assert check["blockers"] == []
+    policy = check["policy"]
+    assert policy["ai_assistance"] == "AI_FORBIDDEN"
+    assert policy["human_assistance"] == "HUMAN_FORBIDDEN"
+    assert policy["share_privacy"] == "PRIVATE_OVERLAY"
+    assert policy["external_writeback"] == "OFF"
+    assert policy["speaker_biometric_identity"] == "OFF"
+    assert policy["emotion_sentiment_profiling"] == "OFF"
+    assert policy["hidden_intent_claims"] == "OFF"
+
+    started = conversations.start_session(session["id"])
+    assert started["pack"]["payload"]["policy"]["ai_assistance"] == "AI_FORBIDDEN"
+    assert started["pack"]["payload"]["policy"]["share_privacy"] == "PRIVATE_OVERLAY"
+
+    suppressed = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "现在要不要补充？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "explicit"}],
+    })
+    assert suppressed["guidance"] is None
+    assert suppressed["suppressed"] == "POLICY_AI_FORBIDDEN"
+
+    with pytest.raises(ValueError, match="External Write-back"):
+        conversations.followup_draft(session["id"])
+
+
+def test_preflight_blocks_unwired_conversation_screen_and_human_runtime(product_env):
+    space = conversations.create_space("Truthful Preflight", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"screen_context": "MANUAL", "human_assistance": "HUMAN_ALLOWED"},
+    )
+    check = conversations.preflight(session["id"])
+    keys = {item["key"] for item in check["blockers"]}
+    assert {"screen_context_runtime", "human_assistance_runtime"} <= keys
+    with pytest.raises(ValueError, match="Screen Context runtime"):
+        conversations.start_session(session["id"])
+
+
+def test_counterparty_state_persists_only_explicit_fields(product_env):
+    space = conversations.create_space("Stakeholder", "CLIENT_CALL")
+    participant = conversations.add_participant(
+        space["id"],
+        display_name="Alex",
+        role="CTO",
+        explicit_priority="上线稳定性",
+        explicit_concern="迁移风险",
+        stated_position="先灰度",
+        decision_authority="架构方案批准人",
+        relationship_context="客户技术负责人",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "Alex 明确说先灰度"}],
+    )
+    state = participant["counterparty_state"]
+    assert state["known_explicit"]["priority"] == "上线稳定性"
+    assert state["known_explicit"]["concern"] == "迁移风险"
+    assert state["known_explicit"]["stated_position"] == "先灰度"
+    assert state["temporary_inferences"] == []
+    assert "emotion" not in state["known_explicit"]
+    assert "hidden_intent" not in state["known_explicit"]
+
+
+def test_stakeholder_context_influences_score_without_hidden_inference(product_env):
+    space = conversations.create_space("Design", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")
+    conversations.start_session(session["id"])
+    result = conversations.evaluate_guidance(session["id"], {
+        "current_topic": "迁移稳定性",
+        "candidate_text": "Q4 benchmark 证明迁移稳定性",
+        "source_refs": [{"kind": "DOCUMENT", "id": "bench"}],
+        "relevance": 1,
+        "novelty": 1,
+        "provenance_strength": 1,
+        "goal_relevance": 0.8,
+        "decision_impact": 0.8,
+        "audience_role": "CTO",
+        "audience_priority": "迁移稳定性",
+        "audience_concern": "回滚风险",
+        "decision_authority": "架构方案批准人",
+    })
+    assert result["guidance"] is not None
+    assert result["guidance"]["score"]["role_relevance"] >= 1.0
+    saved = conversations.require_session(session["id"])
+    assert saved["state"]["audience_context"]["explicit_priority"] == "迁移稳定性"
+    assert "emotion" not in saved["state"]["audience_context"]
+    assert "hidden_intent" not in saved["state"]["audience_context"]
+
+
+def test_ai_limited_allows_manual_but_disables_proactive_transcript_guidance(product_env):
+    space = conversations.create_space("Limited AI", "PROJECT_SYNC")
+    prior = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(prior["id"])
+    item = conversations.add_item(
+        prior["id"],
+        item_type="Decision",
+        title="offline migration 使用 v2",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确使用 v2"}],
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(prior["id"])
+
+    live = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"ai_assistance": "AI_LIMITED"},
+    )
+    conversations.start_session(live["id"])
+    assert conversations.guidance_from_transcript(live["id"], "offline migration") is None
+
+    manual = conversations.evaluate_guidance(live["id"], {
+        "direct_question": "之前为什么用 v2？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "明确使用 v2"}],
+    })
+    assert manual["guidance"]["kind"] == "ANSWER_CUE"
+
+
+def test_continue_contains_what_changed_and_pinned_guidance(product_env):
+    space = conversations.create_space("Continue", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    decision = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="采用 v2",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "决定采用 v2"}],
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    shown = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "接下来？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "next"}],
+    })["guidance"]
+    conversations.set_guidance_action(shown["id"], "PINNED")
+
+    summary = conversations.end_session(session["id"])
+    assert [x["id"] for x in summary["what_changed"]] == [decision["id"]]
+    assert [x["id"] for x in summary["pins"]] == [shown["id"]]
+
+
+def test_conversation_history_is_profile_native_and_counted(product_env):
+    space = conversations.create_space("History Space", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], title="Review #1", consent_ack=True)
+    conversations.start_session(session["id"])
+    decision = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="采用方案 A",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "确认 A"}],
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 rollback？",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
+    )
+    conversations.end_session(session["id"])
+
+    history = conversations.conversation_history()
+    assert history[0]["id"] == session["id"]
+    assert history[0]["space_title"] == "History Space"
+    assert history[0]["space_profile"] == "DESIGN_REVIEW"
+    assert history[0]["decisions_count"] == 1
+    assert history[0]["open_questions_count"] == 1
+    assert history[0]["review_required"] == 1
 
 
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
@@ -545,7 +737,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 4
+    assert diag["schema_version"] == 5
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

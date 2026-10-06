@@ -1,10 +1,21 @@
-import { ArrowRight, MessageSquareText, Plus, Clock3, CircleHelp, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, MessageSquareText, Plus, Clock3, CircleHelp, CheckCircle2, Play } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import { navigate, paths } from '@/lib/router'
 import { EmptyState, ErrorState, Loading, Page, PageHeader, PrimaryButton, Section, SecondaryButton, StatusBadge, formatWhen, useAsync } from '@/components/os/ui'
+import { useState } from 'react'
 
 export default function ConversationHome() {
   const { data, error, loading, reload } = useAsync(() => conversationApi.home(), [])
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState('')
+  const startAdhoc = async () => {
+    setStarting(true); setStartError('')
+    try {
+      const result = await conversationApi.adhoc({ title: '临时对话', profile: 'PROJECT_SYNC', assistance_mode: 'BALANCED' })
+      navigate(paths.conversationLive(result.session.id))
+    } catch (e) { setStartError(e instanceof Error ? e.message : String(e)) }
+    finally { setStarting(false) }
+  }
   if (loading) return <Page testId="conversation-home"><Loading label="正在整理你的对话连续性…" /></Page>
   if (error || !data) return <Page testId="conversation-home"><ErrorState message={error ?? '无法加载对话首页'} onRetry={reload} /></Page>
 
@@ -14,9 +25,10 @@ export default function ConversationHome() {
         eyebrow="Personal Conversation Intelligence · Beta"
         title="对话"
         subtitle="不是会议纪要。把过去真正发生过的事带进下一场对话，并在值得开口时提醒你。"
-        actions={<PrimaryButton onClick={() => navigate(paths.conversationSpaces(undefined, { new: '1' }))} icon={<Plus className="h-3.5 w-3.5" />}>新建对话空间</PrimaryButton>}
+        actions={<div className="flex gap-2"><SecondaryButton disabled={starting} onClick={startAdhoc} icon={<Play className="h-3.5 w-3.5" />}>{starting ? '启动中…' : '开始临时会话'}</SecondaryButton><PrimaryButton onClick={() => navigate(paths.conversationSpaces(undefined, { new: '1' }))} icon={<Plus className="h-3.5 w-3.5" />}>新建对话空间</PrimaryButton></div>}
       />
 
+      {startError ? <div className="mb-4"><ErrorState message={startError} /></div> : null}
       {data.state === 'EMPTY' ? (
         <EmptyState
           title="还没有对话空间"

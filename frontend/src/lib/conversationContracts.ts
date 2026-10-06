@@ -214,3 +214,18 @@ export interface ConversationContinue {
   next_focus: null | { kind: string; title: string; source_ref: string }
   review_required: number
 }
+
+export interface ConversationDraftAction {
+  id: string
+  space_id: string
+  session_id: string | null
+  kind: 'FOLLOWUP_EMAIL_DRAFT' | 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT'
+  title: string
+  content: string
+  target: string
+  payload: Record<string, unknown>
+  source_refs: SourceRef[]
+  status: 'DRAFT' | 'APPROVED' | 'DISMISSED'
+  created_at: number
+  updated_at: number
+}

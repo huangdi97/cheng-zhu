@@ -488,6 +488,22 @@ _V2_TABLES: tuple[str, ...] = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS conversation_draft_action (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT REFERENCES conversation_session(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        target TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        source_refs_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS conversation_guidance_event (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
@@ -516,6 +532,7 @@ _V2_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_item_session ON conversation_item(session_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_conversation_thread_space ON conversation_open_thread(space_id, status, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_conversation_guidance_session ON conversation_guidance_event(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_draft_space ON conversation_draft_action(space_id, status, created_at)",
 )
 
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:

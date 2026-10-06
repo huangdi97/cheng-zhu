@@ -3,6 +3,7 @@ import type {
   AssistanceMode,
   CaptureMode,
   ConversationContinue,
+  ConversationDraftAction,
   ConversationGuidance,
   ConversationHome,
   ConversationItem,
@@ -29,6 +30,8 @@ function list<T>(payload: unknown): { items: T[] } {
 export const conversationApi = {
   templates: () => request<unknown>(`${B}/templates`).then((p) => list<ConversationTemplate>(p)),
   home: () => request<ConversationHome>(`${B}/home`),
+  adhoc: (body: { title?: string; profile?: ConversationProfile; assistance_mode?: AssistanceMode } = {}) =>
+    request<{ space: ConversationSpace; session: ConversationSession; pack: Record<string, unknown> }>(`${B}/adhoc`, json('POST', body)),
   spaces: () => request<unknown>(`${B}/spaces`).then((p) => list<ConversationSpace>(p)),
   createSpace: (body: {
     title: string
@@ -102,4 +105,10 @@ export const conversationApi = {
   ),
   guidanceAction: (id: string, action: string) =>
     request<ConversationGuidance>(`${B}/guidance/${encodeURIComponent(id)}/status`, json('POST', { action })),
+  followupDraft: (sessionId: string) =>
+    request<ConversationDraftAction>(`${B}/sessions/${encodeURIComponent(sessionId)}/followup-draft`, json('POST')),
+  draftActions: (spaceId: string) =>
+    request<unknown>(`${B}/spaces/${encodeURIComponent(spaceId)}/draft-actions`).then((p) => list<ConversationDraftAction>(p)),
+  reviewDraftAction: (id: string, action: 'APPROVE' | 'DISMISS' | 'RESET') =>
+    request<ConversationDraftAction>(`${B}/draft-actions/${encodeURIComponent(id)}/review`, json('POST', { action })),
 }

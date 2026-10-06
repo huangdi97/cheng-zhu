@@ -22,6 +22,7 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_item",
         "conversation_open_thread",
         "conversation_guidance_event",
+        "conversation_draft_action",
     } <= tables
 
 
@@ -268,3 +269,24 @@ def test_session_pack_freezes_ready_material_version_and_user_notes(product_env)
     assert pack["payload"]["sources"][0]["is_personal_evidence"] is True
     assert pack["payload"]["quick_notes"][0]["kind"] == "USER_NOTE"
     assert pack["payload"]["quick_notes"][0].get("is_evidence") is None
+
+
+def test_adhoc_session_and_reviewed_followup_draft_never_claim_external_send(product_env):
+    started = conversations.create_adhoc(title="临时设计讨论", profile="DESIGN_REVIEW")
+    assert started["session"]["status"] == "ACTIVE"
+    session_id = started["session"]["id"]
+    decision = conversations.add_item(
+        session_id, item_type="Decision", title="采用方案 B",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确采用 B"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(session_id)
+    draft = conversations.followup_draft(session_id)
+    assert draft["kind"] == "FOLLOWUP_EMAIL_DRAFT"
+    assert draft["status"] == "DRAFT"
+    assert "采用方案 B" in draft["content"]
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+    assert approved["status"] == "APPROVED"
+    assert "sent" not in approved
+    assert conversations.list_draft_actions(started["space"]["id"])[0]["id"] == draft["id"]

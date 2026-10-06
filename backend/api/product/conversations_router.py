@@ -47,6 +47,18 @@ def home():
     return conversations.home_summary()
 
 
+class AdhocCreate(BaseModel):
+    title: str = Field(default="临时对话", max_length=160)
+    profile: str = "PROJECT_SYNC"
+    assistance_mode: str = ""
+
+
+@router.post("/adhoc")
+def adhoc(body: AdhocCreate):
+    with domain_errors():
+        return conversations.create_adhoc(**body.model_dump())
+
+
 @router.get("/spaces")
 def spaces(status: str = "ACTIVE"):
     return {"items": conversations.list_spaces(status)}
@@ -214,6 +226,43 @@ class ReviewBody(BaseModel):
 def review_item(item_id: str, body: ReviewBody):
     with domain_errors():
         return conversations.review_item(item_id, body.action, body.patch)
+
+
+class DraftActionCreate(BaseModel):
+    kind: str
+    title: str = Field(default="", max_length=300)
+    content: str = Field(default="", max_length=20000)
+    target: str = Field(default="", max_length=500)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/sessions/{session_id}/draft-actions")
+def create_draft_action(session_id: str, body: DraftActionCreate):
+    with domain_errors():
+        return conversations.create_draft_action(session_id, **body.model_dump())
+
+
+@router.post("/sessions/{session_id}/followup-draft")
+def create_followup_draft(session_id: str):
+    with domain_errors():
+        return conversations.followup_draft(session_id)
+
+
+@router.get("/spaces/{space_id}/draft-actions")
+def list_draft_actions(space_id: str, status: str = ""):
+    with domain_errors():
+        return {"items": conversations.list_draft_actions(space_id, status)}
+
+
+class DraftActionReview(BaseModel):
+    action: str
+
+
+@router.post("/draft-actions/{action_id}/review")
+def review_draft_action(action_id: str, body: DraftActionReview):
+    with domain_errors():
+        return conversations.review_draft_action(action_id, body.action)
 
 
 class GuidanceBody(BaseModel):

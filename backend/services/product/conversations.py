@@ -805,6 +805,116 @@ def home_summary() -> dict[str, Any]:
     }
 
 
+DRAFT_ACTION_KINDS = {
+    "FOLLOWUP_EMAIL_DRAFT",
+    "CREATE_TASK_DRAFT",
+    "CREATE_ISSUE_DRAFT",
+    "UPDATE_DECISION_LOG_DRAFT",
+}
+
+
+def create_adhoc(
+    *,
+    title: str = "临时对话",
+    profile: str = "PROJECT_SYNC",
+    assistance_mode: str = "",
+) -> dict[str, Any]:
+    """Create and start an ad-hoc local session without Calendar/connectors."""
+    space = create_space(title or "临时对话", profile, default_mode=assistance_mode)
+    session = create_session(
+        space["id"],
+        title=title or "临时对话",
+        capture_mode="NOTES_ONLY",
+        processing_mode="LOCAL",
+        assistance_mode=assistance_mode or space["default_mode"],
+        consent_ack=True,
+    )
+    started = start_session(session["id"])
+    return {"space": require_space(space["id"]), **started}
+
+
+def create_draft_action(
+    session_id: str,
+    *,
+    kind: str,
+    title: str = "",
+    content: str = "",
+    target: str = "",
+    source_refs: Optional[list[dict[str, Any]]] = None,
+    payload: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    session = require_session(session_id)
+    kind = str(kind or "").upper()
+    if kind not in DRAFT_ACTION_KINDS:
+        raise ValueError("DraftAction 类型不支持")
+    if not (title or content):
+        raise ValueError("DraftAction 不能为空")
+    ts = store.now()
+    row = {
+        "id": store.new_id("cda_"),
+        "space_id": session["space_id"],
+        "session_id": session_id,
+        "kind": kind,
+        "title": str(title or "")[:300],
+        "content": str(content or "")[:20_000],
+        "target": str(target or "")[:500],
+        "payload": dict(payload or {}),
+        "source_refs": list(source_refs or []),
+        "status": "DRAFT",
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_draft_action", row)
+    return store.get("conversation_draft_action", row["id"]) or row
+
+
+def list_draft_actions(space_id: str, status: str = "") -> list[dict[str, Any]]:
+    require_space(space_id)
+    if status:
+        return store.select(
+            "conversation_draft_action", where="space_id = ? AND status = ?",
+            params=(space_id, status.upper()), order="created_at DESC",
+        )
+    return store.select("conversation_draft_action", where="space_id = ?", params=(space_id,), order="created_at DESC")
+
+
+def review_draft_action(action_id: str, action: str) -> dict[str, Any]:
+    row = store.get("conversation_draft_action", action_id)
+    if not row:
+        raise ValueError("DraftAction 不存在")
+    action = str(action or "").upper()
+    mapping = {"APPROVE": "APPROVED", "DISMISS": "DISMISSED", "RESET": "DRAFT"}
+    if action not in mapping:
+        raise ValueError("DraftAction 审核动作不支持")
+    # APPROVED means the user reviewed the local draft. It deliberately does
+    # not mean an external connector sent/created anything.
+    store.update("conversation_draft_action", action_id, {"status": mapping[action], "updated_at": store.now()})
+    return store.get("conversation_draft_action", action_id) or row
+
+
+def followup_draft(session_id: str) -> dict[str, Any]:
+    summary = continue_summary(session_id)
+    lines = ["这场之后："]
+    if summary["decisions"]:
+        lines.append("Decisions：" + "；".join(x["title"] for x in summary["decisions"]))
+    if summary["commitments"]:
+        lines.append("Commitments：" + "；".join(x["title"] for x in summary["commitments"]))
+    if summary["open_questions"]:
+        lines.append("Open Questions：" + "；".join(x["title"] for x in summary["open_questions"]))
+    if len(lines) == 1:
+        lines.append("当前没有已确认的 Decision / Commitment；建议先完成逐项确认。")
+    sources: list[dict[str, Any]] = []
+    for item in summary["decisions"] + summary["commitments"] + summary["open_questions"]:
+        sources.extend(item.get("source_refs") or [])
+    return create_draft_action(
+        session_id,
+        kind="FOLLOWUP_EMAIL_DRAFT",
+        title=f"{summary['session']['title']} · Follow-up",
+        content="\n".join(lines),
+        source_refs=sources,
+    )
+
+
 def export_space(space_id: str) -> dict[str, Any]:
     detail = space_detail(space_id)
     return {
@@ -822,4 +932,5 @@ def export_space(space_id: str) -> dict[str, Any]:
             "WHERE s.space_id = ? ORDER BY g.created_at ASC",
             (space_id,),
         ),
+        "draft_actions": list_draft_actions(space_id),
     }

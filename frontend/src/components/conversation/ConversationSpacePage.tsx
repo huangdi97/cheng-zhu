@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Download, Play, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationItem, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationItem, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -40,6 +40,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [participantRole, setParticipantRole] = useState('')
   const [goalTitle, setGoalTitle] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
+  const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
 
   useEffect(() => { if (detail.data?.default_mode) setMode(detail.data.default_mode) }, [detail.data?.default_mode])
 
@@ -125,6 +126,21 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try { await conversationApi.deleteSpace(spaceId); navigate(paths.conversationSpaces()) }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)); setSessionBusy(false) }
+  }
+
+  const makeFollowupDraft = async (targetSessionId: string) => {
+    setSessionBusy(true); setSessionError('')
+    try { setDraft(await conversationApi.followupDraft(targetSessionId)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const reviewDraft = async (action: 'APPROVE' | 'DISMISS') => {
+    if (!draft) return
+    setSessionBusy(true); setSessionError('')
+    try { setDraft(await conversationApi.reviewDraftAction(draft.id, action)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
   }
 
   const start = async () => {
@@ -228,6 +244,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <h3 className="text-sm font-semibold text-text-primary">这场之后</h3>
             <p className="mt-1 text-xs text-text-muted">Decision {continueData.decisions.length} · Commitment {continueData.commitments.length} · Open Question {continueData.open_questions.length} · 待确认 {continueData.review_required}</p>
             {continueData.next_focus ? <p className="mt-3 text-sm text-text-primary">Next Focus · {continueData.next_focus.title}</p> : null}
+            <div className="mt-3"><SecondaryButton disabled={sessionBusy} onClick={() => makeFollowupDraft(continueData.session.id)}>生成 Follow-up Draft</SecondaryButton></div>
+            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件或写入外部系统。</p></div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

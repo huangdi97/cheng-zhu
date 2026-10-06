@@ -1,8 +1,9 @@
-"""Chengzhu v2.0 Personal Conversation Intelligence contracts.
+"""Chengzhu v2.0 Personal Conversation Intelligence executable contracts.
 
-This module remains storage/UI agnostic.  It upgrades the v1.x future-profile
-placeholder into an executable vocabulary for v2 design without claiming that
-Conversation runtime, routes, database tables, or product UI already exist.
+This module stays storage/UI agnostic, but it is no longer a hypothetical
+future-profile placeholder: Conversation runtime, routes, product.db entities
+and product UI exist.  The contract deliberately separates productized launch
+wedges from templates whose specialized behavior still needs validation.
 
 Truth rule:
     a model candidate is not a confirmed conversation fact.
@@ -108,6 +109,34 @@ class ProcessingMode(str, Enum):
     LOCAL = "LOCAL"
     CLOUD = "CLOUD"
     OFF = "OFF"
+
+
+class AiAssistancePolicy(str, Enum):
+    FORBIDDEN = "AI_FORBIDDEN"
+    LIMITED = "AI_LIMITED"
+    ALLOWED = "AI_ALLOWED"
+    EXPECTED = "AI_EXPECTED"
+
+
+class HumanAssistancePolicy(str, Enum):
+    FORBIDDEN = "HUMAN_FORBIDDEN"
+    PRACTICE_ONLY = "HUMAN_PRACTICE_ONLY"
+    ALLOWED = "HUMAN_ALLOWED"
+
+
+@dataclass
+class ConversationSessionPolicy:
+    transcript_retention: str = "SPACE_POLICY"
+    screen_context: str = "OFF"
+    ai_assistance: AiAssistancePolicy = AiAssistancePolicy.ALLOWED
+    human_assistance: HumanAssistancePolicy = HumanAssistancePolicy.PRACTICE_ONLY
+    share_privacy: str = "OFF"
+    external_writeback: str = "REVIEW_REQUIRED"
+    participant_consent_status: str = "NOT_RECORDED"
+    connector_permissions: list[str] = field(default_factory=list)
+    speaker_biometric_identity: str = "OFF"
+    emotion_sentiment_profiling: str = "OFF"
+    hidden_intent_claims: str = "OFF"
 
 
 class SourceKind(str, Enum):
@@ -217,6 +246,19 @@ class ExpressionIntent:
 
 
 @dataclass
+class ExpressionPlan:
+    action: ExpressionAction = ExpressionAction.SILENT
+    guidance_kind: GuidanceKind | None = None
+    target_participant_id: str = ""
+    text: str = ""
+    source_refs: list[SourceRef] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    max_length: int = 0
+    render_as: str = "SILENCE"
+    suppression_reasons: list[str] = field(default_factory=list)
+
+
+@dataclass
 class OpportunityScore:
     relevance: float = 0.0
     novelty: float = 0.0
@@ -281,7 +323,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
             GuidanceKind.TALKING_POINT,
         ),
-        productized=False,
+        productized=True,
     ),
     ConversationProfile(
         ConversationProfileKind.DESIGN_REVIEW,
@@ -293,7 +335,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.RISK,
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
         ),
-        productized=False,
+        productized=True,
     ),
     ConversationProfile(
         ConversationProfileKind.PRESENTATION_QA,

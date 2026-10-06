@@ -268,6 +268,24 @@ export interface ConversationHome {
   recent_change: ConversationItem | null
 }
 
+export interface ConversationProcessingRuntime {
+  mode: ProcessingMode
+  capture_mode: CaptureMode
+  configured_stt_provider: string
+  main_audio_remote_possible: boolean
+  self_mic_remote_possible: boolean
+  data_path: {
+    capture: 'LOCAL_DEVICE_CAPTURE' | 'NO_CAPTURE' | 'STRUCTURED_NOTES_ONLY' | string
+    stt: 'LOCAL_ONLY' | 'REMOTE_POSSIBLE' | 'NOT_USED' | string
+    inference: 'LOCAL_DETERMINISTIC' | string
+    retention: 'LOCAL_PRODUCT_DB' | string
+    writeback: 'DISABLED' | 'LOCAL_REVIEWED_DRAFT_ONLY' | string
+    audio_retention: string
+    transcript_retention: string
+  }
+  blockers: string[]
+}
+
 export interface ConversationPreflight {
   session: ConversationSession
   space: ConversationSpace
@@ -275,14 +293,7 @@ export interface ConversationPreflight {
   blockers: Array<{ key: string; label: string; message: string }>
   warnings: Array<{ key: string; label: string; message: string }>
   policy: ConversationSessionPolicy
-  processing_runtime: {
-    mode: ProcessingMode
-    capture_mode: CaptureMode
-    configured_stt_provider: string
-    main_audio_remote_possible: boolean
-    self_mic_remote_possible: boolean
-    blockers: string[]
-  }
+  processing_runtime: ConversationProcessingRuntime
   pack_preview: {
     goal_ids: string[]
     selected_source_ids: string[]
@@ -403,14 +414,7 @@ export interface ConversationSessionContext {
     counterparty_state: CounterpartyState
   }>
   expression_profile: Record<string, unknown>
-  processing_runtime: {
-    mode?: ProcessingMode
-    capture_mode?: CaptureMode
-    configured_stt_provider?: string
-    main_audio_remote_possible?: boolean
-    self_mic_remote_possible?: boolean
-    blockers?: string[]
-  }
+  processing_runtime: Partial<ConversationProcessingRuntime>
   policy: ConversationSessionPolicy
   pack_digest: string
 }

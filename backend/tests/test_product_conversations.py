@@ -338,6 +338,23 @@ def test_stakeholder_context_influences_score_without_hidden_inference(product_e
     assert "hidden_intent" not in saved["state"]["audience_context"]
 
 
+
+
+def test_ai_forbidden_blocks_manual_ask_as_well_as_guidance(product_env):
+    space = conversations.create_space("No AI", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"ai_assistance": "AI_FORBIDDEN"},
+    )
+    conversations.start_session(session["id"])
+    with pytest.raises(ValueError, match="AI Assistance 已禁用"):
+        conversations.ask(session["id"], "之前为什么用 v2？")
+    result = conversations.evaluate_guidance(session["id"], {"direct_question": "为什么？"})
+    assert result["guidance"] is None
+    assert result["suppressed"] == "POLICY_AI_FORBIDDEN"
+
+
 def test_ai_limited_allows_manual_but_disables_proactive_transcript_guidance(product_env):
     space = conversations.create_space("Limited AI", "PROJECT_SYNC")
     prior = conversations.create_session(space["id"], consent_ack=True)

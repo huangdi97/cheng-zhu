@@ -10,7 +10,7 @@ from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 5
+    assert store.schema_version() == 6
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -27,6 +27,7 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_draft_action",
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
+        "conversation_feedback_event",
     } <= tables
     conn = sqlite3.connect(store.DB_PATH)
     try:
@@ -2273,7 +2274,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 5
+    assert diag["schema_version"] == 6
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

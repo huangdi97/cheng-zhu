@@ -110,7 +110,7 @@ export const conversationApi = {
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
   sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>
-    request<{ deleted: boolean; session_id: string; provenance_tombstones: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
+    request<{ deleted: boolean; session_id: string; provenance_tombstones: number; removed_open_thread_projections: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
 
   patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack' | 'policy'>>) =>
     request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),

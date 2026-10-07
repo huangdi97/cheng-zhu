@@ -448,6 +448,17 @@ export interface ConversationSessionContext {
   expression_profile: Record<string, unknown>
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: Partial<ConversationProcessingRuntime>
+  screen_context_observations: Array<{
+    id: string
+    kind: 'SCREEN_CONTEXT'
+    description: string
+    image_hash: string
+    region: string
+    model: string
+    processing: 'LOCAL' | 'CLOUD'
+    authority: 'OBSERVED_NOT_CONFIRMED'
+    created_at: number
+  }>
   policy: ConversationSessionPolicy
   pack_digest: string
 }

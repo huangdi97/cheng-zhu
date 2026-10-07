@@ -387,6 +387,13 @@ export interface ConversationSessionContext {
     goals?: Array<{ id: string; title: string; outcome_definition: string; priority: number }>
     agenda?: string[]
     expected_questions?: string[]
+    open_threads?: Array<{
+      id: string
+      kind: string
+      text: string
+      owner_id: string
+      source_refs: SourceRef[]
+    }>
     unresolved_count?: number
     known_participants?: number
     contribution_candidates?: Array<{ text: string; source_refs: SourceRef[]; kind: string }>

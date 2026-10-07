@@ -229,6 +229,9 @@ try {
   await page.getByRole('button', { name: '开始会话' }).click()
   await page.getByTestId('conversation-live').waitFor({ timeout: 20000 })
   await page.getByTestId('conversation-session-pulse').waitFor({ timeout: 20000 })
+  const sessionMatch = page.url().match(/#\/conversation\/live\/([^/?#]+)/)
+  if (!sessionMatch) throw new Error('could not resolve active Conversation session id from ' + page.url())
+  const currentSessionId = decodeURIComponent(sessionMatch[1])
   await capture(page, '05-live-session-pulse', 'Guidance-first Live with frozen Session Pulse')
 
   const askBox = page.getByPlaceholder('例如：之前为什么用 v2？Q4 benchmark 说了什么？刚才是否提到 rollback？')
@@ -237,9 +240,21 @@ try {
   await page.getByText('CONFIRMED_TRUTH').waitFor({ timeout: 15000 })
   await capture(page, '06-manual-ask-provenance', 'Manual Ask returns provenance tier instead of generic chat')
 
+  const liveDecision = await request(base, 'POST', '/api/product/conversation/sessions/' + currentSessionId + '/items', {
+    item_type: 'Decision',
+    title: 'Packaged Conversation evidence requires a dedicated Windows gate',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'explicit packaged-session decision', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(base, 'POST', '/api/product/conversation/items/' + liveDecision.id + '/review', {
+    action: 'CONFIRM',
+    patch: {},
+  })
+
   await page.getByRole('button', { name: '结束并 Continue' }).click()
-  await page.getByText('What changed').waitFor({ timeout: 15000 }).catch(() => {})
-  await capture(page, '07-continue', 'Continue after real packaged Session end')
+  await page.getByText('What changed').waitFor({ timeout: 15000 })
+  await page.getByText('Packaged Conversation evidence requires a dedicated Windows gate').waitFor({ timeout: 15000 })
+  await capture(page, '07-continue', 'Continue proves reviewed current-Session truth flows into What changed')
 
   await page.evaluate(() => { window.location.hash = '#/history' })
   await page.getByTestId('conversation-history').waitFor({ timeout: 20000 })
@@ -260,6 +275,7 @@ try {
     frontend_dist: path.relative(ROOT, FRONTEND_DIST),
     space_id: space.id,
     prior_session_id: prior.id,
+    current_session_id: currentSessionId,
     entries,
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))

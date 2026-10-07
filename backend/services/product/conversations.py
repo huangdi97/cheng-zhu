@@ -154,6 +154,14 @@ def resolved_ai_behavior(policy: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _has_vision_runtime() -> bool:
+    try:
+        from services.llm import has_vision_model
+        return bool(has_vision_model())
+    except Exception:
+        return False
+
+
 def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool = False) -> dict[str, Any]:
     """Resolve whether the shared STT transport satisfies this Session policy.
 
@@ -229,6 +237,7 @@ def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool
             "desktop_runtime": desktop_runtime,
             "share_privacy_private_overlay": desktop_runtime,
             "screen_capture": desktop_runtime,
+            "vision_model": _has_vision_runtime(),
         },
         "main_audio_remote_possible": main_remote_possible,
         "self_mic_remote_possible": self_mic_remote_possible,
@@ -917,12 +926,29 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": "PRIVATE_OVERLAY 将在 Desktop 同时对主窗口和浮窗启用系统 content protection；它只降低受支持捕获路径中的意外暴露，不是“不可检测”保证。",
         })
 
-    screen_ok = policy["screen_context"] == "OFF"
-    if not screen_ok:
+    capabilities = processing_runtime.get("capabilities") or {}
+    screen_mode = policy["screen_context"]
+    screen_ok = screen_mode == "OFF"
+    if screen_mode == "MANUAL":
+        screen_ok = bool(capabilities.get("desktop_runtime") and capabilities.get("screen_capture") and capabilities.get("vision_model"))
+        if not screen_ok:
+            blockers.append({
+                "key": "screen_context_runtime",
+                "label": "屏幕上下文",
+                "message": "MANUAL Screen Context 需要 Electron Desktop + 本机截图能力 + 已配置 vision 模型；当前环境不能完整证明这条链。",
+            })
+        else:
+            warnings.append({
+                "key": "screen_context_manual",
+                "label": "屏幕上下文",
+                "message": "MANUAL 只在你点击时截取一次屏幕并生成本场 Observation；原图不写入 product.db，也不会自动升级成事实。",
+            })
+    elif screen_mode == "AUTO":
+        screen_ok = False
         blockers.append({
-            "key": "screen_context_runtime",
+            "key": "screen_context_auto",
             "label": "屏幕上下文",
-            "message": "Conversation 的 Screen Context runtime 尚未接线；当前必须保持 OFF，不能把 policy 选择伪装成已生效功能。",
+            "message": "AUTO Screen Context 尚未开放：持续截图频率、敏感窗口排除与成本/隐私治理未完成。请使用 OFF 或 MANUAL。",
         })
 
     human_ok = True
@@ -1460,7 +1486,31 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) The current-session transcript supports catch-up, but remains observation.
+    # 4) Manual screen observations are current-session context, never truth.
+    screen_observations = list((session.get("state") or {}).get("screen_context_observations") or [])
+    for obs in screen_observations[-12:]:
+        lexical = _text_match_score(question, str(obs.get("description") or ""))
+        if lexical:
+            ranked.append((lexical + 2, float(obs.get("created_at") or 0), {
+                "id": str(obs.get("id") or ""),
+                "kind": "SCREEN_CONTEXT",
+                "authority": "OBSERVED_NOT_CONFIRMED",
+                "title": "本场手动屏幕上下文",
+                "excerpt": str(obs.get("description") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "SCREEN_CONTEXT",
+                    "id": str(obs.get("id") or ""),
+                    "session_id": session_id,
+                    "content_hash": str(obs.get("image_hash") or ""),
+                    "timestamp": obs.get("created_at"),
+                    "visibility": "PRIVATE",
+                }],
+            }))
+
+    # 5) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",
@@ -3189,7 +3239,11 @@ def diagnostics() -> dict[str, Any]:
                 if os.environ.get("CHENGZHU_DESKTOP_RUNTIME") == "1"
                 else "BLOCKED_NON_DESKTOP"
             ),
-            "conversation_screen_context": "BLOCKED_NOT_WIRED",
+            "conversation_screen_context": (
+                "MANUAL_AVAILABLE_DESKTOP_WITH_VISION"
+                if os.environ.get("CHENGZHU_DESKTOP_RUNTIME") == "1" and _has_vision_runtime()
+                else "BLOCKED_CAPABILITY_MISSING"
+            ),
             "conversation_human_coach": "AVAILABLE_LOCAL_AND_LAN",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },

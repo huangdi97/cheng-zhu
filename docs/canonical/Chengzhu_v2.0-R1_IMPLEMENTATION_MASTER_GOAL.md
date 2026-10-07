@@ -422,6 +422,8 @@ Unknown
 
 ---
 
+Runtime closure：Expression Plan 是 Guidance 的派生展示层，不单独建立第二套持久化 truth。长期审计以 Guidance 的 kind / expression_action / source_refs / reason / user_action 与 frozen Session Pack 为准；DELIVERY 读取共享 Expression Profile 与 explicit audience context 生成结构提示。
+
 # 12. Guidance Arbiter Gate
 
 硬优先级：

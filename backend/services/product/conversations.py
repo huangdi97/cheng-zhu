@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
-from services.product import materials
+from services.product import conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -784,6 +784,7 @@ def _preflight_context_fingerprint(
     pack_inputs: dict[str, Any],
     policy: dict[str, Any],
     processing_runtime: dict[str, Any],
+    screen_runtime: dict[str, Any],
 ) -> str:
     """Hash every mutable input that can materially change the eventual Pack.
 
@@ -859,6 +860,7 @@ def _preflight_context_fingerprint(
             "contribution_candidates": list(prepared.get("contribution_candidates") or []),
         },
         "processing_runtime": processing_runtime,
+        "screen_runtime": screen_runtime,
     }
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -884,6 +886,14 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
+    screen_runtime = conversation_screen.vision_runtime_status(session)
+    for message in screen_runtime["blockers"]:
+        blockers.append({
+            "key": "screen_context_runtime",
+            "label": "屏幕上下文",
+            "message": message,
+        })
+
     connector_ok = not bool(policy.get("connector_permissions"))
     if not connector_ok:
         blockers.append({
@@ -900,13 +910,10 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": "现有 Private Overlay 仍属于 Interview Live 路径；Conversation 还没有独立 runtime 证明，因此当前必须保持 OFF。",
         })
 
-    screen_ok = policy["screen_context"] == "OFF"
-    if not screen_ok:
-        blockers.append({
-            "key": "screen_context_runtime",
-            "label": "屏幕上下文",
-            "message": "Conversation 的 Screen Context runtime 尚未接线；当前必须保持 OFF，不能把 policy 选择伪装成已生效功能。",
-        })
+    screen_ok = (
+        policy["screen_context"] == "OFF"
+        or (policy["screen_context"] == "MANUAL" and not screen_runtime["blockers"])
+    )
 
     human_ok = policy["human_assistance"] != "HUMAN_ALLOWED"
     if not human_ok:
@@ -943,7 +950,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         })
 
     context_fingerprint = _preflight_context_fingerprint(
-        session, space, pack_inputs, policy, processing_runtime
+        session, space, pack_inputs, policy, processing_runtime, screen_runtime
     )
     if record_fingerprint and session["status"] == "UPCOMING":
         state = dict(session.get("state") or {})
@@ -986,7 +993,11 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
-        {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": screen_ok},
+        {"key": "screen", "label": "屏幕上下文", "value": (
+            f"{policy['screen_context']} · {screen_runtime['route']}"
+            if policy["screen_context"] == "MANUAL"
+            else policy["screen_context"]
+        ), "ok": screen_ok},
         {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": ai_ok},
         {"key": "ai_behavior", "label": "AI 自动行为", "value": (
             "AUTO_GUIDANCE_AND_EXTRACTION" if ai_behavior["automatic_transcript_guidance"]
@@ -1007,6 +1018,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         "policy": policy,
         "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
+        "screen_runtime": screen_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
@@ -1037,6 +1049,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "expression_profile": _expression_profile(),
             "resolved_ai_behavior": ai_behavior,
             "processing_runtime": processing_runtime,
+            "screen_runtime": screen_runtime,
             "policy": {
                 **policy,
                 "capture_mode": session["capture_mode"],
@@ -1112,6 +1125,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "expression_profile": _expression_profile(),
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
+        "screen_runtime": conversation_screen.vision_runtime_status(session),
         "policy": {
             **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],
@@ -1297,6 +1311,7 @@ def session_context(session_id: str) -> dict[str, Any]:
         "expression_profile": payload.get("expression_profile") or {},
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
+        "screen_runtime": payload.get("screen_runtime") or {},
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
         "pack_digest": str((pack_row or {}).get("digest") or ""),
     }

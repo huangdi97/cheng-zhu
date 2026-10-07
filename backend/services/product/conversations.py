@@ -33,7 +33,7 @@ SPACE_PROFILES = {
     "PROJECT_SYNC": {
         "label": "项目同步",
         "default_mode": "BALANCED",
-        "guidance": ["RECALL", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY", "TALKING_POINT"],
+        "guidance": ["RECALL", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
     },
     "DESIGN_REVIEW": {
         "label": "设计评审",
@@ -48,7 +48,7 @@ SPACE_PROFILES = {
     "ONE_ON_ONE": {
         "label": "1:1",
         "default_mode": "ONE_ON_ONE",
-        "guidance": ["RECALL", "QUESTION", "TALKING_POINT", "RISK"],
+        "guidance": ["RECALL", "QUESTION", "TALKING_POINT"],
     },
     "CLIENT_CALL": {
         "label": "客户会",
@@ -58,7 +58,7 @@ SPACE_PROFILES = {
     "NEGOTIATION": {
         "label": "谈判",
         "default_mode": "QUIET",
-        "guidance": ["RECALL", "TALKING_POINT", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
+        "guidance": ["RECALL", "TALKING_POINT", "QUESTION", "RISK"],
     },
 }
 ASSISTANCE_MODES = {m.value for m in AssistanceMode}

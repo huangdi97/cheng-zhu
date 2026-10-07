@@ -866,7 +866,7 @@ Audio store = OFF
 
 这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
 
-当前未接线的 Conversation Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 必须显式阻断，不能把 policy 选择伪装成已生效能力。
+MANUAL Screen Context 只在存在可证明的数据路径时允许：它使用独立 Conversation namespace，原图不持久化，只保存提取文本与 image/model route provenance；LOCAL processing 必须匹配本地 vision route。AUTO Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 在未接线前仍必须显式阻断，不能把 policy 选择伪装成已生效能力。
 
 外部 action 先进入 Review Queue，再由用户确认。
 

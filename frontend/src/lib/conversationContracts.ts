@@ -87,6 +87,9 @@ export interface SourceRef {
   visibility?: string
   version_id?: string
   content_hash?: string
+  image_hash?: string
+  vision_model?: string
+  vision_route?: string
 }
 
 export interface ConversationTemplate {
@@ -286,6 +289,32 @@ export interface ConversationProcessingRuntime {
   blockers: string[]
 }
 
+export interface ConversationScreenRuntime {
+  mode: 'OFF' | 'MANUAL' | 'AUTO'
+  available: boolean
+  route: 'LOCAL' | 'REMOTE' | 'UNAVAILABLE' | string
+  model_name: string
+  model_id: string
+  fingerprint: string
+  raw_image_persisted: boolean
+  blockers: string[]
+}
+
+export interface ConversationScreenContext {
+  id: string
+  space_id: string
+  session_id: string
+  capture_mode: 'MANUAL' | string
+  region: string
+  text: string
+  image_hash: string
+  vision_model: string
+  vision_route: string
+  vision_fingerprint: string
+  source: string
+  created_at: number
+}
+
 export interface ConversationResolvedAiBehavior {
   policy: ConversationSessionPolicy['ai_assistance']
   manual_ask: boolean
@@ -305,6 +334,7 @@ export interface ConversationPreflight {
   policy: ConversationSessionPolicy
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: ConversationProcessingRuntime
+  screen_runtime: ConversationScreenRuntime
   pack_preview: {
     goal_ids: string[]
     selected_source_ids: string[]
@@ -326,6 +356,7 @@ export interface ConversationPreflight {
     expression_profile: Record<string, unknown>
     resolved_ai_behavior: ConversationResolvedAiBehavior
     processing_runtime: ConversationProcessingRuntime
+    screen_runtime: ConversationScreenRuntime
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
   privacy_note: string
@@ -372,7 +403,7 @@ export interface ConversationTranscriptSegment {
 
 export interface ConversationAskMatch {
   id: string
-  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'QUICK_NOTE' | 'TRANSCRIPT_SEGMENT'
+  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
   authority: 'CONFIRMED_TRUTH' | 'PERSONAL_EVIDENCE' | 'REFERENCE_SOURCE' | 'USER_NOTE_NOT_EVIDENCE' | 'OBSERVED_NOT_CONFIRMED'
   title: string
   excerpt: string
@@ -442,6 +473,7 @@ export interface ConversationSessionContext {
   expression_profile: Record<string, unknown>
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: Partial<ConversationProcessingRuntime>
+  screen_runtime: Partial<ConversationScreenRuntime>
   policy: ConversationSessionPolicy
   pack_digest: string
 }

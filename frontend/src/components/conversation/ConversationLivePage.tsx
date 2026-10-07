@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
-import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationGuidanceFeedbackLabel, ConversationItemType, ConversationMissedMomentLabel, ConversationSessionFeedbackLabel, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -43,6 +43,11 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [primaryDevice, setPrimaryDevice] = useState('')
   const [selfMic, setSelfMic] = useState('')
   const [captureBusy, setCaptureBusy] = useState(false)
+  const [feedbackSaved, setFeedbackSaved] = useState('')
+  const [missedLabel, setMissedLabel] = useState<ConversationMissedMomentLabel>('SHOULD_HAVE_RECALLED')
+  const [missedDetail, setMissedDetail] = useState('')
+  const [missedSaved, setMissedSaved] = useState('')
+  const [sessionFeedbackSaved, setSessionFeedbackSaved] = useState('')
 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
@@ -198,6 +203,35 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     finally { setBusy(false) }
   }
 
+  const saveGuidanceFeedback = async (label: ConversationGuidanceFeedbackLabel) => {
+    if (!guidance) return
+    setError(''); setFeedbackSaved('')
+    try {
+      await conversationApi.guidanceFeedback(guidance.id, label)
+      setFeedbackSaved(label)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const saveMissedMoment = async () => {
+    setError(''); setMissedSaved('')
+    try {
+      await conversationApi.missedMomentFeedback(sessionId, missedLabel, {
+        detail: missedDetail.trim(),
+        current_topic: topic.trim() || liveContext.data?.brief.goal || '',
+      })
+      setMissedSaved(missedLabel)
+      setMissedDetail('')
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const saveSessionFeedback = async (label: ConversationSessionFeedbackLabel) => {
+    setError(''); setSessionFeedbackSaved('')
+    try {
+      await conversationApi.sessionFeedback(sessionId, label)
+      setSessionFeedbackSaved(label)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
+
   const end = async () => {
     setBusy(true); setError('')
     try {
@@ -290,6 +324,23 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <p className="mt-4 text-lg font-medium leading-relaxed text-text-primary">{guidance.text}</p>
                 <p className="mt-3 text-xs text-text-muted">来源：{guidance.source_refs.length ? guidance.source_refs.map((x) => x.kind).join(' · ') : '当前直接问题 / 会话状态'} · reason {guidance.reason}</p>
                 <div className="mt-4 flex gap-2"><SecondaryButton onClick={() => void conversationApi.guidanceAction(guidance.id, 'PINNED')} icon={<Pin className="h-3.5 w-3.5" />}>Pin</SecondaryButton><SecondaryButton onClick={() => { void conversationApi.guidanceAction(guidance.id, 'DISMISSED'); setGuidance(null) }}>忽略</SecondaryButton></div>
+                <div className="mt-4 border-t border-bg-tertiary/70 pt-3" data-testid="guidance-dogfood-feedback">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Dogfood · 人工质量标签</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {([
+                      ['USEFUL', '有用'],
+                      ['WRONG', '内容错'],
+                      ['SOURCE_WRONG', '来源错'],
+                      ['INTERRUPTING', '打断我'],
+                      ['TOO_LATE', '太晚'],
+                      ['ALREADY_KNEW', '我已知道'],
+                    ] as Array<[ConversationGuidanceFeedbackLabel, string]>).map(([label, text]) => (
+                      <button key={label} type="button" onClick={() => void saveGuidanceFeedback(label)}
+                        className="rounded-lg border border-bg-tertiary px-2 py-1 text-[10px] text-text-secondary hover:bg-bg-hover">{text}</button>
+                    ))}
+                  </div>
+                  {feedbackSaved ? <p className="mt-2 text-[10px] text-status-direct">已本地记录 · {feedbackSaved}；不会上传，也不等于 precision/PMF。</p> : null}
+                </div>
               </>
             ) : (
               <div className="flex h-full min-h-[120px] flex-col items-center justify-center text-center">
@@ -303,6 +354,22 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
           <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/20 p-4">
             <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-text-primary">Live Transcript</h2><span className="text-[11px] text-text-muted">{segments.length} final segments</span></div>
             {segments.length ? <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">{segments.slice(-20).map((seg) => <div key={seg.id} className="rounded-xl bg-bg-primary/65 px-3 py-2"><div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">{seg.channel === 'SELF_MIC' ? '我的麦克风' : '主音频'} · {seg.provider || 'ASR'}</div><p className="mt-1 text-xs leading-relaxed text-text-primary">{seg.text}</p></div>)}</div> : <p className="mt-3 text-xs text-text-muted">还没有最终转写。开启真实转写后，这里只显示 Conversation 自己的 timeline。</p>}
+            <details className="mt-3 border-t border-bg-tertiary/70 pt-3" data-testid="missed-moment-feedback">
+              <summary className="cursor-pointer text-[11px] font-medium text-text-secondary">本该提醒但没提醒？记录一个 Missed Moment</summary>
+              <p className="mt-2 text-[10px] text-text-muted">这是人工评测样本，不会自动改写 Conversation truth，也不会上传。</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[220px_1fr_auto]">
+                <select className={inputCls} value={missedLabel} onChange={(e) => setMissedLabel(e.target.value as ConversationMissedMomentLabel)} aria-label="Missed Moment 类型">
+                  <option value="SHOULD_HAVE_RECALLED">应该 Recall</option>
+                  <option value="SHOULD_HAVE_WARNED_RISK">应该提醒 Risk</option>
+                  <option value="SHOULD_HAVE_ASKED">应该建议追问</option>
+                  <option value="SHOULD_HAVE_SURFACED_SOURCE">应该带出来源</option>
+                  <option value="OTHER">其他</option>
+                </select>
+                <input className={inputCls} value={missedDetail} onChange={(e) => setMissedDetail(e.target.value)} placeholder="可选：当时缺了什么？" />
+                <SecondaryButton onClick={saveMissedMoment}>记录</SecondaryButton>
+              </div>
+              {missedSaved ? <p className="mt-2 text-[10px] text-status-direct">已本地记录 · {missedSaved}</p> : null}
+            </details>
           </div>
         </div>
 
@@ -394,6 +461,17 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         <h2 className="text-sm font-semibold text-text-primary">这场之后</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-4"><div><div className="text-2xl font-semibold">{summary.decisions.length}</div><div className="text-[11px] text-text-muted">Decisions</div></div><div><div className="text-2xl font-semibold">{summary.commitments.length}</div><div className="text-[11px] text-text-muted">Commitments</div></div><div><div className="text-2xl font-semibold">{summary.open_questions.length}</div><div className="text-[11px] text-text-muted">Open Questions</div></div><div><div className="text-2xl font-semibold">{summary.review_required}</div><div className="text-[11px] text-text-muted">待确认</div></div></div>
         {summary.next_focus ? <p className="mt-4 text-sm text-text-primary">Next Focus · {summary.next_focus.title}</p> : null}
+        <div className="mt-4 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="session-dogfood-feedback">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Dogfood · 会后人工标签</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={() => void saveSessionFeedback('CONTINUE_HELPED_NEXT_PREP')} className="rounded-lg border border-bg-tertiary px-2 py-1 text-[10px] text-text-secondary">Continue 有帮助</button>
+            <button type="button" onClick={() => void saveSessionFeedback('CONTINUE_PARTLY_HELPED')} className="rounded-lg border border-bg-tertiary px-2 py-1 text-[10px] text-text-secondary">部分有帮助</button>
+            <button type="button" onClick={() => void saveSessionFeedback('CONTINUE_DID_NOT_HELP')} className="rounded-lg border border-bg-tertiary px-2 py-1 text-[10px] text-text-secondary">没帮助</button>
+            <button type="button" onClick={() => void saveSessionFeedback('WOULD_REUSE_SPACE')} className="rounded-lg border border-bg-tertiary px-2 py-1 text-[10px] text-text-secondary">愿意继续用这个 Space</button>
+            <button type="button" onClick={() => void saveSessionFeedback('WOULD_NOT_REUSE_SPACE')} className="rounded-lg border border-bg-tertiary px-2 py-1 text-[10px] text-text-secondary">不想继续用</button>
+          </div>
+          {sessionFeedbackSaved ? <p className="mt-2 text-[10px] text-status-direct">已本地记录 · {sessionFeedbackSaved}</p> : null}
+        </div>
         <div className="mt-4"><PrimaryButton onClick={() => navigate(paths.conversationSpace(s.space_id, 'sessions'))}>回到 Space · Continue</PrimaryButton></div>
       </div> : null}
     </Page>

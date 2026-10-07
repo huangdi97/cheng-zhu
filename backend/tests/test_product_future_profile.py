@@ -54,6 +54,36 @@ def test_v2_conversation_profile_contract_is_complete_but_not_falsely_productize
     }
 
 
+def test_conversation_profile_guidance_lanes_match_canonical_contract():
+    expected = {
+        ConversationProfileKind.PROJECT_SYNC: {
+            GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.RISK,
+            GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+        },
+        ConversationProfileKind.DESIGN_REVIEW: {
+            GuidanceKind.RECALL, GuidanceKind.TALKING_POINT, GuidanceKind.QUESTION,
+            GuidanceKind.RISK, GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+        },
+        ConversationProfileKind.PRESENTATION_QA: {
+            GuidanceKind.ANSWER_CUE, GuidanceKind.RECALL, GuidanceKind.QUESTION,
+            GuidanceKind.DELIVERY,
+        },
+        ConversationProfileKind.ONE_ON_ONE: {
+            GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.TALKING_POINT,
+        },
+        ConversationProfileKind.CLIENT_CALL: {
+            GuidanceKind.RECALL, GuidanceKind.ANSWER_CUE, GuidanceKind.QUESTION,
+            GuidanceKind.RISK, GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+        },
+        ConversationProfileKind.NEGOTIATION: {
+            GuidanceKind.RECALL, GuidanceKind.TALKING_POINT, GuidanceKind.QUESTION,
+            GuidanceKind.RISK,
+        },
+    }
+    for kind, lanes in expected.items():
+        assert set(profile(kind).guidance_kinds) == lanes
+
+
 def test_guidance_and_expression_support_silence_and_opportunity():
     assert set(GuidanceKind) == {
         GuidanceKind.RECALL,

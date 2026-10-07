@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test'
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import { COMMON_WS_BOOTSTRAP, installMocks } from './fixtures/setup.mjs'
+
+const CONVERSATION_EVIDENCE_DIR = path.resolve(process.cwd(), 'artifacts', 'runtime-evidence', 'conversation-beta')
+
+async function saveConversationEvidence(page, name) {
+  await mkdir(CONVERSATION_EVIDENCE_DIR, { recursive: true })
+  await page.screenshot({ path: path.join(CONVERSATION_EVIDENCE_DIR, `${name}.png`), fullPage: true })
+}
 
 const SPACE = {
   id: 'cs-v2',
@@ -575,6 +584,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Open Threads')).toBeVisible()
     await expect(page.getByText(REVIEWED_OPEN.title).first()).toBeVisible()
     await page.goBack()
+    await saveConversationEvidence(page, '01-conversation-home')
     await testInfo.attach('v2-conversation-home', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
     await page.getByRole('button', { name: /对话空间/ }).first().click()
@@ -583,6 +593,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByTestId('conversation-space')).toBeVisible()
     await expect(page.getByText('Conversation Goals')).toBeVisible()
     await expect(page.getByText('Alex · Backend')).toBeVisible()
+    await saveConversationEvidence(page, '02-conversation-space')
   })
 
   test('Goal editor controls outcome, priority and lifecycle without creating a second truth', async ({ context, page }) => {
@@ -631,6 +642,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Auto transcript Guidance · ON')).toBeVisible()
     await expect(page.getByText('Auto candidate extraction · ON')).toBeVisible()
     await expect(page.getByText('记录规则依场景与组织政策而异。')).toBeVisible()
+    await saveConversationEvidence(page, '03-preflight-pack-preview')
     await page.getByRole('button', { name: '开始会话' }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/live/${SESSION.id}`))
     await expect(page.getByTestId('conversation-live')).toBeVisible()
@@ -662,11 +674,13 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('CONTRIBUTION_OPPORTUNITY')).toBeVisible()
     await expect(page.getByRole('paragraph').filter({ hasText: 'Q4 benchmark 已覆盖 10x data scale' })).toBeVisible()
 
+    await saveConversationEvidence(page, '04-live-guidance')
     await testInfo.attach('v2-live-guidance', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
     await page.getByRole('button', { name: '结束并 Continue' }).click()
     await expect(page.getByText('这场之后')).toBeVisible()
     await expect(page.getByText('Next Focus · rollback owner 还没有明确')).toBeVisible()
+    await saveConversationEvidence(page, '05-continue')
   })
 
   test('Live exposes explicit Talking Point and Delivery planner lanes', async ({ context, page }) => {

@@ -955,6 +955,71 @@ def test_deadline_requires_provenance(product_env):
     assert deadline["source_refs"]
 
 
+
+def test_session_delete_removes_projected_open_thread_but_keeps_tombstone(product_env):
+    space = conversations.create_space("Thread Delete Boundary", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    item = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 rollback drill？",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-thread-delete", "excerpt": "owner 还没定"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    threads = conversations.space_detail(space["id"])["threads"]
+    assert len(threads) == 1
+    thread_id = threads[0]["id"]
+
+    conversations.end_session(session["id"])
+    result = conversations.delete_session(session["id"], confirmed_policy="TOMBSTONE")
+    assert result["provenance_tombstones"] == 1
+    assert result["removed_open_thread_projections"] == 1
+    assert store.get("conversation_open_thread", thread_id) is None
+    assert conversations.space_detail(space["id"])["threads"] == []
+    tomb = store.select(
+        "conversation_provenance_tombstone",
+        where="original_item_id = ?",
+        params=(item["id"],),
+    )
+    assert tomb and tomb[0]["title"] == "谁负责 rollback drill？"
+
+
+def test_started_session_keeps_frozen_open_thread_after_space_thread_is_resolved(product_env):
+    space = conversations.create_space("Frozen Thread Pack", "DESIGN_REVIEW")
+    prior = conversations.create_session(space["id"], title="Prior review", consent_ack=True)
+    conversations.start_session(prior["id"])
+    item = conversations.add_item(
+        prior["id"],
+        item_type="Risk",
+        title="rollback drill 还没有 owner",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-thread-pack", "excerpt": "owner unresolved"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(prior["id"])
+
+    current = conversations.create_session(space["id"], title="Current review", consent_ack=True)
+    started = conversations.start_session(current["id"])
+    frozen_threads = started["pack"]["payload"]["session_brief"]["open_threads"]
+    assert len(frozen_threads) == 1
+    assert frozen_threads[0]["text"] == "rollback drill 还没有 owner"
+    assert frozen_threads[0]["source_refs"]
+
+    context_before = conversations.session_context(current["id"])
+    assert context_before["brief"]["open_threads"][0]["id"] == frozen_threads[0]["id"]
+
+    conversations.review_item(item["id"], "RESOLVE")
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+    # The active Session remains a historical snapshot of what was known/open
+    # when it started; resolving the Space thread cannot rewrite this Pack.
+    context_after = conversations.session_context(current["id"])
+    assert context_after["brief"]["open_threads"] == frozen_threads
+
+
+
 def test_guidance_arbiter_critical_risk_visibility_duplicate_social_and_budget(product_env):
     space = conversations.create_space("Arbiter", "DESIGN_REVIEW")
 

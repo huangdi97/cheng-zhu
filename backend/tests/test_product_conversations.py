@@ -525,6 +525,8 @@ def test_unreviewed_open_question_stays_in_review_queue_not_longitudinal_continu
     assert row["open_questions_count"] == 0
 
     before_review = conversations.continue_summary(session["id"])
+    assert before_review["open_questions"] == []
+    assert [x["id"] for x in before_review["candidates"]] == [candidate["id"]]
     assert before_review["review_required"] == 1
     assert before_review["next_focus"] is None
 
@@ -541,6 +543,8 @@ def test_unreviewed_open_question_stays_in_review_queue_not_longitudinal_continu
     assert home_after["next_focus"]["kind"] == "OPEN_QUESTION"
 
     after_review = conversations.continue_summary(session["id"])
+    assert [x["id"] for x in after_review["open_questions"]] == [candidate["id"]]
+    assert after_review["candidates"] == []
     assert after_review["next_focus"]["kind"] == "OPEN_QUESTION"
     assert after_review["next_focus"]["source_ref"] == candidate["id"]
 

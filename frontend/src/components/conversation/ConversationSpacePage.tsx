@@ -478,7 +478,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <Field label="记录方式"><select className={inputCls} value={capture} onChange={(e) => setCapture(e.target.value as CaptureMode)}><option value="NOTES_ONLY">仅结构化笔记</option><option value="TRANSCRIPT">转写</option><option value="NO_CAPTURE">不记录</option></select></Field>
               <Field label="处理方式"><select className={inputCls} value={processing} onChange={(e) => setProcessing(e.target.value as ProcessingMode)}><option value="LOCAL">Local</option><option value="CLOUD">Cloud allowed</option><option value="OFF">Off（TRANSCRIPT / AI 会被阻止）</option></select></Field>
               <Field label="帮助方式"><select className={inputCls} value={mode} onChange={(e) => setMode(e.target.value as AssistanceMode)}><option value="QUIET">Quiet</option><option value="BALANCED">Balanced</option><option value="ACTIVE">Active</option><option value="PRESENTATION">Presentation</option><option value="ONE_ON_ONE">1:1</option></select></Field>
-              <Field label="屏幕上下文"><select className={inputCls} value={screenContext} onChange={(e) => setScreenContext(e.target.value as typeof screenContext)}><option value="OFF">Off</option><option value="MANUAL">Manual（runtime 未接线，会阻止开始）</option><option value="AUTO">Auto（runtime 未接线，会阻止开始）</option></select></Field>
+              <Field label="屏幕上下文"><select className={inputCls} value={screenContext} onChange={(e) => setScreenContext(e.target.value as typeof screenContext)}><option value="OFF">Off</option><option value="MANUAL">Manual · 手动抓屏，原图不保存</option><option value="AUTO">Auto（尚未接线，会阻止开始）</option></select></Field>
               <Field label="AI Assistance"><select className={inputCls} value={aiPolicy} onChange={(e) => setAiPolicy(e.target.value as typeof aiPolicy)}><option value="AI_FORBIDDEN">Forbidden · AI 全关闭</option><option value="AI_LIMITED">Limited · 仅用户主动调用</option><option value="AI_ALLOWED">Allowed · 允许自动辅助</option><option value="AI_EXPECTED">Expected · 用户报告本场预期自动辅助</option></select></Field>
               <Field label="Human Assistance"><select className={inputCls} value={humanPolicy} onChange={(e) => setHumanPolicy(e.target.value as typeof humanPolicy)}><option value="HUMAN_FORBIDDEN">Forbidden</option><option value="HUMAN_PRACTICE_ONLY">Practice only</option><option value="HUMAN_ALLOWED">Allowed（runtime 未接线，会阻止开始）</option></select></Field>
               <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay（Conversation runtime 未接线，会阻止开始）</option></select></Field>
@@ -511,6 +511,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Retention · {preflight.processing_runtime.data_path.retention}</span>
                   <span>Write-back · {preflight.processing_runtime.data_path.writeback}</span>
                   <span>Audio retention · {preflight.processing_runtime.data_path.audio_retention}</span>
+                  <span>Screen · {preflight.screen_runtime.mode} / {preflight.screen_runtime.route}</span>
+                  <span>Raw screenshot · {preflight.screen_runtime.raw_image_persisted ? 'PERSISTED' : 'NOT STORED'}</span>
                 </div>
                 <p className="mt-2">“Local”不会把 capture / STT / inference / retention / write-back 混成一个标签；任何一段与 policy 不一致都会 fail-closed。</p>
               </div>
@@ -529,6 +531,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>STT {preflight.pack_preview.processing_runtime.data_path.stt}</span>
                   <span>Inference {preflight.pack_preview.processing_runtime.data_path.inference}</span>
                   <span>Write-back {preflight.pack_preview.processing_runtime.data_path.writeback}</span>
+                  <span>Screen {preflight.pack_preview.screen_runtime.mode} / {preflight.pack_preview.screen_runtime.route}</span>
+                  <span>Vision {preflight.pack_preview.screen_runtime.model_id || preflight.pack_preview.screen_runtime.model_name || '—'}</span>
                 </div>
                 {preflight.pack_preview.sources.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen sources</div>
@@ -539,7 +543,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <div className="mt-1 space-y-1">{preflight.pack_preview.quick_notes.map((note) => <div key={note.id} className="text-[11px] text-text-secondary">• {note.title || note.id}</div>)}</div>
                 </div> : null}
                 {preflight.pack_preview.skipped_sources.length ? <div className="mt-3 text-[11px] text-status-inferred">Skipped Sources · {preflight.pack_preview.skipped_sources.map((x) => x.title || x.id).join(' · ')}</div> : null}
-                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、我的表达与 policy 会被冻结进 Session Pack；后续资料或表达偏好变化不会静默改写本场。</p>
+                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、我的表达、policy 与 Screen/Processing route 会被冻结进 Session Pack；后续资料、表达偏好或模型路由变化不会静默改写本场。</p>
               </div>
               <p className="mt-3 text-[11px] text-text-muted">{preflight.privacy_note}</p>
             </div> : null}

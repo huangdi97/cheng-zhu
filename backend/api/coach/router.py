@@ -222,9 +222,11 @@ def helper_state(x_coach_token: Optional[str] = Header(default=None)):
         state["current_topic"] = (context.get("conversation_state") or {}).get("current_topic") or ""
         state["brief"] = context.get("brief") or {}
         if session.permissions.get("transcript"):
+            from services.product import conversation_capture
+
             state["transcript"] = [
                 {"text": row.get("text") or "", "channel": row.get("channel") or ""}
-                for row in conversations.transcript(session.live_session_id, 12)
+                for row in conversation_capture.transcript(session.live_session_id, 12)
             ][-6:]
         if session.permissions.get("ai_cue"):
             shown = [

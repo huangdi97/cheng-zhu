@@ -59,7 +59,7 @@ def _hash(token: str) -> str:
 class CoachSession:
     id: str
     token_hash: str
-    session_kind: str  # "practice" | "live"
+    session_kind: str  # "practice" | "live" | "conversation"
     permissions: dict[str, bool]
     created_at: float
     expires_at: float
@@ -76,6 +76,7 @@ class CoachSession:
         return {
             "id": self.id,
             "session_kind": self.session_kind,
+            "target_session_id": self.live_session_id,
             "permissions": dict(self.permissions),
             "created_at": self.created_at,
             "expires_at": self.expires_at,
@@ -104,13 +105,15 @@ class CoachRegistry:
         ttl_min: int = DEFAULT_TTL_MIN,
         live_session_id: str = "",
     ) -> tuple[CoachSession, str]:
-        kind = "live" if session_kind == "live" else "practice"
-        if not human_coach_allowed(human_policy, session_kind=kind):
+        requested = str(session_kind or "practice").strip().lower()
+        kind = requested if requested in {"practice", "live", "conversation"} else "practice"
+        policy_kind = "practice" if kind == "practice" else "live"
+        if not human_coach_allowed(human_policy, session_kind=policy_kind):
             policy = resolve_human_policy(human_policy)
             reason = (
                 "人工协助策略为「禁止」。"
                 if policy == "HUMAN_FORBIDDEN"
-                else "人工协助默认仅用于演练/练习；正式场次需面试方明确允许并在本场策略中设为「允许」。"
+                else "人工协助默认仅用于演练/练习；Interview Live 或 Conversation 正式场次需明确把本场 Human Assistance 设为「允许」。"
             )
             raise CoachPolicyError(reason)
         perms = {p: bool((permissions or {}).get(p, p == "transcript")) for p in PERMISSIONS}
@@ -166,7 +169,8 @@ class CoachRegistry:
 
     def check_policy(self, session: CoachSession, human_policy: str) -> None:
         """Re-checked on every cue: a policy tightened mid-session wins."""
-        if not human_coach_allowed(human_policy, session_kind=session.session_kind):
+        policy_kind = "practice" if session.session_kind == "practice" else "live"
+        if not human_coach_allowed(human_policy, session_kind=policy_kind):
             raise CoachPolicyError("当前人工协助策略不允许发送建议")
 
     def take_rate(self, session: CoachSession) -> None:
@@ -203,6 +207,8 @@ def coach_cue_payload(session: CoachSession, *, text: str = "", voice_id: str = 
         "type": "coach_cue",
         "id": f"cc-{uuid.uuid4().hex[:10]}",
         "coach_session_id": session.id,
+        "target_session_id": session.live_session_id,
+        "session_kind": session.session_kind,
         "text": text[:MAX_TEXT_CHARS],
         "voice_url": f"/api/coach/voice/{voice_id}" if voice_id else "",
         "source": "HUMAN_COACH",

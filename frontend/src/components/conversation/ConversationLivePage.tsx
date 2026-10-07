@@ -3,6 +3,8 @@ import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
 import { useInterviewStore } from '@/stores/configStore'
+import CoachCues from '@/components/coach/CoachCues'
+import CoachPanel from '@/components/coach/CoachPanel'
 import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
@@ -232,6 +234,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
       {error ? <ErrorState message={error} /> : null}
 
+      {s.policy?.human_assistance === 'HUMAN_ALLOWED' ? <CoachCues targetSessionId={sessionId} /> : null}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/25 p-4">
@@ -324,6 +328,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         </div>
 
         <aside className="space-y-4">
+          {s.policy?.human_assistance === 'HUMAN_ALLOWED'
+            ? <CoachPanel sessionKind="conversation" targetSessionId={sessionId} />
+            : null}
+
           {liveContext.data ? <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/20 p-4" data-testid="conversation-session-pulse">
             <div className="flex items-start justify-between gap-3">
               <div>

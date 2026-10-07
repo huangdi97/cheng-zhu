@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from typing import Any, Optional
 
@@ -219,10 +220,16 @@ def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool
         else "LOCAL_REVIEWED_DRAFT_ONLY"
     )
 
+    desktop_runtime = os.environ.get("CHENGZHU_DESKTOP_RUNTIME") == "1"
     return {
         "mode": mode,
         "capture_mode": capture_mode,
         "configured_stt_provider": provider,
+        "capabilities": {
+            "desktop_runtime": desktop_runtime,
+            "share_privacy_private_overlay": desktop_runtime,
+            "screen_capture": desktop_runtime,
+        },
         "main_audio_remote_possible": main_remote_possible,
         "self_mic_remote_possible": self_mic_remote_possible,
         "data_path": {
@@ -892,12 +899,22 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
         })
 
-    share_ok = policy["share_privacy"] == "OFF"
+    share_capable = bool((processing_runtime.get("capabilities") or {}).get("share_privacy_private_overlay"))
+    share_ok = (
+        policy["share_privacy"] == "OFF"
+        or (policy["share_privacy"] == "PRIVATE_OVERLAY" and share_capable)
+    )
     if not share_ok:
         blockers.append({
             "key": "share_privacy_runtime",
             "label": "屏幕共享保护",
-            "message": "现有 Private Overlay 仍属于 Interview Live 路径；Conversation 还没有独立 runtime 证明，因此当前必须保持 OFF。",
+            "message": "PRIVATE_OVERLAY 需要 Electron Desktop runtime；当前运行环境无法证明 setContentProtection 可用，因此必须 fail-closed。",
+        })
+    elif policy["share_privacy"] == "PRIVATE_OVERLAY":
+        warnings.append({
+            "key": "share_privacy_best_effort",
+            "label": "屏幕共享保护",
+            "message": "PRIVATE_OVERLAY 将在 Desktop 同时对主窗口和浮窗启用系统 content protection；它只降低受支持捕获路径中的意外暴露，不是“不可检测”保证。",
         })
 
     screen_ok = policy["screen_context"] == "OFF"
@@ -994,7 +1011,11 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             else "DISABLED"
         ), "ok": True},
         {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": human_ok},
-        {"key": "share", "label": "屏幕共享保护", "value": policy["share_privacy"], "ok": share_ok},
+        {"key": "share", "label": "屏幕共享保护", "value": (
+            "PRIVATE_OVERLAY · DESKTOP_CONTENT_PROTECTION"
+            if policy["share_privacy"] == "PRIVATE_OVERLAY" and share_ok
+            else policy["share_privacy"]
+        ), "ok": share_ok},
         {"key": "writeback", "label": "外部写回", "value": policy["external_writeback"], "ok": True},
     ]
     return {
@@ -3132,6 +3153,11 @@ def diagnostics() -> dict[str, Any]:
             "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
             "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
             "external_connectors": "NOT_CONFIGURED",
+            "conversation_share_privacy": (
+                "AVAILABLE_DESKTOP"
+                if os.environ.get("CHENGZHU_DESKTOP_RUNTIME") == "1"
+                else "BLOCKED_NON_DESKTOP"
+            ),
             "conversation_screen_context": "BLOCKED_NOT_WIRED",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",

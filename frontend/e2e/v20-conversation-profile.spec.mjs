@@ -120,6 +120,17 @@ const COMMITMENT_CANDIDATE = {
 
 function mocks() {
   let session = { ...SESSION }
+  let goal = {
+    id: 'cg-1',
+    space_id: SPACE.id,
+    title: SPACE.default_goal,
+    outcome_definition: '',
+    status: 'ACTIVE',
+    priority: 50,
+    source: { kind: 'USER' },
+    created_at: 1,
+    resolved_at: null,
+  }
   return async (pathname, method, request) => {
     if (pathname === '/api/product/conversation/demo') return {
       evidence: 'SYNTHETIC_DEMO',
@@ -165,7 +176,8 @@ function mocks() {
     if (pathname === '/api/product/conversation/spaces' && method === 'POST') return SPACE
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'GET') return {
       ...SPACE,
-      goals: [{ id: 'cg-1', space_id: SPACE.id, title: SPACE.default_goal, outcome_definition: '', status: 'ACTIVE', priority: 50, source: { kind: 'USER' }, created_at: 1, resolved_at: null }],
+      default_goal: goal.status === 'ACTIVE' ? goal.title : '',
+      goals: [goal],
       sessions: [{ ...session, status: 'ENDED', ended_at: 3 }],
       participants: [{
         id: 'cp-1', space_id: SPACE.id, session_id: null, display_name: 'Alex', role: 'Backend',
@@ -190,8 +202,8 @@ function mocks() {
       threads: [THREAD],
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/prepare`) return {
-      space: SPACE,
-      goals: [],
+      space: { ...SPACE, default_goal: goal.status === 'ACTIVE' ? goal.title : '' },
+      goals: [goal],
       next_session: null,
       open_commitments: [],
       open_questions: [REVIEWED_OPEN],
@@ -460,7 +472,19 @@ function mocks() {
         known_explicit: request.postDataJSON(), source_refs: [], temporary_inferences: [], unknown: [],
       },
     }
-    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/goals`) return { id: 'cg-2', title: '确认 owner' }
+    if (pathname === `/api/product/conversation/goals/${goal.id}` && method === 'PATCH') {
+      const patch = request.postDataJSON()
+      goal = {
+        ...goal,
+        ...patch,
+        resolved_at: patch.status === 'RESOLVED' ? 4 : patch.status === 'ACTIVE' ? null : goal.resolved_at,
+      }
+      return goal
+    }
+    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/goals` && method === 'POST') {
+      const body = request.postDataJSON()
+      return { id: 'cg-2', space_id: SPACE.id, ...body, status: 'ACTIVE', source: { kind: 'USER' }, created_at: 5, resolved_at: null }
+    }
     return undefined
   }
 }
@@ -531,6 +555,35 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Conversation Goals')).toBeVisible()
     await expect(page.getByText('Alex · Backend')).toBeVisible()
   })
+
+  test('Goal editor controls outcome, priority and lifecycle without creating a second truth', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}`)
+    await expect(page.getByText('PRIMARY ACTIVE GOAL')).toBeVisible()
+    await page.getByRole('button', { name: '编辑' }).click()
+    await expect(page.getByPlaceholder('例如：形成 conflict merge strategy 决策')).toHaveValue(SPACE.default_goal)
+    await page.getByPlaceholder('例如：形成 conflict merge strategy 决策').fill('决定最终 conflict merge strategy')
+    await page.getByPlaceholder('例如：方案、owner 与 rollout 条件均明确').fill('方案、owner 与 rollout 条件都明确')
+    await page.getByLabel('Goal 优先级').fill('90')
+    await page.getByRole('button', { name: '保存 Goal' }).click()
+    await expect(page.getByText('决定最终 conflict merge strategy')).toBeVisible()
+    await expect(page.getByText('达成定义 · 方案、owner 与 rollout 条件都明确')).toBeVisible()
+    await expect(page.getByText('P90')).toBeVisible()
+    await expect(page.getByText('PRIMARY ACTIVE GOAL')).toBeVisible()
+
+    await page.getByRole('button', { name: '完成目标' }).click()
+    await expect(page.getByText('RESOLVED')).toBeVisible()
+    await expect(page.getByText('PRIMARY ACTIVE GOAL')).toHaveCount(0)
+
+    await page.getByRole('button', { name: '重新打开' }).click()
+    await expect(page.getByText('ACTIVE')).toBeVisible()
+    await expect(page.getByText('PRIMARY ACTIVE GOAL')).toBeVisible()
+  })
+
 
   test('Prepare → Preflight → Live → Guidance → Continue is one real product loop', async ({ context, page }, testInfo) => {
     await installMocks(context, {

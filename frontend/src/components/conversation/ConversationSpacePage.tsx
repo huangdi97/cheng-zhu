@@ -467,7 +467,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <Field label="处理方式"><select className={inputCls} value={processing} onChange={(e) => setProcessing(e.target.value as ProcessingMode)}><option value="LOCAL">Local</option><option value="CLOUD">Cloud allowed</option><option value="OFF">Off（TRANSCRIPT / AI 会被阻止）</option></select></Field>
               <Field label="帮助方式"><select className={inputCls} value={mode} onChange={(e) => setMode(e.target.value as AssistanceMode)}><option value="QUIET">Quiet</option><option value="BALANCED">Balanced</option><option value="ACTIVE">Active</option><option value="PRESENTATION">Presentation</option><option value="ONE_ON_ONE">1:1</option></select></Field>
               <Field label="屏幕上下文"><select className={inputCls} value={screenContext} onChange={(e) => setScreenContext(e.target.value as typeof screenContext)}><option value="OFF">Off</option><option value="MANUAL">Manual（runtime 未接线，会阻止开始）</option><option value="AUTO">Auto（runtime 未接线，会阻止开始）</option></select></Field>
-              <Field label="AI Assistance"><select className={inputCls} value={aiPolicy} onChange={(e) => setAiPolicy(e.target.value as typeof aiPolicy)}><option value="AI_FORBIDDEN">Forbidden</option><option value="AI_LIMITED">Limited</option><option value="AI_ALLOWED">Allowed</option><option value="AI_EXPECTED">Expected</option></select></Field>
+              <Field label="AI Assistance"><select className={inputCls} value={aiPolicy} onChange={(e) => setAiPolicy(e.target.value as typeof aiPolicy)}><option value="AI_FORBIDDEN">Forbidden · AI 全关闭</option><option value="AI_LIMITED">Limited · 仅用户主动调用</option><option value="AI_ALLOWED">Allowed · 允许自动辅助</option><option value="AI_EXPECTED">Expected · 用户报告本场预期自动辅助</option></select></Field>
               <Field label="Human Assistance"><select className={inputCls} value={humanPolicy} onChange={(e) => setHumanPolicy(e.target.value as typeof humanPolicy)}><option value="HUMAN_FORBIDDEN">Forbidden</option><option value="HUMAN_PRACTICE_ONLY">Practice only</option><option value="HUMAN_ALLOWED">Allowed（runtime 未接线，会阻止开始）</option></select></Field>
               <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay（Conversation runtime 未接线，会阻止开始）</option></select></Field>
               <Field label="外部写回"><select className={inputCls} value={externalWriteback} onChange={(e) => setExternalWriteback(e.target.value as typeof externalWriteback)}><option value="REVIEW_REQUIRED">只生成草稿，必须确认</option><option value="OFF">完全关闭</option></select></Field>
@@ -480,6 +480,16 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {sessionError ? <div className="mt-3"><ErrorState message={sessionError} /></div> : null}
             {preflight ? <div className="mt-4 rounded-2xl border border-bg-tertiary p-3">
               <div className="space-y-1">{preflight.items.map((x) => <div key={x.key} className="flex items-center justify-between gap-3 text-xs"><span className="text-text-muted">{x.label}</span><span className={x.ok ? 'text-status-direct' : 'text-status-risk'}>{x.ok ? '✓ ' : '! '}{String(x.value)}</span></div>)}</div>
+              <div className="mt-3 rounded-xl bg-bg-secondary/35 p-3 text-[11px] text-text-muted">
+                <div className="font-semibold text-text-secondary">Resolved AI Behavior</div>
+                <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                  <span>Manual Ask · {preflight.resolved_ai_behavior.manual_ask ? 'ON' : 'OFF'}</span>
+                  <span>Manual Guidance · {preflight.resolved_ai_behavior.manual_guidance ? 'ON' : 'OFF'}</span>
+                  <span>Auto transcript Guidance · {preflight.resolved_ai_behavior.automatic_transcript_guidance ? 'ON' : 'OFF'}</span>
+                  <span>Auto candidate extraction · {preflight.resolved_ai_behavior.automatic_candidate_extraction ? 'ON' : 'OFF'}</span>
+                </div>
+                <p className="mt-2">{preflight.resolved_ai_behavior.expected_by_user_report ? 'Expected 只记录“用户报告本场预期 AI 辅助”；当前 Beta engine 与 Allowed 相同。' : '行为由本场 policy 显式解析，不用标签猜测。'}</p>
+              </div>
               <div className="mt-3 rounded-xl bg-bg-secondary/35 p-3 text-[11px] text-text-muted">
                 <div className="font-semibold text-text-secondary">Resolved Data Path</div>
                 <div className="mt-2 grid gap-1 sm:grid-cols-2">

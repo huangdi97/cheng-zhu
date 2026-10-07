@@ -726,6 +726,11 @@ PR 合并后至少要有：
 
 # 19. 当前完成定义
 
+逐项设计→runtime 对照与证据索引见：
+
+- [v2.0-R1 Design → Runtime Closure Matrix](Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md)
+
+
 本次 v2.0-R1 closure 只有在以下条件同时成立时才算“设计与当前仓库可做部分做完”：
 
 - canonical 已同步真实实现；

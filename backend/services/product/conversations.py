@@ -400,6 +400,7 @@ def list_space_summaries(status: str = "") -> list[dict[str, Any]]:
         ) or 0)
         out.append({
             **space,
+            "default_goal": _primary_goal_title(space["id"]),
             "next_session": upcoming[0] if upcoming else None,
             "last_session": recent[0] if recent else None,
             "open_commitments_count": open_commitments,
@@ -410,8 +411,9 @@ def list_space_summaries(status: str = "") -> list[dict[str, Any]]:
 
 def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     current = require_space(space_id)
+    requested_default_goal = patch.get("default_goal") if "default_goal" in patch else None
     allowed = {
-        "title", "description", "status", "project_id", "relationship_key", "default_goal",
+        "title", "description", "status", "project_id", "relationship_key",
         "default_mode", "selected_source_ids", "selected_quick_note_ids", "retention_policy",
     }
     clean = {k: v for k, v in patch.items() if k in allowed}
@@ -447,7 +449,20 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     clean["updated_at"] = store.now()
     if clean:
         store.update("conversation_space", space_id, clean)
-    return require_space(space_id) if clean else current
+
+    if "default_goal" in patch:
+        title = str(requested_default_goal or "").strip()
+        active = _active_goals(space_id)
+        if not title:
+            if active:
+                raise ValueError("default_goal 只是 ACTIVE Conversation Goal 的投影；请通过 Goal lifecycle 显式 Resolve")
+            _sync_primary_goal_projection(space_id)
+        elif active:
+            update_goal(active[0]["id"], {"title": title})
+        else:
+            create_goal(space_id, title)
+
+    return require_space(space_id) if (clean or "default_goal" in patch) else current
 
 
 def delete_space(space_id: str, *, confirm: bool = False) -> bool:
@@ -455,6 +470,47 @@ def delete_space(space_id: str, *, confirm: bool = False) -> bool:
     if not confirm:
         raise ValueError("删除整个 Conversation Space 会彻底擦除其 Session、Items、Packs、Drafts 与 provenance tombstones；请明确确认")
     return store.delete("conversation_space", space_id)
+
+
+def _active_goals(space_id: str) -> list[dict[str, Any]]:
+    return store.select(
+        "conversation_goal",
+        where="space_id = ? AND status = 'ACTIVE'",
+        params=(space_id,),
+        order="priority DESC, created_at ASC",
+    )
+
+
+def _goals_for_session(session: dict[str, Any]) -> list[dict[str, Any]]:
+    ids = set(session.get("goal_ids") or [])
+    if not ids:
+        return []
+    return [
+        goal for goal in store.select(
+            "conversation_goal",
+            where="space_id = ?",
+            params=(session["space_id"],),
+            order="priority DESC, created_at ASC",
+        )
+        if goal["id"] in ids
+    ]
+
+
+def _primary_goal_title(space_id: str) -> str:
+    active = _active_goals(space_id)
+    return str(active[0].get("title") or "") if active else ""
+
+
+def _sync_primary_goal_projection(space_id: str) -> None:
+    space = store.get("conversation_space", space_id)
+    if not space:
+        return
+    projected = _primary_goal_title(space_id)
+    if str(space.get("default_goal") or "") != projected:
+        store.update("conversation_space", space_id, {
+            "default_goal": projected,
+            "updated_at": store.now(),
+        })
 
 
 def create_goal(space_id: str, title: str, outcome_definition: str = "", priority: int = 50) -> dict[str, Any]:
@@ -474,6 +530,7 @@ def create_goal(space_id: str, title: str, outcome_definition: str = "", priorit
         "resolved_at": None,
     }
     store.insert("conversation_goal", row)
+    _sync_primary_goal_projection(space_id)
     return store.get("conversation_goal", row["id"]) or row
 
 
@@ -499,6 +556,7 @@ def update_goal(goal_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         clean["resolved_at"] = store.now() if status == "RESOLVED" else None
     if clean:
         store.update("conversation_goal", goal_id, clean)
+        _sync_primary_goal_projection(goal["space_id"])
     return store.get("conversation_goal", goal_id) or goal
 
 
@@ -782,6 +840,7 @@ def preflight(session_id: str) -> dict[str, Any]:
             "message": "尚未记录你将如何让参与者知道正在使用转写/辅助。成竹当前不会自动发送 chat notice 或添加 watermark。",
         })
 
+    session_goals = _goals_for_session(session)
     selected_source_count = len(space.get("selected_source_ids") or [])
     ready_source_count = len(pack_inputs["sources"])
     selected_note_count = len(space.get("selected_quick_note_ids") or [])
@@ -800,7 +859,7 @@ def preflight(session_id: str) -> dict[str, Any]:
     )
 
     items = [
-        {"key": "goal", "label": "本次目标", "value": space.get("default_goal") or "可在会中补充", "ok": True},
+        {"key": "goal", "label": "本次目标", "value": (session_goals[0]["title"] if session_goals else "可在会中补充"), "ok": True},
         {"key": "schedule", "label": "人工排期", "value": session.get("scheduled_at") or "未排期", "ok": True},
         {"key": "mode", "label": "帮助方式", "value": session["assistance_mode"], "ok": True},
         {"key": "capture", "label": "记录方式", "value": session["capture_mode"], "ok": consent_ok},
@@ -887,6 +946,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
     pack_inputs = _pack_inputs(space)
     participants = store.select("conversation_participant", where="space_id = ?", params=(space["id"],), order="created_at ASC")
     prepared = prepare_space(space["id"])
+    frozen_goals = _goals_for_session(session)
 
     payload = {
         "contract": "v2.0-R1",
@@ -902,7 +962,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "session_brief": {
             "title": session.get("title") or space.get("title") or "",
             "scheduled_at": session.get("scheduled_at"),
-            "goal": space.get("default_goal") or "",
+            "goal": frozen_goals[0]["title"] if frozen_goals else "",
             "goals": [
                 {
                     "id": goal["id"],
@@ -910,13 +970,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
                     "outcome_definition": goal.get("outcome_definition") or "",
                     "priority": goal.get("priority") or 0,
                 }
-                for goal in store.select(
-                    "conversation_goal",
-                    where="space_id = ?",
-                    params=(space["id"],),
-                    order="priority DESC, created_at ASC",
-                )
-                if goal["id"] in set(session.get("goal_ids") or [])
+                for goal in frozen_goals
             ],
             "agenda": list(prepared.get("agenda") or []),
             "expected_questions": list(prepared.get("expected_questions") or []),
@@ -2278,6 +2332,7 @@ def space_detail(space_id: str) -> dict[str, Any]:
         }
     return {
         **space,
+        "default_goal": next((g["title"] for g in goals if g["status"] == "ACTIVE"), ""),
         "goals": goals,
         "sessions": sessions,
         "participants": participants,
@@ -2371,7 +2426,7 @@ def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
 
 
 def home_summary() -> dict[str, Any]:
-    spaces = list_spaces("ACTIVE")
+    spaces = list_space_summaries("ACTIVE")
     if not spaces:
         return {
             "state": "EMPTY", "spaces": [], "next_session": None, "next_focus": None,

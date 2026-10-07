@@ -32,8 +32,6 @@ def _configure(root: Path) -> None:
     intel_storage.DB_PATH = str(root / "intelligence.db")
     product._READY_PATHS.clear()  # noqa: SLF001
     product._COLUMNS_CACHE.clear()  # noqa: SLF001
-    intel_storage._READY_PATHS.clear()  # noqa: SLF001
-
     config_module._save_config = lambda cfg: True  # type: ignore[assignment]  # noqa: ARG005, SLF001
     config_module._config = config_module._raw_config().model_copy(deep=True)  # noqa: SLF001
     config_module._effective = None  # noqa: SLF001

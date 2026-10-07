@@ -363,6 +363,15 @@ function mocks() {
         },
       }],
       expression_profile: { conclusion_first: true, target_seconds: 60, shape: 'bullet' },
+      resolved_ai_behavior: {
+        policy: 'AI_ALLOWED',
+        manual_ask: true,
+        manual_guidance: true,
+        automatic_transcript_guidance: true,
+        automatic_candidate_extraction: true,
+        expected_by_user_report: false,
+        engine: 'LOCAL_DETERMINISTIC',
+      },
       processing_runtime: {
         mode: 'LOCAL',
         capture_mode: 'NOTES_ONLY',
@@ -632,6 +641,10 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Inference · LOCAL_DETERMINISTIC')).toBeVisible()
     await expect(page.getByText('Retention · LOCAL_PRODUCT_DB')).toBeVisible()
     await expect(page.getByText('Write-back · LOCAL_REVIEWED_DRAFT_ONLY')).toBeVisible()
+    await expect(page.getByText('Frozen AI behavior')).toBeVisible()
+    await expect(page.getByText('Policy · AI_ALLOWED')).toBeVisible()
+    await expect(page.getByText('Auto Guidance · ON')).toBeVisible()
+    await expect(page.getByText('Auto Extraction · ON')).toBeVisible()
     await page.getByText('高级 / 手动 Guidance 验证').click()
     await expect(page.getByLabel('当前受众')).toHaveValue('cp-1')
     await expect(page.getByPlaceholder('对方明确角色，例如 CTO / 客户')).toHaveValue('Backend')

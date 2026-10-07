@@ -245,6 +245,16 @@ def get_session_context(session_id: str):
         return conversations.session_context(session_id)
 
 
+class ScreenContextCapture(BaseModel):
+    region: str = Field(default="left_half", max_length=120)
+
+
+@router.post("/sessions/{session_id}/screen-context/capture")
+def capture_screen_context(session_id: str, body: ScreenContextCapture):
+    with domain_errors():
+        return conversations.capture_manual_screen_context(session_id, region=body.region)
+
+
 class SessionDelete(BaseModel):
     confirmed_policy: str = "BLOCK"
 

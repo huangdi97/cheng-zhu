@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 5
+LATEST_SCHEMA_VERSION = 6
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -596,6 +596,35 @@ def _apply_v5(conn: sqlite3.Connection) -> None:
     if "counterparty_state_json" not in participant_cols:
         conn.execute("ALTER TABLE conversation_participant ADD COLUMN counterparty_state_json TEXT NOT NULL DEFAULT '{}'")
 
+# --- v2.0 beta productization: Conversation-owned manual screen observations ---
+# Raw screenshots are never persisted here.  Only extracted text plus a
+# cryptographic image fingerprint/provenance is retained as session-scoped
+# observation state.
+_V6_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_screen_context (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
+        capture_mode TEXT NOT NULL DEFAULT 'MANUAL',
+        region TEXT NOT NULL DEFAULT '',
+        text TEXT NOT NULL DEFAULT '',
+        image_hash TEXT NOT NULL DEFAULT '',
+        vision_model TEXT NOT NULL DEFAULT '',
+        vision_route TEXT NOT NULL DEFAULT '',
+        vision_fingerprint TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL DEFAULT 'LOCAL_SCREEN_CAPTURE',
+        created_at REAL NOT NULL
+    )
+    """,
+)
+
+_V6_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_screen_session ON conversation_screen_context(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_screen_space ON conversation_screen_context(space_id, created_at)",
+)
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -607,6 +636,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     3: (lambda conn: _apply_statements(conn, _V3_TABLES + _V3_INDEXES), "v2.0 conversation runtime closure"),
     4: (lambda conn: _apply_statements(conn, _V4_TABLES + _V4_INDEXES), "v2.0 deletion provenance tombstones"),
     5: (_apply_v5, "v2.0 explicit session policy and counterparty state"),
+    6: (lambda conn: _apply_statements(conn, _V6_TABLES + _V6_INDEXES), "v2.0 manual Conversation screen context observations"),
 }
 
 

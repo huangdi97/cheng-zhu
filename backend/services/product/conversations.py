@@ -3117,6 +3117,7 @@ def diagnostics() -> dict[str, Any]:
     active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
     ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
     transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
+    screen_observations = int(store.scalar("SELECT COUNT(*) FROM conversation_screen_context") or 0)
     confirmed_items = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
     ) or 0)
@@ -3160,6 +3161,7 @@ def diagnostics() -> dict[str, Any]:
             "active_sessions": active_sessions,
             "ended_sessions": ended_sessions,
             "transcript_segments": transcripts,
+            "screen_context_observations": screen_observations,
             "confirmed_items": confirmed_items,
             "pending_review_items": pending_items,
             "guidance_shown": shown,
@@ -3202,7 +3204,7 @@ def diagnostics() -> dict[str, Any]:
             "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
             "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
             "external_connectors": "NOT_CONFIGURED",
-            "conversation_screen_context": "BLOCKED_NOT_WIRED",
+            "conversation_screen_context": "MANUAL_AVAILABLE_AUTO_BLOCKED",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
@@ -3217,6 +3219,7 @@ def diagnostics() -> dict[str, Any]:
             "speaker_biometric_identity": "OFF",
             "emotion_sentiment_profiling": "OFF",
             "hidden_intent_claims": "OFF",
+            "screen_raw_image_persistence": "OFF",
         },
     }
 

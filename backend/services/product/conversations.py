@@ -138,6 +138,21 @@ def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict
     return source
 
 
+def resolved_ai_behavior(policy: dict[str, Any]) -> dict[str, Any]:
+    level = str(policy.get("ai_assistance") or "AI_ALLOWED")
+    automatic = level in {"AI_ALLOWED", "AI_EXPECTED"}
+    manual = level != "AI_FORBIDDEN"
+    return {
+        "policy": level,
+        "manual_ask": manual,
+        "manual_guidance": manual,
+        "automatic_transcript_guidance": automatic,
+        "automatic_candidate_extraction": automatic,
+        "expected_by_user_report": level == "AI_EXPECTED",
+        "engine": "LOCAL_DETERMINISTIC",
+    }
+
+
 def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool = False) -> dict[str, Any]:
     """Resolve whether the shared STT transport satisfies this Session policy.
 
@@ -773,6 +788,7 @@ def preflight(session_id: str) -> dict[str, Any]:
         blockers.append({"key": "consent", "label": "转写确认", "message": "开启转写前，请确认当前场景允许记录/转写。"})
 
     policy = _normalize_session_policy(session.get("policy"))
+    ai_behavior = resolved_ai_behavior(policy)
     retention = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
     processing_runtime = processing_runtime_status(session)
     for message in processing_runtime["blockers"]:
@@ -875,6 +891,11 @@ def preflight(session_id: str) -> dict[str, Any]:
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
         {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": screen_ok},
         {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": ai_ok},
+        {"key": "ai_behavior", "label": "AI 自动行为", "value": (
+            "AUTO_GUIDANCE_AND_EXTRACTION" if ai_behavior["automatic_transcript_guidance"]
+            else "MANUAL_ONLY" if ai_behavior["manual_ask"]
+            else "DISABLED"
+        ), "ok": True},
         {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": human_ok},
         {"key": "share", "label": "屏幕共享保护", "value": policy["share_privacy"], "ok": share_ok},
         {"key": "writeback", "label": "外部写回", "value": policy["external_writeback"], "ok": True},
@@ -886,6 +907,7 @@ def preflight(session_id: str) -> dict[str, Any]:
         "blockers": blockers,
         "warnings": warnings,
         "policy": policy,
+        "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
@@ -915,6 +937,7 @@ def preflight(session_id: str) -> dict[str, Any]:
             ) or 0),
             "confirmed_items_count": len(_confirmed_context_items(space["id"])),
             "expression_profile": _expression_profile(),
+            "resolved_ai_behavior": ai_behavior,
             "processing_runtime": processing_runtime,
             "policy": {
                 **policy,
@@ -989,6 +1012,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
             "contribution_candidates": list(prepared.get("contribution_candidates") or []),
         },
         "expression_profile": _expression_profile(),
+        "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
         "policy": {
             **_normalize_session_policy(session.get("policy")),

@@ -286,6 +286,16 @@ export interface ConversationProcessingRuntime {
   blockers: string[]
 }
 
+export interface ConversationResolvedAiBehavior {
+  policy: ConversationSessionPolicy['ai_assistance']
+  manual_ask: boolean
+  manual_guidance: boolean
+  automatic_transcript_guidance: boolean
+  automatic_candidate_extraction: boolean
+  expected_by_user_report: boolean
+  engine: string
+}
+
 export interface ConversationPreflight {
   session: ConversationSession
   space: ConversationSpace
@@ -293,6 +303,7 @@ export interface ConversationPreflight {
   blockers: Array<{ key: string; label: string; message: string }>
   warnings: Array<{ key: string; label: string; message: string }>
   policy: ConversationSessionPolicy
+  resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: ConversationProcessingRuntime
   pack_preview: {
     goal_ids: string[]
@@ -313,6 +324,7 @@ export interface ConversationPreflight {
     participants_count: number
     confirmed_items_count: number
     expression_profile: Record<string, unknown>
+    resolved_ai_behavior: ConversationResolvedAiBehavior
     processing_runtime: ConversationProcessingRuntime
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }

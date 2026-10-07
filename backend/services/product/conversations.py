@@ -778,7 +778,93 @@ def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def preflight(session_id: str) -> dict[str, Any]:
+def _preflight_context_fingerprint(
+    session: dict[str, Any],
+    space: dict[str, Any],
+    pack_inputs: dict[str, Any],
+    policy: dict[str, Any],
+    processing_runtime: dict[str, Any],
+) -> str:
+    """Hash every mutable input that can materially change the eventual Pack.
+
+    This is a TOCTOU guard, not a security signature. The user-facing Preview
+    and Start must refer to the same context revision; if any relevant input
+    changes after Preview, Start asks the user to run Preflight again.
+    """
+    goals = _goals_for_session(session)
+    participants = store.select(
+        "conversation_participant",
+        where="space_id = ?",
+        params=(space["id"],),
+        order="created_at ASC",
+    )
+    confirmed = _confirmed_context_items(space["id"])
+    threads = store.select(
+        "conversation_open_thread",
+        where="space_id = ? AND status = 'OPEN'",
+        params=(space["id"],),
+        order="created_at DESC",
+    )
+    prepared = prepare_space(space["id"])
+    snapshot = {
+        "session": {
+            "id": session["id"],
+            "title": session.get("title") or "",
+            "scheduled_at": session.get("scheduled_at"),
+            "goal_ids": list(session.get("goal_ids") or []),
+            "capture_mode": session.get("capture_mode"),
+            "processing_mode": session.get("processing_mode"),
+            "assistance_mode": session.get("assistance_mode"),
+            "consent_ack": bool(session.get("consent_ack")),
+            "policy": policy,
+        },
+        "space": {
+            "id": space["id"],
+            "profile": space.get("profile"),
+            "title": space.get("title"),
+            "selected_source_ids": list(space.get("selected_source_ids") or []),
+            "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "retention_policy": dict(space.get("retention_policy") or {}),
+        },
+        "goals": [
+            {
+                "id": g.get("id"),
+                "title": g.get("title"),
+                "outcome_definition": g.get("outcome_definition"),
+                "priority": g.get("priority"),
+                "status": g.get("status"),
+                "updated_at": g.get("updated_at"),
+            }
+            for g in goals
+        ],
+        "sources": [
+            {
+                "material_id": s.get("material_id"),
+                "version_id": s.get("version_id"),
+                "content_hash": s.get("content_hash"),
+                "text": s.get("text"),
+            }
+            for s in pack_inputs.get("sources") or []
+        ],
+        "skipped_sources": list(pack_inputs.get("skipped_sources") or []),
+        "quick_notes": list(pack_inputs.get("quick_notes") or []),
+        "missing_quick_note_ids": list(pack_inputs.get("missing_quick_note_ids") or []),
+        "participants": participants,
+        "confirmed_items": confirmed,
+        "open_threads": threads,
+        "expression_profile": _expression_profile(),
+        "prepared": {
+            "agenda": list(prepared.get("agenda") or []),
+            "expected_questions": list(prepared.get("expected_questions") or []),
+            "contribution_candidates": list(prepared.get("contribution_candidates") or []),
+        },
+        "processing_runtime": processing_runtime,
+    }
+    raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, Any]:
     session = require_session(session_id)
     space = require_space(session["space_id"])
     blockers: list[dict[str, str]] = []
@@ -856,6 +942,17 @@ def preflight(session_id: str) -> dict[str, Any]:
             "message": "尚未记录你将如何让参与者知道正在使用转写/辅助。成竹当前不会自动发送 chat notice 或添加 watermark。",
         })
 
+    context_fingerprint = _preflight_context_fingerprint(
+        session, space, pack_inputs, policy, processing_runtime
+    )
+    if record_fingerprint and session["status"] == "UPCOMING":
+        state = dict(session.get("state") or {})
+        state["preflight_context_fingerprint"] = context_fingerprint
+        store.update("conversation_session", session_id, {
+            "state": state,
+            "updated_at": store.now(),
+        })
+
     session_goals = _goals_for_session(session)
     selected_source_count = len(space.get("selected_source_ids") or [])
     ready_source_count = len(pack_inputs["sources"])
@@ -906,6 +1003,7 @@ def preflight(session_id: str) -> dict[str, Any]:
         "items": items,
         "blockers": blockers,
         "warnings": warnings,
+        "context_fingerprint": context_fingerprint,
         "policy": policy,
         "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
@@ -1038,9 +1136,13 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
 
 
 def start_session(session_id: str) -> dict[str, Any]:
-    check = preflight(session_id)
+    before = require_session(session_id)
+    expected_fingerprint = str((before.get("state") or {}).get("preflight_context_fingerprint") or "")
+    check = preflight(session_id, record_fingerprint=False)
     if check["blockers"]:
         raise ValueError(check["blockers"][0]["message"])
+    if expected_fingerprint and expected_fingerprint != check["context_fingerprint"]:
+        raise ValueError("本场上下文自上次 Preflight 后已变化；请重新检查 Session Pack Preview 后再开始")
     session = check["session"]
     if session["status"] == "ENDED":
         raise ValueError("已结束的会话不能重新开始")

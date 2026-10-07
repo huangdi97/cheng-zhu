@@ -389,6 +389,8 @@ Unknown
 
 ---
 
+Conversation State 同样是派生 read model：phase / topic / user-speaking / audience context / current items / reviewed open threads / last guidance 从已有真值对象组合，不新增独立可写状态表。
+
 # 11. Expression Planner Gate
 
 输入至少覆盖：

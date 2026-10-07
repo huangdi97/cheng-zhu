@@ -2148,8 +2148,10 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
             status="SHOWN",
             reason="DIRECT_QUESTION",
         )
-        state["direct_question_pending"] = False
-        store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
+        latest_state = dict((require_session(session_id).get("state") or {}))
+        latest_state["direct_question_pending"] = False
+        latest_state["last_guidance_id"] = event["id"]
+        store.update("conversation_session", session_id, {"state": latest_state, "updated_at": store.now()})
         return {"guidance": event, "suppressed": None}
 
     critical_risk = str(body.get("critical_risk") or "").strip()

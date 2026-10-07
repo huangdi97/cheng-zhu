@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
+import { Mic, MonitorSmartphone, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
 import { useInterviewStore } from '@/stores/configStore'
@@ -47,6 +47,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [primaryDevice, setPrimaryDevice] = useState('')
   const [selfMic, setSelfMic] = useState('')
   const [captureBusy, setCaptureBusy] = useState(false)
+  const [screenBusy, setScreenBusy] = useState(false)
 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
@@ -149,6 +150,15 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     try { setCapture(await conversationApi.captureStop(sessionId)) }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setCaptureBusy(false) }
+  }
+
+  const captureScreenContext = async () => {
+    setScreenBusy(true); setError('')
+    try {
+      await conversationApi.captureScreenContext(sessionId, 'left_half')
+      await liveContext.reload()
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setScreenBusy(false) }
   }
 
   const evaluate = async () => {
@@ -328,6 +338,14 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         </div>
 
         <aside className="space-y-4">
+          {s.policy?.screen_context === 'MANUAL' ? <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/20 p-4" data-testid="conversation-screen-context">
+            <div className="flex items-start justify-between gap-3">
+              <div><h2 className="text-sm font-semibold text-text-primary">Manual Screen Context</h2><p className="mt-1 text-[11px] text-text-muted">仅在你点击时截一次；原图不写入 product.db，vision 描述只属于本场 Observation。</p></div>
+              <SecondaryButton disabled={screenBusy || s.status !== 'ACTIVE'} onClick={captureScreenContext} icon={<MonitorSmartphone className="h-3.5 w-3.5" />}>{screenBusy ? '分析中…' : '截取当前屏幕'}</SecondaryButton>
+            </div>
+            {(liveContext.data?.screen_context_observations?.length ?? 0) > 0 ? <div className="mt-3 space-y-2">{liveContext.data!.screen_context_observations.slice(-3).reverse().map((obs) => <div key={obs.id} className="rounded-xl bg-bg-primary/55 px-3 py-2"><div className="flex flex-wrap items-center gap-2 text-[10px] text-text-muted"><StatusBadge tone="muted">OBSERVED_NOT_CONFIRMED</StatusBadge><span>{obs.processing}</span><span>{obs.model}</span><span>hash {obs.image_hash.slice(0, 8)}</span></div><p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-text-secondary">{obs.description}</p></div>)}</div> : <p className="mt-3 text-[11px] text-text-muted">还没有手动屏幕 Observation。</p>}
+          </div> : null}
+
           {s.policy?.human_assistance === 'HUMAN_ALLOWED'
             ? <CoachPanel sessionKind="conversation" targetSessionId={sessionId} />
             : null}

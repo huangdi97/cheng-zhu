@@ -1430,6 +1430,65 @@ def test_direct_question_cancels_stale_proactive_talking_point(product_env):
     assert old["user_action"] == "CANCELLED_BY_DIRECT_QUESTION"
 
 
+
+
+def test_unreviewed_open_question_never_becomes_proactive_cross_session_guidance(product_env):
+    space = conversations.create_space("Review Boundary", "PROJECT_SYNC")
+    prior = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(prior["id"])
+    candidate = conversations.add_item(
+        prior["id"],
+        item_type="OpenQuestion",
+        title="AI 只是猜测 rollback owner 未明确",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-unreviewed", "excerpt": "可能还没定"}],
+        epistemic_status="INFERRED",
+        review_status="AI_EXTRACTED",
+    )
+    conversations.end_session(prior["id"])
+
+    current = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(current["id"])
+    result = conversations.evaluate_guidance(current["id"], {})
+    assert result["guidance"] is None
+    assert result["suppressed"] == "NO_HIGH_VALUE_GUIDANCE"
+
+    # The candidate still exists for review/history of the source session, but
+    # it did not become long-term proactive truth.
+    assert conversations.require_item(candidate["id"])["review_status"] == "AI_EXTRACTED"
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+
+def test_client_call_does_not_enable_unlisted_talking_point_or_delivery_lanes(product_env):
+    space = conversations.create_space("Client", "CLIENT_CALL")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    src = [{"kind": "DOCUMENT", "id": "client-brief", "visibility": "PRIVATE"}]
+
+    talking = conversations.evaluate_guidance(session["id"], {
+        "talking_point": "主动销售式 talking point",
+        "source_refs": src,
+    })
+    assert talking["guidance"] is None
+    assert talking["suppressed"] == "PROFILE_GUIDANCE_NOT_ALLOWED"
+
+    delivery = conversations.evaluate_guidance(session["id"], {
+        "delivery_focus": "把回答改成演示模式",
+    })
+    assert delivery["guidance"] is None
+    assert delivery["suppressed"] == "PROFILE_GUIDANCE_NOT_ALLOWED"
+
+    opportunity = conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "客户明确 concern 与 benchmark 之间有一个可补充事实",
+        "source_refs": src,
+        "relevance": 1,
+        "novelty": 1,
+        "provenance_strength": 1,
+        "goal_relevance": 1,
+        "decision_impact": 1,
+    })
+    assert opportunity["guidance"]["kind"] == "CONTRIBUTION_OPPORTUNITY"
+
+
 def test_opportunity_needs_source_and_threshold(product_env):
     space = conversations.create_space("Sync", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")
@@ -1657,13 +1716,15 @@ def test_all_profile_templates_share_one_runtime_without_cross_space_leak(produc
         epistemic_status="OBSERVED",
     )
     assert item["space_id"] == space["id"]
+    conversations.review_item(item["id"], "CONFIRM")
     conversations.end_session(first["id"])
 
     second = conversations.create_session(space["id"], consent_ack=True)
     conversations.start_session(second["id"])
     result = conversations.evaluate_guidance(second["id"], {})
-    # Quiet negotiation may stay silent; all other profiles can surface the
-    # unresolved question through the same shared runtime.
+    # Only reviewed continuity is eligible. Quiet negotiation may still stay
+    # silent because its default suggestion budget is zero; all other profiles
+    # can surface the reviewed unresolved question through the shared runtime.
     if conversations.require_space(space["id"])["default_mode"] == "QUIET":
         assert result["guidance"] is None
     else:

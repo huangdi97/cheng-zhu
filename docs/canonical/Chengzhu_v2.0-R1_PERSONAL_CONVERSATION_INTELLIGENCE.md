@@ -224,6 +224,17 @@ Person
 ### Conversation Session
 一次真实会话的发生记录。
 
+### Conversation State（派生 read model）
+
+Conversation State 用于 Live / Expression Planner 的当前状态输入，但**不是第三套持久化 truth store**。当前 runtime 从既有对象派生：
+
+- Session status → phase（Prepare / Participate / Continue）；
+- Session state → current topic / user speaking / audience context / last guidance；
+- current-session Conversation Items；
+- Space 中 reviewed Open Threads。
+
+它可以被 UI / Guidance / diagnostics 读取，但不得与 Conversation Item / Open Thread 形成两套可独立修改的事实。
+
 ### Conversation Item
 Decision / Commitment / Task 等结构化状态。
 

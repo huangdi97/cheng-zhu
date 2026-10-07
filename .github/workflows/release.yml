@@ -103,7 +103,7 @@ jobs:
       - name: Packaged smoke (sidecar, fake provider, restart, persistence)
         run: |
           pip install websocket-client
-          python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report dist/release/packaged-smoke.json
+          python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report dist/release/packaged-smoke.json --markdown-report dist/release/packaged-smoke.md
 
       - name: Package Electron (installer + portable)
         working-directory: desktop
@@ -186,7 +186,7 @@ jobs:
             if (-not (Test-Path $required)) { throw "clean install missing: $required" }
           }
 
-          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report dist/release/clean-install-smoke.json
+          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report dist/release/clean-install-smoke.json --markdown-report dist/release/clean-install-smoke.md
 
           $smoke = Get-Content dist/release/clean-install-smoke.json -Raw | ConvertFrom-Json
           if (-not $smoke.passed) { throw "clean-install packaged smoke did not pass" }
@@ -202,7 +202,7 @@ jobs:
           } | ConvertTo-Json -Depth 4 | Set-Content dist/release/clean-install-replay.json -Encoding utf8
 
       - name: Installed-layout smoke (unpacked app resources)
-        run: python scripts/packaged_smoke.py --exe dist/desktop/win-unpacked/resources/backend/chengzhu-backend.exe --frontend-dist dist/desktop/win-unpacked/resources/frontend-dist --resources dist/desktop/win-unpacked/resources --report dist/release/installed-layout-smoke.json
+        run: python scripts/packaged_smoke.py --exe dist/desktop/win-unpacked/resources/backend/chengzhu-backend.exe --frontend-dist dist/desktop/win-unpacked/resources/frontend-dist --resources dist/desktop/win-unpacked/resources --report dist/release/installed-layout-smoke.json --markdown-report dist/release/installed-layout-smoke.md
 
       - name: Collect release files + SHA256
         shell: pwsh
@@ -335,7 +335,7 @@ jobs:
             if (-not (Test-Path $required)) { throw "download-back install missing: $required" }
           }
 
-          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report dist/release/download-back-smoke.json
+          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report dist/release/download-back-smoke.json --markdown-report dist/release/download-back-smoke.md
           $smoke = Get-Content dist/release/download-back-smoke.json -Raw | ConvertFrom-Json
           if (-not $smoke.passed) { throw "download-back packaged smoke did not pass" }
 
@@ -396,6 +396,7 @@ jobs:
           name: chengzhu-download-back-verification
           path: |
             dist/release/download-back-smoke.json
+            dist/release/download-back-smoke.md
             dist/release/download-back-verification.json
           retention-days: 30
           if-no-files-found: error

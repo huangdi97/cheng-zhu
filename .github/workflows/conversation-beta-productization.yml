@@ -54,9 +54,13 @@ jobs:
       - name: Pin evidence source SHA
         shell: pwsh
         run: |
-          $actual = (git rev-parse HEAD).Trim()
-          "CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA=$actual" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "Conversation Beta evidence source SHA: $actual"
+          $checkout = (git rev-parse HEAD).Trim()
+          $head = "${{ github.event.pull_request.head.sha }}"
+          if ([string]::IsNullOrWhiteSpace($head)) { $head = $checkout }
+          "CHENGZHU_CONVERSATION_EVIDENCE_HEAD_SHA=$head" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CHENGZHU_CONVERSATION_EVIDENCE_CHECKOUT_SHA=$checkout" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Conversation Beta PR/source head SHA: $head"
+          Write-Host "Conversation Beta tested checkout SHA: $checkout"
 
       - uses: actions/setup-python@v5
         with:
@@ -174,7 +178,8 @@ jobs:
           python scripts/conversation_packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report artifacts/conversation-beta-evidence/clean-install-conversation-smoke.json
 
           @{
-            source_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA
+            source_head_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_HEAD_SHA
+            tested_checkout_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_CHECKOUT_SHA
             installer = $installer
             install_dir = $installDir
             interview_smoke = "PASS"
@@ -207,7 +212,8 @@ jobs:
           @{
             contract = "v2.0-R1"
             evidence_type = "CONVERSATION_BETA_PACKAGED_PRODUCTIZATION"
-            source_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA
+            source_head_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_HEAD_SHA
+            tested_checkout_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_CHECKOUT_SHA
             app_version = $version
             installer_sha256 = $installerHash
             portable_sha256 = $portableHash

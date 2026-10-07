@@ -52,6 +52,17 @@ const SESSION = {
   updated_at: 2,
 }
 
+const SCREEN_RUNTIME_OFF = {
+  mode: 'OFF',
+  available: false,
+  route: 'UNAVAILABLE',
+  model_name: '',
+  model_id: '',
+  fingerprint: '',
+  raw_image_persisted: false,
+  blockers: [],
+}
+
 const DECISION = {
   id: 'ci-decision',
   space_id: SPACE.id,
@@ -225,7 +236,7 @@ function mocks() {
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
       policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30 },
-      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0 },
+      would_delete: { transcript_segments: 0, screen_context_observations: 0, guidance_events: 0, draft_actions: 0 },
       kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP' },
       destructive: false,
     }
@@ -266,6 +277,7 @@ function mocks() {
         },
         blockers: [],
       },
+      screen_runtime: SCREEN_RUNTIME_OFF,
       pack_preview: {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
@@ -311,6 +323,7 @@ function mocks() {
           },
           blockers: [],
         },
+        screen_runtime: SCREEN_RUNTIME_OFF,
         policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
       },
       privacy_note: '记录规则依场景与组织政策而异。',
@@ -406,6 +419,7 @@ function mocks() {
         },
         blockers: [],
       },
+      screen_runtime: SCREEN_RUNTIME_OFF,
       policy: SESSION.policy,
       pack_digest: 'abcdef1234567890',
     }

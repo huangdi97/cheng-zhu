@@ -154,12 +154,33 @@ def resolved_ai_behavior(policy: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _has_vision_runtime() -> bool:
+def _vision_runtime_status() -> dict[str, Any]:
     try:
-        from services.llm import has_vision_model
-        return bool(has_vision_model())
+        from core.config import get_config
+        cfg = get_config()
+        for model in getattr(cfg, "models", []) or []:
+            if not (
+                getattr(model, "supports_vision", False)
+                and bool(getattr(model, "enabled", True))
+                and getattr(model, "api_key", "")
+                and getattr(model, "api_key", "") not in ("", "sk-your-api-key-here")
+            ):
+                continue
+            base = str(getattr(model, "api_base_url", "") or "").lower()
+            local = "localhost" in base or "127.0.0.1" in base
+            return {
+                "available": True,
+                "model": str(getattr(model, "name", "") or getattr(model, "model", "")),
+                "local": local,
+                "remote_possible": not local,
+            }
     except Exception:
-        return False
+        pass
+    return {"available": False, "model": "", "local": False, "remote_possible": False}
+
+
+def _has_vision_runtime() -> bool:
+    return bool(_vision_runtime_status()["available"])
 
 
 def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool = False) -> dict[str, Any]:
@@ -238,6 +259,7 @@ def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool
             "share_privacy_private_overlay": desktop_runtime,
             "screen_capture": desktop_runtime,
             "vision_model": _has_vision_runtime(),
+            "vision": _vision_runtime_status(),
         },
         "main_audio_remote_possible": main_remote_possible,
         "self_mic_remote_possible": self_mic_remote_possible,
@@ -930,12 +952,19 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
     screen_mode = policy["screen_context"]
     screen_ok = screen_mode == "OFF"
     if screen_mode == "MANUAL":
-        screen_ok = bool(capabilities.get("desktop_runtime") and capabilities.get("screen_capture") and capabilities.get("vision_model"))
+        vision = capabilities.get("vision") or {}
+        screen_ok = bool(
+            capabilities.get("desktop_runtime")
+            and capabilities.get("screen_capture")
+            and capabilities.get("vision_model")
+            and session["processing_mode"] != "OFF"
+            and not (session["processing_mode"] == "LOCAL" and vision.get("remote_possible"))
+        )
         if not screen_ok:
             blockers.append({
                 "key": "screen_context_runtime",
                 "label": "屏幕上下文",
-                "message": "MANUAL Screen Context 需要 Electron Desktop + 本机截图能力 + 已配置 vision 模型；当前环境不能完整证明这条链。",
+                "message": "MANUAL Screen Context 需要 Electron Desktop + 本机截图 + vision 模型；Processing=LOCAL 时 vision endpoint 也必须是本地地址，OFF 不允许视觉推理。当前环境不能完整证明这条链。",
             })
         else:
             warnings.append({

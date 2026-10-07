@@ -3,8 +3,11 @@ import { buildApiUrl } from '@/lib/backendUrl'
 import { useInterviewStore } from '@/stores/configStore'
 
 // 教练建议：来源 HUMAN_COACH，只是建议，不是证据，也不是你本人的确认。
-export default function CoachCues() {
-  const cues = useInterviewStore((s) => s.coachCues)
+export default function CoachCues({ targetSessionId = '' }: { targetSessionId?: string }) {
+  const allCues = useInterviewStore((s) => s.coachCues)
+  const cues = targetSessionId
+    ? allCues.filter((cue) => cue.sessionKind === 'conversation' && cue.targetSessionId === targetSessionId)
+    : allCues.filter((cue) => cue.sessionKind !== 'conversation')
   const dismiss = useInterviewStore((s) => s.dismissCoachCue)
   if (!cues.length) return null
   return (

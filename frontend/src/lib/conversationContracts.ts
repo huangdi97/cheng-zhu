@@ -428,6 +428,7 @@ export interface ConversationSessionContext {
     counterparty_state: CounterpartyState
   }>
   expression_profile: Record<string, unknown>
+  resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: Partial<ConversationProcessingRuntime>
   policy: ConversationSessionPolicy
   pack_digest: string

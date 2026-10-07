@@ -393,6 +393,15 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       {summary ? <div className="mt-5 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-5">
         <h2 className="text-sm font-semibold text-text-primary">这场之后</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-4"><div><div className="text-2xl font-semibold">{summary.decisions.length}</div><div className="text-[11px] text-text-muted">Decisions</div></div><div><div className="text-2xl font-semibold">{summary.commitments.length}</div><div className="text-[11px] text-text-muted">Commitments</div></div><div><div className="text-2xl font-semibold">{summary.open_questions.length}</div><div className="text-[11px] text-text-muted">Open Questions</div></div><div><div className="text-2xl font-semibold">{summary.review_required}</div><div className="text-[11px] text-text-muted">待确认</div></div></div>
+        {summary.what_changed.length ? <div className="mt-4">
+          <div className="text-xs font-semibold text-text-secondary">What changed</div>
+          <div className="mt-2 space-y-1">{summary.what_changed.slice(0, 6).map((item) => <div key={item.id} className="text-xs text-text-primary">• {item.title} · {item.state}</div>)}</div>
+        </div> : null}
+        {summary.pins.length ? <div className="mt-4">
+          <div className="text-xs font-semibold text-text-secondary">Pins</div>
+          <div className="mt-2 space-y-1">{summary.pins.slice(0, 6).map((pin) => <div key={pin.id} className="text-xs text-text-primary">• {pin.text || pin.kind}</div>)}</div>
+        </div> : null}
+        {summary.candidates.length ? <p className="mt-4 text-xs text-status-inferred">还有 {summary.candidates.length} 条 AI / 会中提取候选需要回到 Continue 逐项确认；不会自动进入长期 truth。</p> : null}
         {summary.next_focus ? <p className="mt-4 text-sm text-text-primary">Next Focus · {summary.next_focus.title}</p> : null}
         <div className="mt-4"><PrimaryButton onClick={() => navigate(paths.conversationSpace(s.space_id, 'sessions'))}>回到 Space · Continue</PrimaryButton></div>
       </div> : null}

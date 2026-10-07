@@ -2191,6 +2191,98 @@ def _recent_duplicate_guidance(session_id: str, text: str, seconds: float = 90.0
     ))
 
 
+def capture_manual_screen_context(
+    session_id: str,
+    *,
+    region: str = "left_half",
+) -> dict[str, Any]:
+    """Capture one user-triggered screen snapshot and store only its description.
+
+    The raw image is held only for the synchronous vision call and is not
+    written to product.db. The resulting observation is session-scoped and
+    explicitly OBSERVED_NOT_CONFIRMED.
+    """
+    session = require_session(session_id)
+    if session["status"] != "ACTIVE":
+        raise ValueError("Screen Context 只能用于进行中的 Conversation")
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["screen_context"] != "MANUAL":
+        raise ValueError("本场 Screen Context 不是 MANUAL")
+    runtime = processing_runtime_status(session)
+    caps = runtime.get("capabilities") or {}
+    vision = caps.get("vision") or {}
+    if not (
+        caps.get("desktop_runtime")
+        and caps.get("screen_capture")
+        and caps.get("vision_model")
+        and session["processing_mode"] != "OFF"
+        and not (session["processing_mode"] == "LOCAL" and vision.get("remote_possible"))
+    ):
+        raise ValueError("当前 runtime 不满足本场 MANUAL Screen Context 的截图/vision/processing policy")
+
+    from services.capture.screen_capture import capture_primary_region_data_url
+    from services.llm import get_client_for_model
+    from core.config import get_config
+
+    image_data_url = capture_primary_region_data_url(region)
+    image_hash = hashlib.sha256(image_data_url.encode("utf-8")).hexdigest()
+
+    cfg = get_config()
+    model = next(
+        (
+            m for m in getattr(cfg, "models", []) or []
+            if getattr(m, "supports_vision", False)
+            and bool(getattr(m, "enabled", True))
+            and getattr(m, "api_key", "")
+            and getattr(m, "api_key", "") not in ("", "sk-your-api-key-here")
+        ),
+        None,
+    )
+    if model is None:
+        raise ValueError("未配置可用的 vision 模型")
+
+    prompt = (
+        "你在帮助用户理解一次对话中的当前屏幕。只描述截图中明确可见、与讨论有关的事实、文字、"
+        "表格、图表、界面状态或错误信息；不要推断人物情绪、隐藏意图、身份或屏幕外信息。"
+        "如果内容不清楚就明确说不清楚。输出 3-8 条简体中文要点，不要给行动结论。"
+    )
+    client = get_client_for_model(model)
+    response = client.chat.completions.create(
+        model=model.model,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ],
+        }],
+        temperature=0,
+        max_tokens=700,
+        stream=False,
+    )
+    description = (response.choices[0].message.content or "").strip()
+    if not description:
+        raise ValueError("vision 模型没有返回可用的屏幕描述")
+
+    observation = {
+        "id": store.new_id("sc_"),
+        "kind": "SCREEN_CONTEXT",
+        "description": description[:4000],
+        "image_hash": image_hash,
+        "region": str(region or "left_half")[:120],
+        "model": str(getattr(model, "name", "") or getattr(model, "model", ""))[:200],
+        "processing": "LOCAL" if vision.get("local") else "CLOUD",
+        "authority": "OBSERVED_NOT_CONFIRMED",
+        "created_at": store.now(),
+    }
+    state = dict(session.get("state") or {})
+    observations = list(state.get("screen_context_observations") or [])
+    observations.append(observation)
+    state["screen_context_observations"] = observations[-12:]
+    store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
+    return observation
+
+
 def human_coach_guidance(
     session_id: str,
     *,

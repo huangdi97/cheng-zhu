@@ -1740,7 +1740,7 @@ def continue_summary(session_id: str) -> dict[str, Any]:
         "session": session,
         "decisions": decisions,
         "commitments": commitments,
-        "open_questions": open_questions,
+        "open_questions": reviewed_open_questions,
         "candidates": candidates,
         "what_changed": what_changed,
         "pins": pins,
@@ -2719,10 +2719,7 @@ def review_draft_action(action_id: str, action: str) -> dict[str, Any]:
 
 def followup_draft(session_id: str) -> dict[str, Any]:
     summary = continue_summary(session_id)
-    reviewed_open_questions = [
-        item for item in summary["open_questions"]
-        if item.get("review_status") in THREAD_CONFIRMED_REVIEW
-    ]
+    reviewed_open_questions = list(summary["open_questions"])
     lines = ["这场之后："]
     if summary["decisions"]:
         lines.append("Decisions：" + "；".join(x["title"] for x in summary["decisions"]))
@@ -2771,10 +2768,7 @@ def derived_writeback_draft(session_id: str, kind: str) -> dict[str, Any]:
             for item in items
         ]
     elif requested == "CREATE_ISSUE_DRAFT":
-        items = [
-            item for item in summary["open_questions"]
-            if item.get("review_status") in THREAD_CONFIRMED_REVIEW
-        ]
+        items = list(summary["open_questions"])
         label = "Issue Draft"
         lines = [
             f"- {item['title']} · review={item.get('review_status') or 'UNKNOWN'}"

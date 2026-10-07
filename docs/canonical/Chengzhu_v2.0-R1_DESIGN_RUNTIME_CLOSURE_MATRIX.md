@@ -551,17 +551,33 @@ PR #19 的 CI 必须同时通过：
 - shared Interview regressions；
 - ci-gate。
 
-在 PR gate 全绿前：
+代码闭环 checkpoint：
 
 ```text
-PR_CI_GATE = PENDING
-ENGINEERING_CLOSURE_CANDIDATE = TRUE
+CODE_CLOSURE_HEAD = 873e92f98e357f49358fd6b04a4c440ec43f6750
+CODE_CLOSURE_CI_RUN = 37571903716
+CODE_CLOSURE_CI_GATE = PASS
 ```
 
-即使 PR 全绿，也仍然：
+该 run 已通过：
+
+- backend；
+- frontend；
+- desktop；
+- Playwright functional；
+- visual；
+- e2e-smoke；
+- packaged-smoke；
+- ci-gate。
+
+任何后续文档/证据提交都会形成新的 PR HEAD，因此 **最终 merge 仍必须以实际最终 HEAD 的 CI 全绿为准**，不能拿旧 checkpoint 给新 HEAD 背书。
+
+即使最终 PR 全绿并合并，也仍然：
 
 ```text
 V2_PRODUCTIZED_RELEASE = FALSE
+REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
+PMF_PROVEN = FALSE
 ```
 
 直到完成独立 Windows Conversation Beta packaged runtime evidence、clean-install replay、artifact hash、download-back 与 release provenance。

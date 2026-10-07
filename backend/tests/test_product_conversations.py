@@ -940,6 +940,51 @@ def test_rejected_candidate_never_becomes_longitudinal_thread(product_env):
     assert conversations.space_detail(space["id"])["threads"] == []
 
 
+
+
+def test_conversation_state_is_derived_from_session_items_threads_and_guidance(product_env):
+    space = conversations.create_space("Derived State", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    question = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 rollback drill？",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "owner 未确认"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(question["id"], "CONFIRM")
+
+    state = conversations.conversation_state(session["id"])
+    assert state["phase"] == "PARTICIPATE"
+    assert state["current_topic"] == ""
+    assert state["open_threads"][0]["text"] == "谁负责 rollback drill？"
+    assert state["items"][0]["id"] == question["id"]
+
+    result = conversations.evaluate_guidance(session["id"], {
+        "current_topic": "rollback drill",
+        "user_speaking": True,
+        "candidate_text": "补充 owner",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "owner 未确认"}],
+    })
+    assert result["suppressed"] == "USER_SPEAKING"
+
+    updated = conversations.conversation_state(session["id"])
+    assert updated["current_topic"] == "rollback drill"
+    assert updated["user_speaking"] is True
+    assert updated["last_guidance_id"] == ""
+
+    direct = conversations.evaluate_guidance(session["id"], {"direct_question": "谁负责？"})
+    assert direct["guidance"] is not None
+    after_direct = conversations.conversation_state(session["id"])
+    assert after_direct["direct_question_pending"] is False
+    assert after_direct["last_guidance_id"] == direct["guidance"]["id"]
+
+    conversations.end_session(session["id"])
+    assert conversations.conversation_state(session["id"])["phase"] == "CONTINUE"
+
+
 def test_guidance_arbiter_prefers_direct_question_and_can_stay_silent(product_env):
     space = conversations.create_space("Design Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True, assistance_mode="BALANCED")

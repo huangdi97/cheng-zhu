@@ -307,6 +307,20 @@ Decision / Commitment / Task 等结构化状态。
 
 禁止：欺骗、操纵性心理画像、秘密推断对方“底价/真实情绪”。
 
+### 4.7 Profile lane 语义
+
+上面的列表用于定义 **profile-supported proactive lanes / ranking priors**，但有两类全局 override：
+
+- Direct Question / Answer Cue：任何 Conversation Profile 都可进入最高优先级；
+- Critical Risk：只要 provenance 与 visibility 合法，任何 Profile 都不能因为模板列表缺少 Risk 而强制沉默。
+
+另外：
+
+- Project Sync 的 **Commit Next Step** 是 `ExpressionAction.COMMIT_NEXT_STEP` / Continue continuity，不是独立 GuidanceKind；
+- 1:1 的 **Commitment continuity** 是 reviewed state / Next Focus continuity，不是把未确认 Commitment 自动弹成 Guidance。
+
+因此模板的 `guidance` 数组不得被理解为“产品价值全部内容”，但所有非全局 proactive lane 必须服从该数组，避免 Presentation / 1:1 / Client Call 等共享 runtime 串 lane。
+
 ---
 
 # 5. v2 IA：Profile Switcher，而不是导航爆炸

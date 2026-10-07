@@ -241,6 +241,11 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
     assert policy["participant_consent_status"] == "USER_REPORTS_CONSENTED"
     assert check["pack_preview"]["participants_count"] == 0
     assert check["pack_preview"]["policy"]["ai_assistance"] == "AI_FORBIDDEN"
+    assert check["resolved_ai_behavior"]["manual_ask"] is False
+    assert check["resolved_ai_behavior"]["manual_guidance"] is False
+    assert check["resolved_ai_behavior"]["automatic_transcript_guidance"] is False
+    assert check["resolved_ai_behavior"]["automatic_candidate_extraction"] is False
+    assert check["pack_preview"]["resolved_ai_behavior"] == check["resolved_ai_behavior"]
     assert policy["speaker_biometric_identity"] == "OFF"
     assert policy["emotion_sentiment_profiling"] == "OFF"
     assert policy["hidden_intent_claims"] == "OFF"
@@ -248,6 +253,8 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
     started = conversations.start_session(session["id"])
     assert started["pack"]["payload"]["policy"]["ai_assistance"] == "AI_FORBIDDEN"
     assert started["pack"]["payload"]["policy"]["share_privacy"] == "OFF"
+    assert started["pack"]["payload"]["resolved_ai_behavior"]["manual_ask"] is False
+    assert conversations.session_context(session["id"])["resolved_ai_behavior"]["policy"] == "AI_FORBIDDEN"
 
     suppressed = conversations.evaluate_guidance(session["id"], {
         "direct_question": "现在要不要补充？",
@@ -407,7 +414,15 @@ def test_ai_limited_allows_manual_but_disables_proactive_transcript_guidance(pro
         consent_ack=True,
         policy={"ai_assistance": "AI_LIMITED"},
     )
-    conversations.start_session(live["id"])
+    limited_check = conversations.preflight(live["id"])
+    behavior = limited_check["resolved_ai_behavior"]
+    assert behavior["manual_ask"] is True
+    assert behavior["manual_guidance"] is True
+    assert behavior["automatic_transcript_guidance"] is False
+    assert behavior["automatic_candidate_extraction"] is False
+    started = conversations.start_session(live["id"])
+    assert started["pack"]["payload"]["resolved_ai_behavior"] == behavior
+    assert conversations.session_context(live["id"])["resolved_ai_behavior"] == behavior
     assert conversations.guidance_from_transcript(live["id"], "offline migration") is None
 
     manual = conversations.evaluate_guidance(live["id"], {
@@ -415,6 +430,41 @@ def test_ai_limited_allows_manual_but_disables_proactive_transcript_guidance(pro
         "source_refs": [{"kind": "USER_NOTE", "excerpt": "明确使用 v2"}],
     })
     assert manual["guidance"]["kind"] == "ANSWER_CUE"
+
+    store.insert("conversation_transcript_segment", {
+        "id": "cts_limited_no_extract",
+        "space_id": space["id"],
+        "session_id": live["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我们决定改成 v3。",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    assert conversations.extract_transcript_candidates(live["id"]) == []
+
+
+def test_ai_expected_uses_allowed_engine_but_records_expectation_without_extra_capability(product_env):
+    space = conversations.create_space("Expected AI", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"ai_assistance": "AI_EXPECTED"},
+    )
+    check = conversations.preflight(session["id"])
+    behavior = check["resolved_ai_behavior"]
+    assert behavior == {
+        "policy": "AI_EXPECTED",
+        "manual_ask": True,
+        "manual_guidance": True,
+        "automatic_transcript_guidance": True,
+        "automatic_candidate_extraction": True,
+        "expected_by_user_report": True,
+        "engine": "LOCAL_DETERMINISTIC",
+    }
+    started = conversations.start_session(session["id"])
+    assert started["pack"]["payload"]["resolved_ai_behavior"] == behavior
 
 
 def test_continue_contains_what_changed_and_pinned_guidance(product_env):

@@ -18,6 +18,30 @@ def _stop_capture_for_session(session_id: str) -> None:
         conversation_capture.stop(session_id)
 
 
+def _revoke_coach_for_session(session_id: str) -> None:
+    from services import coach
+
+    coach.registry.revoke_target(session_id, session_kind="conversation")
+
+
+def _revoke_coach_for_space(space_id: str) -> None:
+    from services import coach
+
+    for item in coach.registry.list():
+        if item.get("session_kind") != "conversation" or not item.get("active"):
+            continue
+        target = str(item.get("target_session_id") or "")
+        if not target:
+            continue
+        try:
+            session = conversations.require_session(target)
+        except ValueError:
+            coach.registry.revoke_target(target, session_kind="conversation")
+            continue
+        if session.get("space_id") == space_id:
+            coach.registry.revoke_target(target, session_kind="conversation")
+
+
 def _stop_capture_for_space(space_id: str) -> None:
     state = conversation_capture.status()
     active_session_id = str(state.get("session_id") or "")
@@ -263,6 +287,7 @@ class SessionDelete(BaseModel):
 def delete_session(session_id: str, body: SessionDelete):
     with domain_errors():
         _stop_capture_for_session(session_id)
+        _revoke_coach_for_session(session_id)
         return conversations.delete_session(session_id, confirmed_policy=body.confirmed_policy)
 
 
@@ -348,6 +373,7 @@ def start_session(session_id: str):
 def end_session(session_id: str):
     with domain_errors():
         _stop_capture_for_session(session_id)
+        _revoke_coach_for_session(session_id)
         return conversations.end_session(session_id)
 
 

@@ -37,6 +37,7 @@ function resolveBackendCommand({ isPackaged, resourcesPath, repoRoot, port, user
         CHENGZHU_HOME: userDataDir,
         CHENGZHU_FRONTEND_DIST: path.join(resourcesPath, 'frontend-dist'),
         CHENGZHU_INSTANCE_NONCE: nonce,
+        CHENGZHU_DESKTOP_RUNTIME: '1',
         PYTHONIOENCODING: 'utf-8',
       },
       packaged: true,
@@ -47,7 +48,7 @@ function resolveBackendCommand({ isPackaged, resourcesPath, repoRoot, port, user
     command: python,
     args: [path.join(repoRoot, 'start.py'), '--mode', 'network', '--no-build', '--port', String(port)],
     cwd: repoRoot,
-    env: { ...env, CHENGZHU_INSTANCE_NONCE: nonce },
+    env: { ...env, CHENGZHU_INSTANCE_NONCE: nonce, CHENGZHU_DESKTOP_RUNTIME: '1' },
     packaged: false,
   };
 }

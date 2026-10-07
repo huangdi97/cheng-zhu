@@ -53,7 +53,7 @@ SPACE_PROFILES = {
     "CLIENT_CALL": {
         "label": "客户会",
         "default_mode": "BALANCED",
-        "guidance": [k.value for k in GuidanceKind],
+        "guidance": ["RECALL", "ANSWER_CUE", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
     },
     "NEGOTIATION": {
         "label": "谈判",
@@ -2051,7 +2051,9 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
 
     open_questions = store.select(
         "conversation_item",
-        where="space_id = ? AND type = 'OpenQuestion' AND state NOT IN ('DONE','SUPERSEDED')",
+        where="space_id = ? AND type = 'OpenQuestion' "
+              "AND state NOT IN ('DONE','SUPERSEDED','UNKNOWN') "
+              "AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
         params=(session["space_id"],), order="created_at DESC", limit=1,
     )
     if mode != "QUIET" and not budget_exhausted and _guidance_kind_allowed(session, "QUESTION") and open_questions:

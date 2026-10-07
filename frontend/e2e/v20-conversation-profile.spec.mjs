@@ -137,9 +137,12 @@ function mocks() {
     }
     if (pathname === '/api/product/conversation/templates') return {
       items: [
-        { key: 'PROJECT_SYNC', label: '项目同步', default_mode: 'BALANCED', guidance: ['RECALL', 'QUESTION', 'TALKING_POINT'], runtime_available: true, launch_wedge: true, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'BETA_WEDGE' },
-        { key: 'DESIGN_REVIEW', label: '设计评审', default_mode: 'BALANCED', guidance: ['RECALL', 'CONTRIBUTION_OPPORTUNITY', 'TALKING_POINT'], runtime_available: true, launch_wedge: true, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'BETA_WEDGE' },
+        { key: 'PROJECT_SYNC', label: '项目同步', default_mode: 'BALANCED', guidance: ['RECALL', 'QUESTION', 'RISK', 'CONTRIBUTION_OPPORTUNITY'], runtime_available: true, launch_wedge: true, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'BETA_WEDGE' },
+        { key: 'DESIGN_REVIEW', label: '设计评审', default_mode: 'BALANCED', guidance: ['RECALL', 'TALKING_POINT', 'QUESTION', 'RISK', 'CONTRIBUTION_OPPORTUNITY'], runtime_available: true, launch_wedge: true, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'BETA_WEDGE' },
+        { key: 'PRESENTATION_QA', label: '演示 / Q&A', default_mode: 'PRESENTATION', guidance: ['ANSWER_CUE', 'RECALL', 'QUESTION', 'DELIVERY'], runtime_available: true, launch_wedge: false, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'SHARED_RUNTIME_TEMPLATE' },
         { key: 'ONE_ON_ONE', label: '1:1', default_mode: 'ONE_ON_ONE', guidance: ['RECALL', 'QUESTION', 'TALKING_POINT'], runtime_available: true, launch_wedge: false, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'SHARED_RUNTIME_TEMPLATE' },
+        { key: 'CLIENT_CALL', label: '客户会', default_mode: 'BALANCED', guidance: ['RECALL', 'ANSWER_CUE', 'QUESTION', 'RISK', 'CONTRIBUTION_OPPORTUNITY'], runtime_available: true, launch_wedge: false, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'SHARED_RUNTIME_TEMPLATE' },
+        { key: 'NEGOTIATION', label: '谈判', default_mode: 'QUIET', guidance: ['RECALL', 'TALKING_POINT', 'QUESTION', 'RISK'], runtime_available: true, launch_wedge: false, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'SHARED_RUNTIME_TEMPLATE' },
       ],
     }
     if (pathname === '/api/product/conversation/history') return {

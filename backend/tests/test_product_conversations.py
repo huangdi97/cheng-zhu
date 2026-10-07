@@ -919,12 +919,11 @@ def test_reviewed_open_items_project_into_longitudinal_threads_and_resolve(produ
     assert prepared["open_threads"][0]["id"] == thread["id"]
     assert "谁负责 rollback drill？" in prepared["agenda"]
 
-    resolved = conversations.review_item(question["id"], "RESOLVE")
-    assert resolved["state"] == "DONE"
+    resolved_thread = conversations.resolve_open_thread(thread["id"])
+    assert resolved_thread["status"] == "RESOLVED"
+    assert resolved_thread["resolved_at"] is not None
+    assert conversations.require_item(question["id"])["state"] == "DONE"
     assert conversations.space_detail(space["id"])["threads"] == []
-    raw = store.get("conversation_open_thread", thread["id"])
-    assert raw["status"] == "RESOLVED"
-    assert raw["resolved_at"] is not None
 
 
 def test_rejected_candidate_never_becomes_longitudinal_thread(product_env):

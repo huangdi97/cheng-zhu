@@ -336,6 +336,15 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <span>Open {liveContext.data.brief.unresolved_count ?? 0}</span>
             </div>
             <div className="mt-3 rounded-lg bg-bg-primary/55 px-2.5 py-2 text-[10px] text-text-muted">
+              <div className="font-semibold text-text-secondary">Frozen AI behavior</div>
+              <div className="mt-1 grid gap-1">
+                <span>Policy · {liveContext.data.resolved_ai_behavior.policy}</span>
+                <span>Manual · {liveContext.data.resolved_ai_behavior.manual_ask ? 'ON' : 'OFF'}</span>
+                <span>Auto Guidance · {liveContext.data.resolved_ai_behavior.automatic_transcript_guidance ? 'ON' : 'OFF'}</span>
+                <span>Auto Extraction · {liveContext.data.resolved_ai_behavior.automatic_candidate_extraction ? 'ON' : 'OFF'}</span>
+              </div>
+            </div>
+            <div className="mt-3 rounded-lg bg-bg-primary/55 px-2.5 py-2 text-[10px] text-text-muted">
               <div className="font-semibold text-text-secondary">Frozen data path</div>
               <div className="mt-1 grid gap-1">
                 <span>Capture · {liveContext.data.processing_runtime.data_path?.capture ?? '—'}</span>

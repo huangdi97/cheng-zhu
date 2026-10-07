@@ -2294,11 +2294,24 @@ def test_export_is_categorized_and_keeps_truth_classes_separate(product_env):
         source_refs=[{"kind": "USER_NOTE", "excerpt": "maybe"}],
         epistemic_status="OBSERVED",
     )
+    reviewed_risk = conversations.add_item(
+        session["id"], item_type="Risk", title="reviewed rollback risk",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "risk confirmed"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(reviewed_risk["id"], "CONFIRM")
+
     exported = conversations.export_space(space["id"])
     assert "transcript" in exported and "source_manifest" in exported
-    assert [x["id"] for x in exported["confirmed_items"]] == [confirmed["id"]]
+    confirmed_ids = {x["id"] for x in exported["confirmed_items"]}
+    assert {confirmed["id"], reviewed_risk["id"]} <= confirmed_ids
     assert [x["id"] for x in exported["unconfirmed_candidates"]] == [candidate["id"]]
     assert "confirmed_items" in exported["export_manifest"]["categories"]
+    assert "open_threads" in exported["export_manifest"]["categories"]
+    assert exported["open_threads"]
+    assert exported["open_threads"] == exported["threads"]  # compatibility alias
+    assert exported["open_threads"][0]["kind"] == "Risk"
+    assert exported["open_threads"][0]["source_refs"]
     assert "session_packs" in exported["export_manifest"]["categories"]
     assert exported["session_packs"]
     assert exported["session_packs"] == exported["packs"]  # legacy alias, same local truth

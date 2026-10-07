@@ -289,6 +289,22 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
+  const exportEvaluation = async () => {
+    setSessionBusy(true); setSessionError('')
+    try {
+      const payload = await conversationApi.evaluationExport(spaceId)
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `chengzhu-conversation-evaluation-${spaceId}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setLifecycleMessage('已导出本地 dogfood / 人工标签；这不是 precision 或 PMF 报告。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
   const deleteSpace = async () => {
     if (!window.confirm('彻底删除这个对话空间？这是 complete erase：Session、confirmed/candidate items、Session Packs、Guidance、Drafts 与 provenance tombstones 都会一起删除，无法再用于 Recall。若只是暂时不用，请选择“归档”。Interview 数据不受影响。')) return
     setSessionBusy(true); setSessionError('')
@@ -334,6 +350,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       <PageHeader eyebrow={space.profile} title={space.title} subtitle={space.description || space.default_goal || '持续保留 Decision、Commitment 与 Open Question。'}
         actions={<>
           <SecondaryButton onClick={exportSpace} disabled={sessionBusy} icon={<Download className="h-3.5 w-3.5" />}>分类导出</SecondaryButton>
+          <SecondaryButton data-testid="conversation-evaluation-export" onClick={exportEvaluation} disabled={sessionBusy} icon={<Download className="h-3.5 w-3.5" />}>评测标签导出</SecondaryButton>
           <SecondaryButton onClick={() => setArchived(space.status !== 'ARCHIVED')} disabled={sessionBusy}
             icon={space.status === 'ARCHIVED' ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}>
             {space.status === 'ARCHIVED' ? '恢复' : '归档'}

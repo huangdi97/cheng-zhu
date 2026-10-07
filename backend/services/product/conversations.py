@@ -388,7 +388,8 @@ def list_space_summaries(status: str = "") -> list[dict[str, Any]]:
         )
         open_commitments = int(store.scalar(
             "SELECT COUNT(*) FROM conversation_item WHERE space_id = ? "
-            "AND type IN ('Commitment','Task') AND state NOT IN ('DONE','SUPERSEDED')",
+            "AND type IN ('Commitment','Task') AND state = 'COMMITTED' "
+            "AND review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')",
             (space["id"],),
         ) or 0)
         open_questions = int(store.scalar(
@@ -2293,7 +2294,11 @@ def space_detail(space_id: str) -> dict[str, Any]:
 
 def prepare_space(space_id: str) -> dict[str, Any]:
     detail = space_detail(space_id)
-    active = [i for i in detail["commitments"] if i["state"] not in {"DONE", "SUPERSEDED"}]
+    active = [
+        i for i in detail["commitments"]
+        if i["state"] == "COMMITTED"
+        and i["review_status"] in THREAD_CONFIRMED_REVIEW
+    ]
     unresolved = [
         i for i in detail["open_questions"]
         if i["state"] not in {"DONE", "SUPERSEDED", "UNKNOWN"}
@@ -2634,26 +2639,38 @@ def review_draft_action(action_id: str, action: str) -> dict[str, Any]:
 
 def followup_draft(session_id: str) -> dict[str, Any]:
     summary = continue_summary(session_id)
+    reviewed_open_questions = [
+        item for item in summary["open_questions"]
+        if item.get("review_status") in THREAD_CONFIRMED_REVIEW
+    ]
     lines = ["这场之后："]
     if summary["decisions"]:
         lines.append("Decisions：" + "；".join(x["title"] for x in summary["decisions"]))
     if summary["commitments"]:
         lines.append("Commitments：" + "；".join(x["title"] for x in summary["commitments"]))
-    if summary["open_questions"]:
-        lines.append("Open Questions：" + "；".join(x["title"] for x in summary["open_questions"]))
+    if reviewed_open_questions:
+        lines.append("Open Questions：" + "；".join(x["title"] for x in reviewed_open_questions))
     if len(lines) == 1:
-        lines.append("当前没有已确认的 Decision / Commitment；建议先完成逐项确认。")
+        lines.append("当前没有已确认的 Decision / Commitment / Open Question；建议先完成逐项确认。")
     sources: list[dict[str, Any]] = []
-    for item in summary["decisions"] + summary["commitments"] + summary["open_questions"]:
+    for item in summary["decisions"] + summary["commitments"] + reviewed_open_questions:
         sources.extend(item.get("source_refs") or [])
+    excluded = [
+        item["id"] for item in summary["open_questions"]
+        if item.get("review_status") not in THREAD_CONFIRMED_REVIEW
+    ]
     return create_draft_action(
         session_id,
         kind="FOLLOWUP_EMAIL_DRAFT",
         title=f"{summary['session']['title']} · Follow-up",
         content="\n".join(lines),
         source_refs=sources,
+        payload={
+            "excluded_unreviewed_item_ids": excluded,
+            "execution": "LOCAL_REVIEW_ONLY",
+            "external_execution": False,
+        },
     )
-
 
 def derived_writeback_draft(session_id: str, kind: str) -> dict[str, Any]:
     """Build a local review-only action draft from structured Continue state.
@@ -2674,7 +2691,10 @@ def derived_writeback_draft(session_id: str, kind: str) -> dict[str, Any]:
             for item in items
         ]
     elif requested == "CREATE_ISSUE_DRAFT":
-        items = list(summary["open_questions"])
+        items = [
+            item for item in summary["open_questions"]
+            if item.get("review_status") in THREAD_CONFIRMED_REVIEW
+        ]
         label = "Issue Draft"
         lines = [
             f"- {item['title']} · review={item.get('review_status') or 'UNKNOWN'}"

@@ -83,6 +83,28 @@ const OPEN = {
   review_status: 'AI_EXTRACTED',
 }
 
+const REVIEWED_OPEN = {
+  ...OPEN,
+  id: 'ci-open-reviewed',
+  review_status: 'USER_CONFIRMED',
+}
+
+const THREAD = {
+  id: 'cot-reviewed-open',
+  space_id: SPACE.id,
+  session_id: SESSION.id,
+  kind: 'OpenQuestion',
+  text: REVIEWED_OPEN.title,
+  owner_id: '',
+  status: 'OPEN',
+  source_refs: [
+    { kind: 'CONVERSATION_ITEM', id: REVIEWED_OPEN.id, session_id: SESSION.id, visibility: 'PRIVATE' },
+    ...REVIEWED_OPEN.source_refs,
+  ],
+  created_at: 1,
+  resolved_at: null,
+}
+
 const COMMITMENT_CANDIDATE = {
   ...DECISION,
   id: 'ci-commitment',
@@ -131,9 +153,9 @@ function mocks() {
       state: 'ACTIVE',
       spaces: [SPACE],
       next_session: null,
-      next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, space_id: SPACE.id },
+      next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, space_id: SPACE.id },
       owed_by_me: [],
-      open_questions: [OPEN],
+      open_questions: [REVIEWED_OPEN],
       recent_change: DECISION,
     }
     if (pathname === '/api/product/conversation/spaces' && method === 'GET') return { items: [SPACE] }
@@ -161,22 +183,23 @@ function mocks() {
       }],
       decisions: [DECISION],
       commitments: [],
-      open_questions: [OPEN],
-      threads: [],
+      open_questions: [REVIEWED_OPEN, OPEN],
+      threads: [THREAD],
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/prepare`) return {
       space: SPACE,
       goals: [],
       next_session: null,
       open_commitments: [],
-      open_questions: [OPEN],
+      open_questions: [REVIEWED_OPEN],
+      open_threads: [THREAD],
       related_decisions: [DECISION],
       participants: [],
       selected_sources: ['benchmark-note'],
       selected_quick_notes: [],
       brief: { last_change: DECISION, unresolved_count: 1, known_participants: 1 },
-      agenda: [OPEN.title],
-      expected_questions: [OPEN.title],
+      agenda: [THREAD.text],
+      expected_questions: [REVIEWED_OPEN.title],
       contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
@@ -264,8 +287,15 @@ function mocks() {
       space: { id: SPACE.id, profile: SPACE.profile, title: SPACE.title },
       brief: {
         goal: SPACE.default_goal,
-        agenda: [OPEN.title],
-        expected_questions: [OPEN.title],
+        agenda: [THREAD.text],
+        expected_questions: [REVIEWED_OPEN.title],
+        open_threads: [{
+          id: THREAD.id,
+          kind: THREAD.kind,
+          text: THREAD.text,
+          owner_id: THREAD.owner_id,
+          source_refs: THREAD.source_refs,
+        }],
         unresolved_count: 1,
         known_participants: 1,
         contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
@@ -375,13 +405,13 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/end` && method === 'POST') {
       session = { ...session, status: 'ENDED', ended_at: 3 }
-      return { session, decisions: [DECISION], commitments: [], open_questions: [OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, source_ref: OPEN.id }, review_required: 1 }
+      return { session, decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN, OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1 }
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) return {
       session: { ...session, status: 'ENDED', ended_at: 3 },
-      decisions: [DECISION], commitments: [], open_questions: [OPEN], candidates: [OPEN],
+      decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN, OPEN], candidates: [OPEN],
       what_changed: [DECISION], pins: [],
-      next_focus: { kind: 'OPEN_QUESTION', title: OPEN.title, source_ref: OPEN.id }, review_required: 1,
+      next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1,
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/derived-draft` && method === 'POST') {
       const kind = request.postDataJSON().kind
@@ -485,6 +515,10 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByRole('heading', { name: '对话' })).toBeVisible()
     await expect(page.getByText('rollback owner 还没有明确').first()).toBeVisible()
     await expect(page.getByText('offline migration 采用 v2')).toBeVisible()
+    await page.getByRole('button', { name: /PDIG · Android Architecture/ }).click()
+    await expect(page.getByText('Open Threads')).toBeVisible()
+    await expect(page.getByText(REVIEWED_OPEN.title).first()).toBeVisible()
+    await page.goBack()
     await testInfo.attach('v2-conversation-home', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
     await page.getByRole('button', { name: /对话空间/ }).first().click()
@@ -516,6 +550,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Session Pulse')).toBeVisible()
     await expect(page.getByText(SPACE.default_goal)).toBeVisible()
     await expect(page.getByText('PACK abcdef12')).toBeVisible()
+    await expect(page.getByText('Frozen Open Threads')).toBeVisible()
+    await expect(page.getByText(REVIEWED_OPEN.title).last()).toBeVisible()
     await expect(page.getByText('Inference · LOCAL_DETERMINISTIC')).toBeVisible()
     await expect(page.getByText('Retention · LOCAL_PRODUCT_DB')).toBeVisible()
     await expect(page.getByText('Write-back · LOCAL_REVIEWED_DRAFT_ONLY')).toBeVisible()

@@ -38,6 +38,7 @@ class GuidanceKind(str, Enum):
     RISK = "RISK"
     DELIVERY = "DELIVERY"
     CONTRIBUTION_OPPORTUNITY = "CONTRIBUTION_OPPORTUNITY"
+    HUMAN_COACH = "HUMAN_COACH"
 
 
 class AssistanceMode(str, Enum):

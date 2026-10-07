@@ -514,6 +514,7 @@ try {
     { kind: 'resize', width: 1280, height: 900 },
     { kind: 'storage', key: 'chengzhu-product-profile', value: 'conversation' },
     { kind: 'storage', key: 'chengzhu-conversation-optin', value: '1' },
+    { kind: 'reload', selector: '[data-testid="conversation-history"]', timeout_ms: 30000 },
     { kind: 'navigate', hash: '#/conversation', selector: '[data-testid="conversation-home"]' },
     { kind: 'capture', name: '30-conversation-home', note: 'Packaged Conversation Home' },
     { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id, selector: '[data-testid="conversation-space"]' },

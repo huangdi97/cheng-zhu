@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
+import { useInterviewStore } from '@/stores/configStore'
 import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
@@ -13,6 +14,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const session = useAsync(() => conversationApi.session(sessionId), [sessionId])
   const liveContext = useAsync(() => conversationApi.sessionContext(sessionId), [sessionId])
   const devices = useAsync(async () => (await api.getDevices()) as DevicePayload, [])
+  const defaultSharePrivacy = useInterviewStore((state) => state.config?.share_privacy_mode ?? 'OFF')
   const [topic, setTopic] = useState('')
   const [question, setQuestion] = useState('')
   const [candidate, setCandidate] = useState('')
@@ -47,6 +49,17 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
   }, [session.data?.assistance_mode])
+
+  useEffect(() => {
+    const policy = session.data?.policy?.share_privacy
+    if (!policy || !window.electronAPI?.setSharePrivacy) return
+    void window.electronAPI.setSharePrivacy(policy)
+  }, [session.data?.policy?.share_privacy])
+
+  useEffect(() => {
+    if (session.data?.status !== 'ENDED' || !window.electronAPI?.setSharePrivacy) return
+    void window.electronAPI.setSharePrivacy(defaultSharePrivacy)
+  }, [defaultSharePrivacy, session.data?.status])
 
   useEffect(() => {
     const participants = liveContext.data?.participants ?? []
@@ -202,7 +215,11 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     setBusy(true); setError('')
     try {
       if (capture?.owns_requested_session) setCapture(await conversationApi.captureStop(sessionId))
-      setSummary(await conversationApi.end(sessionId)); await session.reload()
+      setSummary(await conversationApi.end(sessionId))
+      if (window.electronAPI?.setSharePrivacy) {
+        await window.electronAPI.setSharePrivacy(defaultSharePrivacy)
+      }
+      await session.reload()
     }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
@@ -357,6 +374,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
                 <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
                 <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
+                <span>Window privacy · {liveContext.data.policy.share_privacy === 'PRIVATE_OVERLAY' && liveContext.data.processing_runtime.capabilities?.share_privacy_private_overlay ? 'CONTENT_PROTECTION ON' : 'OFF'}</span>
               </div>
             </div>
           </div> : null}

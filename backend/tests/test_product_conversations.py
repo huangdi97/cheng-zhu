@@ -1878,6 +1878,7 @@ def test_reviewed_derived_drafts_preserve_sources_and_never_claim_external_execu
         session["id"], item_type="OpenQuestion", title="谁负责 rollback drill？",
         source_refs=src, epistemic_status="OBSERVED",
     )
+    question = conversations.review_item(question["id"], "CONFIRM")
     conversations.end_session(session["id"])
 
     decision_draft = conversations.derived_writeback_draft(session["id"], "UPDATE_DECISION_LOG_DRAFT")
@@ -1913,11 +1914,22 @@ def test_adhoc_session_and_reviewed_followup_draft_never_claim_external_send(pro
         epistemic_status="OBSERVED",
     )
     conversations.review_item(decision["id"], "CONFIRM")
+    candidate = conversations.add_item(
+        session_id,
+        item_type="OpenQuestion",
+        title="AI candidate 不应进入 follow-up",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "candidate-followup", "excerpt": "可能需要确认"}],
+        epistemic_status="INFERRED",
+        review_status="AI_EXTRACTED",
+    )
     conversations.end_session(session_id)
     draft = conversations.followup_draft(session_id)
     assert draft["kind"] == "FOLLOWUP_EMAIL_DRAFT"
     assert draft["status"] == "DRAFT"
     assert "采用方案 B" in draft["content"]
+    assert "AI candidate 不应进入 follow-up" not in draft["content"]
+    assert draft["payload"]["excluded_unreviewed_item_ids"] == [candidate["id"]]
+    assert draft["payload"]["external_execution"] is False
     approved = conversations.review_draft_action(draft["id"], "APPROVE")
     assert approved["status"] == "APPROVED"
     assert "sent" not in approved
@@ -2231,6 +2243,61 @@ def test_space_summaries_grouping_inputs_include_upcoming_and_open_counts(produc
     assert row["next_session"]["title"] == "Tomorrow"
     assert row["open_questions_count"] == 1
     assert row["open_commitments_count"] == 0
+
+
+
+
+def test_unreviewed_commitment_never_enters_prepare_agenda_or_space_open_count(product_env):
+    space = conversations.create_space("Commitment Boundary", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    candidate = conversations.add_item(
+        session["id"],
+        item_type="Commitment",
+        title="AI 猜测我会补 rollout plan",
+        owner_id="",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-commit-candidate", "excerpt": "可能我来补"}],
+        epistemic_status="INFERRED",
+        review_status="AI_EXTRACTED",
+    )
+
+    prepared = conversations.prepare_space(space["id"])
+    assert prepared["open_commitments"] == []
+    assert candidate["title"] not in prepared["agenda"]
+    summary = next(x for x in conversations.list_space_summaries("") if x["id"] == space["id"])
+    assert summary["open_commitments_count"] == 0
+
+    reviewed = conversations.review_item(candidate["id"], "CONFIRM", {"owner_id": "me"})
+    assert reviewed["state"] == "COMMITTED"
+    prepared_after = conversations.prepare_space(space["id"])
+    assert [x["id"] for x in prepared_after["open_commitments"]] == [candidate["id"]]
+    assert candidate["title"] in prepared_after["agenda"]
+    summary_after = next(x for x in conversations.list_space_summaries("") if x["id"] == space["id"])
+    assert summary_after["open_commitments_count"] == 1
+
+
+def test_issue_draft_cannot_bypass_open_question_item_review(product_env):
+    space = conversations.create_space("Issue Review Boundary", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    candidate = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="rollback owner 是否已经确定？",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-issue-candidate", "excerpt": "还要问"}],
+        epistemic_status="INFERRED",
+        review_status="AI_EXTRACTED",
+    )
+    conversations.end_session(session["id"])
+
+    with pytest.raises(ValueError, match="当前没有可生成 Issue Draft"):
+        conversations.derived_writeback_draft(session["id"], "CREATE_ISSUE_DRAFT")
+
+    conversations.review_item(candidate["id"], "CONFIRM")
+    draft = conversations.derived_writeback_draft(session["id"], "CREATE_ISSUE_DRAFT")
+    assert candidate["title"] in draft["content"]
+    assert "review=USER_CONFIRMED" in draft["content"]
+    assert draft["payload"]["external_execution"] is False
 
 
 def test_synthetic_demo_is_non_persistent_and_explicitly_labeled(product_env):

@@ -492,6 +492,54 @@ function mocks() {
       }
     }
     if (pathname.startsWith('/api/product/conversation/items/') && pathname.endsWith('/review')) return { ...OPEN, review_status: 'USER_CONFIRMED' }
+    if (pathname === '/api/product/conversation/guidance/ge-1/feedback' && method === 'POST') {
+      const body = request.postDataJSON()
+      return {
+        id: 'cfe-guidance',
+        space_id: SPACE.id,
+        session_id: SESSION.id,
+        guidance_id: 'ge-1',
+        kind: 'GUIDANCE_QUALITY',
+        label: body.label,
+        detail: body.detail || '',
+        context: { guidance_kind: 'CONTRIBUTION_OPPORTUNITY' },
+        source_refs: DECISION.source_refs,
+        created_at: 3,
+      }
+    }
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback/missed` && method === 'POST') {
+      const body = request.postDataJSON()
+      return {
+        id: 'cfe-missed',
+        space_id: SPACE.id,
+        session_id: SESSION.id,
+        guidance_id: null,
+        kind: 'MISSED_MOMENT',
+        label: body.label,
+        detail: body.detail || '',
+        context: { current_topic: body.current_topic || '' },
+        source_refs: body.source_refs || [],
+        created_at: 3,
+      }
+    }
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback/session` && method === 'POST') {
+      const body = request.postDataJSON()
+      return {
+        id: 'cfe-session',
+        space_id: SPACE.id,
+        session_id: SESSION.id,
+        guidance_id: null,
+        kind: 'SESSION_OUTCOME',
+        label: body.label,
+        detail: body.detail || '',
+        context: { status: 'ENDED' },
+        source_refs: [],
+        created_at: 4,
+      }
+    }
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback`) return {
+      items: [],
+    }
     if (pathname.startsWith('/api/product/conversation/guidance/')) return { id: 'ge-1', user_action: request.postDataJSON().action }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/export`) return { kind: 'CONVERSATION_SPACE', contract: 'v2.0-R1', space: SPACE }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/participants`) return {
@@ -662,11 +710,24 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('CONTRIBUTION_OPPORTUNITY')).toBeVisible()
     await expect(page.getByRole('paragraph').filter({ hasText: 'Q4 benchmark 已覆盖 10x data scale' })).toBeVisible()
 
+    await expect(page.getByTestId('guidance-dogfood-feedback')).toBeVisible()
+    await page.getByTestId('guidance-feedback-useful').click()
+    await expect(page.getByText('已本地记录 · USEFUL')).toBeVisible()
+
+    await page.getByText('本该提醒但没提醒？记录一个 Missed Moment').click()
+    await page.getByLabel('Missed Moment 类型').selectOption('SHOULD_HAVE_SURFACED_SOURCE')
+    await page.getByPlaceholder('可选：当时缺了什么？').fill('应该更早带出 benchmark')
+    await page.getByTestId('missed-moment-feedback').getByRole('button', { name: '记录' }).click()
+    await expect(page.getByText('已本地记录 · SHOULD_HAVE_SURFACED_SOURCE')).toBeVisible()
+
     await testInfo.attach('v2-live-guidance', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
 
-    await page.getByRole('button', { name: '结束并 Continue' }).click()
+    await page.getByTestId('conversation-end-session').click()
     await expect(page.getByText('这场之后')).toBeVisible()
     await expect(page.getByText('Next Focus · rollback owner 还没有明确')).toBeVisible()
+    await expect(page.getByTestId('session-dogfood-feedback')).toBeVisible()
+    await page.getByRole('button', { name: '愿意继续用这个 Space' }).click()
+    await expect(page.getByText('已本地记录 · WOULD_REUSE_SPACE')).toBeVisible()
   })
 
   test('Live exposes explicit Talking Point and Delivery planner lanes', async ({ context, page }) => {

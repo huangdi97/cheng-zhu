@@ -2421,6 +2421,197 @@ def guidance_history(session_id: str, limit: int = 30) -> list[dict[str, Any]]:
     )
 
 
+GUIDANCE_FEEDBACK_LABELS = {
+    "USEFUL",
+    "NOT_USEFUL",
+    "WRONG",
+    "SOURCE_WRONG",
+    "INTERRUPTING",
+    "TOO_EARLY",
+    "TOO_LATE",
+    "ALREADY_KNEW",
+}
+MISSED_MOMENT_LABELS = {
+    "SHOULD_HAVE_RECALLED",
+    "SHOULD_HAVE_WARNED_RISK",
+    "SHOULD_HAVE_ASKED",
+    "SHOULD_HAVE_SURFACED_SOURCE",
+    "OTHER",
+}
+SESSION_FEEDBACK_LABELS = {
+    "CONTINUE_HELPED_NEXT_PREP",
+    "CONTINUE_PARTLY_HELPED",
+    "CONTINUE_DID_NOT_HELP",
+    "WOULD_REUSE_SPACE",
+    "WOULD_NOT_REUSE_SPACE",
+}
+
+
+def _feedback_event(
+    session: dict[str, Any],
+    *,
+    kind: str,
+    label: str,
+    detail: str = "",
+    guidance_id: str = "",
+    context: Optional[dict[str, Any]] = None,
+    source_refs: Optional[list[dict[str, Any]]] = None,
+) -> dict[str, Any]:
+    row = {
+        "id": store.new_id("cfe_"),
+        "space_id": session["space_id"],
+        "session_id": session["id"],
+        "guidance_id": guidance_id or None,
+        "kind": str(kind or "")[:80],
+        "label": str(label or "")[:120],
+        "detail": str(detail or "")[:4000],
+        "context": dict(context or {}),
+        "source_refs": list(source_refs or []),
+        "created_at": store.now(),
+    }
+    store.insert("conversation_feedback_event", row)
+    return store.get("conversation_feedback_event", row["id"]) or row
+
+
+def record_guidance_feedback(guidance_id: str, label: str, detail: str = "") -> dict[str, Any]:
+    guidance = store.get("conversation_guidance_event", guidance_id)
+    if not guidance:
+        raise ValueError("实时提示不存在")
+    if guidance.get("status") != "SHOWN":
+        raise ValueError("只有实际显示给用户的 Guidance 才能做人类质量标注")
+    normalized = str(label or "").upper()
+    if normalized not in GUIDANCE_FEEDBACK_LABELS:
+        raise ValueError("Guidance 反馈标签不支持")
+    session = require_session(guidance["session_id"])
+    return _feedback_event(
+        session,
+        kind="GUIDANCE_QUALITY",
+        label=normalized,
+        detail=detail,
+        guidance_id=guidance_id,
+        context={
+            "guidance_kind": guidance.get("kind") or "",
+            "expression_action": guidance.get("expression_action") or "",
+            "reason": guidance.get("reason") or "",
+            "text": guidance.get("text") or "",
+            "status": guidance.get("status") or "",
+            "user_action": guidance.get("user_action") or "NONE",
+        },
+        source_refs=list(guidance.get("source_refs") or []),
+    )
+
+
+def record_missed_moment(
+    session_id: str,
+    label: str,
+    detail: str = "",
+    *,
+    current_topic: str = "",
+    source_refs: Optional[list[dict[str, Any]]] = None,
+) -> dict[str, Any]:
+    session = require_session(session_id)
+    normalized = str(label or "").upper()
+    if normalized not in MISSED_MOMENT_LABELS:
+        raise ValueError("Missed Moment 标签不支持")
+    return _feedback_event(
+        session,
+        kind="MISSED_MOMENT",
+        label=normalized,
+        detail=detail,
+        context={
+            "current_topic": str(current_topic or "")[:500],
+            "profile": session.get("template") or "",
+            "assistance_mode": session.get("assistance_mode") or "",
+            "status": session.get("status") or "",
+        },
+        source_refs=source_refs,
+    )
+
+
+def record_session_feedback(session_id: str, label: str, detail: str = "") -> dict[str, Any]:
+    session = require_session(session_id)
+    normalized = str(label or "").upper()
+    if normalized not in SESSION_FEEDBACK_LABELS:
+        raise ValueError("Session 反馈标签不支持")
+    return _feedback_event(
+        session,
+        kind="SESSION_OUTCOME",
+        label=normalized,
+        detail=detail,
+        context={
+            "profile": session.get("template") or "",
+            "assistance_mode": session.get("assistance_mode") or "",
+            "capture_mode": session.get("capture_mode") or "",
+            "processing_mode": session.get("processing_mode") or "",
+            "status": session.get("status") or "",
+        },
+    )
+
+
+def feedback_events(
+    *,
+    session_id: str = "",
+    space_id: str = "",
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    if session_id:
+        require_session(session_id)
+        return store.select(
+            "conversation_feedback_event",
+            where="session_id = ?",
+            params=(session_id,),
+            order="created_at DESC",
+            limit=max(1, min(2000, int(limit))),
+        )
+    if space_id:
+        require_space(space_id)
+        return store.select(
+            "conversation_feedback_event",
+            where="space_id = ?",
+            params=(space_id,),
+            order="created_at DESC",
+            limit=max(1, min(2000, int(limit))),
+        )
+    return store.select(
+        "conversation_feedback_event",
+        order="created_at DESC",
+        limit=max(1, min(2000, int(limit))),
+    )
+
+
+def evaluation_export(space_id: str = "") -> dict[str, Any]:
+    if space_id:
+        require_space(space_id)
+    events = feedback_events(space_id=space_id, limit=2000)
+    guidance_labels = [event for event in events if event.get("kind") == "GUIDANCE_QUALITY"]
+    missed = [event for event in events if event.get("kind") == "MISSED_MOMENT"]
+    session_labels = [event for event in events if event.get("kind") == "SESSION_OUTCOME"]
+    label_counts: dict[str, int] = {}
+    for event in events:
+        key = f"{event.get('kind')}:{event.get('label')}"
+        label_counts[key] = label_counts.get(key, 0) + 1
+    return {
+        "kind": "CONVERSATION_BETA_EVALUATION_EXPORT",
+        "contract": "v2.1-R1",
+        "scope": {"space_id": space_id or "ALL_LOCAL_SPACES"},
+        "evidence_boundary": {
+            "storage": "LOCAL_PRODUCT_DB",
+            "remote_telemetry": False,
+            "human_labels": True,
+            "synthetic_or_dogfood_labels_are_not_pmf": True,
+            "interpretation": "These events are explicit human/dogfood labels, not automatic precision or PMF claims.",
+        },
+        "summary": {
+            "feedback_events": len(events),
+            "guidance_quality_labels": len(guidance_labels),
+            "missed_moments": len(missed),
+            "session_outcome_labels": len(session_labels),
+            "label_counts": label_counts,
+        },
+        "events": events,
+    }
+
+
 def set_guidance_action(guidance_id: str, action: str) -> dict[str, Any]:
     row = store.get("conversation_guidance_event", guidance_id)
     if not row:
@@ -2665,6 +2856,7 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
             "confirmed_items": "KEEP",
             "session_packs": "KEEP",
             "provenance_tombstones": "KEEP",
+            "dogfood_feedback": "KEEP_UNTIL_SESSION_OR_SPACE_DELETE",
         },
         "destructive": any((transcript_count, guidance_count, draft_count)),
     }
@@ -3123,7 +3315,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "export_manifest": {
             "categories": [
                 "transcript", "notes", "confirmed_items", "unconfirmed_candidates",
-                "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
+                "guidance", "feedback", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -3137,6 +3329,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "confirmed_items": confirmed,
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
+        "feedback": feedback_events(space_id=space_id, limit=2000),
         "source_manifest": source_manifest,
         "draft_actions": list_draft_actions(space_id),
         "provenance_tombstones": tombstones,

@@ -138,12 +138,30 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = (Resolve-Path "dist/desktop/Chengzhu-Setup-x64.exe").Path
-          $installDir = Join-Path $env:RUNNER_TEMP "Chengzhu-Conversation-Beta-CleanInstall"
-          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
-          New-Item -ItemType Directory -Force $installDir | Out-Null
-
-          $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
-          if ($proc.ExitCode -ne 0) { throw "Conversation Beta clean install failed: $($proc.ExitCode)" }
+          $attempts = @()
+          $installDir = $null
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Get-Process Chengzhu, chengzhu-backend -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds ([Math]::Min(2 * $attempt, 5))
+            $candidate = Join-Path $env:RUNNER_TEMP "Chengzhu-Conversation-Beta-CleanInstall-$attempt"
+            if (Test-Path $candidate) { Remove-Item -Recurse -Force $candidate -ErrorAction SilentlyContinue }
+            New-Item -ItemType Directory -Force $candidate | Out-Null
+            $started = Get-Date
+            $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$candidate") -Wait -PassThru
+            $attempts += [pscustomobject]@{
+              attempt = $attempt
+              install_dir = $candidate
+              exit_code = $proc.ExitCode
+              duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
+            }
+            if ($proc.ExitCode -eq 0) {
+              $installDir = $candidate
+              break
+            }
+            Write-Warning "NSIS attempt $attempt failed with exit code $($proc.ExitCode); retrying in a fresh directory."
+          }
+          $attempts | ConvertTo-Json -Depth 4 | Set-Content artifacts/conversation-beta-evidence/nsis-clean-install-attempts.json -Encoding utf8
+          if (-not $installDir) { throw "Conversation Beta clean install failed after 3 isolated attempts" }
 
           $resources = Join-Path $installDir "resources"
           $backendExe = Join-Path $resources "backend/chengzhu-backend.exe"
@@ -180,18 +198,24 @@ jobs:
             "$portableHash  Chengzhu-Portable-x64.zip"
           ) | Set-Content artifacts/conversation-beta-evidence/SHA256SUMS.txt -Encoding ascii
 
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $browserManifest = "artifacts/conversation-beta-evidence/v$version/browserwindow/conversation-manifest.json"
+          $webManifest = "artifacts/conversation-beta-evidence/v$version/web-fallback/conversation-manifest.json"
+          $browserStatus = $(if (Test-Path $browserManifest) { "PASS" } else { "BLOCKED_HOSTED_WINDOWS_RUNNER_FALLBACK_USED" })
+          $webStatus = $(if (Test-Path $webManifest) { "PASS" } else { "NOT_NEEDED" })
+
           @{
             contract = "v2.0-R1"
             evidence_type = "CONVERSATION_BETA_PACKAGED_PRODUCTIZATION"
             source_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA
-            app_version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+            app_version = $version
             installer_sha256 = $installerHash
             portable_sha256 = $portableHash
             stable_interview_packaged_regression = "PASS"
             conversation_packaged_runtime = "PASS"
             clean_install_replay = "PASS"
-            browserwindow_evidence = if (Test-Path "artifacts/conversation-beta-evidence/v$((Get-Content desktop/package.json -Raw | ConvertFrom-Json).version)/browserwindow/conversation-manifest.json") { "PASS" } else { "BLOCKED_HOSTED_WINDOWS_RUNNER_FALLBACK_USED" }
-            packaged_web_fallback = if (Test-Path "artifacts/conversation-beta-evidence/v$((Get-Content desktop/package.json -Raw | ConvertFrom-Json).version)/web-fallback/conversation-manifest.json") { "PASS" } else { "NOT_NEEDED" }
+            browserwindow_evidence = $browserStatus
+            packaged_web_fallback = $webStatus
             real_audio_capture = "NOT_PROVEN_ON_HOSTED_WINDOWS_RUNNER"
             real_conversation_user_evidence = "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
             v2_productized_release = $false

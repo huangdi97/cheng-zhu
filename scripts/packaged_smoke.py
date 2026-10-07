@@ -553,14 +553,21 @@ def main() -> int:
         ok &= bool(checks["license_bundled"])
 
     results["passed"] = bool(ok)
-    text = json.dumps(results, ensure_ascii=False, indent=2)
-    print(text)
+    report_text = json.dumps(results, ensure_ascii=False, indent=2)
+
+    # Persist evidence before writing anything to the runner console. Hosted
+    # Windows may expose cp1252 stdout; Conversation titles/policy details are
+    # intentionally Unicode and must never make a successful smoke lose its
+    # JSON/Markdown artifacts at the final print().
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.report).write_text(text, encoding="utf-8")
+        Path(args.report).write_text(report_text, encoding="utf-8")
     if args.markdown_report:
         Path(args.markdown_report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.markdown_report).write_text(markdown_report(results), encoding="utf-8")
+
+    console_text = report_text.encode("ascii", "backslashreplace").decode("ascii")
+    print(console_text)
     shutil.rmtree(home, ignore_errors=True)
     return 0 if ok else 1
 

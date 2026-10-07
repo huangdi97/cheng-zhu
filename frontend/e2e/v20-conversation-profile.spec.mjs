@@ -611,7 +611,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.goto(`/#/conversation/spaces/${SPACE.id}`)
     await expect(page.getByText('Open Threads')).toBeVisible()
     await expect(page.getByText(THREAD.text).first()).toBeVisible()
-    await page.getByRole('button', { name: '标记已解决' }).click()
+    await page.getByLabel('Open Threads').getByRole('button', { name: '标记已解决' }).click()
     await expect(page.getByText('Open Thread 已通过其 reviewed Conversation Item provenance 标记为已解决。')).toBeVisible()
     await expect(page.getByText('暂无已确认的跨场未解决 thread。')).toBeVisible()
   })

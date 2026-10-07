@@ -3194,6 +3194,26 @@ def diagnostics() -> dict[str, Any]:
         "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED' "
         "AND reason IN ('POLICY_AI_FORBIDDEN','SOURCE_VISIBILITY_BLOCKED','SOCIAL_RISK','STALE_CONTEXT','SUGGESTION_BUDGET')"
     ) or 0)
+    feedback_total = int(store.scalar("SELECT COUNT(*) FROM conversation_feedback_event") or 0)
+    guidance_feedback = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_feedback_event WHERE kind = 'GUIDANCE_QUALITY'"
+    ) or 0)
+    missed_moments = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_feedback_event WHERE kind = 'MISSED_MOMENT'"
+    ) or 0)
+    session_feedback = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_feedback_event WHERE kind = 'SESSION_OUTCOME'"
+    ) or 0)
+    useful_labels = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_feedback_event WHERE kind = 'GUIDANCE_QUALITY' AND label = 'USEFUL'"
+    ) or 0)
+    wrong_labels = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_feedback_event WHERE kind = 'GUIDANCE_QUALITY' "
+        "AND label IN ('WRONG','SOURCE_WRONG')"
+    ) or 0)
+    interrupting_labels = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_feedback_event WHERE kind = 'GUIDANCE_QUALITY' AND label = 'INTERRUPTING'"
+    ) or 0)
     capture = conversation_capture.status()
     return {
         "contract": "v2.0-R1",
@@ -3217,8 +3237,22 @@ def diagnostics() -> dict[str, Any]:
             "guidance_dismissed": dismissed_guidance,
             "duplicate_suppressed": duplicate_suppressed,
             "policy_suppressed": policy_suppressed,
+            "feedback_events": feedback_total,
+            "guidance_quality_labels": guidance_feedback,
+            "missed_moments": missed_moments,
+            "session_outcome_labels": session_feedback,
         },
         "evaluation": {
+            "human_label_ledger": {
+                "total": feedback_total,
+                "guidance_quality": guidance_feedback,
+                "useful": useful_labels,
+                "wrong_or_source_wrong": wrong_labels,
+                "interrupting": interrupting_labels,
+                "missed_moments": missed_moments,
+                "session_outcomes": session_feedback,
+                "interpretation": "Explicit local labels can support later precision/regret studies; counts alone are not quality or PMF.",
+            },
             "observed_proxies": {
                 "source_attribution_coverage": (sourced_shown / shown) if shown else None,
                 "guidance_adoption_rate": (adopted_guidance / shown) if shown else None,
@@ -3263,6 +3297,8 @@ def diagnostics() -> dict[str, Any]:
             "speaker_biometric_identity": "OFF",
             "emotion_sentiment_profiling": "OFF",
             "hidden_intent_claims": "OFF",
+            "dogfood_feedback_storage": "LOCAL_PRODUCT_DB",
+            "remote_feedback_telemetry": "OFF",
         },
     }
 

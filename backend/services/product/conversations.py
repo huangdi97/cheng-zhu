@@ -925,12 +925,12 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": "Conversation 的 Screen Context runtime 尚未接线；当前必须保持 OFF，不能把 policy 选择伪装成已生效功能。",
         })
 
-    human_ok = policy["human_assistance"] != "HUMAN_ALLOWED"
-    if not human_ok:
-        blockers.append({
-            "key": "human_assistance_runtime",
+    human_ok = True
+    if policy["human_assistance"] == "HUMAN_ALLOWED":
+        warnings.append({
+            "key": "human_assistance_explicit",
             "label": "Human Assistance",
-            "message": "Conversation Human Coach runtime 尚未接线；当前只能使用 HUMAN_FORBIDDEN 或 HUMAN_PRACTICE_ONLY。",
+            "message": "本场允许 Human Coach。教练链接有 TTL/撤销/权限/速率限制；所有 cue 都标为建议，不是事实或证据。公网 relay 未配置时只提供本机/局域网路径。",
         })
 
     pack_inputs = _pack_inputs(space)
@@ -2112,6 +2112,37 @@ def _recent_duplicate_guidance(session_id: str, text: str, seconds: float = 90.0
     ))
 
 
+def human_coach_guidance(
+    session_id: str,
+    *,
+    text: str,
+    coach_session_id: str,
+    voice_url: str = "",
+) -> dict[str, Any]:
+    """Persist a Human Coach cue as advice, never as evidence or truth."""
+    session = require_session(session_id)
+    if session["status"] != "ACTIVE":
+        raise ValueError("Human Coach 只能给进行中的 Conversation 发送建议")
+    policy = _normalize_session_policy(session.get("policy"))
+    if policy["human_assistance"] != "HUMAN_ALLOWED":
+        raise ValueError("本场 Human Assistance 未允许")
+    cleaned = str(text or "").strip()[:1200]
+    if not cleaned and not voice_url:
+        raise ValueError("教练建议不能为空")
+    label = cleaned or "教练发送了一段语音建议"
+    if voice_url:
+        label = f"{label} · voice={voice_url}"
+    return _persist_guidance(
+        session_id,
+        kind=GuidanceKind.HUMAN_COACH.value,
+        action=ExpressionAction.ADD_TALKING_POINT.value,
+        text=label,
+        source_refs=[],
+        status="SHOWN",
+        reason=f"HUMAN_COACH:{coach_session_id}",
+    )
+
+
 def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     session = require_session(session_id)
     if session["status"] != "ACTIVE":
@@ -3159,7 +3190,7 @@ def diagnostics() -> dict[str, Any]:
                 else "BLOCKED_NON_DESKTOP"
             ),
             "conversation_screen_context": "BLOCKED_NOT_WIRED",
-            "conversation_human_coach": "BLOCKED_NOT_WIRED",
+            "conversation_human_coach": "AVAILABLE_LOCAL_AND_LAN",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
         "evidence": {

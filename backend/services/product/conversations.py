@@ -2530,6 +2530,8 @@ def record_missed_moment(
 
 def record_session_feedback(session_id: str, label: str, detail: str = "") -> dict[str, Any]:
     session = require_session(session_id)
+    if session.get("status") != "ENDED":
+        raise ValueError("Session outcome 反馈只能在会话结束后记录")
     normalized = str(label or "").upper()
     if normalized not in SESSION_FEEDBACK_LABELS:
         raise ValueError("Session 反馈标签不支持")

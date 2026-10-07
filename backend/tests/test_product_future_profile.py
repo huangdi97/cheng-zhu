@@ -45,6 +45,13 @@ def test_v2_conversation_profile_contract_is_complete_but_not_falsely_productize
     assert profile(ConversationProfileKind.PROJECT_SYNC).default_mode is AssistanceMode.BALANCED
     assert profile(ConversationProfileKind.PRESENTATION_QA).default_mode is AssistanceMode.PRESENTATION
     assert profile(ConversationProfileKind.ONE_ON_ONE).default_mode is AssistanceMode.ONE_ON_ONE
+    assert set(profile(ConversationProfileKind.CLIENT_CALL).guidance_kinds) == {
+        GuidanceKind.RECALL,
+        GuidanceKind.ANSWER_CUE,
+        GuidanceKind.QUESTION,
+        GuidanceKind.RISK,
+        GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+    }
 
 
 def test_guidance_and_expression_support_silence_and_opportunity():

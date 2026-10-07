@@ -609,8 +609,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('PRIMARY ACTIVE GOAL')).toHaveCount(0)
 
     await page.getByRole('button', { name: '重新打开' }).click()
-    await expect(page.getByText('ACTIVE')).toBeVisible()
-    await expect(page.getByText('PRIMARY ACTIVE GOAL')).toBeVisible()
+    await expect(page.getByText('ACTIVE', { exact: true })).toBeVisible()
+    await expect(page.getByText('PRIMARY ACTIVE GOAL', { exact: true })).toBeVisible()
   })
 
 

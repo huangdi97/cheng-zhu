@@ -53,6 +53,7 @@ test('packaged backend uses the sidecar exe and the user-data dir, not system py
   assert.deepEqual(cmd.args, ['--port', '18081', '--host', '127.0.0.1']);
   assert.equal(cmd.env.CHENGZHU_HOME, 'C:\\Users\\u\\AppData\\Roaming\\Chengzhu');
   assert.equal(cmd.env.CHENGZHU_FRONTEND_DIST, path.join('C:\\Program Files\\Chengzhu\\resources', 'frontend-dist'));
+  assert.equal(cmd.env.CHENGZHU_DESKTOP_RUNTIME, '1');
 });
 
 test('development backend keeps the python start.py path', () => {
@@ -60,6 +61,7 @@ test('development backend keeps the python start.py path', () => {
   assert.equal(cmd.command, 'python3');
   assert.equal(cmd.args[0], path.join('/repo', 'start.py'));
   assert.equal(cmd.env.CHENGZHU_HOME, undefined);
+  assert.equal(cmd.env.CHENGZHU_DESKTOP_RUNTIME, '1');
 });
 
 test('pickPort skips occupied ports and gives up after the attempt budget', async () => {

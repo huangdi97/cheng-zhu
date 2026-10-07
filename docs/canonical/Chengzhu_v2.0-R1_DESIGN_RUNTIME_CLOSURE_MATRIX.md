@@ -198,7 +198,9 @@ Thread 是 read-model projection，不替代 Conversation Item truth。
 - Live Session Pulse 显示 frozen Open Threads；
 - Session 开始后 Thread 被 resolve，不改写已经开始的 Pack；
 - 删除来源 Session 时移除派生 Thread projection，避免 phantom continuity；
-- tombstone 保留删除 provenance，但不会留下可行动的幽灵 Thread。
+- tombstone 保留删除 provenance，但不会留下可行动的幽灵 Thread；
+- Space Overview 可直接 Resolve reviewed Open Thread；
+- thread-level Resolve 不自己改 truth，而是沿 `CONVERSATION_ITEM` provenance 调用原 Item 的 reviewed resolve transition。
 
 ---
 
@@ -266,6 +268,18 @@ Direct Question / Answer Cue
 - 任意时刻一个 primary Guidance。
 
 高级手工 Guidance 注入被降级为 dogfood / verification surface，不作为普通用户主路径。
+
+Expression Planner runtime boundary：
+
+```text
+Conversation State
++ frozen Expression Profile
++ explicit audience context
++ provenance / policy / Profile lane
+→ Guidance(kind / expression_action / text / source / reason)
+```
+
+Expression Plan 是 Guidance 的派生展示层，不建立第二套持久化 truth table；长期审计仍以 Guidance event + frozen Session Pack 为准。
 
 ---
 
@@ -468,6 +482,30 @@ APPROVED
 
 ---
 
+# 14.5 Derived Conversation State
+
+Conversation State 已有真实 runtime read model，但不是独立可写数据库真值：
+
+- Session status → PREPARE / PARTICIPATE / CONTINUE；
+- session state → current topic / user speaking / audience context / last guidance；
+- current Session Items；
+- reviewed longitudinal Open Threads。
+
+Live Session Pulse 可读取该状态。
+
+规则：
+
+```text
+derived state view
+!= Conversation Item truth
+!= Open Thread truth
+!= new persistence authority
+```
+
+这避免 Expression Planner / UI / diagnostics 各自维护一套可漂移状态。
+
+---
+
 # 15. Evaluation Boundary
 
 可由本地工程事实直接测量：
@@ -571,6 +609,8 @@ CODE_CLOSURE_CI_GATE = PASS
 - ci-gate。
 
 任何后续文档/证据提交都会形成新的 PR HEAD，因此 **最终 merge 仍必须以实际最终 HEAD 的 CI 全绿为准**，不能拿旧 checkpoint 给新 HEAD 背书。
+
+PR #19 已合并到 main。post-merge 对象闭环由 PR #24 承接；PR #24 只包含 Open Thread Resolve / derived Conversation State / Expression Plan truth-boundary 及其测试/文档增量。它必须以自己的 final-head CI 作为合并证据。
 
 即使最终 PR 全绿并合并，也仍然：
 

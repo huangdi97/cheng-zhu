@@ -272,6 +272,11 @@ export interface ConversationProcessingRuntime {
   mode: ProcessingMode
   capture_mode: CaptureMode
   configured_stt_provider: string
+  capabilities: {
+    desktop_runtime: boolean
+    share_privacy_private_overlay: boolean
+    screen_capture: boolean
+  }
   main_audio_remote_possible: boolean
   self_mic_remote_possible: boolean
   data_path: {

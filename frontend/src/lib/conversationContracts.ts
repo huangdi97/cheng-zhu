@@ -48,6 +48,7 @@ export type GuidanceKind =
   | 'RISK'
   | 'DELIVERY'
   | 'CONTRIBUTION_OPPORTUNITY'
+  | 'HUMAN_COACH'
 
 export type ExpressionAction =
   | 'SILENT'

@@ -15,6 +15,7 @@ interface CoachSessionView {
   active: boolean
   cue_count: number
   connected: boolean
+  target_session_id?: string
 }
 
 const PERM_LABELS: Array<[string, string]> = [
@@ -23,7 +24,13 @@ const PERM_LABELS: Array<[string, string]> = [
   ['resume_jd', '简历 / 岗位'],
 ]
 
-export default function CoachPanel({ sessionKind = 'practice' }: { sessionKind?: 'practice' | 'live' }) {
+export default function CoachPanel({
+  sessionKind = 'practice',
+  targetSessionId = '',
+}: {
+  sessionKind?: 'practice' | 'live' | 'conversation'
+  targetSessionId?: string
+}) {
   const pushToast = useInterviewStore((s) => s.pushToast)
   const [perms, setPerms] = useState<Record<string, boolean>>({ transcript: true, ai_cue: false, resume_jd: false })
   const [lan, setLan] = useState(true)
@@ -43,7 +50,7 @@ export default function CoachPanel({ sessionKind = 'practice' }: { sessionKind?:
   const create = async () => {
     setError(null)
     try {
-      const r = await api.coachCreate({ session_kind: sessionKind, permissions: perms, lan })
+      const r = await api.coachCreate({ session_kind: sessionKind, target_session_id: targetSessionId || undefined, permissions: perms, lan })
       setLinks(r.urls)
       load()
     } catch (e) {
@@ -64,12 +71,12 @@ export default function CoachPanel({ sessionKind = 'practice' }: { sessionKind?:
     <section className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-4 space-y-3" data-testid="coach-panel">
       <div className="flex items-center gap-2">
         <Users className="h-4 w-4 text-accent-blue" aria-hidden />
-        <h3 className="text-sm font-semibold text-text-primary">人工教练{sessionKind === 'practice' ? '（练习）' : '（正式场次）'}</h3>
+        <h3 className="text-sm font-semibold text-text-primary">人工教练{sessionKind === 'practice' ? '（练习）' : sessionKind === 'conversation' ? '（Conversation）' : '（正式面试）'}</h3>
       </div>
       <p className="text-[11px] text-text-muted">教练通过浏览器看到你授权的内容，并给你发文字或语音建议。建议会标注为「教练建议」，不会成为事实或证据；教练无法控制你的电脑。</p>
       <fieldset className="flex flex-wrap gap-3 text-xs text-text-secondary">
         <legend className="sr-only">授权内容</legend>
-        {PERM_LABELS.map(([key, label]) => (
+        {PERM_LABELS.filter(([key]) => sessionKind !== 'conversation' || key !== 'resume_jd').map(([key, label]) => (
           <label key={key} className="inline-flex items-center gap-1">
             <input type="checkbox" checked={Boolean(perms[key])} onChange={(e) => setPerms({ ...perms, [key]: e.target.checked })} />
             {label}
@@ -97,7 +104,7 @@ export default function CoachPanel({ sessionKind = 'practice' }: { sessionKind?:
       )}
       {sessions.length > 0 && (
         <ul className="space-y-1 text-xs">
-          {sessions.map((s) => (
+          {sessions.filter((s) => sessionKind !== 'conversation' || (s as CoachSessionView & { target_session_id?: string }).target_session_id === targetSessionId).map((s) => (
             <li key={s.id} className="flex items-center justify-between gap-2 rounded-lg bg-bg-tertiary/25 px-2 py-1">
               <span className="text-text-secondary">
                 {s.active ? (s.connected ? '已连接' : '等待连接') : s.revoked ? '已撤销' : '已过期'} · 建议 {s.cue_count} 条 · 至 {new Date(s.expires_at * 1000).toLocaleTimeString()}

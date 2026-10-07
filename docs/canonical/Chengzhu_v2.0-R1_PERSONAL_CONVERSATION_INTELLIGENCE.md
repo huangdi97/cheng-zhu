@@ -971,8 +971,9 @@ v2.0-R1 设计完成必须同时存在：
 - executable contract types；
 - no false implementation / release / validation claim。
 
-对应实现总目标：
+对应实现与闭环证据：
 
 - [v2.0-R1 Implementation & Rollout Master Goal](Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md)
+- [v2.0-R1 Design → Runtime Closure Matrix](Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md)
 
 本版已经从“允许进入 implementation”推进为“设计完整 + Beta runtime 已存在”。下一状态升级必须依赖 PR/CI、packaged runtime、release provenance 或真实用户证据，不能仅靠文档声明。

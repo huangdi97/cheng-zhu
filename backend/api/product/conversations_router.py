@@ -476,3 +476,56 @@ def guidance_history(session_id: str, limit: int = 30):
 def guidance_action(guidance_id: str, body: GuidanceAction):
     with domain_errors():
         return conversations.set_guidance_action(guidance_id, body.action)
+
+
+class GuidanceFeedbackCreate(BaseModel):
+    label: str
+    detail: str = Field(default="", max_length=4000)
+
+
+@router.post("/guidance/{guidance_id}/feedback")
+def guidance_feedback(guidance_id: str, body: GuidanceFeedbackCreate):
+    with domain_errors():
+        return conversations.record_guidance_feedback(guidance_id, body.label, body.detail)
+
+
+class MissedMomentFeedbackCreate(BaseModel):
+    label: str
+    detail: str = Field(default="", max_length=4000)
+    current_topic: str = Field(default="", max_length=500)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
+
+
+@router.post("/sessions/{session_id}/feedback/missed")
+def missed_moment_feedback(session_id: str, body: MissedMomentFeedbackCreate):
+    with domain_errors():
+        return conversations.record_missed_moment(
+            session_id,
+            body.label,
+            body.detail,
+            current_topic=body.current_topic,
+            source_refs=body.source_refs,
+        )
+
+
+class SessionFeedbackCreate(BaseModel):
+    label: str
+    detail: str = Field(default="", max_length=4000)
+
+
+@router.post("/sessions/{session_id}/feedback/session")
+def session_feedback(session_id: str, body: SessionFeedbackCreate):
+    with domain_errors():
+        return conversations.record_session_feedback(session_id, body.label, body.detail)
+
+
+@router.get("/sessions/{session_id}/feedback")
+def session_feedback_events(session_id: str, limit: int = 500):
+    with domain_errors():
+        return {"items": conversations.feedback_events(session_id=session_id, limit=limit)}
+
+
+@router.get("/evaluation/export")
+def evaluation_export(space_id: str = ""):
+    with domain_errors():
+        return conversations.evaluation_export(space_id)

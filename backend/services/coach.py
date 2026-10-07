@@ -155,6 +155,21 @@ class CoachRegistry:
                     count += 1
             return count
 
+    def revoke_target(self, target_session_id: str, *, session_kind: str = "") -> int:
+        target = str(target_session_id or "")
+        if not target:
+            return 0
+        with self._lock:
+            count = 0
+            for session in self._by_id.values():
+                if session.revoked or session.live_session_id != target:
+                    continue
+                if session_kind and session.session_kind != session_kind:
+                    continue
+                session.revoked = True
+                count += 1
+            return count
+
     # -- helper side --------------------------------------------------------
     def authenticate(self, token: str) -> CoachSession:
         if not token:

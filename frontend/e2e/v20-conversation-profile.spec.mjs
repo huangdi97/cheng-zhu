@@ -447,11 +447,11 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/end` && method === 'POST') {
       session = { ...session, status: 'ENDED', ended_at: 3 }
-      return { session, decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN, OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1 }
+      return { session, decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1 }
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) return {
       session: { ...session, status: 'ENDED', ended_at: 3 },
-      decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN, OPEN], candidates: [OPEN],
+      decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN], candidates: [OPEN],
       what_changed: [DECISION], pins: [],
       next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1,
     }

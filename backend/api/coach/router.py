@@ -45,6 +45,8 @@ def _human_policy_for(session_kind: str, target_session_id: str = "") -> str:
         from services.product import conversations
 
         session = conversations.require_session(target_session_id)
+        if session.get("status") != "ACTIVE":
+            return "HUMAN_FORBIDDEN"
         return str((session.get("policy") or {}).get("human_assistance") or "HUMAN_PRACTICE_ONLY")
 
     if session_kind == "live":

@@ -2834,10 +2834,10 @@ def followup_draft(session_id: str) -> dict[str, Any]:
     sources: list[dict[str, Any]] = []
     for item in summary["decisions"] + summary["commitments"] + reviewed_open_questions:
         sources.extend(item.get("source_refs") or [])
-    excluded = [
-        item["id"] for item in summary["open_questions"]
-        if item.get("review_status") not in THREAD_CONFIRMED_REVIEW
-    ]
+    # Continue deliberately separates reviewed open questions from the
+    # AI_EXTRACTED review queue. Keep the excluded candidate ids in the draft
+    # provenance so users can audit what was *not* promoted into follow-up.
+    excluded = [item["id"] for item in summary["candidates"]]
     return create_draft_action(
         session_id,
         kind="FOLLOWUP_EMAIL_DRAFT",

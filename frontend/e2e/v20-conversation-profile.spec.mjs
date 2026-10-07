@@ -944,6 +944,65 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('MANUAL Screen Context stays in Conversation namespace and never returns raw screenshot bytes', async ({ context, page }) => {
+    const base = mocks()
+    const manualScreen = async (pathname, method, request) => {
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') {
+        return { ...SESSION, policy: { ...SESSION.policy, screen_context: 'MANUAL' } }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') {
+        const original = await base(pathname, method, request)
+        return {
+          ...original,
+          policy: { ...SESSION.policy, screen_context: 'MANUAL' },
+          screen_runtime: {
+            mode: 'MANUAL',
+            available: true,
+            route: 'LOCAL',
+            model_name: 'local-vision',
+            model_id: 'vision-local',
+            fingerprint: 'vision-fp',
+            raw_image_persisted: false,
+            blockers: [],
+          },
+        }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context` && method === 'GET') return { items: [] }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/capture` && method === 'POST') {
+        return {
+          id: 'csc-e2e',
+          space_id: SPACE.id,
+          session_id: SESSION.id,
+          capture_mode: 'MANUAL',
+          region: request.postDataJSON().region === 'configured' ? 'left_half' : request.postDataJSON().region,
+          text: '截图可见：rollback owner = Alex；版本 v2。',
+          image_hash: 'abcdef1234567890abcdef1234567890',
+          vision_model: 'vision-local',
+          vision_route: 'LOCAL',
+          vision_fingerprint: 'vision-fp',
+          source: 'LOCAL_SCREEN_CAPTURE',
+          created_at: 4,
+        }
+      }
+      return base(pathname, method, request)
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: manualScreen,
+    })
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect(page.getByTestId('conversation-screen-context')).toBeVisible()
+    await expect(page.getByText('原图不保存', { exact: false })).toBeVisible()
+    await expect(page.getByText('LOCAL', { exact: true }).last()).toBeVisible()
+    await page.getByRole('button', { name: '抓取一次' }).click()
+    await expect(page.getByText('截图可见：rollback owner = Alex；版本 v2。')).toBeVisible()
+    await expect(page.getByText('OBSERVED_NOT_CONFIRMED')).toBeVisible()
+    await expect(page.getByText(/raw image NOT STORED/)).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('data:image/')
+  })
+
+
   test('Conversation History stays inside Conversation Profile and returns to the same Space', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,

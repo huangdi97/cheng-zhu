@@ -366,7 +366,13 @@ PROFILES: tuple[ConversationProfile, ...] = (
     ConversationProfile(
         ConversationProfileKind.CLIENT_CALL,
         "客户会",
-        tuple(GuidanceKind),
+        (
+            GuidanceKind.RECALL,
+            GuidanceKind.ANSWER_CUE,
+            GuidanceKind.QUESTION,
+            GuidanceKind.RISK,
+            GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+        ),
         productized=False,
         runtime_available=True,
     ),

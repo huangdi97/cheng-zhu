@@ -303,6 +303,57 @@ try {
   })
   await request(base, 'POST', '/api/product/practice/' + practice.practice_id + '/finish', {})
 
+  const conversationSpace = await request(base, 'POST', '/api/product/conversation/spaces', {
+    title: 'WenNian Project Sync',
+    profile: 'PROJECT_SYNC',
+    description: 'Packaged Conversation Beta evidence',
+    default_goal: '确认 rollout strategy 与 rollback owner',
+    default_mode: 'BALANCED',
+    selected_source_ids: [material.id],
+    selected_quick_note_ids: [note.id],
+  })
+  const conversationSession = await request(
+    base,
+    'POST',
+    '/api/product/conversation/spaces/' + conversationSpace.id + '/sessions',
+    {
+      title: 'Packaged Project Sync',
+      capture_mode: 'NOTES_ONLY',
+      processing_mode: 'LOCAL',
+      assistance_mode: 'BALANCED',
+      consent_ack: true,
+      policy: {
+        ai_assistance: 'AI_ALLOWED',
+        external_writeback: 'REVIEW_REQUIRED',
+        participant_consent_status: 'NOT_APPLICABLE',
+        participant_transparency_plan: 'NOT_APPLICABLE',
+      },
+    },
+  )
+  const conversationDecision = await request(
+    base,
+    'POST',
+    '/api/product/conversation/sessions/' + conversationSession.id + '/items',
+    {
+      item_type: 'Decision',
+      title: 'offline migration 采用 v2',
+      source_refs: [{ kind: 'DOCUMENT', id: material.id, excerpt: 'WenNian 架构说明', visibility: 'PRIVATE' }],
+      source_excerpt: 'WenNian 架构说明',
+      epistemic_status: 'OBSERVED',
+    },
+  )
+  await request(base, 'POST', '/api/product/conversation/items/' + conversationDecision.id + '/review', { action: 'CONFIRM', patch: {} })
+  await request(base, 'POST', '/api/product/conversation/sessions/' + conversationSession.id + '/start', {})
+  const conversationGuidance = await request(
+    base,
+    'POST',
+    '/api/product/conversation/sessions/' + conversationSession.id + '/guidance/evaluate',
+    {
+      direct_question: '为什么之前选择 v2？',
+      source_refs: [{ kind: 'DOCUMENT', id: material.id, excerpt: 'WenNian 架构说明', visibility: 'PRIVATE' }],
+    },
+  )
+
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.getByTestId('action-home').waitFor({ timeout: 30000 })
   await shot(page, '02-action-home', 'Action Home')
@@ -377,6 +428,39 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
   if (overflow) throw new Error('390px Goal Prepare has horizontal overflow')
 
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.evaluate(() => {
+    localStorage.setItem('chengzhu-product-profile', 'conversation')
+    localStorage.setItem('chengzhu-conversation-optin', '1')
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await go(page, '#/conversation', '[data-testid="conversation-home"]')
+  await shot(page, '30-conversation-home', 'Packaged fallback Conversation Home')
+  await go(page, '#/conversation/spaces/' + conversationSpace.id, '[data-testid="conversation-space"]')
+  await shot(page, '31-conversation-space', 'Conversation Space overview')
+  await go(page, '#/conversation/spaces/' + conversationSpace.id + '/prepare', '[data-testid="conversation-space"]')
+  await shot(page, '32-conversation-prepare', 'Conversation Prepare')
+  await page.getByTestId('conversation-create-preflight').click()
+  await page.getByTestId('conversation-start-session').waitFor({ timeout: 15000 })
+  await shot(page, '33-conversation-preflight', 'Conversation Preflight + Pack/Data-path truth')
+  await go(page, '#/conversation/live/' + conversationSession.id, '[data-testid="conversation-live"]')
+  await page.getByTestId('conversation-session-pulse').waitFor({ timeout: 15000 })
+  await page.getByTestId('guidance-dogfood-feedback').waitFor({ timeout: 15000 })
+  await shot(page, '34-conversation-live-guidance', 'Conversation Live + frozen Session Pulse')
+  await page.getByTestId('guidance-feedback-useful').click()
+  await page.waitForTimeout(350)
+  await shot(page, '35-conversation-dogfood-label', 'Local Guidance human label')
+  await page.getByTestId('conversation-end-session').click()
+  await page.getByTestId('conversation-continue-summary').waitFor({ timeout: 15000 })
+  await shot(page, '36-conversation-continue', 'Conversation Continue + dogfood labels')
+  await go(page, '#/history', '[data-testid="conversation-history"]')
+  await shot(page, '37-conversation-history', 'Profile-aware Conversation History')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await go(page, '#/conversation/spaces/' + conversationSpace.id + '/prepare', '[data-testid="conversation-space"]')
+  await shot(page, '38-conversation-mobile-390-prepare', '390px Conversation Prepare')
+  const conversationOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+  if (conversationOverflow) throw new Error('390px Conversation Prepare has horizontal overflow')
+
   const manifest = {
     captured_at: new Date().toISOString(),
     evidence_type: 'PACKAGED_FRONTEND_DIST_VIA_PACKAGED_SIDECAR_HEADLESS_CHROMIUM',
@@ -385,10 +469,14 @@ try {
     frontend_dist: FRONTEND_DIST,
     goal_id: goal.id,
     practice_id: practice.practice_id,
+    conversation_space_id: conversationSpace.id,
+    conversation_session_id: conversationSession.id,
+    conversation_guidance_id: conversationGuidance.guidance?.id || '',
+    conversation_beta_evidence: true,
     entries,
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (entries.length < 29) throw new Error('expected at least 29 packaged fallback captures, got ' + entries.length)
+  if (entries.length < 38) throw new Error('expected at least 38 packaged fallback captures including Conversation Beta, got ' + entries.length)
   console.log('packaged web fallback evidence complete captures=' + entries.length)
 } catch (error) {
   console.error(error)

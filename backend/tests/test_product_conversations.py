@@ -2265,6 +2265,129 @@ def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_
     assert conversations.guidance_from_transcript(live["id"], "offline migration") is None
 
 
+
+
+def test_dogfood_feedback_is_explicit_local_evidence_not_guidance_action(product_env):
+    space = conversations.create_space("Dogfood", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    guidance = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "为什么？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "source"}],
+    })["guidance"]
+    assert guidance is not None
+
+    conversations.set_guidance_action(guidance["id"], "PINNED")
+    useful = conversations.record_guidance_feedback(guidance["id"], "USEFUL", "帮我快速回忆")
+    late = conversations.record_guidance_feedback(guidance["id"], "TOO_LATE", "晚了几秒")
+    missed = conversations.record_missed_moment(
+        session["id"],
+        "SHOULD_HAVE_SURFACED_SOURCE",
+        "应该更早带出 benchmark",
+        current_topic="benchmark",
+        source_refs=[{"kind": "DOCUMENT", "id": "bench"}],
+    )
+
+    assert useful["kind"] == "GUIDANCE_QUALITY"
+    assert late["label"] == "TOO_LATE"
+    assert missed["kind"] == "MISSED_MOMENT"
+    assert conversations.guidance_history(session["id"])[0]["user_action"] == "PINNED"
+
+    with pytest.raises(ValueError, match="会话结束后"):
+        conversations.record_session_feedback(session["id"], "WOULD_REUSE_SPACE")
+
+    conversations.end_session(session["id"])
+    reuse = conversations.record_session_feedback(session["id"], "WOULD_REUSE_SPACE")
+    helped = conversations.record_session_feedback(session["id"], "CONTINUE_HELPED_NEXT_PREP")
+    assert reuse["kind"] == "SESSION_OUTCOME"
+    assert helped["label"] == "CONTINUE_HELPED_NEXT_PREP"
+
+    exported = conversations.evaluation_export(space["id"])
+    assert exported["contract"] == "v2.1-R1"
+    assert exported["evidence_boundary"]["remote_telemetry"] is False
+    assert exported["evidence_boundary"]["synthetic_or_dogfood_labels_are_not_pmf"] is True
+    assert exported["summary"]["guidance_quality_labels"] == 2
+    assert exported["summary"]["missed_moments"] == 1
+    assert exported["summary"]["session_outcome_labels"] == 2
+    assert exported["summary"]["label_counts"]["GUIDANCE_QUALITY:USEFUL"] == 1
+
+
+def test_feedback_survives_guidance_retention_but_respects_session_delete(product_env):
+    space = conversations.create_space("Retention Feedback", "PROJECT_SYNC")
+    conversations.update_space(space["id"], {
+        "retention_policy": {
+            "preset": "CUSTOM",
+            "transcript_days": 30,
+            "guidance_days": 0,
+            "draft_days": 30,
+            "confirmed_items": "KEEP",
+            "audio_retention": "OFF",
+        }
+    })
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    guidance = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "为什么？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "source"}],
+    })["guidance"]
+    feedback = conversations.record_guidance_feedback(guidance["id"], "USEFUL")
+    conversations.end_session(session["id"])
+
+    preview = conversations.retention_preview(space["id"])
+    assert preview["would_delete"]["guidance_events"] >= 1
+    assert preview["kept"]["dogfood_feedback"] == "KEEP_UNTIL_SESSION_OR_SPACE_DELETE"
+    conversations.apply_retention(space["id"], confirm=True)
+
+    kept = store.get("conversation_feedback_event", feedback["id"])
+    assert kept is not None
+    assert kept["guidance_id"] is None
+
+    conversations.delete_session(session["id"], confirmed_policy="BLOCK")
+    assert store.get("conversation_feedback_event", feedback["id"]) is None
+
+
+def test_diagnostics_reports_human_label_ledger_separately_from_proxies(product_env):
+    space = conversations.create_space("Label Diagnostics", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    guidance = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "为什么？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "source"}],
+    })["guidance"]
+    conversations.record_guidance_feedback(guidance["id"], "USEFUL")
+    conversations.record_guidance_feedback(guidance["id"], "INTERRUPTING")
+    conversations.record_missed_moment(session["id"], "SHOULD_HAVE_RECALLED")
+    conversations.end_session(session["id"])
+    conversations.record_session_feedback(session["id"], "WOULD_REUSE_SPACE")
+
+    diag = conversations.diagnostics()
+    ledger = diag["evaluation"]["human_label_ledger"]
+    assert ledger["total"] == 4
+    assert ledger["guidance_quality"] == 2
+    assert ledger["useful"] == 1
+    assert ledger["interrupting"] == 1
+    assert ledger["missed_moments"] == 1
+    assert ledger["session_outcomes"] == 1
+    assert "not quality or PMF" in ledger["interpretation"]
+    assert diag["privacy"]["dogfood_feedback_storage"] == "LOCAL_PRODUCT_DB"
+    assert diag["privacy"]["remote_feedback_telemetry"] == "OFF"
+
+
+def test_space_export_contains_local_feedback_as_separate_category(product_env):
+    space = conversations.create_space("Export Feedback", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    guidance = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "为什么？",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "source"}],
+    })["guidance"]
+    feedback = conversations.record_guidance_feedback(guidance["id"], "SOURCE_WRONG", "引用错了")
+    payload = conversations.export_space(space["id"])
+    assert "feedback" in payload["export_manifest"]["categories"]
+    assert payload["feedback"][0]["id"] == feedback["id"]
+    assert payload["feedback"][0]["label"] == "SOURCE_WRONG"
+
+
 def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env):
     space = conversations.create_space("Diagnostic Space", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True)

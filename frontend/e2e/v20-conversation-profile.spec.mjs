@@ -120,6 +120,7 @@ const COMMITMENT_CANDIDATE = {
 
 function mocks() {
   let session = { ...SESSION }
+  let threadOpen = true
   let goal = {
     id: 'cg-1',
     space_id: SPACE.id,
@@ -199,7 +200,7 @@ function mocks() {
       decisions: [DECISION],
       commitments: [],
       open_questions: [REVIEWED_OPEN, OPEN],
-      threads: [THREAD],
+      threads: threadOpen ? [THREAD] : [],
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/prepare`) return {
       space: { ...SPACE, default_goal: goal.status === 'ACTIVE' ? goal.title : '' },
@@ -207,15 +208,19 @@ function mocks() {
       next_session: null,
       open_commitments: [],
       open_questions: [REVIEWED_OPEN],
-      open_threads: [THREAD],
+      open_threads: threadOpen ? [THREAD] : [],
       related_decisions: [DECISION],
       participants: [],
       selected_sources: ['benchmark-note'],
       selected_quick_notes: [],
       brief: { last_change: DECISION, unresolved_count: 1, known_participants: 1 },
-      agenda: [THREAD.text],
+      agenda: threadOpen ? [THREAD.text] : [],
       expected_questions: [REVIEWED_OPEN.title],
       contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
+    }
+    if (pathname === `/api/product/conversation/threads/${THREAD.id}/resolve` && method === 'POST') {
+      threadOpen = false
+      return { ...THREAD, status: 'RESOLVED', resolved_at: 4 }
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
@@ -317,6 +322,18 @@ function mocks() {
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') return session
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') return {
       session_id: SESSION.id,
+      conversation_state: {
+        phase: 'PARTICIPATE',
+        current_topic: '',
+        user_speaking: false,
+        direct_question_pending: false,
+        audience_context: {},
+        items: [
+          { id: DECISION.id, type: DECISION.type, state: DECISION.state, title: DECISION.title, review_status: DECISION.review_status },
+        ],
+        open_threads: threadOpen ? [{ id: THREAD.id, kind: THREAD.kind, text: THREAD.text, owner_id: '' }] : [],
+        last_guidance_id: '',
+      },
       space: { id: SPACE.id, profile: SPACE.profile, title: SPACE.title },
       brief: {
         goal: SPACE.default_goal,
@@ -584,6 +601,21 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Conversation Goals')).toBeVisible()
     await expect(page.getByText('Alex · Backend')).toBeVisible()
   })
+
+  test('Open Thread can be resolved from Space through reviewed provenance', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}`)
+    await expect(page.getByText('Open Threads')).toBeVisible()
+    await expect(page.getByText(THREAD.text).first()).toBeVisible()
+    await page.getByLabel('Open Threads').getByRole('button', { name: '标记已解决' }).click()
+    await expect(page.getByText('Open Thread 已通过其 reviewed Conversation Item provenance 标记为已解决。')).toBeVisible()
+    await expect(page.getByText('暂无已确认的跨场未解决 thread。')).toBeVisible()
+  })
+
 
   test('Goal editor controls outcome, priority and lifecycle without creating a second truth', async ({ context, page }) => {
     await installMocks(context, {

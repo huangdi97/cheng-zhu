@@ -389,6 +389,8 @@ Unknown
 
 ---
 
+Conversation State 同样是派生 read model：phase / topic / user-speaking / audience context / current items / reviewed open threads / last guidance 从已有真值对象组合，不新增独立可写状态表。
+
 # 11. Expression Planner Gate
 
 输入至少覆盖：
@@ -421,6 +423,8 @@ Unknown
 > 修改表达结构，不修改事实。
 
 ---
+
+Runtime closure：Expression Plan 是 Guidance 的派生展示层，不单独建立第二套持久化 truth。长期审计以 Guidance 的 kind / expression_action / source_refs / reason / user_action 与 frozen Session Pack 为准；DELIVERY 读取共享 Expression Profile 与 explicit audience context 生成结构提示。
 
 # 12. Guidance Arbiter Gate
 

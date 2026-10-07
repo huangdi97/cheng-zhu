@@ -11,6 +11,7 @@ import type {
   ConversationHome,
   ConversationItem,
   ConversationItemType,
+  ConversationOpenThread,
   ConversationPreflight,
   ConversationPrepare,
   ConversationProfile,
@@ -150,6 +151,8 @@ export const conversationApi = {
   }) => request<ConversationItem>(`${B}/sessions/${encodeURIComponent(id)}/items`, json('POST', body)),
   reviewItem: (id: string, action: 'CONFIRM' | 'EDIT' | 'REJECT' | 'DONE' | 'RESOLVE' | 'SUPERSEDE', patch: Record<string, unknown> = {}) =>
     request<ConversationItem>(`${B}/items/${encodeURIComponent(id)}/review`, json('POST', { action, patch })),
+  resolveThread: (id: string) =>
+    request<ConversationOpenThread>(`${B}/threads/${encodeURIComponent(id)}/resolve`, json('POST')),
   evaluateGuidance: (id: string, body: {
     current_topic?: string
     direct_question?: string

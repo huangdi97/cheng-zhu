@@ -389,8 +389,20 @@ export interface ConversationAskResult {
   truth_confirmed: boolean
 }
 
+export interface ConversationStateView {
+  phase: string
+  current_topic: string
+  user_speaking: boolean
+  direct_question_pending: boolean
+  audience_context: Record<string, string>
+  items: Array<{ id: string; type: string; state: string; title: string; review_status: string }>
+  open_threads: Array<{ id: string; kind: string; text: string; owner_id: string }>
+  last_guidance_id: string
+}
+
 export interface ConversationSessionContext {
   session_id: string
+  conversation_state: ConversationStateView
   space: { id: string; profile?: ConversationProfile; title?: string }
   brief: {
     title?: string

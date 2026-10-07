@@ -90,6 +90,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
   const [lifecycleMessage, setLifecycleMessage] = useState('')
 
+  const resolveThread = async (threadId: string) => {
+    setSessionBusy(true); setSessionError('')
+    try {
+      await conversationApi.resolveThread(threadId)
+      setLifecycleMessage('Open Thread 已通过其 reviewed Conversation Item provenance 标记为已解决。')
+      await detail.reload()
+      await prepare.reload()
+    } catch (e) {
+      setSessionError(e instanceof Error ? e.message : String(e))
+    } finally { setSessionBusy(false) }
+  }
+
   useEffect(() => { if (detail.data?.default_mode) setMode(detail.data.default_mode) }, [detail.data?.default_mode])
 
   const tabs = useMemo<Array<[ConversationTab, string, number?]>>(() => [
@@ -366,7 +378,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Open Commitments">{prepare.loading ? <Loading /> : prepare.data?.open_commitments.length ? <div className="space-y-2">{prepare.data.open_commitments.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无。</p>}</Section>
             <Section title="Open Questions">{prepare.loading ? <Loading /> : prepare.data?.open_questions.length ? <div className="space-y-2">{prepare.data.open_questions.map((x) => <ItemRow key={x.id} item={x} onChanged={() => { void detail.reload(); void prepare.reload() }} />)}</div> : <p className="text-xs text-text-muted">暂无。</p>}</Section>
-            <Section title="Open Threads">{prepare.loading ? <Loading /> : prepare.data?.open_threads?.length ? <div className="space-y-1">{prepare.data.open_threads.map((thread) => <div key={thread.id} className="rounded-xl border border-bg-tertiary/70 px-3 py-2"><div className="flex items-center gap-2"><StatusBadge tone="warn">{thread.kind}</StatusBadge><span className="text-xs text-text-primary">{thread.text}</span></div><div className="mt-1 text-[10px] text-text-muted">reviewed longitudinal thread · source refs {thread.source_refs.length}</div></div>)}</div> : <p className="text-xs text-text-muted">暂无已确认的跨场未解决 thread。</p>}</Section>
+            <Section title="Open Threads">{prepare.loading ? <Loading /> : prepare.data?.open_threads?.length ? <div className="space-y-2">{prepare.data.open_threads.map((thread) => <div key={thread.id} className="rounded-xl border border-bg-tertiary/70 px-3 py-2"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex items-center gap-2"><StatusBadge tone="warn">{thread.kind}</StatusBadge><span className="text-xs text-text-primary">{thread.text}</span></div><div className="mt-1 text-[10px] text-text-muted">reviewed longitudinal thread · source refs {thread.source_refs.length}{thread.owner_id ? ` · owner ${thread.owner_id}` : ''}</div></div><SecondaryButton disabled={sessionBusy} onClick={() => resolveThread(thread.id)}>标记已解决</SecondaryButton></div></div>)}</div> : <p className="text-xs text-text-muted">暂无已确认的跨场未解决 thread。</p>}</Section>
           </div>
           <Section title="参与者 / Counterparty State（只记录明确信息）">
             {space.participants.length ? <div className="space-y-2">{space.participants.map((p) => {

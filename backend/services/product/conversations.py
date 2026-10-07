@@ -1454,7 +1454,34 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) The current-session transcript supports catch-up, but remains observation.
+    # 4) Manual Screen Context is a current-session observation. The raw image
+    # is never persisted; only extracted text + image hash/model provenance is
+    # queryable, and it never becomes confirmed truth by itself.
+    for screen in conversation_screen.list_context(session_id, 40):
+        lexical = _text_match_score(question, str(screen.get("text") or ""))
+        if lexical:
+            ranked.append((lexical + 2, float(screen.get("created_at") or 0), {
+                "id": screen.get("id") or "",
+                "kind": "SCREEN_CONTEXT",
+                "authority": "OBSERVED_NOT_CONFIRMED",
+                "title": f"屏幕上下文 · {screen.get('region') or 'screen'}",
+                "excerpt": str(screen.get("text") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "SCREEN_CONTEXT",
+                    "id": screen.get("id") or "",
+                    "session_id": session_id,
+                    "image_hash": screen.get("image_hash") or "",
+                    "vision_model": screen.get("vision_model") or "",
+                    "vision_route": screen.get("vision_route") or "",
+                    "timestamp": screen.get("created_at"),
+                    "visibility": "PRIVATE",
+                }],
+            }))
+
+    # 5) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",
@@ -1487,7 +1514,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     matches = [match for _, _, match in ranked[:6]]
     if not matches:
         return {
-            "answer": "没有在本场冻结来源、已确认历史或当前转写中找到足够直接的可追溯内容。",
+            "answer": "没有在本场冻结来源、已确认历史、屏幕观察或当前转写中找到足够直接的可追溯内容。",
             "matches": [],
             "grounded": False,
             "truth_confirmed": False,
@@ -1499,7 +1526,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
         "PERSONAL_EVIDENCE": "本场个人证据",
         "REFERENCE_SOURCE": "本场参考来源",
         "USER_NOTE_NOT_EVIDENCE": "本场 Quick Note",
-        "OBSERVED_NOT_CONFIRMED": "本场转写观察",
+        "OBSERVED_NOT_CONFIRMED": "本场观察",
     }.get(top["authority"], "可追溯来源")
     answer = f"{prefix}：{top['title']}"
     if top.get("excerpt") and top["excerpt"] != top["title"]:
@@ -2734,6 +2761,10 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
         "SELECT COUNT(*) FROM conversation_transcript_segment WHERE space_id = ? AND created_at <= ?",
         (space_id, _retention_cutoff(transcript_days, now_value)),
     ) or 0)
+    screen_context_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_screen_context WHERE space_id = ? AND created_at <= ?",
+        (space_id, _retention_cutoff(transcript_days, now_value)),
+    ) or 0)
     guidance_count = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_guidance_event g "
         "JOIN conversation_session s ON s.id = g.session_id "
@@ -2749,6 +2780,7 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
         "policy": policy,
         "would_delete": {
             "transcript_segments": transcript_count,
+            "screen_context_observations": screen_context_count,
             "guidance_events": guidance_count,
             "draft_actions": draft_count,
         },
@@ -2757,7 +2789,7 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
             "session_packs": "KEEP",
             "provenance_tombstones": "KEEP",
         },
-        "destructive": any((transcript_count, guidance_count, draft_count)),
+        "destructive": any((transcript_count, screen_context_count, guidance_count, draft_count)),
     }
 
 
@@ -2767,7 +2799,7 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
         raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
     policy = preview["policy"]
     now_value = store.now()
-    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0}
+    deleted = {"transcript_segments": 0, "screen_context_observations": 0, "guidance_events": 0, "draft_actions": 0}
 
     transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
     for row in store.select(
@@ -2776,6 +2808,13 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
         params=(space_id, transcript_cutoff),
     ):
         deleted["transcript_segments"] += int(store.delete("conversation_transcript_segment", row["id"]))
+
+    for row in store.select(
+        "conversation_screen_context",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    ):
+        deleted["screen_context_observations"] += int(store.delete("conversation_screen_context", row["id"]))
 
     guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
     guidance_rows = store.rows(
@@ -3172,6 +3211,9 @@ def export_space(space_id: str) -> dict[str, Any]:
     transcript = store.select(
         "conversation_transcript_segment", where="space_id = ?", params=(space_id,), order="created_at ASC"
     )
+    screen_context = store.select(
+        "conversation_screen_context", where="space_id = ?", params=(space_id,), order="created_at ASC"
+    )
     guidance = store.rows(
         "SELECT g.* FROM conversation_guidance_event g JOIN conversation_session s ON s.id = g.session_id "
         "WHERE s.space_id = ? ORDER BY g.created_at ASC",
@@ -3213,7 +3255,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
-                "transcript", "notes", "confirmed_items", "unconfirmed_candidates",
+                "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
                 "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
@@ -3224,6 +3266,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "sessions": detail["sessions"],
         "participants": detail["participants"],
         "transcript": transcript,
+        "screen_context_observations": screen_context,
         "notes": notes,
         "confirmed_items": confirmed,
         "unconfirmed_candidates": candidates,

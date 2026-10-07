@@ -48,6 +48,7 @@ def test_active_conversation_goals_default_into_new_session_and_old_pack_stays_f
     second_goal = conversations.create_goal(
         space["id"], "确认 rollback owner", outcome_definition="owner 明确", priority=80,
     )
+    assert conversations.require_space(space["id"])["default_goal"] == first_goal["title"]
 
     first_session = conversations.create_session(space["id"], consent_ack=True)
     assert first_session["goal_ids"] == [first_goal["id"], second_goal["id"]]
@@ -59,6 +60,7 @@ def test_active_conversation_goals_default_into_new_session_and_old_pack_stays_f
     resolved = store.get("conversation_goal", first_goal["id"])
     assert resolved["status"] == "RESOLVED"
     assert resolved["resolved_at"] is not None
+    assert conversations.require_space(space["id"])["default_goal"] == second_goal["title"]
 
     # Existing Session Pack remains immutable.
     existing = conversations.session_context(first_session["id"])
@@ -68,12 +70,44 @@ def test_active_conversation_goals_default_into_new_session_and_old_pack_stays_f
     assert second_session["goal_ids"] == [second_goal["id"]]
     second_pack = conversations.start_session(second_session["id"])["pack"]
     assert [g["id"] for g in second_pack["payload"]["session_brief"]["goals"]] == [second_goal["id"]]
+    assert second_pack["payload"]["session_brief"]["goal"] == second_goal["title"]
 
     reopened = conversations.update_goal(first_goal["id"], {"status": "ACTIVE"})
     assert reopened["status"] == "ACTIVE"
     assert reopened["resolved_at"] is None
+    assert conversations.require_space(space["id"])["default_goal"] == first_goal["title"]
+
+    renamed = conversations.update_goal(first_goal["id"], {"title": "决定最终 rollout strategy"})
+    assert renamed["title"] == "决定最终 rollout strategy"
+    assert conversations.require_space(space["id"])["default_goal"] == "决定最终 rollout strategy"
 
 
+
+
+
+
+def test_legacy_default_goal_patch_writes_through_to_primary_goal_without_double_truth(product_env):
+    space = conversations.create_space(
+        "Goal Projection",
+        "PROJECT_SYNC",
+        default_goal="旧主目标",
+    )
+    goals = conversations.space_detail(space["id"])["goals"]
+    assert len(goals) == 1
+    primary_id = goals[0]["id"]
+
+    updated = conversations.update_space(space["id"], {"default_goal": "新主目标"})
+    assert updated["default_goal"] == "新主目标"
+    assert store.get("conversation_goal", primary_id)["title"] == "新主目标"
+
+    session = conversations.create_session(space["id"], consent_ack=True)
+    check = conversations.preflight(session["id"])
+    assert next(x for x in check["items"] if x["key"] == "goal")["value"] == "新主目标"
+    started = conversations.start_session(session["id"])
+    assert started["pack"]["payload"]["session_brief"]["goal"] == "新主目标"
+
+    with pytest.raises(ValueError, match="Goal lifecycle"):
+        conversations.update_space(space["id"], {"default_goal": ""})
 
 
 def test_manual_scheduling_drives_next_session_without_calendar_connector(product_env, monkeypatch):

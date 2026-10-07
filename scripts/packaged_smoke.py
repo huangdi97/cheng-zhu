@@ -11,8 +11,11 @@ Checks:
   5. Fast Cue E2E with the fake provider: guidance_fast before the first
      answer_chunk, answer_done carries latency
   6. InterviewPack freeze persists across a sidecar restart
-  7. nothing is written next to the executable (install dir stays clean)
-  8. LICENSE / THIRD_PARTY_NOTICES bundled
+  7. Conversation Beta packaged contracts: Space → Preflight → Start → Guidance
+     → human label → End → evaluation export
+  8. Conversation product.db schema + feedback survive a sidecar restart
+  9. nothing is written next to the executable (install dir stays clean)
+ 10. LICENSE / THIRD_PARTY_NOTICES bundled
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -236,6 +239,93 @@ def main() -> int:
 
         pack = http_json(f"{base}/api/intelligence/pack/freeze", "POST", {"share_privacy_policy": "OFF"})
         checks["pack_frozen_id"] = pack.get("id")
+
+        # v2.1 Conversation Beta packaged truth: exercise the real built
+        # sidecar rather than relying on source-only unit/E2E tests.
+        cb = "/api/product/conversation"
+        space = http_json(f"{base}{cb}/spaces", "POST", {
+            "title": "Packaged Conversation Beta",
+            "profile": "PROJECT_SYNC",
+            "default_goal": "验证 packaged Conversation continuity",
+            "default_mode": "BALANCED",
+        })
+        session = http_json(f"{base}{cb}/spaces/{space['id']}/sessions", "POST", {
+            "title": "Packaged Dogfood",
+            "capture_mode": "NOTES_ONLY",
+            "processing_mode": "LOCAL",
+            "assistance_mode": "BALANCED",
+            "consent_ack": True,
+            "policy": {
+                "ai_assistance": "AI_ALLOWED",
+                "external_writeback": "REVIEW_REQUIRED",
+            },
+        })
+        preflight = http_json(f"{base}{cb}/sessions/{session['id']}/preflight")
+        checks["conversation_preflight_blockers"] = preflight.get("blockers")
+        checks["conversation_preflight_ok"] = not bool(preflight.get("blockers"))
+        ok &= bool(checks["conversation_preflight_ok"])
+
+        started = http_json(f"{base}{cb}/sessions/{session['id']}/start", "POST", {})
+        checks["conversation_pack_digest"] = (started.get("pack") or {}).get("digest")
+        checks["conversation_started"] = (started.get("session") or {}).get("status") == "ACTIVE"
+        ok &= bool(checks["conversation_started"]) and bool(checks["conversation_pack_digest"])
+
+        guidance_result = http_json(f"{base}{cb}/sessions/{session['id']}/guidance/evaluate", "POST", {
+            "direct_question": "为什么要保留 provenance？",
+            "source_refs": [{"kind": "USER_NOTE", "excerpt": "Packaged smoke source", "visibility": "PRIVATE"}],
+        })
+        guidance = guidance_result.get("guidance") or {}
+        checks["conversation_guidance_kind"] = guidance.get("kind")
+        checks["conversation_guidance_shown"] = bool(guidance.get("id"))
+        ok &= bool(checks["conversation_guidance_shown"])
+
+        feedback = http_json(f"{base}{cb}/guidance/{guidance['id']}/feedback", "POST", {
+            "label": "USEFUL",
+            "detail": "packaged smoke human-label contract",
+        })
+        checks["conversation_guidance_feedback"] = feedback.get("label")
+        ok &= checks["conversation_guidance_feedback"] == "USEFUL"
+
+        missed = http_json(f"{base}{cb}/sessions/{session['id']}/feedback/missed", "POST", {
+            "label": "SHOULD_HAVE_SURFACED_SOURCE",
+            "detail": "packaged smoke missed-moment contract",
+            "current_topic": "provenance",
+            "source_refs": [{"kind": "USER_NOTE", "excerpt": "dogfood"}],
+        })
+        checks["conversation_missed_moment"] = missed.get("label")
+        ok &= checks["conversation_missed_moment"] == "SHOULD_HAVE_SURFACED_SOURCE"
+
+        ended = http_json(f"{base}{cb}/sessions/{session['id']}/end", "POST", {})
+        checks["conversation_ended"] = (ended.get("session") or {}).get("status") == "ENDED"
+        ok &= bool(checks["conversation_ended"])
+
+        outcome = http_json(f"{base}{cb}/sessions/{session['id']}/feedback/session", "POST", {
+            "label": "WOULD_REUSE_SPACE",
+            "detail": "packaged smoke session outcome",
+        })
+        checks["conversation_session_feedback"] = outcome.get("label")
+        ok &= checks["conversation_session_feedback"] == "WOULD_REUSE_SPACE"
+
+        evaluation = http_json(f"{base}{cb}/evaluation/export?space_id={space['id']}")
+        checks["conversation_evaluation_contract"] = evaluation.get("contract")
+        checks["conversation_feedback_events"] = (evaluation.get("summary") or {}).get("feedback_events")
+        checks["conversation_remote_feedback_telemetry"] = (evaluation.get("evidence_boundary") or {}).get("remote_telemetry")
+        ok &= (
+            checks["conversation_evaluation_contract"] == "v2.1-R1"
+            and int(checks["conversation_feedback_events"] or 0) >= 3
+            and checks["conversation_remote_feedback_telemetry"] is False
+        )
+
+        product_db = home / "data" / "product.db"
+        product_version = sqlite3.connect(product_db).execute("PRAGMA user_version").fetchone()[0] if product_db.exists() else None
+        product_migrations_source = (Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "product_migrations.py").read_text(encoding="utf-8")
+        product_match = re.search(r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)", product_migrations_source, re.MULTILINE)
+        product_expected = int(product_match.group(1)) if product_match else None
+        checks["product_schema_version"] = product_version
+        checks["product_schema_expected"] = product_expected
+        ok &= product_expected is not None and product_version == product_expected
+
+        conversation_ids = {"space_id": space["id"], "session_id": session["id"]}
         stop(proc)
 
         proc = start(exe, port, home, args.frontend_dist)
@@ -243,6 +333,21 @@ def main() -> int:
         after = http_json(f"{base}/api/intelligence/pack")
         checks["pack_persisted_after_restart"] = bool(after.get("frozen")) and after["pack"]["id"] == pack.get("id")
         ok &= bool(checks["pack_persisted_after_restart"])
+
+        evaluation_after = http_json(
+            f"{base}/api/product/conversation/evaluation/export?space_id={conversation_ids['space_id']}"
+        )
+        checks["conversation_feedback_persisted_after_restart"] = (
+            (evaluation_after.get("summary") or {}).get("feedback_events") == checks.get("conversation_feedback_events")
+            and int((evaluation_after.get("summary") or {}).get("feedback_events") or 0) >= 3
+        )
+        history_after = http_json(f"{base}/api/product/conversation/history")
+        checks["conversation_history_persisted_after_restart"] = any(
+            item.get("id") == conversation_ids["session_id"]
+            for item in history_after.get("items", [])
+        )
+        ok &= bool(checks["conversation_feedback_persisted_after_restart"])
+        ok &= bool(checks["conversation_history_persisted_after_restart"])
     except Exception as exc:  # noqa: BLE001
         checks["error"] = f"{type(exc).__name__}: {exc}"
         ok = False

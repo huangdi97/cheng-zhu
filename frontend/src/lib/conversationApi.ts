@@ -17,6 +17,7 @@ import type {
   ConversationProfile,
   ConversationSession,
   ConversationSessionContext,
+  ConversationScreenContext,
   ConversationTranscriptSegment,
   ConversationSpace,
   ConversationSpaceDetail,
@@ -65,7 +66,7 @@ export const conversationApi = {
   retentionPreview: (id: string) => request<{
     space_id: string
     policy: Record<string, unknown>
-    would_delete: { transcript_segments: number; guidance_events: number; draft_actions: number }
+    would_delete: { transcript_segments: number; screen_context_observations: number; guidance_events: number; draft_actions: number }
     kept: Record<string, string>
     destructive: boolean
   }>(`${B}/spaces/${encodeURIComponent(id)}/retention`),
@@ -117,6 +118,10 @@ export const conversationApi = {
     request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),
   ask: (id: string, question: string) =>
     request<ConversationAskResult>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
+  screenContext: (id: string, limit = 20) =>
+    request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/screen-context?limit=${limit}`).then((p) => list<ConversationScreenContext>(p)),
+  captureScreenContext: (id: string, region: 'configured' | 'full' | 'left_half' | 'right_half' | 'top_half' | 'bottom_half' = 'configured') =>
+    request<ConversationScreenContext>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/capture`, json('POST', { region })),
   captureStatus: (id: string) =>
     request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture`),
   captureStart: (id: string, device_id: number, candidate_mic_device_id?: number | null) =>

@@ -208,6 +208,64 @@ export interface ConversationGuidance {
   created_at: number
 }
 
+export type ConversationGuidanceFeedbackLabel =
+  | 'USEFUL'
+  | 'NOT_USEFUL'
+  | 'WRONG'
+  | 'SOURCE_WRONG'
+  | 'INTERRUPTING'
+  | 'TOO_EARLY'
+  | 'TOO_LATE'
+  | 'ALREADY_KNEW'
+
+export type ConversationMissedMomentLabel =
+  | 'SHOULD_HAVE_RECALLED'
+  | 'SHOULD_HAVE_WARNED_RISK'
+  | 'SHOULD_HAVE_ASKED'
+  | 'SHOULD_HAVE_SURFACED_SOURCE'
+  | 'OTHER'
+
+export type ConversationSessionFeedbackLabel =
+  | 'CONTINUE_HELPED_NEXT_PREP'
+  | 'CONTINUE_PARTLY_HELPED'
+  | 'CONTINUE_DID_NOT_HELP'
+  | 'WOULD_REUSE_SPACE'
+  | 'WOULD_NOT_REUSE_SPACE'
+
+export interface ConversationFeedbackEvent {
+  id: string
+  space_id: string
+  session_id: string
+  guidance_id: string | null
+  kind: 'GUIDANCE_QUALITY' | 'MISSED_MOMENT' | 'SESSION_OUTCOME'
+  label: string
+  detail: string
+  context: Record<string, unknown>
+  source_refs: SourceRef[]
+  created_at: number
+}
+
+export interface ConversationEvaluationExport {
+  kind: 'CONVERSATION_BETA_EVALUATION_EXPORT'
+  contract: 'v2.1-R1'
+  scope: { space_id: string }
+  evidence_boundary: {
+    storage: 'LOCAL_PRODUCT_DB'
+    remote_telemetry: false
+    human_labels: true
+    synthetic_or_dogfood_labels_are_not_pmf: true
+    interpretation: string
+  }
+  summary: {
+    feedback_events: number
+    guidance_quality_labels: number
+    missed_moments: number
+    session_outcome_labels: number
+    label_counts: Record<string, number>
+  }
+  events: ConversationFeedbackEvent[]
+}
+
 export interface ConversationOpenThread {
   id: string
   space_id: string

@@ -380,6 +380,12 @@ def review_item(item_id: str, body: ReviewBody):
         return conversations.review_item(item_id, body.action, body.patch)
 
 
+@router.post("/threads/{thread_id}/resolve")
+def resolve_open_thread(thread_id: str):
+    with domain_errors():
+        return conversations.resolve_open_thread(thread_id)
+
+
 class DraftActionCreate(BaseModel):
     kind: str
     title: str = Field(default="", max_length=300)

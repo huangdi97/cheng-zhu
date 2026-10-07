@@ -324,6 +324,11 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Expected Questions</div>
               <div className="mt-1 space-y-1">{liveContext.data.brief.expected_questions!.slice(0, 3).map((item) => <div key={item} className="text-[11px] text-text-secondary">• {item}</div>)}</div>
             </div> : null}
+            {(liveContext.data.brief.open_threads?.length ?? 0) > 0 ? <div className="mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen Open Threads</div>
+              <div className="mt-1 space-y-1">{liveContext.data.brief.open_threads!.slice(0, 4).map((thread) => <div key={thread.id} className="flex items-start gap-1.5 text-[11px] text-text-secondary"><StatusBadge tone="warn">{thread.kind}</StatusBadge><span>{thread.text}</span></div>)}</div>
+              <p className="mt-1 text-[10px] text-text-muted">只来自开始前已 review 的 longitudinal state；本场新提取内容要到 Continue 审核后才会进入下一场。</p>
+            </div> : null}
             <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] text-text-muted">
               <span>Sources {liveContext.data.sources.length}</span>
               <span>Quick Notes {liveContext.data.quick_notes.length}</span>

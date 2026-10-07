@@ -43,6 +43,15 @@ def get(base: str, path: str) -> dict:
 
 
 def main() -> int:
+    # GitHub Windows runners commonly expose a cp1252 console. Evidence
+    # payloads contain Chinese product text; console encoding must never turn a
+    # successful packaged runtime check into a false failure.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
     ap.add_argument("--frontend-dist", default="")
@@ -380,11 +389,13 @@ def main() -> int:
 
     result["passed"] = bool(ok)
     rendered = json.dumps(result, ensure_ascii=False, indent=2)
-    print(rendered)
+    # Persist the evidence before writing it to the human-facing console so a
+    # terminal encoding problem can never erase the machine-readable report.
     if args.report:
         report = Path(args.report)
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(rendered, encoding="utf-8")
+    print(rendered)
     shutil.rmtree(home, ignore_errors=True)
     return 0 if ok else 1
 

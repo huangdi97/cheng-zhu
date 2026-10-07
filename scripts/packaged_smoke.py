@@ -6,13 +6,17 @@ dir and a local fake OpenAI-compatible provider, so no real key is needed.
 Checks:
   1. sidecar starts without a system Python assumption (CHENGZHU_HOME set)
   2. /api/options, /api/config respond; version string
-  3. DB migrations applied under CHENGZHU_HOME/data (latest intelligence schema)
+  3. DB migrations applied under CHENGZHU_HOME/data (latest intelligence + product schema)
   4. prebuilt frontend served (CHENGZHU_FRONTEND_DIST)
   5. Fast Cue E2E with the fake provider: guidance_fast before the first
      answer_chunk, answer_done carries latency
   6. InterviewPack freeze persists across a sidecar restart
-  7. nothing is written next to the executable (install dir stays clean)
-  8. LICENSE / THIRD_PARTY_NOTICES bundled
+  7. Conversation Beta packaged loop:
+     Space -> Preflight -> frozen Session Pack -> reviewed truth/Open Thread
+     -> deterministic Guidance -> Continue -> History -> Export
+  8. Conversation product.db and continuity persist across sidecar restart
+  9. nothing is written next to the executable (install dir stays clean)
+ 10. LICENSE / THIRD_PARTY_NOTICES bundled
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -148,6 +152,211 @@ def ws_collect(port: int, ask_text: str, timeout: float = 40) -> list[dict]:
     return events
 
 
+def run_conversation_packaged_loop(base: str) -> dict[str, object]:
+    """Exercise the real Conversation API through the packaged sidecar.
+
+    This deliberately avoids microphone/OS-device assumptions. Audio transport
+    has its own tests; this gate proves the packaged product/runtime contract
+    and the persistence/truth boundaries that make Conversation Beta usable.
+    """
+    out: dict[str, object] = {}
+
+    space = http_json(
+        f"{base}/api/product/conversation/spaces",
+        "POST",
+        {
+            "title": "Packaged Project Sync",
+            "profile": "PROJECT_SYNC",
+            "description": "Windows packaged Conversation Beta smoke",
+            "default_goal": "确认 packaged Conversation continuity",
+        },
+    )
+    space_id = str(space["id"])
+    out["space_id"] = space_id
+    out["space_profile"] = space.get("profile")
+
+    goal = http_json(
+        f"{base}/api/product/conversation/spaces/{space_id}/goals",
+        "POST",
+        {
+            "title": "形成 packaged runtime 结论",
+            "outcome_definition": "Decision 有 provenance；Open Thread 可延续；重启后仍存在",
+            "priority": 90,
+        },
+    )
+    out["goal_id"] = goal.get("id")
+
+    session = http_json(
+        f"{base}/api/product/conversation/spaces/{space_id}/sessions",
+        "POST",
+        {
+            "title": "Packaged Project Sync #1",
+            "goal_ids": [goal["id"]],
+            "capture_mode": "NOTES_ONLY",
+            "processing_mode": "LOCAL",
+            "assistance_mode": "BALANCED",
+            "consent_ack": True,
+            "policy": {
+                "screen_context": "OFF",
+                "ai_assistance": "AI_ALLOWED",
+                "human_assistance": "HUMAN_PRACTICE_ONLY",
+                "share_privacy": "OFF",
+                "external_writeback": "REVIEW_REQUIRED",
+                "participant_consent_status": "NOT_APPLICABLE",
+                "participant_transparency_plan": "NOT_APPLICABLE",
+            },
+        },
+    )
+    session_id = str(session["id"])
+    out["session_id"] = session_id
+
+    preflight = http_json(f"{base}/api/product/conversation/sessions/{session_id}/preflight")
+    blockers = list(preflight.get("blockers") or [])
+    out["preflight_blockers"] = blockers
+    out["preflight_policy"] = preflight.get("policy")
+    out["preflight_processing_runtime"] = preflight.get("processing_runtime")
+    if blockers:
+        raise AssertionError(f"Conversation packaged preflight blockers: {blockers}")
+
+    started = http_json(f"{base}/api/product/conversation/sessions/{session_id}/start", "POST", {})
+    pack = started.get("pack") or {}
+    digest = str(pack.get("digest") or "")
+    if not digest:
+        raise AssertionError("Conversation Session Pack has no digest")
+    out["pack_id"] = pack.get("id")
+    out["pack_digest"] = digest
+    payload = pack.get("payload") or {}
+    out["pack_policy"] = payload.get("policy")
+    out["pack_processing_runtime"] = payload.get("processing_runtime")
+    if (payload.get("policy") or {}).get("share_privacy") != "OFF":
+        raise AssertionError("Conversation packaged pack did not freeze Share Privacy OFF")
+
+    decision = http_json(
+        f"{base}/api/product/conversation/sessions/{session_id}/items",
+        "POST",
+        {
+            "item_type": "Decision",
+            "title": "packaged Conversation 使用 frozen Session Pack",
+            "state": "PROPOSED",
+            "source_refs": [
+                {
+                    "kind": "USER_NOTE",
+                    "excerpt": "packaged smoke explicitly confirms the frozen Session Pack rule",
+                    "visibility": "PRIVATE",
+                }
+            ],
+            "source_excerpt": "packaged smoke explicitly confirms the frozen Session Pack rule",
+            "confidence": 1.0,
+            "epistemic_status": "OBSERVED",
+        },
+    )
+    decision = http_json(
+        f"{base}/api/product/conversation/items/{decision['id']}/review",
+        "POST",
+        {"action": "CONFIRM", "patch": {}},
+    )
+    out["decision"] = {
+        "id": decision.get("id"),
+        "state": decision.get("state"),
+        "review_status": decision.get("review_status"),
+        "source_refs": decision.get("source_refs"),
+    }
+    if decision.get("state") != "AGREED" or not decision.get("source_refs"):
+        raise AssertionError("Conversation Decision did not become sourced AGREED truth")
+
+    question = http_json(
+        f"{base}/api/product/conversation/sessions/{session_id}/items",
+        "POST",
+        {
+            "item_type": "OpenQuestion",
+            "title": "packaged restart 后 continuity 是否仍存在？",
+            "state": "PROPOSED",
+            "source_refs": [
+                {
+                    "kind": "USER_NOTE",
+                    "excerpt": "packaged continuity must survive restart",
+                    "visibility": "PRIVATE",
+                }
+            ],
+            "confidence": 1.0,
+            "epistemic_status": "OBSERVED",
+        },
+    )
+    question = http_json(
+        f"{base}/api/product/conversation/items/{question['id']}/review",
+        "POST",
+        {"action": "CONFIRM", "patch": {}},
+    )
+    out["open_question"] = {
+        "id": question.get("id"),
+        "review_status": question.get("review_status"),
+    }
+
+    detail = http_json(f"{base}/api/product/conversation/spaces/{space_id}")
+    threads = list(detail.get("threads") or [])
+    out["open_threads"] = [
+        {"id": t.get("id"), "status": t.get("status"), "text": t.get("text")}
+        for t in threads
+    ]
+    if not any(t.get("status") == "OPEN" and question["id"] in json.dumps(t.get("source_refs") or []) for t in threads):
+        raise AssertionError("reviewed OpenQuestion did not project to a sourced Open Thread")
+
+    guidance = http_json(
+        f"{base}/api/product/conversation/sessions/{session_id}/guidance/evaluate",
+        "POST",
+        {
+            "candidate_text": "提醒这场使用 frozen Session Pack，并确认 restart continuity",
+            "source_refs": [
+                {
+                    "kind": "USER_NOTE",
+                    "excerpt": "packaged smoke verified source",
+                    "visibility": "PRIVATE",
+                }
+            ],
+            "relevance": 1.0,
+            "novelty": 1.0,
+            "provenance_strength": 1.0,
+            "goal_relevance": 1.0,
+            "decision_impact": 1.0,
+        },
+    )
+    event = guidance.get("guidance")
+    if not event:
+        raise AssertionError(f"Conversation deterministic Guidance suppressed unexpectedly: {guidance}")
+    out["guidance"] = {
+        "kind": event.get("kind"),
+        "expression_action": event.get("expression_action"),
+        "reason": event.get("reason"),
+        "source_refs": event.get("source_refs"),
+    }
+
+    ended = http_json(f"{base}/api/product/conversation/sessions/{session_id}/end", "POST", {})
+    out["continue_review_required"] = ended.get("review_required")
+    out["continue_next_focus"] = ended.get("next_focus")
+    if not any(x.get("id") == decision["id"] for x in ended.get("decisions") or []):
+        raise AssertionError("confirmed Decision missing from Continue")
+    if not any(x.get("id") == question["id"] for x in ended.get("open_questions") or []):
+        raise AssertionError("reviewed OpenQuestion missing from Continue")
+
+    history = http_json(f"{base}/api/product/conversation/history?limit=20")
+    history_items = list(history.get("items") or [])
+    out["history_count"] = len(history_items)
+    if not any(x.get("id") == session_id and x.get("space_id") == space_id for x in history_items):
+        raise AssertionError("ended Conversation session missing from Conversation History")
+
+    exported = http_json(f"{base}/api/product/conversation/spaces/{space_id}/export")
+    out["export_keys"] = sorted(exported.keys())
+    serialized_export = json.dumps(exported, ensure_ascii=False)
+    if str(decision["id"]) not in serialized_export or str(question["id"]) not in serialized_export:
+        raise AssertionError("Conversation export lost reviewed truth/provenance")
+
+    retention = http_json(f"{base}/api/product/conversation/spaces/{space_id}/retention")
+    out["retention_policy"] = retention.get("policy")
+    out["retention_would_delete"] = retention.get("would_delete")
+
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
@@ -219,6 +428,18 @@ def main() -> int:
         checks["intelligence_schema_expected"] = expected_schema
         ok &= expected_schema is not None and user_version == expected_schema
 
+        conversation = run_conversation_packaged_loop(base)
+        checks["conversation_packaged_loop"] = conversation
+
+        product_db = home / "data" / "product.db"
+        product_version = sqlite3.connect(product_db).execute("PRAGMA user_version").fetchone()[0] if product_db.exists() else None
+        checks["product_schema_version"] = product_version
+        product_migrations = (Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "product_migrations.py").read_text(encoding="utf-8")
+        product_version_match = re.search(r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)", product_migrations, re.MULTILINE)
+        expected_product_schema = int(product_version_match.group(1)) if product_version_match else None
+        checks["product_schema_expected"] = expected_product_schema
+        ok &= expected_product_schema is not None and product_version == expected_product_schema
+
         if args.frontend_dist:
             with urllib.request.urlopen(f"{base}/", timeout=10) as resp:
                 html = resp.read().decode("utf-8", "replace")
@@ -243,6 +464,12 @@ def main() -> int:
         after = http_json(f"{base}/api/intelligence/pack")
         checks["pack_persisted_after_restart"] = bool(after.get("frozen")) and after["pack"]["id"] == pack.get("id")
         ok &= bool(checks["pack_persisted_after_restart"])
+
+        conv_after = http_json(f"{base}/api/product/conversation/history?limit=20")
+        conv_ids = [x.get("id") for x in conv_after.get("items") or []]
+        conversation_session_id = str((checks.get("conversation_packaged_loop") or {}).get("session_id") or "")
+        checks["conversation_persisted_after_restart"] = conversation_session_id in conv_ids
+        ok &= bool(checks["conversation_persisted_after_restart"])
     except Exception as exc:  # noqa: BLE001
         checks["error"] = f"{type(exc).__name__}: {exc}"
         ok = False

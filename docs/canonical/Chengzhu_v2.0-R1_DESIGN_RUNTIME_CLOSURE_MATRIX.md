@@ -408,6 +408,13 @@ Audio retention = OFF
 
 Local processing 对可能进入 remote STT 的配置 fail-closed；Capture start 会重新校验，防止 Preflight 后配置变化绕过 policy。
 
+MANUAL Screen Context 的 vision route 也按同一原则解析并冻结：
+- LOCAL + remote vision route → fail-closed；
+- Session Pack 冻结 vision fingerprint；
+- 会中 provider / model / base URL 改变 → 当前 Session 拒绝继续抓屏；
+- 原始 screenshot 只在内存中进入 vision，product.db / export 仅保留提取文本 + image hash + model/route provenance；
+- Screen Context observation = OBSERVED_NOT_CONFIRMED，不能直接成为 Decision / Commitment truth。
+
 ---
 
 # 12. Continue / Reviewed Write-back
@@ -472,7 +479,8 @@ APPROVED
 
 | 能力 | 当前状态 | 为什么不伪装 |
 | --- | --- | --- |
-| Conversation Screen Context | BLOCKED | Interview screenshot path 不能无条件复用到第三方会话 |
+| Conversation Screen Context · MANUAL | RUNTIME CANDIDATE · PR #26 | 独立 Conversation namespace；复用本机 capture transport，但不复用 Interview answer/review state；原图不落库 |
+| Conversation Screen Context · AUTO | BLOCKED | 自动抓屏需要独立节流、显式 policy、可见状态与 runtime evidence，不能由 MANUAL 推导完成 |
 | Conversation Human Coach | BLOCKED | 需要独立 policy / disclosure / runtime evidence |
 | Conversation Private Overlay / Share Privacy | BLOCKED | 需要 presenter-visible control 与 Conversation namespace |
 | Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |

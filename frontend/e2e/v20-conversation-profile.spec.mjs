@@ -666,6 +666,8 @@ test.describe('v2.0 Conversation Profile', () => {
 
     await page.getByRole('button', { name: '结束并 Continue' }).click()
     await expect(page.getByText('这场之后')).toBeVisible()
+    await expect(page.getByText('What changed')).toBeVisible()
+    await expect(page.getByText(`• ${DECISION.title} · AGREED`)).toBeVisible()
     await expect(page.getByText('Next Focus · rollback owner 还没有明确')).toBeVisible()
   })
 

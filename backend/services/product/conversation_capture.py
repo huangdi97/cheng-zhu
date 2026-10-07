@@ -68,6 +68,12 @@ def start(session_id: str, device_id: int, candidate_mic_device_id: Optional[int
         raise ValueError("本场记录方式不是 TRANSCRIPT")
     if not session["consent_ack"]:
         raise ValueError("启动转写前需要完成 Preflight 记录确认")
+    processing = conversations.processing_runtime_status(
+        session,
+        include_self_mic=candidate_mic_device_id is not None,
+    )
+    if processing["blockers"]:
+        raise ValueError(processing["blockers"][0])
 
     with _lock:
         if _active_session_id and _active_session_id != session_id:
@@ -233,7 +239,7 @@ def record_transcription(
     }
     store.insert("conversation_transcript_segment", row)
 
-    guidance = conversations.guidance_from_transcript(session_id, cleaned)
+    guidance = conversations.guidance_from_transcript(session_id, cleaned, channel=str(channel or "PRIMARY_AUDIO"))
     try:
         from api.realtime.ws import broadcast
         broadcast({"type": "conversation_transcription", "session_id": session_id, "segment": row})

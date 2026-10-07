@@ -1,8 +1,9 @@
-"""Chengzhu v2.0 Personal Conversation Intelligence contracts.
+"""Chengzhu v2.0 Personal Conversation Intelligence executable contracts.
 
-This module remains storage/UI agnostic.  It upgrades the v1.x future-profile
-placeholder into an executable vocabulary for v2 design without claiming that
-Conversation runtime, routes, database tables, or product UI already exist.
+This module stays storage/UI agnostic, but it is no longer a hypothetical
+future-profile placeholder: Conversation runtime, routes, product.db entities
+and product UI exist.  The contract deliberately separates productized launch
+wedges from templates whose specialized behavior still needs validation.
 
 Truth rule:
     a model candidate is not a confirmed conversation fact.
@@ -110,6 +111,35 @@ class ProcessingMode(str, Enum):
     OFF = "OFF"
 
 
+class AiAssistancePolicy(str, Enum):
+    FORBIDDEN = "AI_FORBIDDEN"
+    LIMITED = "AI_LIMITED"
+    ALLOWED = "AI_ALLOWED"
+    EXPECTED = "AI_EXPECTED"
+
+
+class HumanAssistancePolicy(str, Enum):
+    FORBIDDEN = "HUMAN_FORBIDDEN"
+    PRACTICE_ONLY = "HUMAN_PRACTICE_ONLY"
+    ALLOWED = "HUMAN_ALLOWED"
+
+
+@dataclass
+class ConversationSessionPolicy:
+    transcript_retention: str = "SPACE_POLICY"
+    screen_context: str = "OFF"
+    ai_assistance: AiAssistancePolicy = AiAssistancePolicy.ALLOWED
+    human_assistance: HumanAssistancePolicy = HumanAssistancePolicy.PRACTICE_ONLY
+    share_privacy: str = "OFF"
+    external_writeback: str = "REVIEW_REQUIRED"
+    participant_consent_status: str = "NOT_RECORDED"
+    participant_transparency_plan: str = "NOT_RECORDED"
+    connector_permissions: list[str] = field(default_factory=list)
+    speaker_biometric_identity: str = "OFF"
+    emotion_sentiment_profiling: str = "OFF"
+    hidden_intent_claims: str = "OFF"
+
+
 class SourceKind(str, Enum):
     TRANSCRIPT_SEGMENT = "TRANSCRIPT_SEGMENT"
     USER_NOTE = "USER_NOTE"
@@ -141,6 +171,9 @@ class ConversationProfile:
     productized: bool
     default_mode: AssistanceMode = AssistanceMode.BALANCED
     design_complete: bool = True
+    runtime_available: bool = False
+    launch_wedge: bool = False
+    specialized_behavior_validated: bool = False
 
 
 @dataclass
@@ -217,6 +250,19 @@ class ExpressionIntent:
 
 
 @dataclass
+class ExpressionPlan:
+    action: ExpressionAction = ExpressionAction.SILENT
+    guidance_kind: GuidanceKind | None = None
+    target_participant_id: str = ""
+    text: str = ""
+    source_refs: list[SourceRef] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    max_length: int = 0
+    render_as: str = "SILENCE"
+    suppression_reasons: list[str] = field(default_factory=list)
+
+
+@dataclass
 class OpportunityScore:
     relevance: float = 0.0
     novelty: float = 0.0
@@ -270,6 +316,8 @@ PROFILES: tuple[ConversationProfile, ...] = (
         "面试",
         (GuidanceKind.ANSWER_CUE, GuidanceKind.QUESTION, GuidanceKind.RISK, GuidanceKind.DELIVERY),
         productized=True,
+        runtime_available=True,
+        specialized_behavior_validated=True,
     ),
     ConversationProfile(
         ConversationProfileKind.PROJECT_SYNC,
@@ -279,9 +327,10 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.QUESTION,
             GuidanceKind.RISK,
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
-            GuidanceKind.TALKING_POINT,
         ),
         productized=False,
+        runtime_available=True,
+        launch_wedge=True,
     ),
     ConversationProfile(
         ConversationProfileKind.DESIGN_REVIEW,
@@ -294,26 +343,37 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.CONTRIBUTION_OPPORTUNITY,
         ),
         productized=False,
+        runtime_available=True,
+        launch_wedge=True,
     ),
     ConversationProfile(
         ConversationProfileKind.PRESENTATION_QA,
         "演示 / Q&A",
         (GuidanceKind.ANSWER_CUE, GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.DELIVERY),
         productized=False,
+        runtime_available=True,
         default_mode=AssistanceMode.PRESENTATION,
     ),
     ConversationProfile(
         ConversationProfileKind.ONE_ON_ONE,
         "1:1",
-        (GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.TALKING_POINT, GuidanceKind.RISK),
+        (GuidanceKind.RECALL, GuidanceKind.QUESTION, GuidanceKind.TALKING_POINT),
         productized=False,
+        runtime_available=True,
         default_mode=AssistanceMode.ONE_ON_ONE,
     ),
     ConversationProfile(
         ConversationProfileKind.CLIENT_CALL,
         "客户会",
-        tuple(GuidanceKind),
+        (
+            GuidanceKind.RECALL,
+            GuidanceKind.ANSWER_CUE,
+            GuidanceKind.QUESTION,
+            GuidanceKind.RISK,
+            GuidanceKind.CONTRIBUTION_OPPORTUNITY,
+        ),
         productized=False,
+        runtime_available=True,
     ),
     ConversationProfile(
         ConversationProfileKind.NEGOTIATION,
@@ -323,15 +383,16 @@ PROFILES: tuple[ConversationProfile, ...] = (
             GuidanceKind.TALKING_POINT,
             GuidanceKind.QUESTION,
             GuidanceKind.RISK,
-            GuidanceKind.CONTRIBUTION_OPPORTUNITY,
         ),
         productized=False,
+        runtime_available=True,
     ),
     ConversationProfile(
         ConversationProfileKind.MEETING,
         "会议（兼容抽象）",
         tuple(GuidanceKind),
         productized=False,
+        runtime_available=False,
     ),
 )
 

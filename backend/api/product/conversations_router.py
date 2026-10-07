@@ -66,6 +66,12 @@ def home():
     return conversations.home_summary()
 
 
+@router.get("/history")
+def history(limit: int = 100):
+    with domain_errors():
+        return {"items": conversations.conversation_history(limit)}
+
+
 @router.get("/diagnostics")
 def diagnostics():
     return conversations.diagnostics()
@@ -112,10 +118,11 @@ def patch_space(space_id: str, body: SpacePatch):
 
 
 @router.delete("/spaces/{space_id}")
-def delete_space(space_id: str):
+def delete_space(space_id: str, confirm: bool = False):
     with domain_errors():
-        _stop_capture_for_space(space_id)
-        return {"deleted": conversations.delete_space(space_id)}
+        if confirm:
+            _stop_capture_for_space(space_id)
+        return {"deleted": conversations.delete_space(space_id, confirm=confirm)}
 
 
 @router.get("/spaces/{space_id}/prepare")
@@ -158,18 +165,55 @@ def add_goal(space_id: str, body: GoalCreate):
         return conversations.create_goal(space_id, **body.model_dump())
 
 
+class GoalPatch(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=240)
+    outcome_definition: Optional[str] = Field(default=None, max_length=2000)
+    priority: Optional[int] = Field(default=None, ge=0, le=100)
+    status: Optional[str] = None
+
+
+@router.patch("/goals/{goal_id}")
+def patch_goal(goal_id: str, body: GoalPatch):
+    with domain_errors():
+        return conversations.update_goal(goal_id, body.model_dump(exclude_unset=True))
+
+
 class ParticipantCreate(BaseModel):
     display_name: str = Field(default="", max_length=160)
     role: str = Field(default="", max_length=160)
     organization: str = Field(default="", max_length=160)
     session_id: str = ""
     identity_source: str = "USER"
+    explicit_priority: str = Field(default="", max_length=800)
+    explicit_concern: str = Field(default="", max_length=1200)
+    stated_position: str = Field(default="", max_length=1600)
+    decision_authority: str = Field(default="", max_length=500)
+    relationship_context: str = Field(default="", max_length=800)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 @router.post("/spaces/{space_id}/participants")
 def add_participant(space_id: str, body: ParticipantCreate):
     with domain_errors():
         return conversations.add_participant(space_id, **body.model_dump())
+
+
+class ParticipantPatch(BaseModel):
+    display_name: Optional[str] = Field(default=None, max_length=160)
+    role: Optional[str] = Field(default=None, max_length=160)
+    organization: Optional[str] = Field(default=None, max_length=160)
+    explicit_priority: Optional[str] = Field(default=None, max_length=800)
+    explicit_concern: Optional[str] = Field(default=None, max_length=1200)
+    stated_position: Optional[str] = Field(default=None, max_length=1600)
+    decision_authority: Optional[str] = Field(default=None, max_length=500)
+    relationship_context: Optional[str] = Field(default=None, max_length=800)
+    source_refs: Optional[list[dict[str, Any]]] = None
+
+
+@router.patch("/participants/{participant_id}")
+def patch_participant(participant_id: str, body: ParticipantPatch):
+    with domain_errors():
+        return conversations.update_participant(participant_id, body.model_dump(exclude_unset=True))
 
 
 class SessionCreate(BaseModel):
@@ -180,6 +224,7 @@ class SessionCreate(BaseModel):
     processing_mode: str = "LOCAL"
     assistance_mode: str = ""
     consent_ack: bool = False
+    policy: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/spaces/{space_id}/sessions")
@@ -192,6 +237,12 @@ def create_session(space_id: str, body: SessionCreate):
 def get_session(session_id: str):
     with domain_errors():
         return conversations.require_session(session_id)
+
+
+@router.get("/sessions/{session_id}/context")
+def get_session_context(session_id: str):
+    with domain_errors():
+        return conversations.session_context(session_id)
 
 
 class SessionDelete(BaseModel):
@@ -210,6 +261,7 @@ class SessionPatch(BaseModel):
     capture_mode: Optional[str] = None
     processing_mode: Optional[str] = None
     consent_ack: Optional[bool] = None
+    policy: Optional[dict[str, Any]] = None
 
 
 @router.patch("/sessions/{session_id}")
@@ -349,6 +401,16 @@ def create_followup_draft(session_id: str):
         return conversations.followup_draft(session_id)
 
 
+class DerivedDraftCreate(BaseModel):
+    kind: str
+
+
+@router.post("/sessions/{session_id}/derived-draft")
+def create_derived_draft(session_id: str, body: DerivedDraftCreate):
+    with domain_errors():
+        return conversations.derived_writeback_draft(session_id, body.kind)
+
+
 @router.get("/spaces/{space_id}/draft-actions")
 def list_draft_actions(space_id: str, status: str = ""):
     with domain_errors():
@@ -369,6 +431,9 @@ class GuidanceBody(BaseModel):
     current_topic: str = Field(default="", max_length=500)
     direct_question: str = Field(default="", max_length=1200)
     answer_cue: str = Field(default="", max_length=1200)
+    critical_risk: str = Field(default="", max_length=1200)
+    talking_point: str = Field(default="", max_length=1200)
+    delivery_focus: str = Field(default="", max_length=1200)
     candidate_text: str = Field(default="", max_length=1200)
     source_refs: list[dict[str, Any]] = Field(default_factory=list)
     user_speaking: bool = False
@@ -384,6 +449,11 @@ class GuidanceBody(BaseModel):
     uncertainty: float = 0
     social_risk: float = 0
     stale_context_risk: float = 0
+    audience_role: str = Field(default="", max_length=240)
+    audience_priority: str = Field(default="", max_length=800)
+    audience_concern: str = Field(default="", max_length=1200)
+    decision_authority: str = Field(default="", max_length=500)
+    relationship_context: str = Field(default="", max_length=800)
 
 
 @router.post("/sessions/{session_id}/guidance/evaluate")

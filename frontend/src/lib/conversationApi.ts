@@ -2,10 +2,12 @@ import { apiRequest as request } from './api'
 import type {
   AssistanceMode,
   CaptureMode,
+  ConversationAskResult,
   ConversationCaptureStatus,
   ConversationContinue,
   ConversationDraftAction,
   ConversationGuidance,
+  ConversationHistoryItem,
   ConversationHome,
   ConversationItem,
   ConversationItemType,
@@ -13,6 +15,7 @@ import type {
   ConversationPrepare,
   ConversationProfile,
   ConversationSession,
+  ConversationSessionContext,
   ConversationTranscriptSegment,
   ConversationSpace,
   ConversationSpaceDetail,
@@ -32,6 +35,7 @@ function list<T>(payload: unknown): { items: T[] } {
 export const conversationApi = {
   templates: () => request<unknown>(`${B}/templates`).then((p) => list<ConversationTemplate>(p)),
   home: () => request<ConversationHome>(`${B}/home`),
+  history: (limit = 100) => request<{ items: ConversationHistoryItem[] }>(`${B}/history?limit=${limit}`),
   diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
@@ -54,7 +58,7 @@ export const conversationApi = {
   space: (id: string) => request<ConversationSpaceDetail>(`${B}/spaces/${encodeURIComponent(id)}`),
   patchSpace: (id: string, body: Partial<ConversationSpace>) =>
     request<ConversationSpace>(`${B}/spaces/${encodeURIComponent(id)}`, json('PATCH', body)),
-  deleteSpace: (id: string) => request<{ deleted: boolean }>(`${B}/spaces/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteSpace: (id: string, confirm = false) => request<{ deleted: boolean }>(`${B}/spaces/${encodeURIComponent(id)}?confirm=${confirm ? 'true' : 'false'}`, { method: 'DELETE' }),
   prepare: (id: string) => request<ConversationPrepare>(`${B}/spaces/${encodeURIComponent(id)}/prepare`),
   exportSpace: (id: string) => request<Record<string, unknown>>(`${B}/spaces/${encodeURIComponent(id)}/export`),
   retentionPreview: (id: string) => request<{
@@ -69,8 +73,30 @@ export const conversationApi = {
 
   addGoal: (id: string, body: { title: string; outcome_definition?: string; priority?: number }) =>
     request(`${B}/spaces/${encodeURIComponent(id)}/goals`, json('POST', body)),
-  addParticipant: (id: string, body: { display_name?: string; role?: string; organization?: string }) =>
-    request(`${B}/spaces/${encodeURIComponent(id)}/participants`, json('POST', body)),
+  patchGoal: (id: string, body: { title?: string; outcome_definition?: string; priority?: number; status?: 'ACTIVE' | 'RESOLVED' }) =>
+    request(`${B}/goals/${encodeURIComponent(id)}`, json('PATCH', body)),
+  addParticipant: (id: string, body: {
+    display_name?: string
+    role?: string
+    organization?: string
+    explicit_priority?: string
+    explicit_concern?: string
+    stated_position?: string
+    decision_authority?: string
+    relationship_context?: string
+    source_refs?: Array<Record<string, unknown>>
+  }) => request(`${B}/spaces/${encodeURIComponent(id)}/participants`, json('POST', body)),
+  patchParticipant: (id: string, body: {
+    display_name?: string
+    role?: string
+    organization?: string
+    explicit_priority?: string
+    explicit_concern?: string
+    stated_position?: string
+    decision_authority?: string
+    relationship_context?: string
+    source_refs?: Array<Record<string, unknown>>
+  }) => request(`${B}/participants/${encodeURIComponent(id)}`, json('PATCH', body)),
   createSession: (id: string, body: {
     title?: string
     goal_ids?: string[]
@@ -79,15 +105,17 @@ export const conversationApi = {
     processing_mode: ProcessingMode
     assistance_mode: AssistanceMode
     consent_ack: boolean
+    policy?: Partial<ConversationSession['policy']>
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
+  sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>
-    request<{ deleted: boolean; session_id: string; provenance_tombstones: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
+    request<{ deleted: boolean; session_id: string; provenance_tombstones: number; removed_open_thread_projections: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
 
-  patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack'>>) =>
+  patchSession: (id: string, body: Partial<Pick<ConversationSession, 'assistance_mode' | 'capture_mode' | 'processing_mode' | 'consent_ack' | 'policy'>>) =>
     request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`, json('PATCH', body)),
   ask: (id: string, question: string) =>
-    request<{ answer: string; matches: ConversationItem[]; grounded: boolean }>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
+    request<ConversationAskResult>(`${B}/sessions/${encodeURIComponent(id)}/ask`, json('POST', { question })),
   captureStatus: (id: string) =>
     request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture`),
   captureStart: (id: string, device_id: number, candidate_mic_device_id?: number | null) =>
@@ -120,12 +148,15 @@ export const conversationApi = {
     epistemic_status?: string
     review_status?: string
   }) => request<ConversationItem>(`${B}/sessions/${encodeURIComponent(id)}/items`, json('POST', body)),
-  reviewItem: (id: string, action: 'CONFIRM' | 'EDIT' | 'REJECT' | 'DONE' | 'SUPERSEDE', patch: Record<string, unknown> = {}) =>
+  reviewItem: (id: string, action: 'CONFIRM' | 'EDIT' | 'REJECT' | 'DONE' | 'RESOLVE' | 'SUPERSEDE', patch: Record<string, unknown> = {}) =>
     request<ConversationItem>(`${B}/items/${encodeURIComponent(id)}/review`, json('POST', { action, patch })),
   evaluateGuidance: (id: string, body: {
     current_topic?: string
     direct_question?: string
     answer_cue?: string
+    critical_risk?: string
+    talking_point?: string
+    delivery_focus?: string
     candidate_text?: string
     source_refs?: SourceRef[]
     user_speaking?: boolean
@@ -141,6 +172,11 @@ export const conversationApi = {
     uncertainty?: number
     social_risk?: number
     stale_context_risk?: number
+    audience_role?: string
+    audience_priority?: string
+    audience_concern?: string
+    decision_authority?: string
+    relationship_context?: string
   }) => request<{ guidance: ConversationGuidance | null; suppressed: string | null; event?: ConversationGuidance }>(
     `${B}/sessions/${encodeURIComponent(id)}/guidance/evaluate`, json('POST', body),
   ),
@@ -148,6 +184,8 @@ export const conversationApi = {
     request<ConversationGuidance>(`${B}/guidance/${encodeURIComponent(id)}/status`, json('POST', { action })),
   followupDraft: (sessionId: string) =>
     request<ConversationDraftAction>(`${B}/sessions/${encodeURIComponent(sessionId)}/followup-draft`, json('POST')),
+  derivedDraft: (sessionId: string, kind: 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT') =>
+    request<ConversationDraftAction>(`${B}/sessions/${encodeURIComponent(sessionId)}/derived-draft`, json('POST', { kind })),
   draftActions: (spaceId: string) =>
     request<unknown>(`${B}/spaces/${encodeURIComponent(spaceId)}/draft-actions`).then((p) => list<ConversationDraftAction>(p)),
   reviewDraftAction: (id: string, action: 'APPROVE' | 'DISMISS' | 'RESET') =>

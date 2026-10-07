@@ -8,7 +8,7 @@ from services.storage import product as store
 
 
 def test_product_db_schema_is_versioned_and_idempotent(product_env):
-    assert store.schema_version() == 4
+    assert store.schema_version() == 5
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -19,10 +19,10 @@ def test_product_db_schema_is_versioned_and_idempotent(product_env):
                   "conversation_session_pack", "conversation_item", "conversation_guidance_event",
                   "conversation_draft_action", "conversation_transcript_segment", "conversation_provenance_tombstone"):
         assert table in tables, table
-    from services.storage.product_migrations import ensure_schema
+    from services.storage.product_migrations import LATEST_SCHEMA_VERSION, ensure_schema
 
     conn = sqlite3.connect(store.DB_PATH)
-    assert ensure_schema(conn) == 4  # re-run is a no-op
+    assert ensure_schema(conn) == LATEST_SCHEMA_VERSION  # re-run is a no-op
     conn.close()
 
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
-import type { AssistanceMode, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItem, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -11,11 +11,21 @@ type DevicePayload = { devices?: AudioDevice[] }
 
 export default function ConversationLivePage({ sessionId }: { sessionId: string }) {
   const session = useAsync(() => conversationApi.session(sessionId), [sessionId])
+  const liveContext = useAsync(() => conversationApi.sessionContext(sessionId), [sessionId])
   const devices = useAsync(async () => (await api.getDevices()) as DevicePayload, [])
   const [topic, setTopic] = useState('')
   const [question, setQuestion] = useState('')
   const [candidate, setCandidate] = useState('')
+  const [talkingPoint, setTalkingPoint] = useState('')
+  const [deliveryFocus, setDeliveryFocus] = useState('')
+  const [criticalRisk, setCriticalRisk] = useState('')
   const [source, setSource] = useState('')
+  const [audienceParticipantId, setAudienceParticipantId] = useState('')
+  const [audienceRole, setAudienceRole] = useState('')
+  const [audiencePriority, setAudiencePriority] = useState('')
+  const [audienceConcern, setAudienceConcern] = useState('')
+  const [decisionAuthority, setDecisionAuthority] = useState('')
+  const [relationshipContext, setRelationshipContext] = useState('')
   const [speaking, setSpeaking] = useState(false)
   const [guidance, setGuidance] = useState<ConversationGuidance | null>(null)
   const [suppressed, setSuppressed] = useState('')
@@ -27,7 +37,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [summary, setSummary] = useState<ConversationContinue | null>(null)
   const [mode, setMode] = useState<AssistanceMode>('BALANCED')
   const [askText, setAskText] = useState('')
-  const [askResult, setAskResult] = useState<{ answer: string; matches: ConversationItem[]; grounded: boolean } | null>(null)
+  const [askResult, setAskResult] = useState<ConversationAskResult | null>(null)
   const [capture, setCapture] = useState<ConversationCaptureStatus | null>(null)
   const [segments, setSegments] = useState<ConversationTranscriptSegment[]>([])
   const [primaryDevice, setPrimaryDevice] = useState('')
@@ -37,6 +47,23 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
   }, [session.data?.assistance_mode])
+
+  useEffect(() => {
+    const participants = liveContext.data?.participants ?? []
+    if (!audienceParticipantId && participants.length) setAudienceParticipantId(participants[0].id)
+  }, [liveContext.data?.participants, audienceParticipantId])
+
+  useEffect(() => {
+    if (!audienceParticipantId) return
+    const participant = liveContext.data?.participants.find((item) => item.id === audienceParticipantId)
+    if (!participant) return
+    const known = participant.counterparty_state.known_explicit ?? {}
+    setAudienceRole(participant.role || '')
+    setAudiencePriority(known.priority || '')
+    setAudienceConcern(known.concern || '')
+    setDecisionAuthority(known.decision_authority || '')
+    setRelationshipContext(known.relationship_context || '')
+  }, [audienceParticipantId, liveContext.data?.participants])
 
   useEffect(() => {
     const all = devices.data?.devices ?? []
@@ -116,6 +143,9 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       const result = await conversationApi.evaluateGuidance(sessionId, {
         current_topic: topic,
         direct_question: question,
+        critical_risk: criticalRisk,
+        talking_point: talkingPoint,
+        delivery_focus: deliveryFocus,
         candidate_text: candidate,
         source_refs: refs,
         user_speaking: speaking,
@@ -126,6 +156,11 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         goal_relevance: 0.8,
         decision_impact: 0.8,
         interruption_cost: speaking ? 2 : 0,
+        audience_role: audienceRole,
+        audience_priority: audiencePriority,
+        audience_concern: audienceConcern,
+        decision_authority: decisionAuthority,
+        relationship_context: relationshipContext,
       })
       setGuidance(result.guidance); setSuppressed(result.suppressed ?? '')
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -175,7 +210,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
   return (
     <Page wide testId="conversation-live">
-      <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode}`}
+      <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode} · AI ${s.policy?.ai_assistance ?? 'AI_ALLOWED'} · Human ${s.policy?.human_assistance ?? 'HUMAN_PRACTICE_ONLY'}`}
         actions={<PrimaryButton disabled={busy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>} />
 
       {error ? <ErrorState message={error} /> : null}
@@ -194,7 +229,6 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                   <option value="PRESENTATION">Presentation</option>
                   <option value="ONE_ON_ONE">1:1</option>
                 </select>
-                <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />我正在连续表达</label>
               </div>
             </div>
             {s.capture_mode === 'TRANSCRIPT' ? (
@@ -214,13 +248,39 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
             ) : (
               <div className="mt-4 rounded-xl border border-bg-tertiary px-3 py-2 text-[11px] text-text-muted">本场 Preflight 选择的是 {s.capture_mode}；不会启动音频转写。结构化事项与 Manual Ask 仍可使用。</div>
             )}
+            <details className="mt-4 rounded-xl border border-bg-tertiary/70 bg-bg-primary/35 p-3" data-testid="manual-guidance-lab">
+              <summary className="cursor-pointer text-xs font-semibold text-text-secondary">高级 / 手动 Guidance 验证</summary>
+              <p className="mt-2 text-[11px] text-text-muted">正常 TRANSCRIPT 会自动驱动 Direct Question / Recall / Opportunity。这里保留给 dogfood、无音频模拟和边界验证，不是主交互。</p>
+              <div className="mt-3">
+                <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={speaking} onChange={(e) => setSpeaking(e.target.checked)} />模拟：我正在连续表达</label>
+              </div>
             <div className="mt-4 grid gap-3">
-              <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
-              <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
-              <Field label="值得补充的候选内容（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale" /></Field>
-              <Field label="来源 / 依据"><textarea className={inputCls} rows={2} value={source} onChange={(e) => setSource(e.target.value)} placeholder="主动 Contribution Opportunity 必须有来源；没有来源会被抑制。" /></Field>
-            </div>
-            <div className="mt-4"><PrimaryButton disabled={busy || s.status !== 'ACTIVE'} onClick={evaluate} icon={<Volume2 className="h-3.5 w-3.5" />}>评估当前 Guidance</PrimaryButton></div>
+                <Field label="当前话题"><input className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="例如：offline migration" /></Field>
+                <Field label="对方直接问我的问题（如有）"><input className={inputCls} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="直接问题优先于主动 Opportunity" /></Field>
+                <Field label="高价值 Opportunity 候选（如有）"><textarea className={inputCls} rows={3} value={candidate} onChange={(e) => setCandidate(e.target.value)} placeholder="例如：Q4 benchmark 已覆盖 10x data scale；必须有来源，是否显示由 Arbiter 决定。" /></Field>
+                <Field label="明确 Talking Point（如有）"><textarea className={inputCls} rows={2} value={talkingPoint} onChange={(e) => setTalkingPoint(e.target.value)} placeholder="你明确希望组织成 talking point 的内容；仍要求来源且受 Profile 允许项约束。" /></Field>
+                <Field label="Delivery / 表达重点（如有）"><textarea className={inputCls} rows={2} value={deliveryFocus} onChange={(e) => setDeliveryFocus(e.target.value)} placeholder="例如：控制在 45 秒；先回答 CTO 的 rollback concern。只改表达结构，不改事实。" /></Field>
+                <Field label="已知关键风险（如有）"><textarea className={inputCls} rows={2} value={criticalRisk} onChange={(e) => setCriticalRisk(e.target.value)} placeholder="仅填写有明确来源、需要优先提醒的事实 / 承诺 / 冲突风险。" /></Field>
+                <Field label="来源 / 依据"><textarea className={inputCls} rows={2} value={source} onChange={(e) => setSource(e.target.value)} placeholder="主动 Contribution Opportunity 必须有来源；没有来源会被抑制。" /></Field>
+                <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3">
+                  <div className="text-xs font-semibold text-text-secondary">Stakeholder-aware Expression · 只用明确信息</div>
+                  <p className="mt-1 text-[11px] text-text-muted">这些字段只影响“是否值得说、怎么组织”，不会改写事实，也不会推断情绪、人格或隐藏意图。优先级：Direct Question &gt; Critical Risk &gt; Talking Point / Delivery explicit request &gt; proactive Opportunity / Recall / Question。</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <select className={inputCls} value={audienceParticipantId} onChange={(e) => setAudienceParticipantId(e.target.value)} aria-label="当前受众">
+                      <option value="">不绑定已知参与者</option>
+                      {(liveContext.data?.participants ?? []).map((participant) => <option key={participant.id} value={participant.id}>{participant.display_name || '未命名'}{participant.role ? ` · ${participant.role}` : ''}</option>)}
+                    </select>
+                    <input className={inputCls} value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="对方明确角色，例如 CTO / 客户" />
+                    <input className={inputCls} value={decisionAuthority} onChange={(e) => setDecisionAuthority(e.target.value)} placeholder="明确决策权限（可选）" />
+                    <input className={inputCls} value={audiencePriority} onChange={(e) => setAudiencePriority(e.target.value)} placeholder="对方明确优先级" />
+                    <input className={inputCls} value={audienceConcern} onChange={(e) => setAudienceConcern(e.target.value)} placeholder="对方明确 concern" />
+                    <input className={inputCls} value={relationshipContext} onChange={(e) => setRelationshipContext(e.target.value)} placeholder="关系上下文，例如客户技术负责人" />
+                  </div>
+                  {audienceParticipantId ? <p className="mt-2 text-[10px] text-text-muted">已从 Frozen Session Pack 带入该参与者的 explicit state；你可以在本场覆盖表达上下文，但不会改写长期 Counterparty State。</p> : null}
+                </div>
+              </div>
+              <div className="mt-4"><PrimaryButton disabled={busy || s.status !== 'ACTIVE'} onClick={evaluate} icon={<Volume2 className="h-3.5 w-3.5" />}>评估当前 Guidance</PrimaryButton></div>
+            </details>
           </div>
 
           <div className="min-h-[160px] rounded-2xl border border-accent-blue/20 bg-bg-primary p-5">
@@ -247,14 +307,74 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-bg-tertiary p-4">
-            <h2 className="text-sm font-semibold text-text-primary">问成竹 · 已确认历史</h2>
-            <p className="mt-1 text-[11px] text-text-muted">只检索这个 Space 中已经确认、仍有效的 Decision / Commitment 等记录；找不到就明确说找不到。</p>
-            <div className="mt-3 space-y-2">
-              <textarea className={inputCls} rows={2} value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="例如：我们之前为什么决定用 v2？" />
-              <SecondaryButton disabled={busy || !askText.trim()} onClick={ask}>查已确认记录</SecondaryButton>
+          {liveContext.data ? <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/20 p-4" data-testid="conversation-session-pulse">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">Session Pulse</h2>
+                <p className="mt-1 text-[11px] text-text-muted">来自开始时冻结的 Session Pack，不随会中资料替换静默变化。</p>
+              </div>
+              <StatusBadge tone="muted">PACK {liveContext.data.pack_digest ? liveContext.data.pack_digest.slice(0, 8) : '—'}</StatusBadge>
             </div>
-            {askResult ? <div className="mt-3 rounded-xl bg-bg-secondary/45 p-3"><p className="text-xs text-text-primary">{askResult.answer}</p><p className="mt-1 text-[11px] text-text-muted">{askResult.grounded ? `已找到 ${askResult.matches.length} 条可追溯记录` : '没有用模型猜测答案'}</p></div> : null}
+            {liveContext.data.brief.goal ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Goal</div><p className="mt-1 text-xs text-text-primary">{liveContext.data.brief.goal}</p></div> : null}
+            {(liveContext.data.brief.agenda?.length ?? 0) > 0 ? <div className="mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Agenda</div>
+              <div className="mt-1 space-y-1">{liveContext.data.brief.agenda!.slice(0, 5).map((item, index) => <div key={`${index}:${item}`} className="text-[11px] text-text-secondary">{index + 1}. {item}</div>)}</div>
+            </div> : null}
+            {(liveContext.data.brief.expected_questions?.length ?? 0) > 0 ? <div className="mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Expected Questions</div>
+              <div className="mt-1 space-y-1">{liveContext.data.brief.expected_questions!.slice(0, 3).map((item) => <div key={item} className="text-[11px] text-text-secondary">• {item}</div>)}</div>
+            </div> : null}
+            {(liveContext.data.brief.open_threads?.length ?? 0) > 0 ? <div className="mt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen Open Threads</div>
+              <div className="mt-1 space-y-1">{liveContext.data.brief.open_threads!.slice(0, 4).map((thread) => <div key={thread.id} className="flex items-start gap-1.5 text-[11px] text-text-secondary"><StatusBadge tone="warn">{thread.kind}</StatusBadge><span>{thread.text}</span></div>)}</div>
+              <p className="mt-1 text-[10px] text-text-muted">只来自开始前已 review 的 longitudinal state；本场新提取内容要到 Continue 审核后才会进入下一场。</p>
+            </div> : null}
+            <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] text-text-muted">
+              <span>Sources {liveContext.data.sources.length}</span>
+              <span>Quick Notes {liveContext.data.quick_notes.length}</span>
+              <span>Participants {liveContext.data.participants.length}</span>
+              <span>Open {liveContext.data.brief.unresolved_count ?? 0}</span>
+            </div>
+            <div className="mt-3 rounded-lg bg-bg-primary/55 px-2.5 py-2 text-[10px] text-text-muted">
+              <div className="font-semibold text-text-secondary">Frozen AI behavior</div>
+              <div className="mt-1 grid gap-1">
+                <span>Policy · {liveContext.data.resolved_ai_behavior.policy}</span>
+                <span>Manual · {liveContext.data.resolved_ai_behavior.manual_ask ? 'ON' : 'OFF'}</span>
+                <span>Auto Guidance · {liveContext.data.resolved_ai_behavior.automatic_transcript_guidance ? 'ON' : 'OFF'}</span>
+                <span>Auto Extraction · {liveContext.data.resolved_ai_behavior.automatic_candidate_extraction ? 'ON' : 'OFF'}</span>
+              </div>
+            </div>
+            <div className="mt-3 rounded-lg bg-bg-primary/55 px-2.5 py-2 text-[10px] text-text-muted">
+              <div className="font-semibold text-text-secondary">Frozen data path</div>
+              <div className="mt-1 grid gap-1">
+                <span>Capture · {liveContext.data.processing_runtime.data_path?.capture ?? '—'}</span>
+                <span>STT · {liveContext.data.processing_runtime.data_path?.stt ?? '—'} / {liveContext.data.processing_runtime.configured_stt_provider ?? '—'}</span>
+                <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
+                <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
+                <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
+              </div>
+            </div>
+          </div> : null}
+
+          <div className="rounded-2xl border border-bg-tertiary p-4">
+            <h2 className="text-sm font-semibold text-text-primary">问成竹 · 本场可追溯上下文</h2>
+            <p className="mt-1 text-[11px] text-text-muted">检索开始时冻结的 Ready sources / Quick Notes、已确认历史，以及本场当前 transcript。每条结果标明 authority；观察和笔记不会冒充 confirmed truth。</p>
+            <div className="mt-3 space-y-2">
+              <textarea className={inputCls} rows={2} value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="例如：之前为什么用 v2？Q4 benchmark 说了什么？刚才是否提到 rollback？" />
+              <SecondaryButton disabled={busy || !askText.trim() || s.policy?.ai_assistance === 'AI_FORBIDDEN'} onClick={ask}>查本场可用来源</SecondaryButton>
+              {s.policy?.ai_assistance === 'AI_FORBIDDEN' ? <p className="text-[11px] text-status-inferred">本场 AI Assistance = AI_FORBIDDEN；Manual Ask 已禁用。冻结来源仍保留在 Pack 中，但不会由成竹检索回答。</p> : null}
+            </div>
+            {askResult ? <div className="mt-3 rounded-xl bg-bg-secondary/45 p-3">
+              <p className="text-xs text-text-primary">{askResult.answer}</p>
+              <p className="mt-1 text-[11px] text-text-muted">{askResult.grounded ? `已找到 ${askResult.matches.length} 条可追溯来源 · ${askResult.truth_confirmed ? '顶部命中为已确认事实' : '顶部命中不是已确认事实'}` : '没有用模型猜测答案'}</p>
+              {askResult.matches.length ? <div className="mt-3 space-y-2">{askResult.matches.slice(0, 4).map((match) => (
+                <div key={`${match.kind}:${match.id}`} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-2.5 py-2">
+                  <div className="flex flex-wrap items-center gap-1.5"><StatusBadge tone={match.authority === 'CONFIRMED_TRUTH' ? 'ok' : match.authority === 'PERSONAL_EVIDENCE' ? 'info' : 'muted'}>{match.kind}</StatusBadge><span className="text-[10px] font-semibold text-text-muted">{match.authority}</span></div>
+                  <div className="mt-1 text-xs font-medium text-text-primary">{match.title}</div>
+                  {match.excerpt ? <div className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-text-muted">{match.excerpt}</div> : null}
+                </div>
+              ))}</div> : null}
+            </div> : null}
           </div>
 
           <div className="rounded-2xl border border-bg-tertiary p-4">

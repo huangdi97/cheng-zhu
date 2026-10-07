@@ -3,8 +3,8 @@
 
 **版本**：v2.0-R1  
 **日期**：2026-10-06  
-**状态**：CANONICAL DESIGN CANDIDATE / IMPLEMENTATION NOT YET CLAIMED  
-**基线**：v1.4.2 Windows reproducible release + main `d2d564f` public-truth sync  
+**状态**：CANONICAL DESIGN COMPLETE / CONVERSATION BETA RUNTIME AVAILABLE / STABLE v2 RELEASE NOT CLAIMED  
+**基线**：v1.4.2 Windows reproducible Interview release + merged Conversation runtime PR #18 + v2 closure PR #19  
 **产品定义**：Personal Conversation Intelligence  
 **首发验证楔子**：项目周会 / 技术设计评审  
 **核心原则**：Help me know **what is worth saying, why, to whom, and whether I should stay silent.**
@@ -70,8 +70,22 @@ PMF_PROVEN = FALSE
 
 - **DESIGN_COMPLETE**：产品、对象、AI、UI、隐私、评测、迁移定义完整；
 - **CONTRACT_COMPLETE**：共享类型与边界可执行；
-- **ENGINEERING_COMPLETE**：需要后续真实实现与 CI/runtime 证明；
+- **RUNTIME_AVAILABLE**：真实 route / UI / API / persistence / test 路径存在；
+- **PRODUCTIZED_RELEASE**：完成 packaged runtime、release artifact、download-back 与公开发布门禁；
 - **REAL_USER_VALIDATED**：需要真实参与者，当前不得宣称。
+
+截至 2026-10-06 的真实状态：
+
+```text
+V2_DESIGN_COMPLETE = TRUE
+V2_CONTRACT_COMPLETE = TRUE
+V2_RUNTIME_AVAILABLE = TRUE
+V2_PRODUCTIZED_RELEASE = FALSE
+REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
+PMF_PROVEN = FALSE
+```
+
+Conversation runtime 已由 PR #18 落地；PR #19 负责 canonical/runtime closure。Project Sync / Design Review 是 launch wedge。其余模板可运行于 shared runtime，但 profile-specific behavior 尚未分别证明。
 
 ---
 
@@ -85,10 +99,17 @@ PMF_PROVEN = FALSE
 - calendar brief；
 - cross-session memory；
 - 实时 suggestions/coaching；
+- agenda / pacing / task execution；
 - task/CRM/project integrations；
 - MCP/agent access。
 
-因此“更好的纪要”不是足够的产品楔子。
+当前官方产品事实进一步显示：Otter Live Assist 已进入实时 glanceable coaching；Teams Facilitator 已把 agenda / timer / decisions / open questions / tasks 推进到会中；Granola 强调 botless、本机捕获与 private-by-default；Zoom / Gemini 已把 in-meeting Q&A、notes/action items 做成基础能力。
+
+因此“更好的纪要”或“有实时提示卡”都不是足够的产品楔子。
+
+完整研究见：
+
+- [2026-10-06 Conversation Competitive Research](../research/Chengzhu_v2.0_Conversation_Competitive_Research_2026-10-06.md)
 
 Chengzhu v2 的核心差异冻结为：
 
@@ -285,6 +306,20 @@ Decision / Commitment / Task 等结构化状态。
 - Talking Point
 
 禁止：欺骗、操纵性心理画像、秘密推断对方“底价/真实情绪”。
+
+### 4.7 Profile lane 语义
+
+上面的列表用于定义 **profile-supported proactive lanes / ranking priors**，但有两类全局 override：
+
+- Direct Question / Answer Cue：任何 Conversation Profile 都可进入最高优先级；
+- Critical Risk：只要 provenance 与 visibility 合法，任何 Profile 都不能因为模板列表缺少 Risk 而强制沉默。
+
+另外：
+
+- Project Sync 的 **Commit Next Step** 是 `ExpressionAction.COMMIT_NEXT_STEP` / Continue continuity，不是独立 GuidanceKind；
+- 1:1 的 **Commitment continuity** 是 reviewed state / Next Focus continuity，不是把未确认 Commitment 自动弹成 Guidance。
+
+因此模板的 `guidance` 数组不得被理解为“产品价值全部内容”，但所有非全局 proactive lane 必须服从该数组，避免 Presentation / 1:1 / Client Call 等共享 runtime 串 lane。
 
 ---
 
@@ -488,14 +523,16 @@ PDIG · Android Architecture
 第一视觉层只允许当前最高价值 Guidance：
 
 ```text
-Current Topic
+Listening / Capture
 ↓
 One Guidance
 ↓
 Source / Confidence / Warning
 ```
 
-其余 transcript、notes、history、references 后置。
+真实 TRANSCRIPT 正常路径自动驱动 Direct Question / Recall / Opportunity。用户不应为了让系统工作而手工填写 candidate / score；这类输入只作为折叠的高级 dogfood / manual validation surface。
+
+其余 transcript、Session Pulse、notes、history、references 后置。
 
 ## After — Continue
 
@@ -679,22 +716,49 @@ SOURCE_CONFIRMED
 - 冲突的新 Decision 通过 SUPERSEDED 连接旧 Decision，不直接删除；
 - item 的 owner、speaker、due、state 均可独立不确定。
 
+当前 Beta 的 transcript candidate extraction 使用本地 deterministic explicit-language rules，只识别明显的 Decision / Commitment / Deadline / Risk / OpenQuestion 表达：
+
+```text
+final transcript
+→ deterministic candidate extraction
+→ PROPOSED + AI_EXTRACTED + INFERRED
+→ Continue review queue
+→ explicit review
+→ confirmed longitudinal truth
+```
+
+硬边界：
+
+- extractor 不得直接生成 AGREED / COMMITTED；
+- PRIMARY_AUDIO 中的“我”不能自动映射 owner/speaker；
+- 只有 SELF_MIC 的明确第一人称 commitment candidate 才可暂记 `owner=me`，仍需 review；
+- AI_FORBIDDEN / AI_LIMITED 不自动运行 extraction；
+- source 必须指回原 transcript segment；
+- 重跑 extraction 必须幂等去重；
+- 未来即使换成模型 extraction，也不得改变上述 authority boundary。
+
 ---
 
 # 15. Live Guidance Arbitration
 
 实时顺序不是固定“多卡并排”，而是动态 arbitration。
 
-硬优先级：
+硬优先级分两条 lane：
+
+**用户显式请求 lane**（Manual Ask / explicit Talking Point / Delivery request）视为用户主动命令，先经过 policy / Profile / provenance 检查，不与普通 proactive card 竞争。
+
+**自动 proactive lane**：
 
 ```text
 Direct Question / Answer Cue
 > Critical Risk
 > High-confidence Recall
-> High-value Contribution Opportunity
+> Profile-allowed Talking Point / Contribution Opportunity
 > Open Question
 > Delivery
 ```
+
+Direct Question 会取消仍未处理的旧 proactive Opportunity / Talking Point。
 
 抑制规则：
 
@@ -718,7 +782,8 @@ Conversation 比 Interview 涉及更多第三方数据，Preflight 必须明确�
 - Capture Mode；
 - Transcript retention；
 - Processing Mode：Local / Cloud / Off；
-- participants consent status（用户确认）；
+- participants consent status（用户报告）；
+- participant transparency plan（用户报告：口头告知 / chat 告知 / 已告知 / 不适用）；
 - selected sources；
 - connector permissions；
 - screen context；
@@ -739,6 +804,25 @@ No emotion/sentiment profiling
 No hidden-intent claims
 ```
 
+Botless / sidecar 的透明性必须单独处理：参与者同意状态与“如何告知参与者”不是同一个字段。当前成竹不会自动发送 chat notice 或 watermark，因此只能记录用户的 transparency plan / report，不能声称系统已经通知他人。
+
+此外 Preflight 必须展示 **resolved runtime data path**。Capture locality、STT locality、inference locality、retention locality 与 write-back locality 不得混为一个“Local”标签。若用户选择的 policy 与真实 runtime path 不一致，必须 fail-closed；Capture start 还要二次校验，防止 Preflight 后配置变化。
+
+当前 Conversation runtime 的可审计路径应明确显示：
+
+```text
+Capture     = LOCAL_DEVICE_CAPTURE / STRUCTURED_NOTES_ONLY / NO_CAPTURE
+STT         = LOCAL_ONLY / REMOTE_POSSIBLE / NOT_USED
+Inference   = LOCAL_DETERMINISTIC
+Retention   = LOCAL_PRODUCT_DB
+Write-back  = LOCAL_REVIEWED_DRAFT_ONLY / DISABLED
+Audio store = OFF
+```
+
+这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
+
+当前未接线的 Conversation Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 必须显式阻断，不能把 policy 选择伪装成已生效能力。
+
 外部 action 先进入 Review Queue，再由用户确认。
 
 ---
@@ -747,16 +831,30 @@ No hidden-intent claims
 
 ## Phase 1 — Desktop Sidecar
 
-优先复用：
+当前只复用已经证明不会串入 Interview 语义的共享基础设施：
 
 - system audio；
 - mic；
-- ASR；
-- overlay；
-- screenshot/screen context；
+- Audio/VAD/STT transport；
+- desktop lifecycle；
 - shortcuts。
 
-平台无关支持 Zoom / Teams / Meet / 腾讯会议 / 飞书等。
+平台层目标仍是跨 Zoom / Teams / Meet / 腾讯会议 / 飞书等工作，但 **不等于已针对每个平台分别验证**。
+
+以下能力不能因为 Interview 已有就直接复用：
+
+- overlay / Private Share；
+- screenshot / screen context。
+
+它们进入 Conversation 前必须同时满足：
+
+1. 独立 Conversation namespace，不写入 Interview state / history；
+2. 独立 Session Policy / source visibility；
+3. participant transparency / presenter-visible control；
+4. 可暂停 / off-the-record；
+5. runtime evidence 能证明没有静默捕获或共享。
+
+在这些条件满足前保持 Preflight blocked。
 
 ## Phase 2 — Read-only Context Connectors
 
@@ -801,6 +899,32 @@ v2 不以“摘要准确率”作为核心。
 - deletion/export integrity；
 - latency / recovery。
 
+评测必须区分两层：
+
+**本地可直接观测 proxy**：
+- source attribution coverage；
+- guidance adoption / dismissal；
+- suppression；
+- duplicate suppression；
+- review queue；
+- approved draft rate；
+- latency / recovery；
+- deletion / export integrity。
+
+**必须真人标注**：
+- Recall Precision；
+- Source Attribution Accuracy；
+- Direct Question Detection；
+- Decision/Commitment State Precision；
+- Opportunity Precision；
+- Interruption Regret；
+- Useful Silence Rate；
+- Continue Write-back Accuracy；
+- real cross-session value；
+- real cognitive load。
+
+adoption 不得偷换成 precision，synthetic success 不得偷换成 real-user value。
+
 原则：
 
 > **对于主动提示，Precision > Recall。少弹一个，比错弹一个更好。**
@@ -814,11 +938,18 @@ v2 不以“摘要准确率”作为核心。
 ```text
 V2_DESIGN_COMPLETE
 V2_CONTRACT_COMPLETE
+V2_RUNTIME_AVAILABLE
 SYNTHETIC_ENGINEERING_PROVEN
 INTERNAL_DOGFOOD_EVIDENCE
 ```
 
-禁止：
+只有经过 packaged/release gate 后才允许：
+
+```text
+V2_PRODUCTIZED_RELEASE
+```
+
+禁止在真实用户证据前声称：
 
 ```text
 V2_PMF_PROVEN
@@ -852,6 +983,11 @@ v2.0-R1 设计完成必须同时存在：
 - rollout；
 - implementation master goal；
 - executable contract types；
-- no false implementation claim。
+- no false implementation / release / validation claim。
 
-本版完成这些后，才允许进入 v2 engineering implementation。
+对应实现与闭环证据：
+
+- [v2.0-R1 Implementation & Rollout Master Goal](Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md)
+- [v2.0-R1 Design → Runtime Closure Matrix](Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md)
+
+本版已经从“允许进入 implementation”推进为“设计完整 + Beta runtime 已存在”。下一状态升级必须依赖 PR/CI、packaged runtime、release provenance 或真实用户证据，不能仅靠文档声明。

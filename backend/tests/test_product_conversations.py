@@ -2498,8 +2498,8 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
     assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
     assert diag["health"]["conversation_share_privacy"] == "BLOCKED_NON_DESKTOP"
-    assert diag["health"]["conversation_screen_context"] == "BLOCKED_NOT_WIRED"
-    assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
+    assert diag["health"]["conversation_screen_context"] == "BLOCKED_CAPABILITY_MISSING"
+    assert diag["health"]["conversation_human_coach"] == "AVAILABLE_LOCAL_AND_LAN"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"
 

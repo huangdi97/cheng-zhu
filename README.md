@@ -295,7 +295,7 @@ python -m pytest backend/tests -q
 
 ## 文档
 
-canonical：Interview 当前稳定产品以 [v1.3-R2](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md) / [v1.4-R1](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md) 为准；Conversation v2 以 [v2.0-R1 Personal Conversation Intelligence](docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md) + [Implementation Master Goal](docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md) 为准；冻结核心：[v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：
+canonical：Interview 当前稳定产品以 [v1.3-R2](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md) / [v1.4-R1](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md) 为准；Conversation v2 以 [v2.0-R1 Personal Conversation Intelligence](docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md) + [Implementation Master Goal](docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md) + [Design → Runtime Closure Matrix](docs/canonical/Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md) 为准；冻结核心：[v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：
 
 | 分类 | 文档 |
 | --- | --- |

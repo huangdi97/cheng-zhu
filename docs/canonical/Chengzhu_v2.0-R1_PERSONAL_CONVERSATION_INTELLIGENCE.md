@@ -627,9 +627,43 @@ COMMIT_NEXT_STEP
 - 哪些风险；
 - render as cue / caution / question / silence。
 
+### 12.1 Runtime truth：Expression Plan 是 Guidance 的派生展示层
+
+Expression Plan **不是第二套长期事实对象，也不单独成为 truth authority**。
+
+当前 runtime 的等价结构是：
+
+```text
+Conversation State
++ frozen Expression Profile
++ explicit Counterparty / audience context
++ policy / Profile lane
++ selected provenance
+        ↓
+Guidance Arbiter
+        ↓
+Guidance {
+  kind,
+  expression_action,
+  text,
+  source_refs,
+  reason,
+  score,
+  user_action
+}
+```
+
+其中：
+
+- `expression_action` 对应 SILENT / ANSWER / RECALL / ADD_TALKING_POINT / ASK_QUESTION / FLAG_RISK / CLARIFY 等表达动作；
+- DELIVERY lane 会读取共享“我的表达”、Assistance Mode 与 explicit audience context 生成表达结构建议；
+- Guidance 的 `source_refs / reason / user_action` 才是需要审计的长期事件；
+- 不另建一个可与 Guidance 冲突的持久化 ExpressionPlan 表；
+- 如果未来需要更丰富的 render metadata，应作为 Guidance 的派生/版本化展示元数据，而不是复制事实文本与 provenance。
+
 底线：
 
-> **调整表达，不改写事实。**
+> **调整表达，不改写事实；派生展示不制造第二套 truth。**
 
 ---
 

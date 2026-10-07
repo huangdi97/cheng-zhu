@@ -334,13 +334,15 @@ jobs:
       - name: Packaged smoke
         run: |
           pip install websocket-client
-          python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report packaged-smoke.json
+          python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report packaged-smoke.json --markdown-report packaged-smoke.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: packaged-smoke-report
-          path: packaged-smoke.json
-          if-no-files-found: ignore
+          path: |
+            packaged-smoke.json
+            packaged-smoke.md
+          if-no-files-found: error
 
   # ── Aggregate gate so PR can require a single status check ──
   # All required jobs must succeed; nothing is skipped by path filters.

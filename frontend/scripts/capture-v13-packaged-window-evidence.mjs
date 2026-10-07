@@ -368,6 +368,62 @@ try {
   })
   await request(backendBase, 'POST', '/api/product/practice/' + practice.practice_id + '/finish', {})
 
+  // Seed Conversation Beta through the *packaged sidecar*. UI evidence below
+  // still navigates/clicks the real packaged BrowserWindow.
+  const conversationSpace = await request(backendBase, 'POST', '/api/product/conversation/spaces', {
+    title: 'WenNian Project Sync',
+    profile: 'PROJECT_SYNC',
+    description: 'Packaged Conversation Beta evidence',
+    default_goal: '确认 rollout strategy 与 rollback owner',
+    default_mode: 'BALANCED',
+    selected_source_ids: [material.id],
+    selected_quick_note_ids: [note.id],
+  })
+  const conversationSession = await request(
+    backendBase,
+    'POST',
+    '/api/product/conversation/spaces/' + conversationSpace.id + '/sessions',
+    {
+      title: 'Packaged Project Sync',
+      capture_mode: 'NOTES_ONLY',
+      processing_mode: 'LOCAL',
+      assistance_mode: 'BALANCED',
+      consent_ack: true,
+      policy: {
+        ai_assistance: 'AI_ALLOWED',
+        external_writeback: 'REVIEW_REQUIRED',
+        participant_consent_status: 'NOT_APPLICABLE',
+        participant_transparency_plan: 'NOT_APPLICABLE',
+      },
+    },
+  )
+  const conversationDecision = await request(
+    backendBase,
+    'POST',
+    '/api/product/conversation/sessions/' + conversationSession.id + '/items',
+    {
+      item_type: 'Decision',
+      title: 'offline migration 采用 v2',
+      source_refs: [{ kind: 'DOCUMENT', id: material.id, excerpt: 'WenNian 架构说明', visibility: 'PRIVATE' }],
+      source_excerpt: 'WenNian 架构说明',
+      epistemic_status: 'OBSERVED',
+    },
+  )
+  await request(backendBase, 'POST', '/api/product/conversation/items/' + conversationDecision.id + '/review', {
+    action: 'CONFIRM',
+    patch: {},
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + conversationSession.id + '/start', {})
+  const conversationGuidance = await request(
+    backendBase,
+    'POST',
+    '/api/product/conversation/sessions/' + conversationSession.id + '/guidance/evaluate',
+    {
+      direct_question: '为什么之前选择 v2？',
+      source_refs: [{ kind: 'DOCUMENT', id: material.id, excerpt: 'WenNian 架构说明', visibility: 'PRIVATE' }],
+    },
+  )
+
   // Launch 2: real packaged BrowserWindow, real routes and real UI interactions.
   const steps = [
     { kind: 'wait', selector: '[data-testid="action-home"]', timeout_ms: 30000 },
@@ -452,7 +508,36 @@ try {
     { kind: 'navigate', hash: '#/goals/' + goal.id + '/prepare', selector: '[data-testid="goal-room"]' },
     { kind: 'capture', name: '28-mobile-390-goal-prepare', note: '390px Goal Prepare' },
     { kind: 'navigate', hash: '#/history', selector: '[data-testid="history-page"]' },
-    { kind: 'capture', name: '29-history', note: 'Unified History' },
+    { kind: 'capture', name: '29-history', note: 'Unified Interview History' },
+
+    // Conversation Beta packaged productization evidence.
+    { kind: 'resize', width: 1280, height: 900 },
+    { kind: 'storage', key: 'chengzhu-product-profile', value: 'conversation' },
+    { kind: 'storage', key: 'chengzhu-conversation-optin', value: '1' },
+    { kind: 'navigate', hash: '#/conversation', selector: '[data-testid="conversation-home"]' },
+    { kind: 'capture', name: '30-conversation-home', note: 'Packaged Conversation Home' },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id, selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '31-conversation-space', note: 'Conversation Space overview and longitudinal state' },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id + '/prepare', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '32-conversation-prepare', note: 'Conversation Prepare before Preflight' },
+    { kind: 'click', selector: '[data-testid="conversation-create-preflight"]' },
+    { kind: 'wait', selector: '[data-testid="conversation-start-session"]', timeout_ms: 15000 },
+    { kind: 'capture', name: '33-conversation-preflight', note: 'Conversation Preflight + Pack/Data-path truth' },
+    { kind: 'navigate', hash: '#/conversation/live/' + conversationSession.id, selector: '[data-testid="conversation-live"]' },
+    { kind: 'wait', selector: '[data-testid="conversation-session-pulse"]', timeout_ms: 15000 },
+    { kind: 'wait', selector: '[data-testid="guidance-dogfood-feedback"]', timeout_ms: 15000 },
+    { kind: 'capture', name: '34-conversation-live-guidance', note: 'Conversation Live primary Guidance + frozen Session Pulse' },
+    { kind: 'click', selector: '[data-testid="guidance-feedback-useful"]' },
+    { kind: 'sleep', ms: 500 },
+    { kind: 'capture', name: '35-conversation-dogfood-label', note: 'Local human Guidance label in packaged UI' },
+    { kind: 'click', selector: '[data-testid="conversation-end-session"]' },
+    { kind: 'wait', selector: '[data-testid="conversation-continue-summary"]', timeout_ms: 15000 },
+    { kind: 'capture', name: '36-conversation-continue', note: 'Conversation Continue + session dogfood labels' },
+    { kind: 'navigate', hash: '#/history', selector: '[data-testid="conversation-history"]' },
+    { kind: 'capture', name: '37-conversation-history', note: 'Profile-aware Conversation History' },
+    { kind: 'resize', width: 390, height: 844 },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id + '/prepare', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '38-conversation-mobile-390-prepare', note: '390px packaged Conversation Prepare' },
   ]
 
   const second = await runPlan({ name: 'product-loop', userData, backendBase, nonce, token, steps })
@@ -463,10 +548,14 @@ try {
     backend_executable: BACKEND_EXE,
     goal_id: goal.id,
     practice_id: practice.practice_id,
+    conversation_space_id: conversationSpace.id,
+    conversation_session_id: conversationSession.id,
+    conversation_guidance_id: conversationGuidance.guidance?.id || '',
+    conversation_beta_evidence: true,
     entries: [...(first.entries || []), ...(second.entries || [])],
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (manifest.entries.length < 36) throw new Error('expected at least 36 packaged UI captures, got ' + manifest.entries.length)
+  if (manifest.entries.length < 45) throw new Error('expected at least 45 packaged UI captures including Conversation Beta, got ' + manifest.entries.length)
   console.log('done', OUT, 'captures=' + manifest.entries.length)
 } catch (error) {
   console.error(error)

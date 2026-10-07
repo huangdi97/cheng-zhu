@@ -224,7 +224,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.deleteSession(id, 'TOMBSTONE')
-      setLifecycleMessage(`已删除会话；保留 ${result.provenance_tombstones} 条 provenance tombstone。`)
+      setLifecycleMessage(`已删除会话；保留 ${result.provenance_tombstones} 条 provenance tombstone，并移除 ${result.removed_open_thread_projections ?? 0} 条派生 Open Thread projection。`)
       setContinueData(null)
       await detail.reload(); await prepare.reload(); await retention.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }

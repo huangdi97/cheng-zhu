@@ -235,6 +235,15 @@ function mocks() {
       blockers: [],
       warnings: [],
       policy: SESSION.policy,
+      resolved_ai_behavior: {
+        policy: 'AI_ALLOWED',
+        manual_ask: true,
+        manual_guidance: true,
+        automatic_transcript_guidance: true,
+        automatic_candidate_extraction: true,
+        expected_by_user_report: false,
+        engine: 'LOCAL_DETERMINISTIC',
+      },
       processing_runtime: {
         mode: 'LOCAL',
         capture_mode: 'NOTES_ONLY',
@@ -271,6 +280,15 @@ function mocks() {
         participants_count: 1,
         confirmed_items_count: 1,
         expression_profile: { conclusion_first: true, target_seconds: 60, shape: 'bullet' },
+        resolved_ai_behavior: {
+          policy: 'AI_ALLOWED',
+          manual_ask: true,
+          manual_guidance: true,
+          automatic_transcript_guidance: true,
+          automatic_candidate_extraction: true,
+          expected_by_user_report: false,
+          engine: 'LOCAL_DETERMINISTIC',
+        },
         processing_runtime: {
           mode: 'LOCAL',
           capture_mode: 'NOTES_ONLY',
@@ -598,6 +616,9 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Q4 Benchmark')).toBeVisible()
     await expect(page.getByText(/Ready Sources 1\/1/)).toBeVisible()
     await expect(page.getByText('AI AI_ALLOWED')).toBeVisible()
+    await expect(page.getByText('Resolved AI Behavior')).toBeVisible()
+    await expect(page.getByText('Auto transcript Guidance · ON')).toBeVisible()
+    await expect(page.getByText('Auto candidate extraction · ON')).toBeVisible()
     await expect(page.getByText('记录规则依场景与组织政策而异。')).toBeVisible()
     await page.getByRole('button', { name: '开始会话' }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/live/${SESSION.id}`))

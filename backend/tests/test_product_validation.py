@@ -142,7 +142,14 @@ def test_future_profile_is_retained_but_not_productized():
         for p in future_profile.PROFILES
         if p.key is not future_profile.ConversationProfileKind.INTERVIEW
     )
-    assert all(p.runtime_available for p in future_profile.PROFILES)
+    actual_profiles = [
+        p for p in future_profile.PROFILES
+        if p.key is not future_profile.ConversationProfileKind.MEETING
+    ]
+    assert all(p.runtime_available for p in actual_profiles)
+    meeting_compat = future_profile.profile(future_profile.ConversationProfileKind.MEETING)
+    assert meeting_compat.runtime_available is False
+    assert meeting_compat.productized is False
     assert {p.key for p in future_profile.PROFILES if p.launch_wedge} == {
         future_profile.ConversationProfileKind.PROJECT_SYNC,
         future_profile.ConversationProfileKind.DESIGN_REVIEW,

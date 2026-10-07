@@ -638,7 +638,8 @@ def test_capture_rechecks_processing_policy_after_preflight(product_env, monkeyp
         conversation_capture.start(session["id"], 1001)
 
 
-def test_unwired_share_privacy_and_connector_permissions_block_preflight(product_env):
+def test_share_privacy_requires_desktop_runtime_while_connectors_remain_blocked(product_env, monkeypatch):
+    monkeypatch.delenv("CHENGZHU_DESKTOP_RUNTIME", raising=False)
     space = conversations.create_space("Privacy Truth", "CLIENT_CALL")
     session = conversations.create_session(
         space["id"],
@@ -654,6 +655,29 @@ def test_unwired_share_privacy_and_connector_permissions_block_preflight(product
     item_state = {x["key"]: x["ok"] for x in check["items"]}
     assert item_state["share"] is False
     assert item_state["connectors"] is False
+    assert check["processing_runtime"]["capabilities"]["desktop_runtime"] is False
+
+
+def test_private_overlay_is_available_and_frozen_on_electron_desktop(product_env, monkeypatch):
+    monkeypatch.setenv("CHENGZHU_DESKTOP_RUNTIME", "1")
+    space = conversations.create_space("Desktop Privacy", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"share_privacy": "PRIVATE_OVERLAY"},
+    )
+    check = conversations.preflight(session["id"])
+    assert not any(x["key"] == "share_privacy_runtime" for x in check["blockers"])
+    assert next(x for x in check["items"] if x["key"] == "share")["ok"] is True
+    assert next(x for x in check["items"] if x["key"] == "share")["value"] == "PRIVATE_OVERLAY · DESKTOP_CONTENT_PROTECTION"
+    assert any(x["key"] == "share_privacy_best_effort" for x in check["warnings"])
+    assert check["processing_runtime"]["capabilities"]["share_privacy_private_overlay"] is True
+
+    started = conversations.start_session(session["id"])
+    payload = started["pack"]["payload"]
+    assert payload["policy"]["share_privacy"] == "PRIVATE_OVERLAY"
+    assert payload["processing_runtime"]["capabilities"]["desktop_runtime"] is True
+    assert payload["processing_runtime"]["capabilities"]["share_privacy_private_overlay"] is True
 
 
 def test_processing_off_requires_no_transcript_and_ai_forbidden(product_env):
@@ -2351,6 +2375,7 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert "opportunity_precision" in diag["evaluation"]["requires_human_labels"]
     assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
     assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
+    assert diag["health"]["conversation_share_privacy"] == "BLOCKED_NON_DESKTOP"
     assert diag["health"]["conversation_screen_context"] == "BLOCKED_NOT_WIRED"
     assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"

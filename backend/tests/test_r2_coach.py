@@ -97,7 +97,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(coach, "registry", fresh)
     import api.coach.router as router
 
-    monkeypatch.setattr(router, "_human_policy_for", lambda kind: "HUMAN_PRACTICE_ONLY")
+    monkeypatch.setattr(router, "_human_policy_for", lambda kind, target_session_id="": "HUMAN_PRACTICE_ONLY")
     sent: list[dict] = []
     monkeypatch.setattr(router, "_broadcast", sent.append)
     import main
@@ -135,8 +135,127 @@ def test_policy_tightened_mid_session_blocks_cues(client, monkeypatch):
     token = body["urls"]["local"].split("#t=")[1]
     import api.coach.router as router
 
-    monkeypatch.setattr(router, "_human_policy_for", lambda kind: "HUMAN_FORBIDDEN")
+    monkeypatch.setattr(router, "_human_policy_for", lambda kind, target_session_id="": "HUMAN_FORBIDDEN")
     assert client.post("/coach/api/cue", json={"text": "x"}, headers={"X-Coach-Token": token}).status_code == 403
+
+
+
+
+def test_conversation_coach_is_targeted_policy_checked_and_never_exposes_interview_resume(client, monkeypatch):
+    import api.coach.router as router
+    from services.product import conversations
+
+    monkeypatch.setattr(
+        conversations,
+        "require_session",
+        lambda sid: {
+            "id": sid,
+            "status": "ACTIVE",
+            "policy": {"human_assistance": "HUMAN_ALLOWED"},
+        },
+    )
+    monkeypatch.setattr(
+        conversations,
+        "session_context",
+        lambda sid: {
+            "conversation_state": {"current_topic": "rollback"},
+            "brief": {"goal": "决定 rollout"},
+        },
+    )
+    monkeypatch.setattr(
+        conversations,
+        "transcript",
+        lambda sid, limit=12: [
+            {"text": "先确认 rollback owner", "channel": "PRIMARY_AUDIO"},
+        ],
+    )
+    monkeypatch.setattr(
+        conversations,
+        "guidance_history",
+        lambda sid, limit=12: [
+            {"id": "ge-1", "status": "SHOWN", "kind": "RECALL", "text": "上次 owner 未确认"},
+        ],
+    )
+    persisted = []
+    monkeypatch.setattr(
+        conversations,
+        "human_coach_guidance",
+        lambda sid, **kwargs: persisted.append((sid, kwargs)) or {"id": "ge-coach"},
+    )
+    monkeypatch.setattr(
+        router,
+        "_human_policy_for",
+        lambda kind, target_session_id="": "HUMAN_ALLOWED"
+        if kind == "conversation" and target_session_id == "cs-1"
+        else "HUMAN_PRACTICE_ONLY",
+    )
+
+    created = client.post("/api/coach/sessions", json={
+        "session_kind": "conversation",
+        "target_session_id": "cs-1",
+        "permissions": {"transcript": True, "ai_cue": True, "resume_jd": True},
+    })
+    assert created.status_code == 200
+    body = created.json()
+    assert body["session_kind"] == "conversation"
+    assert body["target_session_id"] == "cs-1"
+    token = body["urls"]["local"].split("#t=")[1]
+
+    state = client.get("/coach/api/state", headers={"X-Coach-Token": token}).json()
+    assert state["session"]["kind"] == "conversation"
+    assert state["session"]["target_session_id"] == "cs-1"
+    assert state["current_topic"] == "rollback"
+    assert state["transcript"][0]["text"] == "先确认 rollback owner"
+    assert state["ai_cue"]["id"] == "ge-1"
+    assert "resume_jd" not in state
+
+    sent = client.post(
+        "/coach/api/cue",
+        json={"text": "先问清 rollback owner"},
+        headers={"X-Coach-Token": token},
+    )
+    assert sent.status_code == 200
+    assert persisted == [("cs-1", {
+        "text": "先问清 rollback owner",
+        "coach_session_id": body["id"],
+    })]
+    assert client.sent[-1]["session_kind"] == "conversation"
+    assert client.sent[-1]["target_session_id"] == "cs-1"
+    assert client.sent[-1]["is_evidence"] is False
+
+
+def test_conversation_coach_requires_active_target_and_human_allowed(client, monkeypatch):
+    import api.coach.router as router
+    from services.product import conversations
+
+    monkeypatch.setattr(
+        conversations,
+        "require_session",
+        lambda sid: {"id": sid, "status": "ENDED", "policy": {"human_assistance": "HUMAN_ALLOWED"}},
+    )
+    ended = client.post("/api/coach/sessions", json={
+        "session_kind": "conversation",
+        "target_session_id": "ended",
+        "permissions": {"transcript": True},
+    })
+    assert ended.status_code == 409
+
+    monkeypatch.setattr(
+        conversations,
+        "require_session",
+        lambda sid: {"id": sid, "status": "ACTIVE", "policy": {"human_assistance": "HUMAN_FORBIDDEN"}},
+    )
+    monkeypatch.setattr(
+        router,
+        "_human_policy_for",
+        lambda kind, target_session_id="": "HUMAN_FORBIDDEN",
+    )
+    forbidden = client.post("/api/coach/sessions", json={
+        "session_kind": "conversation",
+        "target_session_id": "cs-forbidden",
+        "permissions": {"transcript": True},
+    })
+    assert forbidden.status_code == 403
 
 
 def test_helper_page_keeps_token_out_of_requests(client):

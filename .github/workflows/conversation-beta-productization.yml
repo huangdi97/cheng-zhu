@@ -1,0 +1,208 @@
+name: Conversation Beta Productization
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/conversation-beta-productization.yml"
+      - "backend/api/product/conversations_router.py"
+      - "backend/services/product/conversation_capture.py"
+      - "backend/services/product/conversations.py"
+      - "backend/services/product/future_profile.py"
+      - "backend/services/storage/product.py"
+      - "backend/services/storage/product_migrations.py"
+      - "backend/tests/test_product_conversations.py"
+      - "frontend/src/App.tsx"
+      - "frontend/src/components/conversation/**"
+      - "frontend/src/lib/conversationApi.ts"
+      - "frontend/src/lib/conversationContracts.ts"
+      - "frontend/scripts/capture-v20-conversation-packaged-window-evidence.mjs"
+      - "frontend/scripts/capture-v20-conversation-packaged-web-evidence.mjs"
+      - "desktop/**"
+      - "packaging/**"
+      - "scripts/build_sidecar.py"
+      - "scripts/packaged_smoke.py"
+      - "scripts/conversation_packaged_smoke.py"
+      - "backend/requirements.txt"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/conversation-beta-productization.yml"
+      - "backend/api/product/conversations_router.py"
+      - "backend/services/product/conversation_capture.py"
+      - "backend/services/product/conversations.py"
+      - "backend/services/storage/product_migrations.py"
+      - "frontend/src/components/conversation/**"
+      - "frontend/scripts/capture-v20-conversation-packaged-window-evidence.mjs"
+      - "frontend/scripts/capture-v20-conversation-packaged-web-evidence.mjs"
+      - "desktop/**"
+      - "scripts/conversation_packaged_smoke.py"
+  workflow_dispatch:
+
+concurrency:
+  group: conversation-beta-productization-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-productization:
+    runs-on: windows-latest
+    timeout-minutes: 100
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pin evidence source SHA
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          "CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA=$actual" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Conversation Beta evidence source SHA: $actual"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - name: Backend contract + tests
+        working-directory: backend
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest httpx ruff
+          ruff check .
+          python -m pytest -q
+
+      - name: Frontend contract + build
+        working-directory: frontend
+        shell: pwsh
+        run: |
+          npm ci
+          npx tsc -b --noEmit
+          npm test
+          npm run build
+
+      - name: Desktop tests
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npm ci
+          node --test *.test.js
+
+      - name: Build packaged backend sidecar
+        shell: pwsh
+        run: python scripts/build_sidecar.py
+
+      - name: Stable Interview packaged regression
+        shell: pwsh
+        run: |
+          pip install websocket-client
+          python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report artifacts/conversation-beta-evidence/interview-packaged-regression.json
+
+      - name: Conversation packaged runtime smoke
+        shell: pwsh
+        run: |
+          python scripts/conversation_packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe --frontend-dist frontend/dist --report artifacts/conversation-beta-evidence/conversation-packaged-smoke.json
+
+      - name: Package Windows installer + portable
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        shell: pwsh
+        run: npm run dist:win
+
+      - name: Install Chromium for packaged UI evidence fallback
+        working-directory: frontend
+        shell: pwsh
+        run: npx playwright install chromium
+
+      - name: Capture Conversation packaged UI evidence
+        working-directory: frontend
+        shell: pwsh
+        run: |
+          node scripts/capture-v20-conversation-packaged-window-evidence.mjs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Packaged Electron BrowserWindow evidence unavailable on hosted Windows; using the explicit packaged-sidecar + packaged-frontend Chromium fallback."
+            node scripts/capture-v20-conversation-packaged-web-evidence.mjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Fresh installer replay + dual packaged smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = (Resolve-Path "dist/desktop/Chengzhu-Setup-x64.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "Chengzhu-Conversation-Beta-CleanInstall"
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
+          New-Item -ItemType Directory -Force $installDir | Out-Null
+
+          $proc = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Conversation Beta clean install failed: $($proc.ExitCode)" }
+
+          $resources = Join-Path $installDir "resources"
+          $backendExe = Join-Path $resources "backend/chengzhu-backend.exe"
+          $frontendDist = Join-Path $resources "frontend-dist"
+          foreach ($required in @((Join-Path $installDir "Chengzhu.exe"), $backendExe, $frontendDist)) {
+            if (-not (Test-Path $required)) { throw "clean install missing: $required" }
+          }
+
+          python scripts/packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report artifacts/conversation-beta-evidence/clean-install-interview-smoke.json
+          python scripts/conversation_packaged_smoke.py --exe $backendExe --frontend-dist $frontendDist --resources $resources --report artifacts/conversation-beta-evidence/clean-install-conversation-smoke.json
+
+          @{
+            source_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA
+            installer = $installer
+            install_dir = $installDir
+            interview_smoke = "PASS"
+            conversation_smoke = "PASS"
+            real_audio_capture = "NOT_PROVEN_ON_HOSTED_WINDOWS_RUNNER"
+            real_conversation_user_evidence = "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
+            pmf = "PMF_PROVEN_FALSE"
+          } | ConvertTo-Json -Depth 5 | Set-Content artifacts/conversation-beta-evidence/clean-install-replay.json -Encoding utf8
+
+      - name: Productization manifest + SHA256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = (Resolve-Path "dist/desktop/Chengzhu-Setup-x64.exe").Path
+          $portable = (Resolve-Path "dist/desktop/Chengzhu-Portable-x64.zip").Path
+          $installerHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          $portableHash = (Get-FileHash $portable -Algorithm SHA256).Hash.ToLower()
+          New-Item -ItemType Directory -Force artifacts/conversation-beta-evidence | Out-Null
+          @(
+            "$installerHash  Chengzhu-Setup-x64.exe",
+            "$portableHash  Chengzhu-Portable-x64.zip"
+          ) | Set-Content artifacts/conversation-beta-evidence/SHA256SUMS.txt -Encoding ascii
+
+          @{
+            contract = "v2.0-R1"
+            evidence_type = "CONVERSATION_BETA_PACKAGED_PRODUCTIZATION"
+            source_sha = $env:CHENGZHU_CONVERSATION_EVIDENCE_SOURCE_SHA
+            app_version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+            installer_sha256 = $installerHash
+            portable_sha256 = $portableHash
+            stable_interview_packaged_regression = "PASS"
+            conversation_packaged_runtime = "PASS"
+            clean_install_replay = "PASS"
+            browserwindow_evidence = if (Test-Path "artifacts/conversation-beta-evidence/v$((Get-Content desktop/package.json -Raw | ConvertFrom-Json).version)/browserwindow/conversation-manifest.json") { "PASS" } else { "BLOCKED_HOSTED_WINDOWS_RUNNER_FALLBACK_USED" }
+            packaged_web_fallback = if (Test-Path "artifacts/conversation-beta-evidence/v$((Get-Content desktop/package.json -Raw | ConvertFrom-Json).version)/web-fallback/conversation-manifest.json") { "PASS" } else { "NOT_NEEDED" }
+            real_audio_capture = "NOT_PROVEN_ON_HOSTED_WINDOWS_RUNNER"
+            real_conversation_user_evidence = "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
+            v2_productized_release = $false
+            pmf_proven = $false
+          } | ConvertTo-Json -Depth 6 | Set-Content artifacts/conversation-beta-evidence/productization-manifest.json -Encoding utf8
+
+      - name: Upload Conversation Beta productization evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chengzhu-conversation-beta-productization
+          path: artifacts/conversation-beta-evidence
+          retention-days: 30
+          if-no-files-found: error

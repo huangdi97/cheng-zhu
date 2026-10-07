@@ -1548,6 +1548,31 @@ def _sync_open_thread(item: dict[str, Any]) -> Optional[dict[str, Any]]:
     return existing
 
 
+def resolve_open_thread(thread_id: str) -> dict[str, Any]:
+    thread = store.get("conversation_open_thread", thread_id)
+    if thread is None:
+        raise ValueError("Open Thread 不存在")
+    if thread.get("status") != "OPEN":
+        return thread
+
+    item_id = ""
+    for ref in thread.get("source_refs") or []:
+        if str(ref.get("kind") or "") == "CONVERSATION_ITEM":
+            item_id = str(ref.get("id") or "")
+            break
+    if not item_id:
+        raise ValueError("Open Thread 缺少对应 Conversation Item provenance，不能直接关闭")
+
+    item = require_item(item_id)
+    if item.get("space_id") != thread.get("space_id"):
+        raise ValueError("Open Thread provenance 与当前 Space 不一致")
+    review_item(item_id, "RESOLVE")
+    refreshed = store.get("conversation_open_thread", thread_id)
+    if refreshed is None:
+        raise ValueError("Open Thread 关闭后读取失败")
+    return refreshed
+
+
 def add_item(
     session_id: str,
     *,

@@ -880,6 +880,59 @@ def test_guidance_arbiter_prefers_direct_question_and_can_stay_silent(product_en
 
 
 
+
+
+def test_reviewed_open_question_projects_to_longitudinal_thread_and_resolve_closes_it(product_env):
+    space = conversations.create_space("Thread Continuity", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    candidate = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 rollback drill？",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-1", "excerpt": "rollback drill owner 还没定"}],
+        epistemic_status="OBSERVED",
+        review_status="AI_EXTRACTED",
+    )
+    # Review-only extraction must not create persistent continuity by itself.
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+    confirmed = conversations.review_item(candidate["id"], "CONFIRM")
+    assert confirmed["review_status"] == "USER_CONFIRMED"
+    threads = conversations.space_detail(space["id"])["threads"]
+    assert len(threads) == 1
+    assert threads[0]["kind"] == "OpenQuestion"
+    assert threads[0]["text"] == "谁负责 rollback drill？"
+    assert threads[0]["status"] == "OPEN"
+    assert any(ref["kind"] == "CONVERSATION_ITEM" and ref["id"] == candidate["id"] for ref in threads[0]["source_refs"])
+
+    prepared = conversations.prepare_space(space["id"])
+    assert prepared["open_threads"][0]["id"] == threads[0]["id"]
+    assert "谁负责 rollback drill？" in prepared["agenda"]
+
+    resolved = conversations.review_item(candidate["id"], "RESOLVE")
+    assert resolved["state"] == "DONE"
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+
+def test_rejected_open_thread_candidate_never_enters_long_term_continuity(product_env):
+    space = conversations.create_space("Rejected Thread", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    candidate = conversations.add_item(
+        session["id"],
+        item_type="Risk",
+        title="可能破坏 rollback window",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-2", "excerpt": "只是猜测"}],
+        review_status="AI_EXTRACTED",
+    )
+    rejected = conversations.review_item(candidate["id"], "REJECT")
+    assert rejected["state"] == "UNKNOWN"
+    assert rejected["review_status"] == "USER_REJECTED"
+    assert conversations.space_detail(space["id"])["threads"] == []
+
+
 def test_deadline_requires_provenance(product_env):
     space = conversations.create_space("Deadline Truth", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True)

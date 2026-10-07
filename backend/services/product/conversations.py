@@ -1199,6 +1199,50 @@ def _frozen_pack_payload(session: dict[str, Any]) -> dict[str, Any]:
     return dict(payload) if isinstance(payload, dict) else {}
 
 
+def conversation_state(session_id: str) -> dict[str, Any]:
+    """Derived Conversation State read model; never a second truth store."""
+    session = require_session(session_id)
+    raw = dict(session.get("state") or {})
+    status = str(session.get("status") or "")
+    phase = "PREPARE" if status == "UPCOMING" else "PARTICIPATE" if status == "ACTIVE" else "CONTINUE" if status == "ENDED" else status
+    items = store.select(
+        "conversation_item",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+        limit=200,
+    )
+    threads = store.select(
+        "conversation_open_thread",
+        where="space_id = ? AND status = 'OPEN'",
+        params=(session["space_id"],),
+        order="created_at DESC",
+        limit=100,
+    )
+    return {
+        "phase": phase,
+        "current_topic": str(raw.get("current_topic") or ""),
+        "user_speaking": bool(raw.get("user_speaking", False)),
+        "direct_question_pending": bool(raw.get("direct_question_pending", False)),
+        "audience_context": dict(raw.get("audience_context") or {}),
+        "items": [
+            {
+                "id": item["id"],
+                "type": item["type"],
+                "state": item["state"],
+                "title": item["title"],
+                "review_status": item["review_status"],
+            }
+            for item in items
+        ],
+        "open_threads": [
+            {"id": thread["id"], "kind": thread["kind"], "text": thread["text"], "owner_id": thread.get("owner_id") or ""}
+            for thread in threads
+        ],
+        "last_guidance_id": str(raw.get("last_guidance_id") or ""),
+    }
+
+
 def session_context(session_id: str) -> dict[str, Any]:
     """Small Live read model derived from the frozen Session Pack.
 
@@ -1244,6 +1288,7 @@ def session_context(session_id: str) -> dict[str, Any]:
         })
     return {
         "session_id": session_id,
+        "conversation_state": conversation_state(session_id),
         "space": payload.get("space") or {"id": session["space_id"]},
         "brief": payload.get("session_brief") or {},
         "sources": sources,
@@ -2066,6 +2111,8 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     current_topic = str(body.get("current_topic") or "").strip()[:500]
     if current_topic:
         state["current_topic"] = current_topic
+    state["user_speaking"] = bool(body.get("user_speaking"))
+    state["direct_question_pending"] = bool(str(body.get("direct_question") or "").strip())
     audience_context = {
         "role": str(body.get("audience_role") or "")[:240],
         "explicit_priority": str(body.get("audience_priority") or "")[:800],
@@ -2101,6 +2148,8 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
             status="SHOWN",
             reason="DIRECT_QUESTION",
         )
+        state["direct_question_pending"] = False
+        store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
         return {"guidance": event, "suppressed": None}
 
     critical_risk = str(body.get("critical_risk") or "").strip()

@@ -351,7 +351,7 @@ const H={'X-Coach-Token':token};
 const $=id=>document.getElementById(id);
 function li(list,items){list.textContent='';for(const x of items||[]){const e=document.createElement('li');e.textContent=typeof x==='string'?x:x.text;list.appendChild(e)}}
 async function poll(){try{const r=await fetch('/coach/api/state',{headers:H});if(!r.ok){$('status').textContent=(await r.json()).detail||'链接不可用';$('status').className='err';return}
-const s=await r.json();$('status').textContent='已连接 · '+(s.session.kind==='live'?'允许协助的正式场次':'练习')+' · 有效期至 '+new Date(s.session.expires_at*1000).toLocaleTimeString();
+const s=await r.json();const kind=s.session.kind==='conversation'?'Conversation':s.session.kind==='live'?'允许协助的正式面试':'练习';$('status').textContent='已连接 · '+kind+' · 有效期至 '+new Date(s.session.expires_at*1000).toLocaleTimeString();
 $('q').textContent=s.current_question||'—';
 if(s.transcript){$('tr').hidden=false;li($('trl'),s.transcript)}
 if(s.ai_cue&&s.ai_cue.cues){$('cue').hidden=false;li($('cuel'),s.ai_cue.cues)}

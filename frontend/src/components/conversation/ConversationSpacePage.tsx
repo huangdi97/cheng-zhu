@@ -500,7 +500,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <div className="mt-3 flex flex-wrap gap-2">
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF'} onClick={() => makeFollowupDraft(continueData.session.id)}>Follow-up Draft</SecondaryButton>
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.commitments.length} onClick={() => makeDerivedDraft(continueData.session.id, 'CREATE_TASK_DRAFT')}>Task Draft</SecondaryButton>
-              <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.open_questions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'CREATE_ISSUE_DRAFT')}>Issue Draft</SecondaryButton>
+              <SecondaryButton
+                disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.open_questions.some((item) => ['USER_CONFIRMED', 'USER_EDITED', 'SOURCE_CONFIRMED'].includes(item.review_status))}
+                onClick={() => makeDerivedDraft(continueData.session.id, 'CREATE_ISSUE_DRAFT')}
+              >Issue Draft</SecondaryButton>
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.decisions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'UPDATE_DECISION_LOG_DRAFT')}>Decision Log Draft</SecondaryButton>
             </div>
             {continueData.session.policy?.external_writeback === 'OFF' ? <p className="mt-2 text-[11px] text-text-muted">本场 External Write-back = OFF，因此不会生成 follow-up / task / issue 草稿。</p> : null}

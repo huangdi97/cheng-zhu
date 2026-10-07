@@ -392,7 +392,7 @@ PROFILES: tuple[ConversationProfile, ...] = (
         "会议（兼容抽象）",
         tuple(GuidanceKind),
         productized=False,
-        runtime_available=True,
+        runtime_available=False,
     ),
 )
 

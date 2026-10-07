@@ -10,9 +10,13 @@ Checks:
   4. prebuilt frontend served (CHENGZHU_FRONTEND_DIST)
   5. Fast Cue E2E with the fake provider: guidance_fast before the first
      answer_chunk, answer_done carries latency
-  6. InterviewPack freeze persists across a sidecar restart
-  7. nothing is written next to the executable (install dir stays clean)
-  8. LICENSE / THIRD_PARTY_NOTICES bundled
+  6. Conversation v2 packaged loop: Space → Preflight → frozen Session Pack →
+     Guidance → reviewed truth → Continue/History
+  7. product.db is migrated to the latest schema and Conversation frozen
+     context/history persist across a sidecar restart
+  8. InterviewPack freeze persists across a sidecar restart
+  9. nothing is written next to the executable (install dir stays clean)
+  10. LICENSE / THIRD_PARTY_NOTICES bundled
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -234,6 +238,158 @@ def main() -> int:
         checks["answer_done_latency"] = done.get("latency")
         ok &= cue_ok and bool(done)
 
+        # Conversation v2: prove the real packaged sidecar carries the
+        # additive product.db runtime, not only the legacy Interview path.
+        conv_space = http_json(f"{base}/api/product/conversation/spaces", "POST", {
+            "title": "Packaged Conversation Smoke",
+            "profile": "PROJECT_SYNC",
+            "default_goal": "Decide the v2 packaged rollout boundary",
+            "default_mode": "BALANCED",
+        })
+        conv_space_id = conv_space.get("id")
+        checks["conversation_space_created"] = bool(conv_space_id)
+        ok &= bool(conv_space_id)
+
+        participant = http_json(
+            f"{base}/api/product/conversation/spaces/{conv_space_id}/participants",
+            "POST",
+            {
+                "display_name": "Alex",
+                "role": "CTO",
+                "explicit_priority": "packaged stability",
+                "explicit_concern": "rollback safety",
+                "decision_authority": "architecture approval",
+                "relationship_context": "runtime evidence fixture",
+                "source_refs": [{"kind": "USER_INPUT", "excerpt": "packaged smoke explicit context"}],
+            },
+        )
+        checks["conversation_participant_explicit"] = (
+            participant.get("counterparty_state", {}).get("known_explicit", {}).get("priority")
+            == "packaged stability"
+        )
+        ok &= bool(checks["conversation_participant_explicit"])
+
+        conv_session = http_json(
+            f"{base}/api/product/conversation/spaces/{conv_space_id}/sessions",
+            "POST",
+            {
+                "title": "Packaged Project Sync",
+                "capture_mode": "NOTES_ONLY",
+                "processing_mode": "LOCAL",
+                "assistance_mode": "BALANCED",
+                "consent_ack": True,
+                "policy": {
+                    "ai_assistance": "AI_ALLOWED",
+                    "human_assistance": "HUMAN_PRACTICE_ONLY",
+                    "screen_context": "OFF",
+                    "share_privacy": "OFF",
+                    "external_writeback": "REVIEW_REQUIRED",
+                    "participant_consent_status": "NOT_APPLICABLE",
+                    "participant_transparency_plan": "NOT_APPLICABLE",
+                },
+            },
+        )
+        conv_session_id = conv_session.get("id")
+        checks["conversation_session_created"] = bool(conv_session_id)
+        ok &= bool(conv_session_id)
+
+        preflight = http_json(f"{base}/api/product/conversation/sessions/{conv_session_id}/preflight")
+        checks["conversation_preflight_blockers"] = preflight.get("blockers")
+        checks["conversation_preflight_local_path"] = (
+            preflight.get("processing_runtime", {}).get("mode") == "LOCAL"
+            and not preflight.get("processing_runtime", {}).get("blockers")
+        )
+        ok &= preflight.get("blockers") == [] and bool(checks["conversation_preflight_local_path"])
+
+        started = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/start",
+            "POST",
+            {},
+        )
+        conv_pack = started.get("pack") or {}
+        conv_pack_digest = conv_pack.get("digest")
+        checks["conversation_session_started"] = started.get("session", {}).get("status") == "ACTIVE"
+        checks["conversation_pack_digest"] = conv_pack_digest
+        checks["conversation_pack_has_explicit_participant"] = bool(
+            conv_pack.get("payload", {}).get("participants")
+        )
+        ok &= (
+            bool(checks["conversation_session_started"])
+            and bool(conv_pack_digest)
+            and bool(checks["conversation_pack_has_explicit_participant"])
+        )
+
+        guidance = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/guidance/evaluate",
+            "POST",
+            {
+                "direct_question": "What did we decide about packaged rollout?",
+                "source_refs": [{"kind": "USER_NOTE", "excerpt": "direct packaged smoke question"}],
+            },
+        )
+        shown = guidance.get("guidance") or {}
+        checks["conversation_direct_question_guidance"] = (
+            shown.get("kind") == "ANSWER_CUE"
+            and shown.get("reason") == "DIRECT_QUESTION"
+        )
+        ok &= bool(checks["conversation_direct_question_guidance"])
+
+        decision = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/items",
+            "POST",
+            {
+                "item_type": "Decision",
+                "title": "Ship Conversation Beta behind the existing profile switcher",
+                "source_refs": [{
+                    "kind": "USER_NOTE",
+                    "excerpt": "packaged smoke explicitly confirms the beta rollout decision",
+                    "visibility": "PRIVATE",
+                }],
+                "epistemic_status": "OBSERVED",
+                "review_status": "AI_EXTRACTED",
+            },
+        )
+        reviewed = http_json(
+            f"{base}/api/product/conversation/items/{decision.get('id')}/review",
+            "POST",
+            {"action": "CONFIRM", "patch": {}},
+        )
+        checks["conversation_reviewed_decision"] = (
+            reviewed.get("state") == "AGREED"
+            and reviewed.get("review_status") == "USER_CONFIRMED"
+        )
+        ok &= bool(checks["conversation_reviewed_decision"])
+
+        continued = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/end",
+            "POST",
+            {},
+        )
+        checks["conversation_continue_has_change"] = any(
+            item.get("id") == decision.get("id")
+            for item in (continued.get("what_changed") or [])
+        )
+        checks["conversation_continue_next_focus_key_present"] = "next_focus" in continued
+        ok &= bool(checks["conversation_continue_has_change"]) and bool(checks["conversation_continue_next_focus_key_present"])
+
+        product_db = home / "data" / "product.db"
+        product_user_version = (
+            sqlite3.connect(product_db).execute("PRAGMA user_version").fetchone()[0]
+            if product_db.exists() else None
+        )
+        checks["product_schema_version"] = product_user_version
+        product_migrations_source = (
+            Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "product_migrations.py"
+        ).read_text(encoding="utf-8")
+        product_version_match = re.search(
+            r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)",
+            product_migrations_source,
+            re.MULTILINE,
+        )
+        expected_product_schema = int(product_version_match.group(1)) if product_version_match else None
+        checks["product_schema_expected"] = expected_product_schema
+        ok &= expected_product_schema is not None and product_user_version == expected_product_schema
+
         pack = http_json(f"{base}/api/intelligence/pack/freeze", "POST", {"share_privacy_policy": "OFF"})
         checks["pack_frozen_id"] = pack.get("id")
         stop(proc)
@@ -243,6 +399,23 @@ def main() -> int:
         after = http_json(f"{base}/api/intelligence/pack")
         checks["pack_persisted_after_restart"] = bool(after.get("frozen")) and after["pack"]["id"] == pack.get("id")
         ok &= bool(checks["pack_persisted_after_restart"])
+
+        conv_history = http_json(f"{base}/api/product/conversation/history?limit=20")
+        history_items = conv_history.get("items") or []
+        checks["conversation_history_persisted_after_restart"] = any(
+            item.get("id") == conv_session_id and item.get("space_id") == conv_space_id
+            for item in history_items
+        )
+        conv_context = http_json(f"{base}/api/product/conversation/sessions/{conv_session_id}/context")
+        checks["conversation_frozen_context_persisted_after_restart"] = (
+            conv_context.get("pack_digest") == conv_pack_digest
+            and conv_context.get("policy", {}).get("ai_assistance") == "AI_ALLOWED"
+            and conv_context.get("space", {}).get("id") == conv_space_id
+        )
+        ok &= (
+            bool(checks["conversation_history_persisted_after_restart"])
+            and bool(checks["conversation_frozen_context_persisted_after_restart"])
+        )
     except Exception as exc:  # noqa: BLE001
         checks["error"] = f"{type(exc).__name__}: {exc}"
         ok = False

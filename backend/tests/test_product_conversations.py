@@ -1006,6 +1006,7 @@ def test_started_session_keeps_frozen_open_thread_after_space_thread_is_resolved
     assert len(frozen_threads) == 1
     assert frozen_threads[0]["text"] == "rollback drill 还没有 owner"
     assert frozen_threads[0]["source_refs"]
+    assert started["session"]["state"]["open_threads"] == [frozen_threads[0]["id"]]
 
     context_before = conversations.session_context(current["id"])
     assert context_before["brief"]["open_threads"][0]["id"] == frozen_threads[0]["id"]

@@ -11,6 +11,7 @@ import type {
   ConversationHome,
   ConversationItem,
   ConversationItemType,
+  ConversationOpenThread,
   ConversationPreflight,
   ConversationPrepare,
   ConversationProfile,

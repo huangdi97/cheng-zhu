@@ -197,6 +197,8 @@ export interface CoachCue {
   text: string
   voiceUrl: string
   createdAt: number
+  sessionKind?: 'practice' | 'live' | 'conversation' | string
+  targetSessionId?: string
 }
 
 /** R2 Session Claim：本场口述但暂无来源的陈述，私有提示 + 同场纠错入口 */

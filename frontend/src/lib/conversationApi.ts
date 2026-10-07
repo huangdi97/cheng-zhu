@@ -110,6 +110,11 @@ export const conversationApi = {
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
   sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
+  captureScreenContext: (id: string, region = 'left_half') =>
+    request<{ id: string; kind: 'SCREEN_CONTEXT'; description: string; image_hash: string; region: string; model: string; processing: 'LOCAL' | 'CLOUD'; authority: 'OBSERVED_NOT_CONFIRMED'; created_at: number }>(
+      `${B}/sessions/${encodeURIComponent(id)}/screen-context/capture`,
+      json('POST', { region }),
+    ),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>
     request<{ deleted: boolean; session_id: string; provenance_tombstones: number; removed_open_thread_projections: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
 

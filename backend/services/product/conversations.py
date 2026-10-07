@@ -1317,6 +1317,22 @@ def session_context(session_id: str) -> dict[str, Any]:
     }
 
 
+def screen_context(session_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    require_session(session_id)
+    return conversation_screen.list_context(session_id, limit)
+
+
+def capture_screen_context(session_id: str, *, region: str = "configured") -> dict[str, Any]:
+    session = require_session(session_id)
+    payload = _frozen_pack_payload(session)
+    frozen_runtime = dict(payload.get("screen_runtime") or {})
+    return conversation_screen.capture_manual(
+        session,
+        region=region,
+        frozen_runtime=frozen_runtime,
+    )
+
+
 def _query_tokens(text: str) -> set[str]:
     normalized = str(text or "").strip().lower()
     if not normalized:

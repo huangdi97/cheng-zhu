@@ -569,7 +569,9 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByRole('heading', { name: '对话' })).toBeVisible()
     await expect(page.getByText('rollback owner 还没有明确').first()).toBeVisible()
     await expect(page.getByText('offline migration 采用 v2')).toBeVisible()
-    await page.getByRole('button', { name: /PDIG · Android Architecture/ }).click()
+    // Conversation Home intentionally does not duplicate an Active Spaces
+    // directory. The primary loop enters the relevant Space through Next Focus.
+    await page.getByRole('button', { name: /rollback owner 还没有明确/ }).click()
     await expect(page.getByText('Open Threads')).toBeVisible()
     await expect(page.getByText(REVIEWED_OPEN.title).first()).toBeVisible()
     await page.goBack()

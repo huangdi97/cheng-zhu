@@ -48,6 +48,38 @@ Required path:
 
 A failing clean-install, download-back or source/tag provenance gate is a release failure.
 
+## Conversation Beta packaged evidence
+
+A future stable v2 release must prove Conversation on the same packaged artifacts, not only Interview.
+
+Required packaged-sidecar contract:
+
+```text
+Space → Preflight → Start → Guidance → Human Label
+→ End → Session Outcome → Evaluation Export
+→ Sidecar Restart → Feedback/History Persistence
+```
+
+Required packaged UI surfaces:
+
+```text
+Conversation Home
+Space
+Prepare
+Preflight
+Live + Frozen Session Pulse
+Guidance + local human label
+Continue
+Conversation History
+390px Prepare
+```
+
+Preferred evidence is the real packaged Electron BrowserWindow. On hosted runners where BrowserWindow capture is blocked by the environment, a fallback may use the **packaged sidecar + packaged frontend bundle** in Chromium, but its manifest must say `BLOCKED_HOSTED_RUNNER`; it is not Electron proof.
+
+Current evidence gates are at least 45 total BrowserWindow captures or 38 packaged-fallback captures because existing Interview evidence remains in the same manifest. The number is an engineering gate, not a product page-count promise.
+
+Conversation human/dogfood labels are local evaluation evidence. They do not change Decision/Commitment truth and do not prove PMF.
+
 ## NSIS hosted-runner reliability
 
 Hosted Windows runners can occasionally fail before target files are written.
@@ -137,6 +169,7 @@ It cannot by itself support:
 ```text
 PMF_PROVEN
 REAL_INTERVIEW_TRANSFER_PROVEN
+REAL_CONVERSATION_VALUE_PROVEN
 REAL_USER_VALIDATION_COMPLETE
 ```
 

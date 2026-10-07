@@ -5,9 +5,10 @@
 Use these in order:
 
 1. runtime / repository / CI facts;
-2. `docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md` — current product Canonical;
-3. `docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md` — current validation/hardening addendum;
-4. `docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md` — frozen Verified Core.
+2. `docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md` + `Chengzhu_v1.4-R1_VALIDATION_HARDENING.md` — current stable Interview product;
+3. `docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md` — Conversation design/runtime truth;
+4. `docs/canonical/Chengzhu_v2.1-R1_CONVERSATION_BETA_PRODUCTIZATION.md` — current Conversation Beta productization/evidence gate;
+5. `docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md` — frozen Verified Core.
 
 Do not rebuild the product from v1.0 / old Stage docs.
 
@@ -21,7 +22,8 @@ Do not rebuild the product from v1.0 / old Stage docs.
 | `backend/sidecar.py` | packaged backend entry |
 | `frontend/` | React + TypeScript + Vite + Zustand Goal-centered UI |
 | `frontend/src/components/os/` | Action Home, Goal Room, Practice, Library, History, Settings, Reflection |
-| `frontend/src/components/live/` | Live Cockpit / companions |
+| `frontend/src/components/live/` | Interview Live Cockpit / companions |
+| `frontend/src/components/conversation/` | Conversation Home / Spaces / Prepare / Live / Continue / History |
 | `desktop/` | Electron main process, Overlay / Share Privacy, backend launcher |
 | `packaging/` | PyInstaller spec |
 | `scripts/` | build, smoke, benchmark, soak, release/validation tooling |
@@ -124,9 +126,10 @@ Deterministic engineering evidence:
 
 ```bash
 python scripts/v14_validation_evidence.py
+python scripts/v21_conversation_beta_evidence.py
 ```
 
-Do not describe synthetic output as real-user evidence.
+v2.1 additionally produces a local-only Conversation human-label/evaluation artifact. Do not describe either synthetic output or dogfood labels as real-user evidence or PMF.
 
 ## Performance / reliability
 
@@ -186,10 +189,10 @@ Tests enforce, among other things:
 - Reflection actions write through the real product loop;
 - synthetic evidence never becomes a PMF claim.
 
-## Future Conversation Profile
+## Conversation Beta
 
-Meeting / Presentation / 1:1 are not current top-level products.
+Conversation is no longer a future-only contract. v2.0 has a real additive runtime and v2.1 productizes its packaged evidence/dogfood loop.
 
-v1.x should retain future-compatible contracts without building a parallel Meeting app.
+Launch wedges remain Project Sync / Design Review. Presentation / Q&A, 1:1, Client Call and Negotiation use shared runtime but are not separate top-level products and are not automatically profile-specific validated.
 
-See the Personal Conversation Intelligence sections in v1.3-R2 Canonical.
+Do not claim stable v2 release or real-user value from source CI alone.

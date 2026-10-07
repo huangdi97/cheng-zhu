@@ -1373,6 +1373,7 @@ def session_context(session_id: str) -> dict[str, Any]:
         "expression_profile": payload.get("expression_profile") or {},
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
+        "screen_context_observations": list((session.get("state") or {}).get("screen_context_observations") or [])[-12:],
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
         "pack_digest": str((pack_row or {}).get("digest") or ""),
     }

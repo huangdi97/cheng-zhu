@@ -239,6 +239,15 @@ function mocks() {
           configured_stt_provider: 'whisper',
           main_audio_remote_possible: false,
           self_mic_remote_possible: false,
+          data_path: {
+            capture: 'STRUCTURED_NOTES_ONLY',
+            stt: 'NOT_USED',
+            inference: 'LOCAL_DETERMINISTIC',
+            retention: 'LOCAL_PRODUCT_DB',
+            writeback: 'LOCAL_REVIEWED_DRAFT_ONLY',
+            audio_retention: 'OFF',
+            transcript_retention: 'SPACE_POLICY',
+          },
           blockers: [],
         },
         policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
@@ -545,7 +554,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByLabel('明确 Talking Point（如有）').fill('先明确 rollback owner 再谈 release window')
     await page.getByLabel('来源 / 依据').fill('Architecture decision note')
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
-    await expect(page.getByText('TALKING_POINT')).toBeVisible()
+    await expect(page.getByText('TALKING_POINT', { exact: true })).toBeVisible()
     await expect(page.getByRole('paragraph').filter({ hasText: '先明确 rollback owner 再谈 release window' })).toBeVisible()
   })
 
@@ -738,8 +747,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByLabel('要替代的旧 Decision').selectOption(DECISION.id)
     await page.getByRole('button', { name: '确认并替代旧 Decision' }).click()
     await expect(page.getByText(`supersedes ${DECISION.id}`)).toBeVisible()
-    await expect(page.getByText('SUPERSEDED')).toBeVisible()
-    await expect(page.getByText('AGREED')).toBeVisible()
+    await expect(page.getByText('SUPERSEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText('AGREED', { exact: true })).toBeVisible()
   })
 
 

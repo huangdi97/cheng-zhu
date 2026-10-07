@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -83,6 +83,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [participantRelationship, setParticipantRelationship] = useState('')
   const [editingParticipantId, setEditingParticipantId] = useState('')
   const [goalTitle, setGoalTitle] = useState('')
+  const [goalOutcome, setGoalOutcome] = useState('')
+  const [goalPriority, setGoalPriority] = useState('50')
+  const [editingGoalId, setEditingGoalId] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
   const [lifecycleMessage, setLifecycleMessage] = useState('')
@@ -166,12 +169,34 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
-  const addGoal = async () => {
+  const resetGoalEditor = () => {
+    setEditingGoalId('')
+    setGoalTitle('')
+    setGoalOutcome('')
+    setGoalPriority('50')
+  }
+
+  const editGoal = (goal: ConversationGoal) => {
+    setEditingGoalId(goal.id)
+    setGoalTitle(goal.title)
+    setGoalOutcome(goal.outcome_definition || '')
+    setGoalPriority(String(goal.priority ?? 50))
+  }
+
+  const saveGoal = async () => {
     if (!goalTitle.trim()) return
+    const parsedPriority = Number.parseInt(goalPriority, 10)
+    const priority = Number.isFinite(parsedPriority) ? Math.max(0, Math.min(100, parsedPriority)) : 50
     setSessionBusy(true); setSessionError('')
     try {
-      await conversationApi.addGoal(spaceId, { title: goalTitle.trim() })
-      setGoalTitle('')
+      const body = {
+        title: goalTitle.trim(),
+        outcome_definition: goalOutcome.trim(),
+        priority,
+      }
+      if (editingGoalId) await conversationApi.patchGoal(editingGoalId, body)
+      else await conversationApi.addGoal(spaceId, body)
+      resetGoalEditor()
       await detail.reload(); await prepare.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -361,11 +386,29 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <div className="mt-2 flex gap-2"><SecondaryButton onClick={addParticipant} disabled={sessionBusy || (!participantName.trim() && !participantRole.trim())} icon={<Plus className="h-3.5 w-3.5" />}>{editingParticipantId ? '保存修正' : '添加明确信息'}</SecondaryButton>{editingParticipantId ? <SecondaryButton disabled={sessionBusy} onClick={resetParticipantEditor}>取消</SecondaryButton> : null}</div>
           </Section>
           <Section title="Conversation Goals">
-            {space.goals.length ? <div className="space-y-2">{space.goals.map((g) => <div key={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-tertiary/70 px-3 py-2">
-              <div><div className="text-xs font-medium text-text-primary">{g.title}</div>{g.outcome_definition ? <div className="mt-1 text-[11px] text-text-muted">{g.outcome_definition}</div> : null}</div>
-              <div className="flex items-center gap-2"><StatusBadge tone={g.status === 'ACTIVE' ? 'ok' : 'muted'}>{g.status}</StatusBadge><SecondaryButton disabled={sessionBusy} onClick={() => setGoalStatus(g.id, g.status === 'ACTIVE' ? 'RESOLVED' : 'ACTIVE')}>{g.status === 'ACTIVE' ? '完成目标' : '重新打开'}</SecondaryButton></div>
+            <p className="mb-3 text-[11px] text-text-muted">Goal 表是长期目标真值；最高优先级的 ACTIVE Goal 会成为 Space 的主目标投影，并自动进入后续 Session。已开始的 Session Pack 不会被后续编辑重写。</p>
+            {space.goals.length ? <div className="space-y-2">{space.goals.map((g) => <div key={g.id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-bg-tertiary/70 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2"><div className="text-xs font-medium text-text-primary">{g.title}</div><StatusBadge tone={g.status === 'ACTIVE' ? 'ok' : 'muted'}>{g.status}</StatusBadge><StatusBadge tone="muted">P{g.priority}</StatusBadge></div>
+                {g.outcome_definition ? <div className="mt-1 text-[11px] text-text-muted">达成定义 · {g.outcome_definition}</div> : <div className="mt-1 text-[11px] text-text-muted">尚未填写达成定义。</div>}
+                {g.status === 'ACTIVE' && g.title === space.default_goal ? <div className="mt-1 text-[10px] font-semibold text-status-direct">PRIMARY ACTIVE GOAL</div> : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <SecondaryButton disabled={sessionBusy} onClick={() => editGoal(g)}>编辑</SecondaryButton>
+                <SecondaryButton disabled={sessionBusy} onClick={() => setGoalStatus(g.id, g.status === 'ACTIVE' ? 'RESOLVED' : 'ACTIVE')}>{g.status === 'ACTIVE' ? '完成目标' : '重新打开'}</SecondaryButton>
+              </div>
             </div>)}</div> : <p className="text-xs text-text-muted">可把本次需要形成 Decision / 明确 owner 等目标写在这里；ACTIVE Goal 会自动进入下一场 Session Pack。</p>}
-            <div className="mt-3 flex gap-2"><input className={inputCls} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="新增一个可验证的对话目标" /><SecondaryButton onClick={addGoal} disabled={sessionBusy || !goalTitle.trim()} icon={<Plus className="h-3.5 w-3.5" />}>添加</SecondaryButton></div>
+            <div className="mt-3 rounded-xl bg-bg-secondary/35 p-3">
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_110px]">
+                <Field label="目标"><input className={inputCls} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="例如：形成 conflict merge strategy 决策" /></Field>
+                <Field label="达成定义"><input className={inputCls} value={goalOutcome} onChange={(e) => setGoalOutcome(e.target.value)} placeholder="例如：方案、owner 与 rollout 条件均明确" /></Field>
+                <Field label="优先级 0–100"><input aria-label="Goal 优先级" type="number" min={0} max={100} className={inputCls} value={goalPriority} onChange={(e) => setGoalPriority(e.target.value)} /></Field>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <SecondaryButton onClick={saveGoal} disabled={sessionBusy || !goalTitle.trim()} icon={<Plus className="h-3.5 w-3.5" />}>{editingGoalId ? '保存 Goal' : '添加 Goal'}</SecondaryButton>
+                {editingGoalId ? <SecondaryButton disabled={sessionBusy} onClick={resetGoalEditor}>取消</SecondaryButton> : null}
+              </div>
+            </div>
           </Section>
           <Section title="数据保留与删除">
             <div className="flex flex-wrap items-center gap-2">

@@ -894,6 +894,128 @@ def test_primary_audio_commitment_does_not_infer_owner(product_env):
         conversations.review_item(commitment["id"], "CONFIRM")
 
 
+
+
+def test_manual_screen_context_fails_closed_for_remote_vision_under_local_processing(product_env, monkeypatch):
+    from core import config as core_config
+
+    class Model:
+        supports_vision = True
+        enabled = True
+        api_key = "key"
+        api_base_url = "https://vision.example.com/v1"
+        name = "remote-vision"
+        model = "remote-vision"
+
+    class Cfg:
+        stt_provider = "whisper"
+        doubao_stt_api_key = ""
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+        models = [Model()]
+
+    monkeypatch.setenv("CHENGZHU_DESKTOP_RUNTIME", "1")
+    monkeypatch.setattr(core_config, "get_config", lambda: Cfg())
+    space = conversations.create_space("Screen Local", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={"screen_context": "MANUAL"},
+    )
+    check = conversations.preflight(session["id"])
+    assert any(x["key"] == "screen_context_runtime" for x in check["blockers"])
+    assert next(x for x in check["items"] if x["key"] == "screen")["ok"] is False
+
+
+def test_manual_screen_context_is_session_observation_and_never_persists_image(product_env, monkeypatch):
+    from core import config as core_config
+    from services.capture import screen_capture
+    import services.llm as llm
+
+    class Model:
+        supports_vision = True
+        enabled = True
+        api_key = "key"
+        api_base_url = "https://vision.example.com/v1"
+        name = "remote-vision"
+        model = "remote-vision"
+
+    class Cfg:
+        stt_provider = "whisper"
+        doubao_stt_api_key = ""
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+        models = [Model()]
+
+    class Message:
+        content = "• 页面显示 rollback owner 尚未确认\n• Q4 benchmark 行显示 10x data scale"
+
+    class Choice:
+        message = Message()
+
+    class Response:
+        choices = [Choice()]
+
+    class Completions:
+        def create(self, **kwargs):
+            assert kwargs["messages"][0]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
+            return Response()
+
+    class Chat:
+        completions = Completions()
+
+    class Client:
+        chat = Chat()
+
+    image = "data:image/png;base64," + ("A" * 256)
+    monkeypatch.setenv("CHENGZHU_DESKTOP_RUNTIME", "1")
+    monkeypatch.setattr(core_config, "get_config", lambda: Cfg())
+    monkeypatch.setattr(screen_capture, "capture_primary_region_data_url", lambda region: image)
+    monkeypatch.setattr(llm, "get_client_for_model", lambda model: Client())
+
+    space = conversations.create_space("Screen Cloud", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="CLOUD",
+        consent_ack=True,
+        policy={"screen_context": "MANUAL"},
+    )
+    assert conversations.preflight(session["id"])["blockers"] == []
+    conversations.start_session(session["id"])
+
+    obs = conversations.capture_manual_screen_context(session["id"], region="left_half")
+    assert obs["kind"] == "SCREEN_CONTEXT"
+    assert obs["authority"] == "OBSERVED_NOT_CONFIRMED"
+    assert obs["processing"] == "CLOUD"
+    assert "rollback owner" in obs["description"]
+    assert obs["image_hash"]
+    assert image not in str(conversations.require_session(session["id"])["state"])
+
+    result = conversations.ask(session["id"], "rollback owner")
+    assert result["grounded"] is True
+    assert result["truth_confirmed"] is False
+    assert result["matches"][0]["kind"] == "SCREEN_CONTEXT"
+    assert result["matches"][0]["authority"] == "OBSERVED_NOT_CONFIRMED"
+
+
+def test_auto_screen_context_remains_fail_closed(product_env, monkeypatch):
+    monkeypatch.setenv("CHENGZHU_DESKTOP_RUNTIME", "1")
+    space = conversations.create_space("Screen Auto", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="CLOUD",
+        consent_ack=True,
+        policy={"screen_context": "AUTO"},
+    )
+    check = conversations.preflight(session["id"])
+    assert any(x["key"] == "screen_context_auto" for x in check["blockers"])
+    with pytest.raises(ValueError, match="AUTO Screen Context"):
+        conversations.start_session(session["id"])
+
+
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
     space = conversations.create_space("Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

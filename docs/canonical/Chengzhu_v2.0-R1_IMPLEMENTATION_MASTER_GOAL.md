@@ -521,7 +521,9 @@ Capture start 必须二次校验，防止 Preflight 后配置改变。
 以下能力在真实 runtime 未接线前必须阻止开始或标明 unavailable：
 
 ## Conversation Screen Context
-不能直接假设 Interview screenshot pipeline 可以安全复用。
+MANUAL 已进入 Conversation Beta productization：只复用通用本机 capture transport，使用独立 Conversation route / persistence / provenance；原始 screenshot 不持久化。LOCAL policy 会校验 vision route，Session Pack 冻结 vision fingerprint。
+
+AUTO 仍然 blocked：不能直接假设 Interview screenshot pipeline 或定时抓屏逻辑可以安全复用。
 
 ## Conversation Human Coach
 不能把 Interview practice/live Coach 权限直接映射到 Conversation。

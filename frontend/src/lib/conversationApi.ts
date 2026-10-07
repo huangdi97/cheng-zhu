@@ -6,16 +6,21 @@ import type {
   ConversationCaptureStatus,
   ConversationContinue,
   ConversationDraftAction,
+  ConversationEvaluationExport,
+  ConversationFeedbackEvent,
   ConversationGuidance,
+  ConversationGuidanceFeedbackLabel,
   ConversationHistoryItem,
   ConversationHome,
   ConversationItem,
   ConversationItemType,
+  ConversationMissedMomentLabel,
   ConversationPreflight,
   ConversationPrepare,
   ConversationProfile,
   ConversationSession,
   ConversationSessionContext,
+  ConversationSessionFeedbackLabel,
   ConversationTranscriptSegment,
   ConversationSpace,
   ConversationSpaceDetail,
@@ -182,6 +187,16 @@ export const conversationApi = {
   ),
   guidanceAction: (id: string, action: string) =>
     request<ConversationGuidance>(`${B}/guidance/${encodeURIComponent(id)}/status`, json('POST', { action })),
+  guidanceFeedback: (id: string, label: ConversationGuidanceFeedbackLabel, detail = '') =>
+    request<ConversationFeedbackEvent>(`${B}/guidance/${encodeURIComponent(id)}/feedback`, json('POST', { label, detail })),
+  missedMomentFeedback: (sessionId: string, label: ConversationMissedMomentLabel, body: { detail?: string; current_topic?: string; source_refs?: SourceRef[] } = {}) =>
+    request<ConversationFeedbackEvent>(`${B}/sessions/${encodeURIComponent(sessionId)}/feedback/missed`, json('POST', { label, ...body })),
+  sessionFeedback: (sessionId: string, label: ConversationSessionFeedbackLabel, detail = '') =>
+    request<ConversationFeedbackEvent>(`${B}/sessions/${encodeURIComponent(sessionId)}/feedback/session`, json('POST', { label, detail })),
+  feedbackEvents: (sessionId: string, limit = 500) =>
+    request<{ items: ConversationFeedbackEvent[] }>(`${B}/sessions/${encodeURIComponent(sessionId)}/feedback?limit=${limit}`),
+  evaluationExport: (spaceId = '') =>
+    request<ConversationEvaluationExport>(`${B}/evaluation/export${spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''}`),
   followupDraft: (sessionId: string) =>
     request<ConversationDraftAction>(`${B}/sessions/${encodeURIComponent(sessionId)}/followup-draft`, json('POST')),
   derivedDraft: (sessionId: string, kind: 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT') =>

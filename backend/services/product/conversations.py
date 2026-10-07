@@ -919,6 +919,16 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
             ],
             "agenda": list(prepared.get("agenda") or []),
             "expected_questions": list(prepared.get("expected_questions") or []),
+            "open_threads": [
+                {
+                    "id": thread.get("id") or "",
+                    "kind": thread.get("kind") or "",
+                    "text": thread.get("text") or "",
+                    "owner_id": thread.get("owner_id") or "",
+                    "source_refs": list(thread.get("source_refs") or []),
+                }
+                for thread in (prepared.get("open_threads") or [])
+            ],
             "unresolved_count": int((prepared.get("brief") or {}).get("unresolved_count") or 0),
             "known_participants": int((prepared.get("brief") or {}).get("known_participants") or 0),
             "contribution_candidates": list(prepared.get("contribution_candidates") or []),
@@ -2509,6 +2519,12 @@ def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[
     if confirmed and policy != "TOMBSTONE":
         raise ValueError("这场包含已确认事项；删除前必须选择 TOMBSTONE 保留 provenance 标记")
     tombstones = 0
+    projected_thread_ids = [
+        thread["id"]
+        for item in confirmed
+        for thread in [_thread_for_item(item)]
+        if thread
+    ]
     if confirmed:
         ts = store.now()
         with store.connect() as conn:
@@ -2527,10 +2543,17 @@ def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[
                     "deleted_at": ts,
                 }, conn=conn)
                 tombstones += 1
+            for thread_id in projected_thread_ids:
+                conn.execute("DELETE FROM conversation_open_thread WHERE id = ?", (thread_id,))
             conn.execute("DELETE FROM conversation_session WHERE id = ?", (session_id,))
     else:
         store.delete("conversation_session", session_id)
-    return {"deleted": True, "session_id": session_id, "provenance_tombstones": tombstones}
+    return {
+        "deleted": True,
+        "session_id": session_id,
+        "provenance_tombstones": tombstones,
+        "removed_open_thread_projections": len(projected_thread_ids),
+    }
 
 
 def create_draft_action(

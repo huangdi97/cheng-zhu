@@ -967,7 +967,19 @@ def start_session(session_id: str) -> dict[str, Any]:
         raise ValueError("已结束的会话不能重新开始")
     pack = freeze_pack(session_id)
     ts = store.now()
-    store.update("conversation_session", session_id, {"status": "ACTIVE", "started_at": session.get("started_at") or ts, "updated_at": ts})
+    state = dict(session.get("state") or {})
+    frozen_brief = ((pack.get("payload") or {}).get("session_brief") or {})
+    state["open_threads"] = [
+        str(thread.get("id") or "")
+        for thread in (frozen_brief.get("open_threads") or [])
+        if thread.get("id")
+    ]
+    store.update("conversation_session", session_id, {
+        "status": "ACTIVE",
+        "started_at": session.get("started_at") or ts,
+        "state": state,
+        "updated_at": ts,
+    })
     return {"session": require_session(session_id), "pack": pack}
 
 

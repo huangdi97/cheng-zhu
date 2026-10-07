@@ -322,6 +322,18 @@ function mocks() {
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') return session
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') return {
       session_id: SESSION.id,
+      conversation_state: {
+        phase: 'PARTICIPATE',
+        current_topic: '',
+        user_speaking: false,
+        direct_question_pending: false,
+        audience_context: {},
+        items: [
+          { id: DECISION.id, type: DECISION.type, state: DECISION.state, title: DECISION.title, review_status: DECISION.review_status },
+        ],
+        open_threads: threadOpen ? [{ id: THREAD.id, kind: THREAD.kind, text: THREAD.text, owner_id: '' }] : [],
+        last_guidance_id: '',
+      },
       space: { id: SPACE.id, profile: SPACE.profile, title: SPACE.title },
       brief: {
         goal: SPACE.default_goal,

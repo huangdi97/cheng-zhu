@@ -37,6 +37,20 @@ def test_default_policy_refuses_live_and_allows_practice():
     live, _ = reg.create(human_policy="HUMAN_ALLOWED", session_kind="live")
     assert live.session_kind == "live"
 
+    with pytest.raises(CoachPolicyError):
+        reg.create(human_policy="HUMAN_PRACTICE_ONLY", session_kind="conversation", live_session_id="conv-1")
+    with pytest.raises(CoachPolicyError):
+        reg.create(human_policy="HUMAN_ALLOWED", session_kind="conversation")
+    conversation, _ = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-1",
+        permissions={"session_context": True, "transcript": False},
+    )
+    assert conversation.session_kind == "conversation"
+    assert conversation.live_session_id == "conv-1"
+    assert conversation.permissions["session_context"] is True
+
 
 def test_ai_allowed_does_not_imply_human_allowed():
     from services.intelligence.policy import human_coach_allowed
@@ -81,6 +95,16 @@ def test_coach_cue_is_advice_not_evidence():
     assert payload["source"] == "HUMAN_COACH" and payload["is_evidence"] is False
     assert len(payload["text"]) <= coach.MAX_TEXT_CHARS
 
+    conversation, _ = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-42",
+    )
+    scoped = coach.coach_cue_payload(conversation, text="只提醒当前这场")
+    assert scoped["session_kind"] == "conversation"
+    assert scoped["target_session_id"] == "conv-42"
+    assert scoped["is_evidence"] is False
+
 
 def test_public_relay_blocked_without_infrastructure(monkeypatch):
     monkeypatch.delenv("COACH_PUBLIC_BASE_URL", raising=False)
@@ -97,7 +121,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(coach, "registry", fresh)
     import api.coach.router as router
 
-    monkeypatch.setattr(router, "_human_policy_for", lambda kind: "HUMAN_PRACTICE_ONLY")
+    monkeypatch.setattr(router, "_human_policy_for", lambda kind, target="": "HUMAN_PRACTICE_ONLY")
     sent: list[dict] = []
     monkeypatch.setattr(router, "_broadcast", sent.append)
     import main
@@ -135,7 +159,7 @@ def test_policy_tightened_mid_session_blocks_cues(client, monkeypatch):
     token = body["urls"]["local"].split("#t=")[1]
     import api.coach.router as router
 
-    monkeypatch.setattr(router, "_human_policy_for", lambda kind: "HUMAN_FORBIDDEN")
+    monkeypatch.setattr(router, "_human_policy_for", lambda kind, target="": "HUMAN_FORBIDDEN")
     assert client.post("/coach/api/cue", json={"text": "x"}, headers={"X-Coach-Token": token}).status_code == 403
 
 
@@ -143,6 +167,9 @@ def test_helper_page_keeps_token_out_of_requests(client):
     html = client.get("/coach").text
     assert "location.hash" in html and "history.replaceState" in html
     assert "X-Coach-Token" in html
+    assert "conversation_context" in html
+    assert "本场冻结上下文" in html
+    assert "本页不能控制对方电脑" in html
     assert client.get("/coach").headers.get("referrer-policy") == "no-referrer"
 
 

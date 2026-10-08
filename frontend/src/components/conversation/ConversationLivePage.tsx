@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
+import { Camera, Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
-import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationTranscriptSegment } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -43,6 +43,9 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [primaryDevice, setPrimaryDevice] = useState('')
   const [selfMic, setSelfMic] = useState('')
   const [captureBusy, setCaptureBusy] = useState(false)
+  const [screenRegion, setScreenRegion] = useState<'configured' | 'full' | 'left_half' | 'right_half' | 'top_half' | 'bottom_half'>('configured')
+  const [screenBusy, setScreenBusy] = useState(false)
+  const [screenObservations, setScreenObservations] = useState<ConversationScreenContext[]>([])
 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
@@ -72,6 +75,18 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       setPrimaryDevice(String(preferred.id))
     }
   }, [devices.data, primaryDevice])
+
+  useEffect(() => {
+    let alive = true
+    if (liveContext.data?.screen_runtime?.mode !== 'MANUAL') {
+      setScreenObservations([])
+      return () => { alive = false }
+    }
+    conversationApi.screenContext(sessionId, 12)
+      .then((payload) => { if (alive) setScreenObservations(payload.items) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [sessionId, liveContext.data?.screen_runtime?.mode])
 
   useEffect(() => {
     let alive = true
@@ -179,6 +194,15 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     try { setAskResult(await conversationApi.ask(sessionId, askText.trim())) }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
+  }
+
+  const captureScreen = async () => {
+    setScreenBusy(true); setError('')
+    try {
+      const saved = await conversationApi.captureScreenContext(sessionId, screenRegion)
+      setScreenObservations((current) => [saved, ...current.filter((item) => item.id !== saved.id)].slice(0, 12))
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setScreenBusy(false) }
   }
 
   const addItem = async () => {
@@ -357,8 +381,30 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
                 <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
                 <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
+                <span>Screen · {liveContext.data.screen_runtime?.mode === 'MANUAL' ? `${liveContext.data.screen_runtime.route ?? '—'} / ${liveContext.data.screen_runtime.model_id || liveContext.data.screen_runtime.model_name || 'vision'}` : liveContext.data.screen_runtime?.mode ?? 'OFF'}</span>
               </div>
             </div>
+          </div> : null}
+
+          {liveContext.data?.screen_runtime?.mode === 'MANUAL' ? <div className="rounded-2xl border border-bg-tertiary p-4" data-testid="conversation-screen-context">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2"><Camera className="h-4 w-4 text-accent-blue" /><h2 className="text-sm font-semibold text-text-primary">Manual Screen Context</h2></div>
+                <p className="mt-1 text-[11px] text-text-muted">只在你主动点击时抓取一次；原图不保存。仅保留提取文本、image hash 与视觉模型/route provenance。</p>
+              </div>
+              <StatusBadge tone={liveContext.data.screen_runtime.route === 'LOCAL' ? 'ok' : 'warn'}>{liveContext.data.screen_runtime.route ?? 'UNAVAILABLE'}</StatusBadge>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <select className={inputCls} value={screenRegion} onChange={(e) => setScreenRegion(e.target.value as typeof screenRegion)} aria-label="屏幕区域">
+                <option value="configured">使用设置中的区域</option><option value="full">全屏</option><option value="left_half">左半屏</option><option value="right_half">右半屏</option><option value="top_half">上半屏</option><option value="bottom_half">下半屏</option>
+              </select>
+              <SecondaryButton disabled={screenBusy || s.status !== 'ACTIVE'} onClick={captureScreen} icon={<Camera className="h-3.5 w-3.5" />}>{screenBusy ? '提取中…' : '抓取一次'}</SecondaryButton>
+            </div>
+            <div className="mt-2 text-[10px] text-text-muted">Model · {liveContext.data.screen_runtime.model_id || liveContext.data.screen_runtime.model_name || '—'} · fingerprint {liveContext.data.screen_runtime.fingerprint ? liveContext.data.screen_runtime.fingerprint.slice(0, 10) : '—'} · raw image NOT STORED</div>
+            {screenObservations.length ? <div className="mt-3 space-y-2">{screenObservations.map((item) => <div key={item.id} className="rounded-xl bg-bg-secondary/40 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2"><StatusBadge tone="muted">OBSERVED_NOT_CONFIRMED</StatusBadge><span className="text-[10px] text-text-muted">{item.vision_route} · {item.vision_model} · {item.region}</span></div>
+              <p className="mt-1 text-xs leading-relaxed text-text-primary">{item.text}</p>
+            </div>)}</div> : <p className="mt-3 text-[11px] text-text-muted">本场还没有屏幕观察。截图提取结果不会自动升级成 Decision / Commitment。</p>}
           </div> : null}
 
           <div className="rounded-2xl border border-bg-tertiary p-4">

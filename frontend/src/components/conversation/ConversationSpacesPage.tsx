@@ -121,6 +121,12 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
           <div className="mt-3"><Field label="希望持续达成什么（可选）"><input className={inputCls} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="例如：把 conflict merge strategy 做成明确 Decision" /></Field></div>
           <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/25 p-3 text-[11px] text-text-muted">
             <div>默认帮助方式：{templateMap.get(profile)?.default_mode ?? 'BALANCED'}。后续每场 Preflight 可单独选择。</div>
+            {templateMap.get(profile)?.playbook ? <div className="mt-2 rounded-lg bg-bg-primary/45 p-2.5">
+              <div className="font-semibold text-text-secondary">本 Profile 的 Closing Objective</div>
+              <div className="mt-1 text-text-primary">{templateMap.get(profile)!.playbook.closing_objective}</div>
+              <div className="mt-2 space-y-1">{templateMap.get(profile)!.playbook.success_conditions.slice(0, 3).map((item) => <div key={item}>• {item}</div>)}</div>
+              <div className="mt-2 text-text-muted">Priority truth · {templateMap.get(profile)!.playbook.priority_truth_types.join(' · ')}</div>
+            </div> : null}
             {templateMap.get(profile)?.launch_wedge ? (
               <div className="mt-1 text-text-secondary">成熟度 · BETA_WEDGE：这是当前首发验证楔子；runtime 可用，但 stable release / real-user validation 仍未成立。</div>
             ) : (

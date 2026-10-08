@@ -435,7 +435,10 @@ def _profile_outcome_evidence(session: dict[str, Any], items: list[dict[str, Any
     # mutable template definitions. Otherwise a later Playbook upgrade silently
     # reclassifies historical reviewed output and changes closing objectives.
     frozen = _frozen_pack_payload(session).get("profile_playbook")
-    playbook = dict(frozen) if isinstance(frozen, dict) and frozen.get("profile") == space["profile"] else profile_playbook(space["profile"])
+    if isinstance(frozen, dict) and frozen.get("profile") == space["profile"]:
+        playbook = dict(frozen)
+    else:
+        playbook = profile_playbook(space["profile"])
     allowed = set(playbook["priority_truth_types"])
     counts: dict[str, int] = {kind: 0 for kind in playbook["priority_truth_types"]}
     reviewed = []

@@ -2226,6 +2226,49 @@ def _score(body: dict[str, Any]) -> OpportunityScore:
     return OpportunityScore(**values)
 
 
+def _expression_plan_for_guidance(event: dict[str, Any]) -> dict[str, Any]:
+    """Derive the user-facing Expression Plan from the persisted Guidance event.
+
+    Guidance remains the only persisted realtime event truth. This read model
+    explains how the event should render, whom it targets, what sources justify
+    it, and why a SILENT decision stayed silent.
+    """
+    session = require_session(str(event.get("session_id") or ""))
+    state = dict(session.get("state") or {})
+    audience = dict(state.get("audience_context") or {})
+    status = str(event.get("status") or "")
+    reason = str(event.get("reason") or "")
+    source_refs = list(event.get("source_refs") or [])
+    text = str(event.get("text") or "")
+    kind = str(event.get("kind") or "")
+    action = str(event.get("expression_action") or ExpressionAction.SILENT.value)
+
+    suppressed = status != "SHOWN" or action == ExpressionAction.SILENT.value
+    warnings: list[str] = []
+    if suppressed and reason:
+        warnings.append(f"Suppressed: {reason}")
+    if not source_refs and kind in {"RECALL", "TALKING_POINT", "RISK", "CONTRIBUTION_OPPORTUNITY"} and not suppressed:
+        warnings.append("No provenance attached; treat as session-state guidance, not confirmed fact.")
+    if audience.get("explicit_concern"):
+        warnings.append("Expression may prioritize the participant's explicitly stated concern; facts remain unchanged.")
+
+    return {
+        "action": action,
+        "guidance_kind": kind or None,
+        "target_participant_id": str(state.get("audience_participant_id") or ""),
+        "text": text,
+        "source_refs": source_refs,
+        "warnings": warnings,
+        "max_length": 0 if suppressed else 1200,
+        "render_as": "SILENCE" if suppressed else "PRIMARY_CARD",
+        "suppression_reasons": [reason] if suppressed and reason else [],
+    }
+
+
+def _guidance_view(event: dict[str, Any]) -> dict[str, Any]:
+    return {**event, "expression_plan": _expression_plan_for_guidance(event)}
+
+
 def _persist_guidance(
     session_id: str,
     *,
@@ -2260,7 +2303,7 @@ def _persist_guidance(
     if status == "SHOWN":
         state["last_guidance_id"] = row["id"]
         store.update("conversation_session", session_id, {"state": state, "updated_at": ts})
-    return saved
+    return _guidance_view(saved)
 
 
 def _space_guidance_kinds(session: dict[str, Any]) -> set[str]:
@@ -2383,7 +2426,12 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     }
     if any(audience_context.values()):
         state["audience_context"] = {k: v for k, v in audience_context.items() if v}
-    if current_topic or any(audience_context.values()):
+    if "audience_participant_id" in body:
+        # API model_dump always carries this key. An explicit empty value means
+        # "do not bind this guidance to a known participant" and must clear a
+        # prior target instead of leaking it across later turns.
+        state["audience_participant_id"] = str(body.get("audience_participant_id") or "").strip()[:160]
+    if current_topic or any(audience_context.values()) or "audience_participant_id" in body:
         store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
     source_refs = list(body.get("source_refs") or [])
@@ -2749,13 +2797,14 @@ def guidance_from_transcript(
 
 def guidance_history(session_id: str, limit: int = 30) -> list[dict[str, Any]]:
     require_session(session_id)
-    return store.select(
+    rows = store.select(
         "conversation_guidance_event",
         where="session_id = ?",
         params=(session_id,),
         order="created_at DESC",
         limit=max(1, min(100, int(limit))),
     )
+    return [_guidance_view(row) for row in rows]
 
 
 def set_guidance_action(guidance_id: str, action: str) -> dict[str, Any]:
@@ -2766,7 +2815,7 @@ def set_guidance_action(guidance_id: str, action: str) -> dict[str, Any]:
     if action not in {"EXPANDED", "PINNED", "DISMISSED", "SNOOZED", "USED", "NONE"}:
         raise ValueError("提示动作不支持")
     store.update("conversation_guidance_event", guidance_id, {"user_action": action})
-    return store.get("conversation_guidance_event", guidance_id) or row
+    return _guidance_view(store.get("conversation_guidance_event", guidance_id) or row)
 
 
 def space_detail(space_id: str) -> dict[str, Any]:

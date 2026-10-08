@@ -1488,6 +1488,59 @@ def test_started_session_keeps_frozen_open_thread_after_space_thread_is_resolved
 
 
 
+
+
+def test_expression_plan_is_derived_from_guidance_and_explicit_audience_only(product_env):
+    space = conversations.create_space("Plan", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    shown = conversations.evaluate_guidance(session["id"], {
+        "talking_point": "只补一条有来源的 benchmark",
+        "source_refs": [{"kind": "DOCUMENT", "id": "bench", "visibility": "PRIVATE"}],
+        "audience_participant_id": "cp_explicit",
+        "audience_role": "CTO",
+        "audience_concern": "回滚风险",
+    })["guidance"]
+    plan = shown["expression_plan"]
+    assert plan["action"] == shown["expression_action"]
+    assert plan["guidance_kind"] == "TALKING_POINT"
+    assert plan["target_participant_id"] == "cp_explicit"
+    assert plan["render_as"] == "PRIMARY_CARD"
+    assert plan["source_refs"] == shown["source_refs"]
+    assert plan["suppression_reasons"] == []
+    assert any("explicitly stated concern" in x for x in plan["warnings"])
+
+    silent = conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "先别打断",
+        "user_speaking": True,
+        "source_refs": [{"kind": "DOCUMENT", "id": "bench", "visibility": "PRIVATE"}],
+        "audience_participant_id": "cp_explicit",
+    })
+    assert silent["guidance"] is None
+    silent_plan = silent["event"]["expression_plan"]
+    assert silent_plan["action"] == "SILENT"
+    assert silent_plan["render_as"] == "SILENCE"
+    assert silent_plan["target_participant_id"] == "cp_explicit"
+    assert silent_plan["suppression_reasons"] == ["USER_SPEAKING"]
+
+    # The DB row remains the existing Guidance event schema: Expression Plan is
+    # a service-boundary read model, not a second mutable truth store.
+    raw = store.get("conversation_guidance_event", shown["id"])
+    assert raw is not None
+    assert "expression_plan" not in raw
+
+    history = conversations.guidance_history(session["id"], 10)
+    from_history = next(x for x in history if x["id"] == shown["id"])
+    assert from_history["expression_plan"] == plan
+
+    cleared = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "还有什么？",
+        "audience_participant_id": "",
+    })["guidance"]
+    assert cleared["expression_plan"]["target_participant_id"] == ""
+
+
 def test_guidance_arbiter_critical_risk_visibility_duplicate_social_and_budget(product_env):
     space = conversations.create_space("Arbiter", "DESIGN_REVIEW")
 

@@ -3,7 +3,7 @@ import { Camera, Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-rea
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
 import { captureViewState, createLivePollGate, latestVisibleGuidance } from './liveViewState'
-import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationExpressionPlan, ConversationGuidance, ConversationItemType, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -29,6 +29,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [relationshipContext, setRelationshipContext] = useState('')
   const [speaking, setSpeaking] = useState(false)
   const [guidance, setGuidance] = useState<ConversationGuidance | null>(null)
+  const [silentPlan, setSilentPlan] = useState<ConversationExpressionPlan | null>(null)
   const [suppressed, setSuppressed] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -112,10 +113,20 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         }
         if (transcriptResult.status === 'fulfilled') setSegments(transcriptResult.value.items)
         if (guidanceResult.status === 'fulfilled') {
-          const latest = latestVisibleGuidance(guidanceResult.value.items)
+          const events = guidanceResult.value.items
+          const newest = events[0]
+          const latest = latestVisibleGuidance(events)
           setGuidance((current) => current?.id === latest?.id ? current : latest)
+          if (latest) {
+            setSilentPlan(null)
+            setSuppressed('')
+          } else if (newest) {
+            setSilentPlan(newest.expression_plan?.render_as === 'SILENCE' ? newest.expression_plan : null)
+            setSuppressed(newest.expression_plan?.suppression_reasons?.[0] ?? newest.reason ?? '')
+          }
         } else {
           setGuidance(null)
+          setSilentPlan(null)
         }
       } finally {
         capturePollGate.finish()
@@ -198,8 +209,11 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         audience_concern: audienceConcern,
         decision_authority: decisionAuthority,
         relationship_context: relationshipContext,
+        audience_participant_id: audienceParticipantId,
       })
-      setGuidance(result.guidance); setSuppressed(result.suppressed ?? '')
+      setGuidance(result.guidance)
+      setSilentPlan(result.guidance ? null : (result.event?.expression_plan ?? null))
+      setSuppressed(result.guidance ? '' : (result.event?.expression_plan?.suppression_reasons?.[0] ?? result.suppressed ?? ''))
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
   }
@@ -334,9 +348,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
           <div className="min-h-[160px] rounded-2xl border border-accent-blue/20 bg-bg-primary p-5">
             {guidance ? (
               <>
-                <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={guidance.kind === 'RISK' ? 'risk' : guidance.kind === 'CONTRIBUTION_OPPORTUNITY' ? 'info' : 'ok'}>{guidance.kind}</StatusBadge><span className="text-[11px] text-text-muted">{guidance.expression_action}</span></div>
+                <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={guidance.kind === 'RISK' ? 'risk' : guidance.kind === 'CONTRIBUTION_OPPORTUNITY' ? 'info' : 'ok'}>{guidance.kind}</StatusBadge><span className="text-[11px] text-text-muted">{guidance.expression_action}</span><StatusBadge tone="muted">{guidance.expression_plan.render_as}</StatusBadge>{guidance.expression_plan.target_participant_id ? <StatusBadge tone="info">target {guidance.expression_plan.target_participant_id}</StatusBadge> : null}</div>
                 <p className="mt-4 text-lg font-medium leading-relaxed text-text-primary">{guidance.text}</p>
                 <p className="mt-3 text-xs text-text-muted">来源：{guidance.source_refs.length ? guidance.source_refs.map((x) => x.kind).join(' · ') : '当前直接问题 / 会话状态'} · reason {guidance.reason}</p>
+                {guidance.expression_plan.warnings.length ? <div className="mt-2 space-y-1">{guidance.expression_plan.warnings.map((warning) => <div key={warning} className="text-[11px] text-status-inferred">Plan · {warning}</div>)}</div> : null}
                 <div className="mt-4 flex gap-2"><SecondaryButton onClick={() => void conversationApi.guidanceAction(guidance.id, 'PINNED')} icon={<Pin className="h-3.5 w-3.5" />}>Pin</SecondaryButton><SecondaryButton onClick={() => { void conversationApi.guidanceAction(guidance.id, 'DISMISSED'); setGuidance(null) }}>忽略</SecondaryButton></div>
               </>
             ) : (
@@ -344,6 +359,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <PauseCircle className="h-7 w-7 text-text-muted" />
                 <p className="mt-2 text-sm font-medium text-text-primary">{suppressed ? '这一次选择不打扰你' : '等待高价值 Guidance'}</p>
                 <p className="mt-1 text-xs text-text-muted">{suppressed ? `SILENT · ${suppressed}` : 'Direct Question > Critical Risk > Recall / Opportunity > Question > Delivery'}</p>
+                {silentPlan ? <p className="mt-2 text-[11px] text-text-muted">Expression Plan · {silentPlan.render_as}{silentPlan.target_participant_id ? ` · target ${silentPlan.target_participant_id}` : ''}</p> : null}
               </div>
             )}
           </div>

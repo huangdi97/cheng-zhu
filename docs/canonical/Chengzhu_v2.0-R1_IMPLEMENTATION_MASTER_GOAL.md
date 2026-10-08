@@ -459,6 +459,15 @@ Conversation State 同样是派生 read model：phase / topic / user-speaking / 
 
 > 修改表达结构，不修改事实。
 
+Runtime closure：
+
+- 每个 Guidance event 在 service boundary 派生 Expression Plan；
+- `PRIMARY_CARD` 与 `SILENCE` 使用同一派生 contract；
+- Plan 必须携带 provenance、warnings、suppression reasons；
+- target participant 只能来自用户明确选择的 frozen participant；
+- 清空 participant 选择必须清掉旧 target，禁止跨 turn 串线；
+- Expression Plan 不新增数据库 truth，不允许与 Guidance 双写/漂移。
+
 ---
 
 Runtime closure：Expression Plan 是 Guidance 的派生展示层，不单独建立第二套持久化 truth。长期审计以 Guidance 的 kind / expression_action / source_refs / reason / user_action 与 frozen Session Pack 为准；DELIVERY 读取共享 Expression Profile 与 explicit audience context 生成结构提示。

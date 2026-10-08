@@ -111,6 +111,51 @@ DEFAULT_SESSION_POLICY: dict[str, Any] = {
     "hidden_intent_claims": "OFF",
 }
 
+TIME_AMBIGUITY_STATES = {"EXACT", "AMBIGUOUS", "UNSPECIFIED_TIMEZONE", "NOT_PARSED", "NOT_APPLICABLE"}
+
+
+def _normalize_time_semantics(
+    raw: Optional[dict[str, Any]],
+    *,
+    original_text: str = "",
+    normalized_datetime: str = "",
+    timezone: str = "",
+    ambiguity: str = "",
+) -> dict[str, str]:
+    source = dict(raw or {})
+    original = str(source.get("original_text") or original_text or "")[:1200]
+    normalized = str(source.get("normalized_datetime") or normalized_datetime or "")[:160]
+    zone = str(source.get("timezone") or timezone or "")[:120]
+    state = str(source.get("ambiguity") or ambiguity or "").upper().strip()
+    if not state:
+        if not original and not normalized:
+            state = "NOT_APPLICABLE"
+        elif normalized and zone:
+            state = "EXACT"
+        elif normalized:
+            state = "UNSPECIFIED_TIMEZONE"
+        else:
+            state = "AMBIGUOUS"
+    if state not in TIME_AMBIGUITY_STATES:
+        raise ValueError("时间歧义状态不支持")
+    return {
+        "original_text": original,
+        "normalized_datetime": normalized,
+        "timezone": zone,
+        "ambiguity": state,
+    }
+
+
+def _time_semantics_resolved(value: Optional[dict[str, Any]]) -> bool:
+    ts = _normalize_time_semantics(value)
+    return bool(
+        ts["ambiguity"] == "EXACT"
+        and ts["normalized_datetime"]
+        and ts["timezone"]
+    )
+
+
+
 
 def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     source = {**DEFAULT_SESSION_POLICY, **dict(base or {}), **dict(raw or {})}
@@ -1628,6 +1673,7 @@ def add_item(
     owner_id: str = "",
     speaker_id: str = "",
     due_at: str = "",
+    time_semantics: Optional[dict[str, Any]] = None,
     source_refs: Optional[list[dict[str, Any]]] = None,
     source_excerpt: str = "",
     confidence: float = 0.0,
@@ -1643,12 +1689,22 @@ def add_item(
     review_status = _require_choice(review_status, REVIEW_STATUSES, "审核状态")
     epistemic_status = _require_choice(epistemic_status, EPISTEMIC_STATUSES, "认知状态")
     refs = list(source_refs or [])
+    temporal = _normalize_time_semantics(
+        time_semantics,
+        original_text=(title if item_type == "Deadline" else ""),
+        normalized_datetime=str(due_at or ""),
+    )
     if item_type == "Deadline" and not refs:
         raise ValueError("Deadline 必须带来源")
     if state == "AGREED" and not (refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
         raise ValueError("Decision 升级为 AGREED 需要来源与明确确认")
     if state == "COMMITTED" and not (owner_id and refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
         raise ValueError("Commitment 升级为 COMMITTED 需要 owner、来源与明确确认")
+    if item_type in {"Commitment", "Task"} and state == "COMMITTED" and temporal["original_text"] and temporal["ambiguity"] != "NOT_APPLICABLE" and not _time_semantics_resolved(temporal):
+        raise ValueError("Commitment 的时间仍有歧义；写入 COMMITTED 前请补 normalized datetime 与 timezone")
+    if item_type == "Deadline" and state in {"COMMITTED", "DONE"}:
+        if review_status not in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"} or not _time_semantics_resolved(temporal):
+            raise ValueError("Deadline 写入长期状态前需要明确 review、normalized datetime 与 timezone")
     title = str(title or "").strip()
     if not title:
         raise ValueError("事项内容不能为空")
@@ -1663,7 +1719,8 @@ def add_item(
         "detail": str(detail or "")[:5000],
         "speaker_id": str(speaker_id or "")[:120],
         "owner_id": str(owner_id or "")[:120],
-        "due_at": str(due_at or "")[:120],
+        "due_at": str(due_at or temporal.get("normalized_datetime") or "")[:120],
+        "time_semantics": temporal,
         "source_refs": refs,
         "source_excerpt": str(source_excerpt or "")[:3000],
         "confidence": max(0.0, min(1.0, float(confidence or 0.0))),
@@ -1685,6 +1742,14 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
     action = str(action or "").upper()
     patch = dict(patch or {})
     update: dict[str, Any] = {}
+    temporal = _normalize_time_semantics(
+        patch.get("time_semantics") if isinstance(patch.get("time_semantics"), dict) else item.get("time_semantics"),
+        original_text=str(item.get("title") or ""),
+        normalized_datetime=str(patch.get("due_at") or item.get("due_at") or ""),
+    )
+    if "time_semantics" in patch or "due_at" in patch:
+        update["time_semantics"] = temporal
+        update["due_at"] = temporal.get("normalized_datetime") or str(patch.get("due_at") or item.get("due_at") or "")
     if action == "CONFIRM":
         update["review_status"] = "USER_CONFIRMED"
         if item["type"] == "Decision" and item["state"] == "PROPOSED":
@@ -1695,12 +1760,23 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
             owner = str(patch.get("owner_id") or item.get("owner_id") or "")
             if not owner or not item.get("source_refs"):
                 raise ValueError("Commitment 确认前需要 owner 与来源")
+            if temporal["original_text"] and temporal["ambiguity"] != "NOT_APPLICABLE" and not _time_semantics_resolved(temporal):
+                raise ValueError("Commitment 的时间仍有歧义；确认前请补 normalized datetime 与 timezone")
             update["owner_id"] = owner
             update["state"] = "COMMITTED"
+        elif item["type"] == "Deadline" and item["state"] == "PROPOSED":
+            if not item.get("source_refs"):
+                raise ValueError("Deadline 确认前需要来源")
+            if not _time_semantics_resolved(temporal):
+                raise ValueError("Deadline 时间仍有歧义；确认前请补 normalized datetime 与 timezone")
+            update["state"] = "COMMITTED"
     elif action == "EDIT":
-        for key in ("title", "detail", "owner_id", "speaker_id", "due_at", "source_excerpt"):
+        for key in ("title", "detail", "owner_id", "speaker_id", "source_excerpt"):
             if key in patch:
                 update[key] = patch[key]
+        if "time_semantics" in patch or "due_at" in patch:
+            update["time_semantics"] = temporal
+            update["due_at"] = temporal.get("normalized_datetime") or str(patch.get("due_at") or "")
         update["review_status"] = "USER_EDITED"
     elif action == "REJECT":
         update.update({"review_status": "USER_REJECTED", "state": "UNKNOWN"})
@@ -1861,6 +1937,12 @@ def extract_transcript_candidates(session_id: str) -> list[dict[str, Any]]:
                     title=sentence[:1000],
                     state="PROPOSED",
                     owner_id=owner_id,
+                    time_semantics=({
+                        "original_text": sentence[:1000],
+                        "normalized_datetime": "",
+                        "timezone": "",
+                        "ambiguity": "AMBIGUOUS",
+                    } if item_type == "Deadline" else None),
                     source_refs=[ref],
                     source_excerpt=sentence[:500],
                     confidence=0.85,
@@ -2596,6 +2678,145 @@ def prepare_space(space_id: str) -> dict[str, Any]:
     }
 
 
+
+def search_items(
+    *,
+    query: str = "",
+    item_type: str = "",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Global Conversation search over item truth with provenance context.
+
+    Results always carry Space, Session, review/state and source refs so the
+    command/search surface cannot become an ungrounded AI answer box.
+    """
+    q = str(query or "").strip()
+    requested = str(item_type or "").strip()
+    allowed_types = {
+        "Decision", "Commitment", "Task", "Deadline", "Risk", "Assumption",
+        "OpenQuestion", "Proposal", "Objection", "Metric", "Status",
+    }
+    params: list[Any] = []
+    clauses = ["1=1"]
+
+    if requested:
+        if requested == "Commitment":
+            clauses.append("i.type IN ('Commitment','Task')")
+        else:
+            if requested not in allowed_types:
+                raise ValueError("不支持的 Conversation Item 类型")
+            clauses.append("i.type = ?")
+            params.append(requested)
+
+    if q:
+        like = f"%{q}%"
+        clauses.append("(i.title LIKE ? OR i.detail LIKE ? OR i.source_excerpt LIKE ?)")
+        params.extend([like, like, like])
+
+    params.append(max(1, min(200, int(limit))))
+    rows = store.rows(
+        "SELECT i.*, sp.title AS space_title, sp.profile AS space_profile, "
+        "s.title AS session_title, s.started_at AS session_started_at, "
+        "s.ended_at AS session_ended_at "
+        "FROM conversation_item i "
+        "JOIN conversation_space sp ON sp.id = i.space_id "
+        "JOIN conversation_session s ON s.id = i.session_id "
+        f"WHERE {' AND '.join(clauses)} "
+        "ORDER BY i.updated_at DESC, i.created_at DESC LIMIT ?",
+        tuple(params),
+    )
+    return rows
+
+
+def export_session(session_id: str) -> dict[str, Any]:
+    session = require_session(session_id)
+    space = require_space(session["space_id"])
+    transcript = store.select(
+        "conversation_transcript_segment",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    items = store.select(
+        "conversation_item",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    guidance = store.select(
+        "conversation_guidance_event",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    drafts = store.select(
+        "conversation_draft_action",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    packs = store.select(
+        "conversation_session_pack",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    confirmed = [
+        item for item in items
+        if item["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
+    ]
+    candidates = [item for item in items if item["review_status"] == "AI_EXTRACTED"]
+    source_manifest: list[dict[str, Any]] = []
+    quick_notes: list[dict[str, Any]] = []
+    for pack in packs:
+        payload = dict(pack.get("payload") or {})
+        for source in payload.get("sources") or []:
+            source_manifest.append({
+                "material_id": source.get("material_id") or "",
+                "version_id": source.get("version_id") or "",
+                "title": source.get("title") or "",
+                "kind": source.get("kind") or "",
+                "usage": source.get("usage") or "",
+                "content_hash": source.get("content_hash") or "",
+                "is_personal_evidence": bool(source.get("is_personal_evidence")),
+            })
+        for note in payload.get("quick_notes") or []:
+            quick_notes.append({
+                "id": note.get("id") or "",
+                "title": note.get("title") or "",
+                "content": note.get("content") or "",
+                "kind": "USER_NOTE",
+            })
+
+    return {
+        "kind": "CONVERSATION_SESSION",
+        "contract": "v2.0-R1",
+        "export_manifest": {
+            "categories": [
+                "session", "transcript", "quick_notes", "confirmed_items",
+                "unconfirmed_candidates", "guidance", "draft_actions",
+                "source_manifest", "session_packs",
+            ],
+            "privacy": "LOCAL_EXPORT",
+            "contains_external_secrets": False,
+        },
+        "space": {
+            "id": space["id"],
+            "title": space["title"],
+            "profile": space["profile"],
+        },
+        "session": session,
+        "transcript": transcript,
+        "quick_notes": quick_notes,
+        "confirmed_items": confirmed,
+        "unconfirmed_candidates": candidates,
+        "guidance": guidance,
+        "draft_actions": drafts,
+        "source_manifest": source_manifest,
+        "session_packs": packs,
+    }
+
+
 def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
     rows = store.rows(
         "SELECT s.*, sp.title AS space_title, sp.profile AS space_profile "
@@ -3131,6 +3352,13 @@ def diagnostics() -> dict[str, Any]:
             "capture": "AVAILABLE" if not capture["active"] else "IN_USE",
             "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
             "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
+            "session_pack_context": "AVAILABLE",
+            "retrieval": "AVAILABLE",
+            "state_engine": "AVAILABLE",
+            "guidance_arbiter": "AVAILABLE",
+            "export_delete_integrity": "AVAILABLE",
+            "processing_policy": "AVAILABLE",
+            "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": "NOT_CONFIGURED",
             "conversation_screen_context": "BLOCKED_NOT_WIRED",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",

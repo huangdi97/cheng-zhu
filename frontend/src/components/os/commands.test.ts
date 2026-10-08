@@ -14,6 +14,7 @@ vi.mock('@/lib/conversationApi', () => ({
     home: vi.fn(async () => ({ next_session: { space_id: 'cs-next' }, next_focus: null })),
     adhoc: vi.fn(async () => ({ session: { id: 'cv-adhoc' } })),
     patchSession: vi.fn(async () => ({})),
+    exportSession: vi.fn(async () => ({ session: { id: 'cv-1', title: 'Architecture Review' } })),
   },
 }))
 
@@ -48,6 +49,8 @@ describe('Command Palette', () => {
     expect(live).toContain('conversation-quiet')
     expect(live).toContain('conversation-balanced')
     expect(live).toContain('conversation-quick-note')
+    expect(live).toContain('conversation-export-session')
+    expect(rankCommands(cmds, 'Decision', 'conversation-live').map((c) => c.id)).toContain('conversation-find-decision')
   })
 
   it('executes real actions, not a search demo', async () => {
@@ -72,5 +75,9 @@ describe('Command Palette', () => {
     useRouter.setState({ route: parsePath('#/conversation') })
     await executeCommand(conversationCommands.find((c) => c.id === 'conversation-prepare-next')!, 'conversation-home')
     expect(useRouter.getState().route).toMatchObject({ name: 'conversation', params: { spaceId: 'cs-next', tab: 'prepare' } })
+
+    useRouter.setState({ route: parsePath('#/conversation') })
+    await executeCommand(conversationCommands.find((c) => c.id === 'conversation-find-decision')!, 'conversation-home')
+    expect(useRouter.getState().route).toMatchObject({ name: 'conversations', query: { find: 'Decision' } })
   })
 })

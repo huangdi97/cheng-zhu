@@ -82,17 +82,18 @@ PDIG Design Review · 10 分钟后
 
 ```text
 [开始临时会话]
-→ 选择/新建 Space
-→ Template
-→ Preflight
+→ 创建一个本地临时 Space-backed continuity container
+→ 使用选择的 Template
 → Start
 ```
 
-结束后可：
+当前 runtime 不建立第二套“standalone Session”真相模型。临时会话从创建起就属于一个普通本地 Space，因此结束后：
 
-- 保存进 Space；
-- 保持 standalone；
-- 删除。
+- 可以继续保留这个临时 Space，下一场沿用 continuity；
+- 可以重命名 / 调整 Goal / Sources，使它成为长期 Space；
+- 不需要保留时，显式删除该临时 Space（遵循现有 provenance / tombstone / destructive confirmation 规则）。
+
+这避免同一套 Decision / Commitment / provenance 在“Space Session”和“standalone Session”之间出现双真相。
 
 # 6. Global Search / Command
 
@@ -110,6 +111,13 @@ Ctrl+K 在 Conversation Profile：
 - Export current session。
 
 Search result 必须带 source/time/space，不做无来源“AI answer”。
+
+Runtime closure（2026-10-08）：
+
+- Ctrl+K 已接入 Find Decision / Commitment / Open Question；
+- 结果显示 Space / Session / time / review state / source kind；
+- Export current session 导出分类化 local JSON；
+- 不把 search 结果或 export 动作解释成外部同步。
 
 # 7. Notifications after meeting
 
@@ -149,6 +157,14 @@ Commitment/Deadline 解析必须保存：
 - ambiguity。
 
 例如“下周五”如果 timezone/context 不明确，必须进入 review。
+
+Runtime closure：
+
+- product schema v6 为 `conversation_item` 增加 additive `time_semantics_json`；
+- transcript 抽出的相对 Deadline 保留原话并默认 `AMBIGUOUS`；
+- Deadline 在 normalized datetime + timezone 明确前不能从 review queue 升级为长期确认状态；
+- 带时间的 Commitment / Task 同样不能把 unresolved temporal metadata 静默写成 COMMITTED；
+- `due_at` 保留兼容字段，但 canonical temporal provenance 以 time semantics envelope 为准。
 
 # 10. Offline
 

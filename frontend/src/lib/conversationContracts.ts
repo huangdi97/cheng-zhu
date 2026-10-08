@@ -170,6 +170,13 @@ export interface ConversationSession {
   updated_at: number
 }
 
+export interface ConversationTimeSemantics {
+  original_text: string
+  normalized_datetime: string
+  timezone: string
+  ambiguity: 'EXACT' | 'AMBIGUOUS' | 'UNSPECIFIED_TIMEZONE' | 'NOT_PARSED' | 'NOT_APPLICABLE' | string
+}
+
 export interface ConversationItem {
   id: string
   space_id: string
@@ -181,6 +188,7 @@ export interface ConversationItem {
   speaker_id: string
   owner_id: string
   due_at: string
+  time_semantics: ConversationTimeSemantics
   source_refs: SourceRef[]
   source_excerpt: string
   confidence: number
@@ -454,6 +462,34 @@ export interface ConversationCaptureStatus {
   candidate_mic_device_id: number | null
   mode: 'TRANSCRIPTION_ONLY' | 'IDLE'
   paused?: boolean
+}
+
+export interface ConversationSearchItem extends ConversationItem {
+  space_title: string
+  space_profile: ConversationProfile
+  session_title: string
+  session_started_at: number | null
+  session_ended_at: number | null
+}
+
+export interface ConversationSessionExport {
+  kind: 'CONVERSATION_SESSION'
+  contract: string
+  export_manifest: {
+    categories: string[]
+    privacy: string
+    contains_external_secrets: boolean
+  }
+  space: { id: string; title: string; profile: ConversationProfile }
+  session: ConversationSession
+  transcript: ConversationTranscriptSegment[]
+  quick_notes: Array<{ id: string; title: string; content: string; kind: 'USER_NOTE' }>
+  confirmed_items: ConversationItem[]
+  unconfirmed_candidates: ConversationItem[]
+  guidance: ConversationGuidance[]
+  draft_actions: ConversationDraftAction[]
+  source_manifest: Array<Record<string, unknown>>
+  session_packs: Array<Record<string, unknown>>
 }
 
 export interface ConversationHistoryItem extends ConversationSession {

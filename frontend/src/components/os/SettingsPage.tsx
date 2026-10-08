@@ -292,12 +292,41 @@ function DiagnosticsGroup() {
           const health = asRecord(d.health)
           const runtime = asRecord(d.runtime)
           const evidence = asRecord(d.evidence)
+          const healthRows = [
+            ['数据库', health.database],
+            ['音频采集', health.capture],
+            ['Session Pack / Context', health.session_pack_context],
+            ['检索', health.retrieval],
+            ['State Engine', health.state_engine],
+            ['Guidance Arbiter', health.guidance_arbiter],
+            ['Export / Delete', health.export_delete_integrity],
+            ['Processing Policy', health.processing_policy],
+            ['Speaker / Diarization', health.speaker_diarization],
+            ['外部连接', health.external_connectors],
+            ['Conversation Screen', health.conversation_screen_context],
+            ['Human Coach', health.conversation_human_coach],
+            ['外部写回执行', health.external_writeback_execution],
+          ] as const
+          const readableHealth = (value: unknown) => {
+            const raw = String(value ?? 'UNKNOWN')
+            if (raw === 'AVAILABLE') return { label: '可用', tone: 'ok' as const }
+            if (raw === 'NEEDS_ACTION') return { label: '需要处理', tone: 'risk' as const }
+            if (raw === 'IN_USE') return { label: '使用中', tone: 'busy' as const }
+            return { label: '受限', tone: 'warn' as const }
+          }
           return <div className="mt-3 space-y-3" data-testid="conversation-diagnostics">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {healthRows.map(([label, value]) => {
+                const view = readableHealth(value)
+                return <div key={label} className="flex items-center justify-between gap-2 rounded-xl bg-bg-tertiary/30 px-2.5 py-2">
+                  <span className="text-[11px] text-text-secondary">{label}</span>
+                  <StatusBadge tone={view.tone}>{view.label}</StatusBadge>
+                </div>
+              })}
+            </div>
             <div className="flex flex-wrap gap-2">
-              <StatusBadge tone={health.database === 'AVAILABLE' ? 'ok' : 'risk'}>数据库：{String(health.database ?? '—')}</StatusBadge>
-              <StatusBadge tone={health.capture === 'AVAILABLE' ? 'ok' : 'busy'}>音频采集：{String(health.capture ?? '—')}</StatusBadge>
-              <StatusBadge tone={health.review_queue === 'NEEDS_ACTION' ? 'warn' : 'ok'}>审核队列：{String(health.review_queue ?? '—')}</StatusBadge>
-              <StatusBadge tone="muted">外部连接：{String(health.external_connectors ?? '—')}</StatusBadge>
+              <StatusBadge tone={health.review_queue === 'NEEDS_ACTION' ? 'warn' : 'ok'}>审核队列：{health.review_queue === 'NEEDS_ACTION' ? '需要处理' : '可用'}</StatusBadge>
+              <StatusBadge tone="muted">受限项不会伪装成已接线能力；详情见原始诊断。</StatusBadge>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="rounded-xl bg-bg-tertiary/30 p-2.5"><div className="text-lg font-semibold text-text-primary">{metric(runtime.spaces, '0')}</div><div className="text-[10px] text-text-muted">Spaces</div></div>

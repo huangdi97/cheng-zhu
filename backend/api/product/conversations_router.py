@@ -72,6 +72,12 @@ def history(limit: int = 100):
         return {"items": conversations.conversation_history(limit)}
 
 
+@router.get("/search")
+def search(query: str = "", item_type: str = "", limit: int = 50):
+    with domain_errors():
+        return {"items": conversations.search_items(query=query, item_type=item_type, limit=limit)}
+
+
 @router.get("/diagnostics")
 def diagnostics():
     return conversations.diagnostics()
@@ -245,6 +251,12 @@ def get_session_context(session_id: str):
         return conversations.session_context(session_id)
 
 
+@router.get("/sessions/{session_id}/export")
+def export_session(session_id: str):
+    with domain_errors():
+        return conversations.export_session(session_id)
+
+
 class SessionDelete(BaseModel):
     confirmed_policy: str = "BLOCK"
 
@@ -355,6 +367,7 @@ class ItemCreate(BaseModel):
     owner_id: str = Field(default="", max_length=120)
     speaker_id: str = Field(default="", max_length=120)
     due_at: str = Field(default="", max_length=120)
+    time_semantics: dict[str, Any] = Field(default_factory=dict)
     source_refs: list[dict[str, Any]] = Field(default_factory=list)
     source_excerpt: str = Field(default="", max_length=3000)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

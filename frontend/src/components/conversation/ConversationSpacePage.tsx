@@ -10,15 +10,34 @@ function ItemRow({ item, onChanged, supersedeOptions = [] }: { item: Conversatio
   const [busy, setBusy] = useState(false)
   const [supersedesId, setSupersedesId] = useState('')
   const [reviewOwner, setReviewOwner] = useState(item.owner_id || '')
+  const [timeNormalized, setTimeNormalized] = useState(item.time_semantics?.normalized_datetime || item.due_at || '')
+  const [timeTimezone, setTimeTimezone] = useState(item.time_semantics?.timezone || '')
   const [rowError, setRowError] = useState('')
+  const temporalAmbiguity = item.time_semantics?.ambiguity || (item.type === 'Deadline' ? 'AMBIGUOUS' : 'NOT_APPLICABLE')
+  const needsTimeReview = item.review_status === 'AI_EXTRACTED'
+    && ['Deadline', 'Commitment', 'Task'].includes(item.type)
+    && temporalAmbiguity !== 'NOT_APPLICABLE'
+    && temporalAmbiguity !== 'EXACT'
   const review = async (action: 'CONFIRM' | 'REJECT' | 'DONE' | 'RESOLVE' | 'SUPERSEDE') => {
     setBusy(true); setRowError('')
     try {
       let patch: Record<string, unknown> = {}
       if (action === 'SUPERSEDE') patch = { supersedes_id: supersedesId }
-      else if (action === 'CONFIRM' && ['Commitment', 'Task'].includes(item.type) && !item.owner_id) {
-        if (!reviewOwner.trim()) throw new Error('确认 Commitment / Task 前需要明确 owner')
-        patch = { owner_id: reviewOwner.trim() }
+      else if (action === 'CONFIRM') {
+        if (['Commitment', 'Task'].includes(item.type) && !item.owner_id) {
+          if (!reviewOwner.trim()) throw new Error('确认 Commitment / Task 前需要明确 owner')
+          patch.owner_id = reviewOwner.trim()
+        }
+        if (needsTimeReview) {
+          if (!timeNormalized.trim() || !timeTimezone.trim()) throw new Error('确认时间事项前需要 normalized datetime 与 timezone')
+          patch.due_at = timeNormalized.trim()
+          patch.time_semantics = {
+            original_text: item.time_semantics?.original_text || item.title,
+            normalized_datetime: timeNormalized.trim(),
+            timezone: timeTimezone.trim(),
+            ambiguity: 'EXACT',
+          }
+        }
       }
       await conversationApi.reviewItem(item.id, action, patch)
       onChanged()
@@ -31,11 +50,21 @@ function ItemRow({ item, onChanged, supersedeOptions = [] }: { item: Conversatio
     <div className="rounded-xl border border-bg-tertiary/70 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-text-primary">{item.title}</span><StatusBadge tone={tone}>{item.state}</StatusBadge>{item.review_status === 'AI_EXTRACTED' ? <StatusBadge tone="warn">待确认</StatusBadge> : null}</div>
       <div className="mt-1 text-[11px] text-text-muted">来源 {item.source_refs.length ? item.source_refs.map((s) => s.kind).join(' · ') : '未附来源'}{item.speaker_id ? ` · speaker ${item.speaker_id}` : ''}{item.owner_id ? ` · owner ${item.owner_id}` : ''}{item.due_at ? ` · due ${item.due_at}` : ''}{item.supersedes_id ? ` · supersedes ${item.supersedes_id}` : ''}</div>
+      {item.time_semantics && temporalAmbiguity !== 'NOT_APPLICABLE' ? <div className="mt-1 text-[10px] text-text-muted">
+        时间 · 原话 {item.time_semantics.original_text || '—'} · normalized {item.time_semantics.normalized_datetime || '未确认'} · timezone {item.time_semantics.timezone || '未确认'} · <span className={temporalAmbiguity === 'EXACT' ? 'text-status-direct' : 'text-status-inferred'}>{temporalAmbiguity}</span>
+      </div> : null}
       {item.review_status === 'AI_EXTRACTED' && ['Commitment', 'Task'].includes(item.type) && !item.owner_id ? <div className="mt-2 rounded-lg bg-bg-secondary/35 p-2">
         <div className="text-[10px] text-text-muted">Owner 当前未知；不要把主音频里的“我”自动当成当前用户。</div>
         <input aria-label="确认 Owner" className={`${inputCls} mt-2`} value={reviewOwner} onChange={(e) => setReviewOwner(e.target.value)} placeholder="明确 owner，例如 me / Alex" />
       </div> : null}
-      {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex flex-wrap gap-2"><SecondaryButton disabled={busy || (['Commitment', 'Task'].includes(item.type) && !item.owner_id && !reviewOwner.trim())} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : ['OpenQuestion', 'Risk', 'Objection'].includes(item.type) && !['DONE', 'SUPERSEDED', 'UNKNOWN'].includes(item.state) ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('RESOLVE')}>标记已解决</SecondaryButton></div> : null}
+      {needsTimeReview ? <div className="mt-2 rounded-lg border border-status-inferred/30 bg-status-inferred/5 p-2">
+        <div className="text-[10px] text-text-muted">原始时间表达仍有歧义。成竹不会自动把“下周五 / Friday”升级成长期 Deadline；请在确认前明确归一化时间和时区。</div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input aria-label="归一化时间" type="datetime-local" className={inputCls} value={timeNormalized} onChange={(e) => setTimeNormalized(e.target.value)} />
+          <input aria-label="时区" className={inputCls} value={timeTimezone} onChange={(e) => setTimeTimezone(e.target.value)} placeholder="例如 Asia/Shanghai" />
+        </div>
+      </div> : null}
+      {item.review_status === 'AI_EXTRACTED' ? <div className="mt-2 flex flex-wrap gap-2"><SecondaryButton disabled={busy || (['Commitment', 'Task'].includes(item.type) && !item.owner_id && !reviewOwner.trim()) || (needsTimeReview && (!timeNormalized.trim() || !timeTimezone.trim()))} onClick={() => review('CONFIRM')}>确认</SecondaryButton><SecondaryButton disabled={busy} onClick={() => review('REJECT')}>拒绝</SecondaryButton></div> : item.state === 'COMMITTED' ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('DONE')}>标记完成</SecondaryButton></div> : ['OpenQuestion', 'Risk', 'Objection'].includes(item.type) && !['DONE', 'SUPERSEDED', 'UNKNOWN'].includes(item.state) ? <div className="mt-2"><SecondaryButton disabled={busy} onClick={() => review('RESOLVE')}>标记已解决</SecondaryButton></div> : null}
       {item.type === 'Decision' && item.state === 'PROPOSED' && item.review_status === 'AI_EXTRACTED' && supersedeOptions.length ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-bg-secondary/35 p-2">
           <select aria-label="要替代的旧 Decision" className={inputCls} value={supersedesId} onChange={(e) => setSupersedesId(e.target.value)}>

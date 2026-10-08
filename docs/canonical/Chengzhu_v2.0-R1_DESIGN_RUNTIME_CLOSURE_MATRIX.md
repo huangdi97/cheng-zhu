@@ -1,8 +1,9 @@
 # Chengzhu v2.0-R1 Design → Runtime Closure Matrix
 
-> 日期：2026-10-07  
-> 分支：`feat/chengzhu-v2-conversation-design-closure`  
-> PR：#19  
+> 日期：2026-10-08  
+> v2 closure：PR #19（已合并）  
+> post-merge semantics：已进入 main  
+> final pure-repo audit：`feat/chengzhu-v2-final-design-audit`  
 > Canonical：`Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md`  
 > 目标：证明“设计完成”对应真实 runtime / UI / tests / evidence，而不是只有文档、字段、数据库表或 mock。
 
@@ -163,6 +164,8 @@ SOURCE_CONFIRMED
 | Commitment / Task → COMMITTED 需要 owner + provenance + review | ENFORCED |
 | 未知 owner 不自动写成 me | ENFORCED |
 | Deadline 必须带 source | ENFORCED |
+| Deadline / 带时间 Commitment 保存 original text / normalized datetime / timezone / ambiguity | ENFORCED · schema v6 |
+| 模糊 Deadline 在时间消歧前不得进入 reviewed long-term truth | ENFORCED |
 | Decision supersession 是 NEW → OLD，旧 Decision 保留为 SUPERSEDED | ENFORCED |
 | Quick Note 可检索但不自动升级成 evidence | ENFORCED |
 | 删除 reviewed truth 的 Session 先保留 tombstone | ENFORCED |
@@ -232,6 +235,13 @@ confirmed cross-session state
 - current transcript 可作为观察上下文，但不自动升级为 confirmed truth。
 
 Manual Ask 是 baseline capability，不作为产品核心差异声明。
+
+全局 Conversation Search 同样遵守 grounded boundary：
+
+- Ctrl+K 可找 Decision / Commitment / Open Question；
+- 搜索结果必须带 Space / Session / time / review state / source kind；
+- 不提供无来源“AI 搜索答案”；
+- current Session 支持分类化 local JSON export，不声称同步到外部系统。
 
 ---
 
@@ -542,6 +552,21 @@ adoption → precision
 test coverage → user value
 ```
 
+Settings > Diagnostics 现已把 Conversation 子系统拆成：
+
+- database；
+- capture；
+- Session Pack / Context；
+- retrieval；
+- state engine；
+- Guidance Arbiter；
+- export/delete integrity；
+- processing policy；
+- speaker/diarization boundary；
+- external connector / screen / coach / write-back execution。
+
+普通 UI 只显示“可用 / 受限 / 需要处理”；raw JSON 二级展开。
+
 ---
 
 # 16. Competitive Boundary
@@ -623,6 +648,30 @@ PMF_PROVEN = FALSE
 直到完成独立 Windows Conversation Beta packaged runtime evidence、clean-install replay、artifact hash、download-back 与 release provenance。
 
 ---
+
+# 17.5 Final Pure-repo Audit
+
+PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 新打包证据或真实用户**的剩余 canonical gap：
+
+- grounded global Item search；
+- Ctrl+K find Decision / Commitment / Open Question；
+- current Session categorized local export；
+- ad-hoc 统一为 Space-backed continuity truth，不再设计第二套 standalone truth；
+- schema v6 temporal provenance + Deadline ambiguity review gate；
+- subsystem-level Conversation Diagnostics；
+- stale Reality Report / historical Goal truth sync。
+
+以下仍保持 external/productization gate，不得为了“全做完”伪实现：
+
+- Calendar / Mail / Docs / project tracker connector；
+- OS notification/discovery；
+- Conversation Screen Context；
+- Human Coach；
+- Private Overlay；
+- actual external write-back execution；
+- participant auto chat notice / watermark；
+- Windows v2 stable packaged release；
+- real-user validation。
 
 # 18. 本 PR 的闭环定义
 

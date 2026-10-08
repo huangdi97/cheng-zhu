@@ -65,6 +65,18 @@ function toast(message: string): void {
   useInterviewStore.getState().setToastMessage?.(message)
 }
 
+function downloadJson(filename: string, payload: unknown): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
 function latestQuestion(): string {
   const qa = useInterviewStore.getState().qaPairs
   return qa.length ? qa[qa.length - 1].question : ''
@@ -188,6 +200,33 @@ export function buildCommands(goalId: string | null, route: Route = currentRoute
         await conversationApi.patchSession(sessionId, { assistance_mode: 'BALANCED' })
         toast('已恢复 Balanced')
       },
+    },
+    {
+      id: 'conversation-export-session', label: '导出当前 Session', contexts: ['conversation-live'],
+      keywords: 'export current session 导出 当前 会话',
+      run: async () => {
+        const sessionId = route.name === 'conversation-live' ? route.params.sessionId : ''
+        if (!sessionId) { toast('当前不在 Conversation Live'); return }
+        const payload = await conversationApi.exportSession(sessionId)
+        const safeTitle = String(payload.session.title || 'conversation-session').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80)
+        downloadJson(`${safeTitle}-${sessionId.slice(0, 8)}.json`, payload)
+        toast('已导出当前 Session JSON')
+      },
+    },
+    {
+      id: 'conversation-find-decision', label: '找 Decision', contexts: ['conversation-home', 'conversation-space', 'conversation-live'],
+      keywords: 'find search decision 查找 决策',
+      run: () => navigate(paths.conversationSpaces(undefined, { find: 'Decision' })),
+    },
+    {
+      id: 'conversation-find-commitment', label: '找 Commitment / Task', contexts: ['conversation-home', 'conversation-space', 'conversation-live'],
+      keywords: 'find search commitment task 查找 承诺 任务',
+      run: () => navigate(paths.conversationSpaces(undefined, { find: 'Commitment' })),
+    },
+    {
+      id: 'conversation-find-open-question', label: '找 Open Question', contexts: ['conversation-home', 'conversation-space', 'conversation-live'],
+      keywords: 'find search open question 查找 开放问题',
+      run: () => navigate(paths.conversationSpaces(undefined, { find: 'OpenQuestion' })),
     },
     // --- Me ---
     { id: 'confirm-facts', label: '确认事实（待确认）', contexts: ['me', 'home'], keywords: 'fact inbox 事实 确认', run: () => navigate(paths.me('inbox')) },

@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 5
+LATEST_SCHEMA_VERSION = 6
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -596,6 +596,13 @@ def _apply_v5(conn: sqlite3.Connection) -> None:
     if "counterparty_state_json" not in participant_cols:
         conn.execute("ALTER TABLE conversation_participant ADD COLUMN counterparty_state_json TEXT NOT NULL DEFAULT '{}'")
 
+
+# --- v2.0 final design audit: explicit temporal provenance ---
+def _apply_v6(conn: sqlite3.Connection) -> None:
+    item_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_item)").fetchall()}
+    if "time_semantics_json" not in item_cols:
+        conn.execute("ALTER TABLE conversation_item ADD COLUMN time_semantics_json TEXT NOT NULL DEFAULT '{}'")
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -607,6 +614,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     3: (lambda conn: _apply_statements(conn, _V3_TABLES + _V3_INDEXES), "v2.0 conversation runtime closure"),
     4: (lambda conn: _apply_statements(conn, _V4_TABLES + _V4_INDEXES), "v2.0 deletion provenance tombstones"),
     5: (_apply_v5, "v2.0 explicit session policy and counterparty state"),
+    6: (_apply_v6, "v2.0 temporal provenance for conversation items"),
 }
 
 

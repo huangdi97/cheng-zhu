@@ -164,6 +164,16 @@ function mocks() {
         decisions_count: 1, commitments_count: 0, open_questions_count: 1, review_required: 1,
       }],
     }
+    if (pathname === '/api/product/conversation/search') return {
+      items: [{
+        ...DECISION,
+        space_title: SPACE.title,
+        space_profile: SPACE.profile,
+        session_title: SESSION.title,
+        session_started_at: 2,
+        session_ended_at: null,
+      }],
+    }
     if (pathname === '/api/product/conversation/home') return {
       state: 'ACTIVE',
       spaces: [SPACE],
@@ -927,6 +937,23 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(/不代表已发送邮件、创建 task \/ issue 或写入 decision log/)).toBeVisible()
     await page.getByRole('button', { name: '确认草稿' }).click()
     await expect(page.getByText('APPROVED')).toBeVisible()
+  })
+
+
+  test('Conversation global search stays grounded in Space Session time and source', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto('/#/conversation/spaces?find=Decision')
+    await expect(page.getByTestId('conversation-search')).toBeVisible()
+    await expect(page.getByText('查找长期对话事实')).toBeVisible()
+    await expect(page.getByText('offline migration 采用 v2')).toBeVisible()
+    await expect(page.getByText(/PDIG · Android Architecture · Architecture Review/)).toBeVisible()
+    await expect(page.getByText(/来源：TRANSCRIPT_SEGMENT/)).toBeVisible()
+    await page.getByRole('button', { name: /offline migration 采用 v2/ }).click()
+    await expect(page).toHaveURL(new RegExp(`#/conversation/spaces/${SPACE.id}/decisions`))
   })
 
 

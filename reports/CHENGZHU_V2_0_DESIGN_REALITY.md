@@ -1,237 +1,142 @@
-# Chengzhu v2.0-R1 — Design Reality Report
+# Chengzhu v2.0-R1 — Design / Runtime Reality Report
 
-> **Status:** V2_DESIGN_COMPLETE_CANDIDATE / V2_CONTRACT_COMPLETE_CANDIDATE
+> **Updated:** 2026-10-08
 >
-> 本报告只描述本 PR 已经真实完成的“设计与可执行 contract”事实，不把设计文档、类型定义或单元测试冒充成 v2 产品 runtime。
+> **Status:** DESIGN_COMPLETE / CONTRACT_COMPLETE / CONVERSATION_BETA_RUNTIME_AVAILABLE
+>
+> **Stable v2 packaged release:** NOT CLAIMED
+>
+> **Real-user value / PMF:** NOT CLAIMED
 
-## 1. Baseline
+This report supersedes the original PR #17 design-stage wording that said Conversation runtime did not exist. The historical design work remains valid input, but that implementation-status statement is no longer true.
 
-v2 设计启动基线：
-
-```text
-stable release:
-v1.4.2
-
-main at v2 branch creation:
-d2d564fba32fbcdff3b70c0da726f2377c83a502
-
-branch:
-feat/chengzhu-v2-personal-conversation-intelligence
-
-PR:
-#17
-```
-
-v1.4.2 Interview 产品继续是当前已发布、可安装、可复现的 Windows baseline。
-
-## 2. Why v2 exists
-
-v1 已经解决：
-
-- Person/Candidate factual boundary；
-- Goal-centered preparation；
-- frozen Pack；
-- Context Compiler；
-- realtime audio/ASR；
-- Fast Cue before Deep；
-- Live/Reflection continuity；
-- local-first product analytics；
-- Windows release engineering。
-
-v2 不重做这些能力，而是把它们泛化为：
-
-> **Personal Conversation Intelligence：在真实专业对话里，帮助用户知道什么值得说、为什么值得说、对谁说，以及什么时候应该保持沉默。**
-
-## 3. Design set present
-
-当前 PR 已有：
+## 1. Current repository baseline
 
 ```text
-docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md
+stable public release:
+v1.4.2 Interview
 
-docs/canonical/v2.0-R1-master/
-├── 01_Research_Product_Strategy.md
-├── 02_Objects_Data_Provenance.md
-├── 03_Conversation_Intelligence_Architecture.md
-├── 04_UIUX_Conversation_Profile.md
-├── 05_Privacy_Integrations_Evaluation.md
-├── 06_Onboarding_Operations_Business_Acceptance.md
-└── README.md
+Conversation runtime:
+merged PR #18
 
-docs/goals/
-└── CHENGZHU_V2_0_IMPLEMENTATION_MASTER_GOAL.md
+design/runtime closure:
+merged PR #19
+
+post-merge object semantics:
+main through f91f6dfe63a8d51c7355001bf7d9c805e150ddf6
+
+final pure-repo design audit:
+feat/chengzhu-v2-final-design-audit
 ```
 
-设计范围已经覆盖：
+The authoritative current sources are:
 
-- product definition；
-- market positioning；
-- launch wedge；
-- all profile templates；
-- object/data/provenance；
-- Conversation State；
-- Counterparty State；
-- Expression Planner；
-- Contribution Opportunity；
-- Guidance Arbiter；
-- Before/During/After；
-- IA / UI / UX；
-- onboarding / upgrade；
-- privacy / consent / retention；
-- connectors / MCP；
-- delete/export；
-- evaluation；
-- rollout；
-- business boundary；
-- operations / diagnostics；
-- engineering implementation stages；
-- final acceptance matrix。
+- `docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md`
+- `docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md`
+- `docs/canonical/Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md`
 
-## 4. Product decisions frozen by the design
+The older `docs/goals/CHENGZHU_V2_0_IMPLEMENTATION_MASTER_GOAL.md` is retained as implementation-history provenance, not as a list of currently unimplemented stages.
 
-### One Core, Profiles — not six apps
+## 2. What exists as real runtime
+
+Conversation Profile now has real:
+
+- Profile switcher and opt-in onboarding;
+- Conversation Home;
+- Space / Goal / Session lifecycle;
+- Prepare and auditable Preflight;
+- frozen Session Pack with digest;
+- real capture ownership and transcript path;
+- deterministic transcript candidate extraction;
+- review-first Decision / Commitment / Deadline truth promotion;
+- reviewed longitudinal Open Threads;
+- source-aware Manual Ask over frozen sources / Quick Notes / current transcript;
+- cross-session Recall;
+- Contribution Opportunity / Answer Cue / Risk / Talking Point / Question / Delivery;
+- profile-aware Guidance Arbiter and SILENT;
+- explicit Counterparty State and stakeholder-aware Expression;
+- Continue / Pins / Next Focus;
+- reviewed local Follow-up / Task / Issue / Decision Log drafts;
+- Conversation-native History;
+- retention / delete / export / tombstones;
+- grounded global Decision / Commitment / Open Question search;
+- current Session export;
+- Conversation subsystem diagnostics;
+- additive schema v6 temporal provenance for Deadline / Commitment review.
+
+Therefore these old statements are **false** and must not be repeated:
 
 ```text
-Interview
-Conversation
-  ├── Project Sync
-  ├── Design Review
-  ├── Presentation / Q&A
-  ├── 1:1
-  ├── Client Call
-  └── Negotiation
+V2_RUNTIME_COMPLETE = FALSE because no routes/UI/DB exist
+future_profile.py is only a hypothetical placeholder
+Conversation has no persistence/runtime UI
 ```
 
-Only Profile changes priorities, surface language and evaluation.
-
-### Launch wedge
+## 3. Truth and privacy boundaries that remain enforced
 
 ```text
-Project Sync
-+
-Design Review
+AI_EXTRACTED != confirmed truth
+Quick Note != evidence
+transcript != agreement
+APPROVED local draft != external execution
+capture local != STT local
+user consent report != system-verified consent
+transparency plan != automatic participant notification
+runtime available != stable packaged release
+synthetic green != real-user value
 ```
 
-chosen because they best reuse current Project/Provenance/Screen/Fast Cue infrastructure while directly testing Contribution Opportunity.
+Current fail-closed / unavailable boundaries:
 
-### Live hierarchy
+- Conversation Screen Context;
+- Conversation Human Coach;
+- Conversation Private Overlay / Share Privacy;
+- Calendar / Mail / Docs / project-tracker connectors;
+- actual external email/task/issue/decision-log execution;
+- automatic participant chat notice / watermark;
+- organization/shared truth registry.
+
+These are external or separately governed runtime gates, not features to fake with placeholders.
+
+## 4. Final pure-repo closure added after PR #19
+
+The final audit closes canonical items that were still implementable without external dependencies:
+
+- global grounded Conversation Item search;
+- Ctrl+K find Decision / Commitment / Open Question;
+- current Session categorized local export;
+- ad-hoc semantics aligned to one Space-backed truth model;
+- time/date provenance: original text + normalized datetime + timezone + ambiguity;
+- ambiguous Deadline cannot enter reviewed long-term truth until explicitly resolved;
+- subsystem-level Conversation Diagnostics with user-facing 可用 / 受限 / 需要处理 states;
+- stale public-truth documents aligned with current runtime.
+
+## 5. What may be claimed after final audit CI is green
 
 ```text
-Current Topic
-→ ONE primary Guidance
-→ Source / Confidence / Warning
+V2_DESIGN_COMPLETE = TRUE
+V2_CONTRACT_COMPLETE = TRUE
+V2_RUNTIME_AVAILABLE = TRUE
+PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
+INTERVIEW_STABLE_RELEASE_BASELINE = v1.4.2
 ```
 
-Transcript and full history remain secondary.
-
-### Differentiator
+## 6. What still may NOT be claimed
 
 ```text
-Contribution Opportunity
-+
-Provenance-aware Continuity
-+
-Stakeholder-aware Expression
-+
-SILENT / interruption control
+V2_PRODUCTIZED_RELEASE = TRUE
+REAL_CONVERSATION_VALUE_PROVEN = TRUE
+REAL_USER_VALIDATED = TRUE
+PMF_PROVEN = TRUE
+ALL_EXTERNAL_CONNECTORS_AVAILABLE = TRUE
 ```
 
-## 5. Executable contract truth
+A stable v2 productized release still requires its own Windows packaged runtime evidence, clean-install replay, release artifacts/hashes/download-back/provenance and no critical runtime blocker.
 
-`backend/services/product/future_profile.py` is no longer only a vocabulary placeholder. It now defines the v2 design contract for:
+Real-user validation still requires real Project Sync / Design Review sessions and human-labeled evaluation for Recall Precision, Opportunity Precision, Interruption Regret, Useful Silence, cross-session value and cognitive load.
 
-- Conversation profile kinds；
-- Assistance modes；
-- Guidance kinds；
-- Expression actions including SILENT；
-- Conversation item taxonomy/states；
-- epistemic/review states；
-- capture/processing modes；
-- SourceRef；
-- ConversationSpace / Goal；
-- CounterpartyObservation；
-- ConversationItem；
-- ConversationState；
-- OpportunityScore；
-- GuidanceCandidate。
+## 7. Final reality rule
 
-It deliberately does **not** create DB tables, routes or UI and therefore does not imply v2 runtime exists.
+Repository state is authoritative over historical planning prose.
 
-## 6. Truth invariants encoded in tests
-
-The PR tests require:
-
-- only Interview remains `productized=True` today；
-- model extraction alone cannot promote a Decision to AGREED；
-- Commitment promotion requires owner + source + confirmation；
-- proactive opportunity value is reduced by interruption / uncertainty / stale context；
-- v1 Interview Goal still maps into the general Conversation contract。
-
-## 7. What this PR may claim when CI is green
-
-```text
-CHENGZHU_V2_0_R1_DESIGN = COMPLETE
-CHENGZHU_V2_0_R1_CONTRACT = COMPLETE
-V1_INTERVIEW_RELEASE_BASELINE = UNCHANGED
-```
-
-## 8. What this PR cannot claim
-
-```text
-V2_ENGINEERING_COMPLETE = FALSE
-V2_RUNTIME_COMPLETE = FALSE
-V2_WINDOWS_RELEASED = FALSE
-REAL_CONVERSATION_VALUE_PROVEN = FALSE
-REAL_USER_VALIDATED = FALSE
-PMF_PROVEN = FALSE
-```
-
-No real users currently exist for v2.
-
-## 9. Next engineering truth
-
-The implementation sequence is authoritative in:
-
-`docs/goals/CHENGZHU_V2_0_IMPLEMENTATION_MASTER_GOAL.md`
-
-Engineering must prove:
-
-```text
-Space
-→ Prepare
-→ Frozen Session Pack
-→ Conversation State
-→ Guidance
-→ Continue
-→ Next Focus
-```
-
-with:
-
-- real DB/API path；
-- real runtime UI；
-- real provenance/state transitions；
-- real Contribution Opportunity suppression；
-- Interview non-regression；
-- full CI；
-- packaged Windows evidence；
-- delete/export；
-- release provenance。
-
-## 10. Final verdict at design stage
-
-Until final PR CI is green:
-
-```text
-V2_DESIGN_COMPLETE_CANDIDATE = TRUE
-V2_CONTRACT_COMPLETE_CANDIDATE = TRUE
-```
-
-After green CI, these may advance to:
-
-```text
-V2_DESIGN_COMPLETE = PASS
-V2_CONTRACT_COMPLETE = PASS
-```
-
-Everything beyond that remains implementation or real-user evidence.
+When a future agent continues this project, it must first verify current `main`, canonical closure matrix, latest CI and release evidence. It must not infer that a Stage is unfinished merely because the historical from-zero implementation goal still describes that Stage.

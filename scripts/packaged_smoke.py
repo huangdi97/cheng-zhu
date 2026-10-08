@@ -261,7 +261,7 @@ def conversation_smoke(base: str) -> dict:
         raise RuntimeError(f"Conversation History missing ended session: {history}")
 
     diagnostics = http_json(f"{prefix}/diagnostics")
-    if diagnostics.get("evidence", {}).get("real_user_status") != "PENDING":
+    if diagnostics.get("evidence", {}).get("real_conversation_user_evidence") != "REAL_CONVERSATION_USER_EVIDENCE_PENDING":
         raise RuntimeError(f"Conversation diagnostics overclaimed real-user evidence: {diagnostics.get('evidence')}")
     if diagnostics.get("health", {}).get("external_writeback_execution") != "DRAFT_ONLY_NO_CONNECTOR_EXECUTION":
         raise RuntimeError(f"Conversation diagnostics write-back truth mismatch: {diagnostics.get('health')}")
@@ -275,7 +275,7 @@ def conversation_smoke(base: str) -> dict:
         "open_thread_id": next((t.get("id") for t in threads if t.get("text") == "Who owns rollback?"), ""),
         "history_count": len(history.get("items") or []),
         "schema_reported": diagnostics.get("schema_version"),
-        "real_user_status": diagnostics.get("evidence", {}).get("real_user_status"),
+        "real_user_status": diagnostics.get("evidence", {}).get("real_conversation_user_evidence"),
     }
 
 

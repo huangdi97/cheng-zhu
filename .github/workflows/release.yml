@@ -18,6 +18,7 @@ on:
       - "scripts/packaged_smoke.py"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
+      - "frontend/scripts/capture-v20-conversation-packaged-evidence.mjs"
       - "backend/requirements.txt"
   workflow_dispatch:
     inputs:
@@ -125,6 +126,10 @@ jobs:
             node scripts/capture-v13-packaged-web-evidence.mjs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+      - name: Capture Conversation Beta packaged runtime UI evidence
+        working-directory: frontend
+        run: node scripts/capture-v20-conversation-packaged-evidence.mjs
 
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4

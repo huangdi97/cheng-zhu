@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
-import { captureViewState, latestVisibleGuidance } from './liveViewState'
+import { captureViewState, createLivePollGate, latestVisibleGuidance } from './liveViewState'
 import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
@@ -48,6 +48,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [screenRegion, setScreenRegion] = useState<'configured' | 'full' | 'left_half' | 'right_half' | 'top_half' | 'bottom_half'>('configured')
   const [screenBusy, setScreenBusy] = useState(false)
   const [screenObservations, setScreenObservations] = useState<ConversationScreenContext[]>([])
+  const capturePollGate = useRef(createLivePollGate()).current
 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
@@ -93,39 +94,51 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   useEffect(() => {
     let alive = true
     const poll = async () => {
-      const [captureResult, transcriptResult, guidanceResult] = await Promise.allSettled([
-        conversationApi.captureStatus(sessionId),
-        conversationApi.transcript(sessionId, 80),
-        conversationApi.guidanceHistory(sessionId, 12),
-      ])
-      if (!alive) return
-      // Capture ownership is a privacy claim. An unreachable endpoint must
-      // never leave the UI's last known CAPTURING state advertised as current.
-      setCaptureStatusError(captureResult.status !== 'fulfilled')
-      if (captureResult.status === 'fulfilled') setCapture(captureResult.value)
-      if (transcriptResult.status === 'fulfilled') setSegments(transcriptResult.value.items)
-      if (guidanceResult.status === 'fulfilled') {
-        const latest = latestVisibleGuidance(guidanceResult.value.items)
-        setGuidance((current) => current?.id === latest?.id ? current : latest)
-      } else {
-        setGuidance(null)
+      // Slow responses cannot race newer polls or resurrect an old CAPTURING
+      // state after a pause, stop, start or end action.
+      const ticket = capturePollGate.begin()
+      if (ticket === null) return
+      try {
+        const [captureResult, transcriptResult, guidanceResult] = await Promise.allSettled([
+          conversationApi.captureStatus(sessionId),
+          conversationApi.transcript(sessionId, 80),
+          conversationApi.guidanceHistory(sessionId, 12),
+        ])
+        if (!alive) return
+        if (capturePollGate.current(ticket)) {
+          // A failed ownership check is UNKNOWN, never proof of stopped capture.
+          setCaptureStatusError(captureResult.status !== 'fulfilled')
+          if (captureResult.status === 'fulfilled') setCapture(captureResult.value)
+        }
+        if (transcriptResult.status === 'fulfilled') setSegments(transcriptResult.value.items)
+        if (guidanceResult.status === 'fulfilled') {
+          const latest = latestVisibleGuidance(guidanceResult.value.items)
+          setGuidance((current) => current?.id === latest?.id ? current : latest)
+        } else {
+          setGuidance(null)
+        }
+      } finally {
+        capturePollGate.finish()
       }
     }
     void poll()
     const timer = window.setInterval(() => void poll(), 1200)
     return () => { alive = false; window.clearInterval(timer) }
-  }, [sessionId])
+  }, [sessionId, capturePollGate])
 
   if (session.loading) return <Page><Loading /></Page>
   if (session.error || !session.data) return <Page><ErrorState message={session.error ?? '会话不存在'} onRetry={session.reload} /></Page>
   const s = session.data
-  const captureView = captureViewState(s, capture, captureStatusError)
+  const captureOwned = Boolean(capture?.owns_requested_session && capture.session_id === sessionId)
+  const captureUnverified = Boolean(capture?.owns_requested_session && !captureOwned)
+  const captureView = captureViewState(s, capture, captureStatusError || captureBusy)
 
   const startCapture = async () => {
     if (!primaryDevice) {
       setError('请选择主音频设备')
       return
     }
+    capturePollGate.invalidate()
     setCaptureBusy(true); setError('')
     try {
       const next = await conversationApi.captureStart(
@@ -135,25 +148,28 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       )
       setCapture(next)
       setCaptureStatusError(false)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { setCaptureStatusError(true); setError(e instanceof Error ? e.message : String(e)) }
     finally { setCaptureBusy(false) }
   }
 
   const toggleCapturePause = async () => {
+    capturePollGate.invalidate()
     setCaptureBusy(true); setError('')
     try {
       const next = capture?.paused
         ? await conversationApi.captureResume(sessionId)
         : await conversationApi.capturePause(sessionId)
       setCapture(next)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+      setCaptureStatusError(false)
+    } catch (e) { setCaptureStatusError(true); setError(e instanceof Error ? e.message : String(e)) }
     finally { setCaptureBusy(false) }
   }
 
   const stopCapture = async () => {
+    capturePollGate.invalidate()
     setCaptureBusy(true); setError('')
-    try { setCapture(await conversationApi.captureStop(sessionId)) }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    try { setCapture(await conversationApi.captureStop(sessionId)); setCaptureStatusError(false) }
+    catch (e) { setCaptureStatusError(true); setError(e instanceof Error ? e.message : String(e)) }
     finally { setCaptureBusy(false) }
   }
 
@@ -229,9 +245,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   }
 
   const end = async () => {
+    capturePollGate.invalidate()
     setBusy(true); setError('')
     try {
-      if (capture?.owns_requested_session) setCapture(await conversationApi.captureStop(sessionId))
+      if (captureOwned) setCapture(await conversationApi.captureStop(sessionId))
       setSummary(await conversationApi.end(sessionId)); await session.reload()
     }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -241,7 +258,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   return (
     <Page wide testId="conversation-live">
       <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode} · AI ${s.policy?.ai_assistance ?? 'AI_ALLOWED'} · Human ${s.policy?.human_assistance ?? 'HUMAN_PRACTICE_ONLY'}`}
-        actions={<PrimaryButton disabled={busy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>} />
+        actions={<PrimaryButton disabled={busy || captureBusy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>} />
 
       {error ? <ErrorState message={error} /> : null}
 
@@ -265,13 +282,13 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <div className="mt-4 rounded-xl border border-bg-tertiary bg-bg-primary/55 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-accent-blue" /><span className="text-xs font-semibold text-text-primary">真实转写</span>{captureStatusError ? <StatusBadge tone="warn">UNKNOWN</StatusBadge> : capture?.owns_requested_session ? <StatusBadge tone={capture.paused ? 'warn' : 'ok'}>{capture.paused ? 'PAUSED' : 'CAPTURING'}</StatusBadge> : <StatusBadge tone="muted">OFF</StatusBadge>}</div>
+                    <div className="flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-accent-blue" /><span className="text-xs font-semibold text-text-primary">真实转写</span>{captureBusy ? <StatusBadge tone="muted">UPDATING</StatusBadge> : (captureStatusError || captureUnverified) ? <StatusBadge tone="warn">UNKNOWN</StatusBadge> : captureOwned ? <StatusBadge tone={capture.paused ? 'warn' : 'ok'}>{capture.paused ? 'PAUSED' : 'CAPTURING'}</StatusBadge> : <StatusBadge tone="muted">OFF</StatusBadge>}</div>
                     <p className="mt-1 text-[11px] text-text-muted">只复用 Audio/VAD/STT；不会启动 Interview 自动答题、Fast Cue 或 Interview Review。</p>
                   </div>
-                  {capture?.owns_requested_session ? <div className="flex gap-2"><SecondaryButton disabled={captureBusy || captureStatusError} onClick={toggleCapturePause} icon={capture.paused ? <Play className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}>{capture.paused ? '继续' : '暂停'}</SecondaryButton><SecondaryButton disabled={captureBusy} onClick={stopCapture}>停止转写</SecondaryButton></div> : <PrimaryButton disabled={captureBusy || !primaryDevice || captureStatusError} onClick={startCapture} icon={<Mic className="h-3.5 w-3.5" />}>{captureBusy ? '启动中…' : '开始转写'}</PrimaryButton>}
+                  {captureOwned ? <div className="flex gap-2"><SecondaryButton disabled={captureBusy || captureStatusError} onClick={toggleCapturePause} icon={capture.paused ? <Play className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}>{capture.paused ? '继续' : '暂停'}</SecondaryButton><SecondaryButton disabled={captureBusy} onClick={stopCapture}>停止转写</SecondaryButton></div> : <PrimaryButton disabled={captureBusy || !primaryDevice || captureStatusError || captureUnverified} onClick={startCapture} icon={<Mic className="h-3.5 w-3.5" />}>{captureBusy ? '启动中…' : '开始转写'}</PrimaryButton>}
                 </div>
                 {captureStatusError ? <p role="alert" className="mt-2 text-[11px] text-status-risk">无法确认后端的当前采集状态。不要把断开连接视为录音已停止；请恢复连接并确认后再启动另一场。</p> : null}
-                {!capture?.owns_requested_session ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {!captureOwned ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Field label="主音频（优先系统/会议音频）"><select className={inputCls} value={primaryDevice} onChange={(e) => setPrimaryDevice(e.target.value)}><option value="">请选择</option>{(devices.data?.devices ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}{d.is_loopback ? ' · loopback' : ''}</option>)}</select></Field>
                   <Field label="我的麦克风（可选）"><select className={inputCls} value={selfMic} onChange={(e) => setSelfMic(e.target.value)}><option value="">不单独采集</option>{(devices.data?.devices ?? []).filter((d) => String(d.id) !== primaryDevice).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
                 </div> : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { captureViewState, latestVisibleGuidance } from './liveViewState'
+import { captureViewState, createLivePollGate, latestVisibleGuidance } from './liveViewState'
 
 describe('Conversation Live capture presentation truth', () => {
   const active = { status: 'ACTIVE', capture_mode: 'TRANSCRIPT' }
@@ -42,5 +42,31 @@ describe('Conversation Guidance selection', () => {
     }
     expect(latestVisibleGuidance([{ ...older, user_action: 'PINNED' }])).toEqual({ ...older, user_action: 'PINNED' })
     expect(latestVisibleGuidance([])).toBeNull()
+  })
+})
+
+describe('Conversation Live async capture race regression', () => {
+  it('does not claim to own a different Session after navigation', () => {
+    const oldCapture = {
+      active: true, owns_requested_session: true, session_id: 'old-session', paused: false,
+    }
+    expect(captureViewState({ id: 'new-session', status: 'ACTIVE', capture_mode: 'TRANSCRIPT' }, oldCapture))
+      .toEqual({ label: '正在确认本场音频状态', listening: false })
+    expect(captureViewState({ id: 'old-session', status: 'ACTIVE', capture_mode: 'TRANSCRIPT' }, oldCapture).listening)
+      .toBe(true)
+  })
+
+  it('serializes polling and rejects responses issued before a start/stop/pause action', () => {
+    const gate = createLivePollGate()
+    const oldest = gate.begin()
+    expect(oldest).not.toBeNull()
+    expect(gate.begin()).toBeNull()
+    gate.invalidate() // user asked to stop: old response cannot restore CAPTURING
+    expect(gate.current(oldest!)).toBe(false)
+    gate.finish()
+    const fresh = gate.begin()
+    expect(fresh).not.toBeNull()
+    expect(gate.current(fresh!)).toBe(true)
+    gate.finish()
   })
 })

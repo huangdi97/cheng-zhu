@@ -5,10 +5,11 @@ export type CaptureViewState = {
 }
 
 export function captureViewState(
-  session: { status: string; capture_mode: string },
+  session: { id?: string; status: string; capture_mode: string },
   capture: {
     active: boolean
     owns_requested_session: boolean
+    session_id?: string
     paused?: boolean
   } | null,
   statusUnavailable = false,
@@ -20,6 +21,11 @@ export function captureViewState(
   }
   if (statusUnavailable) return { label: '音频状态不可确认', listening: false }
   if (!capture) return { label: '正在确认音频状态', listening: false }
+  // Capture status can briefly survive a route/session switch. Ownership is
+  // meaningful only for the exact Session named by the backend response.
+  if (capture.owns_requested_session && session.id && capture.session_id !== session.id) {
+    return { label: '正在确认本场音频状态', listening: false }
+  }
   if (capture.active && capture.owns_requested_session) {
     return capture.paused
       ? { label: '转写已暂停', listening: false }
@@ -39,4 +45,26 @@ export function latestVisibleGuidance<T extends { status: string; user_action: s
   const newest = events[0]
   if (!newest || newest.status !== 'SHOWN') return null
   return ['NONE', 'EXPANDED', 'PINNED'].includes(newest.user_action) ? newest : null
+}
+
+/** Serialize Live polls and invalidate responses pre-dating a capture action. */
+export function createLivePollGate() {
+  let inFlight = false
+  let epoch = 0
+  return {
+    begin(): number | null {
+      if (inFlight) return null
+      inFlight = true
+      return epoch
+    },
+    current(ticket: number): boolean {
+      return ticket === epoch
+    },
+    invalidate(): void {
+      epoch += 1
+    },
+    finish(): void {
+      inFlight = false
+    },
+  }
 }

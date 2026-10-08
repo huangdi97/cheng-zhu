@@ -132,8 +132,8 @@ Conversation Home
 
 当前能力边界：
 - Conversation MANUAL + explicit-start AUTO Screen Context 已实现；AUTO 不随 Session 静默启动，并要求用户报告 consent/allowance + transparency plan；
+- Conversation `PRIVATE_OVERLAY` 已有桌面 runtime：Start 时验证 Electron content protection，Live 可见，End 恢复会话前默认；Web fallback fail-closed；best-effort only，不承诺“不可检测”；
 - Conversation Human Coach 仍未接线；
-- Conversation Private Overlay / Share Privacy；
 - Calendar / Docs / Mail / project tracker connector runtime；
 - actual external email/task/issue write-back；
 - v2 packaged stable release；

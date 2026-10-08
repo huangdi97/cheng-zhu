@@ -3194,7 +3194,10 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
     assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
     assert diag["health"]["conversation_screen_context"] == "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE"
-    assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
+    assert diag["health"]["conversation_human_coach"] == "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK"
+    assert diag["privacy"]["human_coach_default"] == "OFF_EXPLICIT_START_ONLY"
+    assert diag["privacy"]["human_coach_truth_authority"] == "ADVICE_ONLY_NOT_EVIDENCE"
+    assert diag["privacy"]["human_coach_public_relay"] == "BLOCKED_UNLESS_CONFIGURED"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"
 

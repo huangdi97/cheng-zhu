@@ -195,7 +195,6 @@ class ParticipantCreate(BaseModel):
     stated_position: str = Field(default="", max_length=1600)
     decision_authority: str = Field(default="", max_length=500)
     relationship_context: str = Field(default="", max_length=800)
-    audience_participant_id: str = Field(default="", max_length=160)
     source_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -490,6 +489,7 @@ class GuidanceBody(BaseModel):
     audience_concern: str = Field(default="", max_length=1200)
     decision_authority: str = Field(default="", max_length=500)
     relationship_context: str = Field(default="", max_length=800)
+    audience_participant_id: str = Field(default="", max_length=160)
 
 
 @router.post("/sessions/{session_id}/guidance/evaluate")

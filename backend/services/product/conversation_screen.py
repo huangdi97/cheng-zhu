@@ -1,17 +1,41 @@
-"""Conversation-owned manual Screen Context.
+"""Conversation-owned Screen Context runtime.
 
-The capture transport is shared with Interview, but the state and persistence
-are not.  Raw screenshots are ephemeral: only extracted text plus a one-way
-image fingerprint/model-route provenance is written to product.db.
+MANUAL and AUTO share the same ephemeral capture transport, but Conversation
+owns the policy, lifecycle and persistence. Raw screenshots are never written
+to product.db: only extracted observation text plus one-way image/model-route
+provenance is stored.
+
+AUTO is deliberately explicit-start and fail-closed. Selecting AUTO in
+Preflight merely permits the capability; the user must start it again in Live.
 """
 from __future__ import annotations
 
 import hashlib
+import threading
+import time
 from typing import Any
 from urllib.parse import urlparse
 
 from core.config import get_config
 from services.storage import product as store
+
+
+_AUTO_MIN_INTERVAL_SECONDS = 10
+_AUTO_DEFAULT_INTERVAL_SECONDS = 30
+_AUTO_MAX_INTERVAL_SECONDS = 300
+_AUTO_MAX_CONSECUTIVE_ERRORS = 3
+
+_auto_lock = threading.RLock()
+_auto_session_id = ""
+_auto_thread: threading.Thread | None = None
+_auto_stop_event: threading.Event | None = None
+_auto_paused = False
+_auto_interval_seconds = _AUTO_DEFAULT_INTERVAL_SECONDS
+_auto_region = "configured"
+_auto_last_capture_at: float | None = None
+_auto_last_image_hash = ""
+_auto_last_error = ""
+_auto_consecutive_errors = 0
 
 
 def _enabled_vision_models() -> list[Any]:
@@ -48,7 +72,7 @@ def _fingerprint(model: Any) -> str:
 
 
 def vision_runtime_status(session: dict[str, Any]) -> dict[str, Any]:
-    """Resolve the concrete vision route for this Conversation session."""
+    """Resolve the concrete vision route and policy blockers for this Session."""
     policy = dict(session.get("policy") or {})
     screen_mode = str(policy.get("screen_context") or "OFF").upper()
     processing = str(session.get("processing_mode") or "LOCAL").upper()
@@ -58,26 +82,34 @@ def vision_runtime_status(session: dict[str, Any]) -> dict[str, Any]:
     route = _route_for_base_url(str(getattr(model, "api_base_url", "") or "")) if model else "UNAVAILABLE"
     blockers: list[str] = []
 
-    if screen_mode == "AUTO":
-        blockers.append("Conversation 自动 Screen Context 尚未接线；当前仅支持 OFF / MANUAL。")
-    elif screen_mode == "MANUAL":
+    if screen_mode in {"MANUAL", "AUTO"}:
         if processing == "OFF":
             blockers.append("Processing=OFF 时不能使用 Screen Context。")
         if ai_policy == "AI_FORBIDDEN":
             blockers.append("AI_FORBIDDEN 时不能调用视觉模型解析 Screen Context。")
         if model is None:
-            blockers.append("没有配置可用的视觉模型；MANUAL Screen Context 不能开始。")
+            blockers.append("没有配置可用的视觉模型；Screen Context 不能开始。")
         elif processing == "LOCAL" and route != "LOCAL":
             blockers.append("Local Processing 要求 Screen Context 使用本地视觉模型；当前视觉模型存在远程数据路径。")
 
+    if screen_mode == "AUTO":
+        consent = str(policy.get("participant_consent_status") or "NOT_RECORDED")
+        transparency = str(policy.get("participant_transparency_plan") or "NOT_RECORDED")
+        if consent == "NOT_RECORDED":
+            blockers.append("AUTO Screen Context 前必须记录参与者 consent/allowance 状态（用户报告）。")
+        if transparency == "NOT_RECORDED":
+            blockers.append("AUTO Screen Context 前必须记录透明告知计划；成竹不会自动通知其他参与者。")
+
     return {
         "mode": screen_mode,
-        "available": screen_mode == "MANUAL" and not blockers,
+        "available": screen_mode in {"MANUAL", "AUTO"} and not blockers,
         "route": route,
         "model_name": str(getattr(model, "name", "") or "") if model else "",
         "model_id": str(getattr(model, "model", "") or "") if model else "",
         "fingerprint": _fingerprint(model) if model else "",
         "raw_image_persisted": False,
+        "auto_requires_explicit_start": screen_mode == "AUTO",
+        "auto_default_interval_seconds": _AUTO_DEFAULT_INTERVAL_SECONDS,
         "blockers": blockers,
     }
 
@@ -122,23 +154,37 @@ def _analyze_image(image_data_url: str, model: Any) -> str:
     if getattr(response, "choices", None):
         text = str(response.choices[0].message.content or "").strip()
     if not text or text == "NO_USABLE_CONTEXT":
-        raise ValueError("截图中没有提取到足够可用的可追溯上下文")
+        raise ValueError("截图中没有提取到足够可用且可追溯的上下文")
     return text[:6000]
 
 
-def capture_manual(
+def _resolve_region(region: str) -> str:
+    cfg = get_config()
+    capture_region = (
+        str(getattr(cfg, "screen_capture_region", "left_half") or "left_half")
+        if region == "configured"
+        else str(region or "left_half")
+    )
+    if capture_region not in {"full", "left_half", "right_half", "top_half", "bottom_half"}:
+        raise ValueError("Screen Context region 不支持")
+    return capture_region
+
+
+def _capture_once(
     session: dict[str, Any],
     *,
-    region: str = "configured",
-    frozen_runtime: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Capture one screenshot and persist only its extracted observation."""
+    requested_mode: str,
+    region: str,
+    frozen_runtime: dict[str, Any] | None,
+    dedupe_image: bool,
+) -> dict[str, Any] | None:
     if str(session.get("status") or "") != "ACTIVE":
         raise ValueError("只有进行中的 Conversation Session 可以捕获 Screen Context")
 
     status = vision_runtime_status(session)
-    if status["mode"] != "MANUAL":
-        raise ValueError("本场 Screen Context 不是 MANUAL；不能执行手动截图")
+    mode = str(requested_mode or "").upper()
+    if status["mode"] != mode:
+        raise ValueError(f"本场 Screen Context 不是 {mode}；不能执行该捕获")
     if status["blockers"]:
         raise ValueError(status["blockers"][0])
 
@@ -154,26 +200,25 @@ def capture_manual(
 
     from services.capture.screen_capture import capture_primary_region_data_url
 
+    capture_region = _resolve_region(region)
     cfg = get_config()
-    capture_region: Any
-    if region == "configured":
-        capture_region = str(getattr(cfg, "screen_capture_region", "left_half") or "left_half")
-    else:
-        capture_region = str(region or "left_half")
-    if capture_region not in {"full", "left_half", "right_half", "top_half", "bottom_half"}:
-        raise ValueError("Screen Context region 不支持")
     image = capture_primary_region_data_url(
         capture_region,
         max_long_edge=int(getattr(cfg, "screen_capture_max_long_edge", 1600) or 1600),
     )
     image_hash = hashlib.sha256(image.encode("ascii", errors="ignore")).hexdigest()
-    extracted = _analyze_image(image, model)
 
+    if dedupe_image:
+        with _auto_lock:
+            if session["id"] == _auto_session_id and image_hash == _auto_last_image_hash:
+                return None
+
+    extracted = _analyze_image(image, model)
     row = {
         "id": store.new_id("csc_"),
         "space_id": session["space_id"],
         "session_id": session["id"],
-        "capture_mode": "MANUAL",
+        "capture_mode": mode,
         "region": capture_region,
         "text": extracted,
         "image_hash": image_hash,
@@ -187,6 +232,28 @@ def capture_manual(
     return store.get("conversation_screen_context", row["id"]) or row
 
 
+def capture_manual(
+    session: dict[str, Any],
+    *,
+    region: str = "configured",
+    frozen_runtime: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Capture one explicit screenshot and persist only its extracted observation."""
+    with _auto_lock:
+        if _auto_session_id == session.get("id"):
+            raise ValueError("AUTO Screen Context 正在运行；请先 Off the record 或停止 AUTO，再执行手动截图")
+    row = _capture_once(
+        session,
+        requested_mode="MANUAL",
+        region=region,
+        frozen_runtime=frozen_runtime,
+        dedupe_image=False,
+    )
+    if row is None:
+        raise ValueError("Screen Context 未产生新观察")
+    return row
+
+
 def list_context(session_id: str, limit: int = 20) -> list[dict[str, Any]]:
     return store.select(
         "conversation_screen_context",
@@ -195,3 +262,175 @@ def list_context(session_id: str, limit: int = 20) -> list[dict[str, Any]]:
         order="created_at DESC",
         limit=max(1, min(100, int(limit))),
     )
+
+
+def auto_status(session_id: str = "") -> dict[str, Any]:
+    with _auto_lock:
+        active = bool(_auto_session_id and _auto_thread and _auto_thread.is_alive())
+        return {
+            "active": active,
+            "session_id": _auto_session_id,
+            "owns_requested_session": bool(session_id and session_id == _auto_session_id),
+            "paused": bool(_auto_paused) if active else False,
+            "interval_seconds": _auto_interval_seconds,
+            "region": _auto_region,
+            "last_capture_at": _auto_last_capture_at,
+            "last_error": _auto_last_error,
+            "consecutive_errors": _auto_consecutive_errors,
+            "raw_image_persisted": False,
+            "explicit_start_required": True,
+        }
+
+
+def _auto_worker(
+    session_id: str,
+    stop_event: threading.Event,
+    *,
+    interval_seconds: int,
+    region: str,
+    frozen_runtime: dict[str, Any],
+) -> None:
+    global _auto_last_capture_at, _auto_last_error, _auto_consecutive_errors, _auto_last_image_hash
+    try:
+        while not stop_event.is_set():
+            with _auto_lock:
+                if session_id != _auto_session_id:
+                    break
+                paused = _auto_paused
+            if paused:
+                stop_event.wait(0.5)
+                continue
+
+            session = store.get("conversation_session", session_id)
+            if session is None or str(session.get("status") or "") != "ACTIVE":
+                break
+
+            try:
+                row = _capture_once(
+                    session,
+                    requested_mode="AUTO",
+                    region=region,
+                    frozen_runtime=frozen_runtime,
+                    dedupe_image=True,
+                )
+                with _auto_lock:
+                    if row is not None:
+                        _auto_last_capture_at = float(row.get("created_at") or store.now())
+                        _auto_last_image_hash = str(row.get("image_hash") or "")
+                    _auto_last_error = ""
+                    _auto_consecutive_errors = 0
+            except Exception as exc:  # noqa: BLE001
+                with _auto_lock:
+                    _auto_last_error = str(exc)[:800]
+                    _auto_consecutive_errors += 1
+                    should_stop = _auto_consecutive_errors >= _AUTO_MAX_CONSECUTIVE_ERRORS
+                if should_stop:
+                    break
+
+            stop_event.wait(interval_seconds)
+    finally:
+        with _auto_lock:
+            if session_id == _auto_session_id:
+                # Keep diagnostic error/last-capture fields, but release ownership.
+                globals()["_auto_session_id"] = ""
+                globals()["_auto_paused"] = False
+
+
+def start_auto(
+    session: dict[str, Any],
+    *,
+    interval_seconds: int = _AUTO_DEFAULT_INTERVAL_SECONDS,
+    region: str = "configured",
+    frozen_runtime: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    global _auto_session_id, _auto_thread, _auto_stop_event, _auto_paused
+    global _auto_interval_seconds, _auto_region, _auto_last_capture_at
+    global _auto_last_image_hash, _auto_last_error, _auto_consecutive_errors
+
+    if str(session.get("status") or "") != "ACTIVE":
+        raise ValueError("只有进行中的 Conversation Session 可以启动 AUTO Screen Context")
+    status = vision_runtime_status(session)
+    if status["mode"] != "AUTO":
+        raise ValueError("本场 Screen Context 不是 AUTO")
+    if status["blockers"]:
+        raise ValueError(status["blockers"][0])
+
+    interval = max(_AUTO_MIN_INTERVAL_SECONDS, min(_AUTO_MAX_INTERVAL_SECONDS, int(interval_seconds)))
+    frozen = dict(frozen_runtime or {})
+    frozen_fp = str(frozen.get("fingerprint") or "")
+    if frozen_fp and frozen_fp != status["fingerprint"]:
+        raise ValueError("视觉模型/数据路径已在本场开始后变化；请新开一场再启用 AUTO Screen Context")
+    _resolve_region(region)
+
+    with _auto_lock:
+        if _auto_session_id:
+            if _auto_session_id == session["id"]:
+                return auto_status(session["id"])
+            raise ValueError("另一场 Conversation 正在使用 AUTO Screen Context；请先停止它")
+        _auto_session_id = session["id"]
+        _auto_paused = False
+        _auto_interval_seconds = interval
+        _auto_region = region
+        _auto_last_capture_at = None
+        _auto_last_image_hash = ""
+        _auto_last_error = ""
+        _auto_consecutive_errors = 0
+        _auto_stop_event = threading.Event()
+        worker = threading.Thread(
+            target=_auto_worker,
+            kwargs={
+                "session_id": session["id"],
+                "stop_event": _auto_stop_event,
+                "interval_seconds": interval,
+                "region": region,
+                "frozen_runtime": frozen,
+            },
+            daemon=True,
+            name=f"chengzhu-screen-auto-{session['id'][:12]}",
+        )
+        _auto_thread = worker
+        worker.start()
+    return auto_status(session["id"])
+
+
+def pause_auto(session_id: str) -> dict[str, Any]:
+    global _auto_paused
+    with _auto_lock:
+        if session_id != _auto_session_id:
+            raise ValueError("这场 Conversation 没有运行 AUTO Screen Context")
+        _auto_paused = True
+    return auto_status(session_id)
+
+
+def resume_auto(session_id: str) -> dict[str, Any]:
+    global _auto_paused
+    with _auto_lock:
+        if session_id != _auto_session_id:
+            raise ValueError("这场 Conversation 没有运行 AUTO Screen Context")
+        _auto_paused = False
+    return auto_status(session_id)
+
+
+def stop_auto(session_id: str = "") -> dict[str, Any]:
+    global _auto_session_id, _auto_thread, _auto_stop_event, _auto_paused
+    with _auto_lock:
+        if not _auto_session_id:
+            return auto_status(session_id)
+        if session_id and session_id != _auto_session_id:
+            return auto_status(session_id)
+        owned_session = _auto_session_id
+        thread = _auto_thread
+        stop_event = _auto_stop_event
+        if stop_event is not None:
+            stop_event.set()
+
+    if thread is not None and thread is not threading.current_thread():
+        thread.join(timeout=3.0)
+
+    with _auto_lock:
+        if _auto_session_id == owned_session:
+            _auto_session_id = ""
+            _auto_paused = False
+        _auto_thread = None
+        _auto_stop_event = None
+    return auto_status(session_id or owned_session)

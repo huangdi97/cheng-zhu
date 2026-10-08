@@ -36,6 +36,14 @@ describe('Conversation Guidance selection', () => {
     expect(latestVisibleGuidance([{ id: 'g2', status: 'SHOWN', user_action: 'CANCELLED_BY_DIRECT_QUESTION' }, older])).toBeNull()
   })
 
+  it('keeps HUMAN_COACH audit out of the AI primary card', () => {
+    const ai = { id: 'ai-1', kind: 'RECALL', status: 'SHOWN', user_action: 'NONE' }
+    const human = { id: 'human-1', kind: 'HUMAN_COACH', status: 'SHOWN', user_action: 'NONE' }
+
+    expect(latestVisibleGuidance([human, ai])).toEqual(ai)
+    expect(latestVisibleGuidance([human])).toBeNull()
+  })
+
   it('keeps dismissed/snoozed/used Guidance out of the primary card', () => {
     for (const action of ['DISMISSED', 'SNOOZED', 'USED']) {
       expect(latestVisibleGuidance([{ ...older, user_action: action }])).toBeNull()

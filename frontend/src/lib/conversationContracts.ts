@@ -170,6 +170,13 @@ export interface ConversationSession {
   updated_at: number
 }
 
+export interface ConversationTimeSemantics {
+  original_text: string
+  normalized_datetime: string
+  timezone: string
+  ambiguity: 'EXACT' | 'AMBIGUOUS' | 'UNSPECIFIED_TIMEZONE' | 'NOT_PARSED' | 'NOT_APPLICABLE' | string
+}
+
 export interface ConversationItem {
   id: string
   space_id: string
@@ -181,6 +188,7 @@ export interface ConversationItem {
   speaker_id: string
   owner_id: string
   due_at: string
+  time_semantics: ConversationTimeSemantics
   source_refs: SourceRef[]
   source_excerpt: string
   confidence: number

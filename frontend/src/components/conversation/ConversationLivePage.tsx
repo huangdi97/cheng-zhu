@@ -347,6 +347,12 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <StatusBadge tone="muted">PACK {liveContext.data.pack_digest ? liveContext.data.pack_digest.slice(0, 8) : '—'}</StatusBadge>
             </div>
             {liveContext.data.brief.goal ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Goal</div><p className="mt-1 text-xs text-text-primary">{liveContext.data.brief.goal}</p></div> : null}
+            {liveContext.data.profile_playbook ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/45 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen Profile Playbook</div>
+              <p className="mt-1 text-xs text-text-primary">{liveContext.data.profile_playbook.closing_objective}</p>
+              <div className="mt-2 flex flex-wrap gap-1">{liveContext.data.profile_playbook.priority_truth_types.slice(0, 6).map((kind) => <StatusBadge key={kind} tone="muted">{kind}</StatusBadge>)}</div>
+              <p className="mt-2 text-[10px] text-text-muted">本场使用开始时冻结的 {liveContext.data.profile_playbook.profile} 工作框架；不是实时成功评分。</p>
+            </div> : null}
             {(liveContext.data.brief.agenda?.length ?? 0) > 0 ? <div className="mt-3">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Agenda</div>
               <div className="mt-1 space-y-1">{liveContext.data.brief.agenda!.slice(0, 5).map((item, index) => <div key={`${index}:${item}`} className="text-[11px] text-text-secondary">{index + 1}. {item}</div>)}</div>
@@ -452,6 +458,12 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       {summary ? <div className="mt-5 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-5">
         <h2 className="text-sm font-semibold text-text-primary">这场之后</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-4"><div><div className="text-2xl font-semibold">{summary.decisions.length}</div><div className="text-[11px] text-text-muted">Decisions</div></div><div><div className="text-2xl font-semibold">{summary.commitments.length}</div><div className="text-[11px] text-text-muted">Commitments</div></div><div><div className="text-2xl font-semibold">{summary.open_questions.length}</div><div className="text-[11px] text-text-muted">Open Questions</div></div><div><div className="text-2xl font-semibold">{summary.review_required}</div><div className="text-[11px] text-text-muted">待确认</div></div></div>
+        {summary.profile_outcome ? <div className="mt-4 rounded-xl border border-bg-tertiary/70 bg-bg-primary/45 p-3">
+          <div className="text-xs font-semibold text-text-secondary">{summary.profile_outcome.profile} · Reviewed Outcome Evidence</div>
+          <p className="mt-1 text-[11px] text-text-muted">{summary.profile_outcome.closing_objective}</p>
+          <div className="mt-2 flex flex-wrap gap-2">{summary.profile_outcome.priority_truth_types.map((kind) => <StatusBadge key={kind} tone={summary.profile_outcome.reviewed_counts[kind] ? 'ok' : 'muted'}>{kind} {summary.profile_outcome.reviewed_counts[kind] ?? 0}</StatusBadge>)}</div>
+          <p className="mt-2 text-[10px] text-text-muted">{summary.profile_outcome.interpretation}</p>
+        </div> : null}
         {summary.next_focus ? <p className="mt-4 text-sm text-text-primary">Next Focus · {summary.next_focus.title}</p> : null}
         <div className="mt-4"><PrimaryButton onClick={() => navigate(paths.conversationSpace(s.space_id, 'sessions'))}>回到 Space · Continue</PrimaryButton></div>
       </div> : null}

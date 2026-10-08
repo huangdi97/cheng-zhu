@@ -22,6 +22,8 @@ describe('Conversation Live capture presentation truth', () => {
       .toEqual({ label: '转写已暂停', listening: false })
     expect(captureViewState(active, { active: true, owns_requested_session: true, paused: false }))
       .toEqual({ label: '正在采集并转写', listening: true })
+    expect(captureViewState(active, { active: true, owns_requested_session: true }, true))
+      .toEqual({ label: '音频状态不可确认', listening: false })
   })
 })
 

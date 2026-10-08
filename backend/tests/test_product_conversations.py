@@ -1534,6 +1534,12 @@ def test_expression_plan_is_derived_from_guidance_and_explicit_audience_only(pro
     from_history = next(x for x in history if x["id"] == shown["id"])
     assert from_history["expression_plan"] == plan
 
+    cleared = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "还有什么？",
+        "audience_participant_id": "",
+    })["guidance"]
+    assert cleared["expression_plan"]["target_participant_id"] == ""
+
 
 def test_guidance_arbiter_critical_risk_visibility_duplicate_social_and_budget(product_env):
     space = conversations.create_space("Arbiter", "DESIGN_REVIEW")

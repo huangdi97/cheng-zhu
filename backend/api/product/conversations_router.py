@@ -367,6 +367,7 @@ class ItemCreate(BaseModel):
     owner_id: str = Field(default="", max_length=120)
     speaker_id: str = Field(default="", max_length=120)
     due_at: str = Field(default="", max_length=120)
+    time_semantics: dict[str, Any] = Field(default_factory=dict)
     source_refs: list[dict[str, Any]] = Field(default_factory=list)
     source_excerpt: str = Field(default="", max_length=3000)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

@@ -76,6 +76,21 @@ const SCREEN_RUNTIME_OFF = {
   blockers: [],
 }
 
+function expressionPlan(event, target = '') {
+  const silent = event.status !== 'SHOWN' || event.expression_action === 'SILENT'
+  return {
+    action: event.expression_action,
+    guidance_kind: event.kind || null,
+    target_participant_id: target,
+    text: event.text || '',
+    source_refs: event.source_refs || [],
+    warnings: silent && event.reason ? [`Suppressed: ${event.reason}`] : [],
+    max_length: silent ? 0 : 1200,
+    render_as: silent ? 'SILENCE' : 'PRIMARY_CARD',
+    suppression_reasons: silent && event.reason ? [event.reason] : [],
+  }
+}
+
 const DECISION = {
   id: 'ci-decision',
   space_id: SPACE.id,
@@ -464,7 +479,23 @@ function mocks() {
           : kind === 'DELIVERY' ? 'CLARIFY'
             : 'ADD_TALKING_POINT'
       if (!body.direct_question && !body.critical_risk && !body.talking_point && !body.delivery_focus && body.user_speaking) {
-        return { guidance: null, suppressed: 'USER_SPEAKING', event: { id: 'ge-silent', expression_action: 'SILENT' } }
+        const event = {
+          id: 'ge-silent',
+          session_id: SESSION.id,
+          candidate_id: 'gc-silent',
+          kind: 'CONTRIBUTION_OPPORTUNITY',
+          expression_action: 'SILENT',
+          text: '',
+          source_refs: body.source_refs || [],
+          status: 'SUPPRESSED',
+          reason: 'USER_SPEAKING',
+          score: {},
+          user_action: 'NONE',
+          rendered_at: null,
+          created_at: 2,
+        }
+        event.expression_plan = expressionPlan(event, body.audience_participant_id || '')
+        return { guidance: null, suppressed: 'USER_SPEAKING', event }
       }
       return {
         guidance: {
@@ -481,6 +512,14 @@ function mocks() {
           user_action: 'NONE',
           rendered_at: 2,
           created_at: 2,
+          expression_plan: expressionPlan({
+            kind,
+            expression_action: action,
+            text: body.answer_cue || body.critical_risk || body.talking_point || body.delivery_focus || body.candidate_text || 'Q4 benchmark 已覆盖 10x data scale',
+            source_refs: body.source_refs || [],
+            status: 'SHOWN',
+            reason: kind === 'DELIVERY' ? 'EXPRESSION_PLANNER' : kind === 'TALKING_POINT' ? 'MANUAL_TALKING_POINT' : kind === 'RISK' ? 'CRITICAL_RISK' : kind === 'ANSWER_CUE' ? 'DIRECT_QUESTION' : 'HIGH_VALUE_OPPORTUNITY',
+          }, body.audience_participant_id || ''),
         },
         suppressed: null,
       }
@@ -815,11 +854,13 @@ test.describe('v2.0 Conversation Profile', () => {
       status: 'SHOWN', reason: 'DIRECT_QUESTION', score: {},
       user_action: 'NONE', rendered_at: 1, created_at: 1,
     }
+    prior.expression_plan = expressionPlan(prior)
     const newest = {
       ...prior, id: 'ge-silent', status: 'SUPPRESSED',
       expression_action: 'SILENT', text: '', reason: 'USER_SPEAKING',
       rendered_at: null, created_at: 2,
     }
+    newest.expression_plan = expressionPlan(newest)
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },

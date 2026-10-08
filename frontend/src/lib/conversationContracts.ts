@@ -252,6 +252,24 @@ export interface ConversationSpaceDetail extends ConversationSpace {
   threads: ConversationOpenThread[]
 }
 
+export interface ConversationProfilePlaybook {
+  profile: ConversationProfile
+  success_conditions: string[]
+  priority_truth_types: string[]
+  prepare_prompts: string[]
+  closing_objective: string
+  boundaries: string[]
+}
+
+export interface ConversationProfileOutcome {
+  profile: ConversationProfile
+  closing_objective: string
+  priority_truth_types: string[]
+  reviewed_counts: Record<string, number>
+  reviewed_outputs: Array<{ id: string; type: string; state: string; title: string; review_status: string }>
+  interpretation: string
+}
+
 export interface ConversationPrepare {
   space: Pick<ConversationSpace, 'id' | 'profile' | 'title' | 'description' | 'default_goal' | 'default_mode' | 'selected_source_ids' | 'selected_quick_note_ids'>
   goals: ConversationGoal[]
@@ -267,6 +285,7 @@ export interface ConversationPrepare {
   agenda: string[]
   expected_questions: string[]
   contribution_candidates: Array<{ text: string; source_refs: SourceRef[]; kind: string }>
+  profile_playbook: ConversationProfilePlaybook
 }
 
 export interface ConversationHome {
@@ -372,6 +391,7 @@ export interface ConversationPreflight {
 
 export interface ConversationContinue {
   session: ConversationSession
+  profile_outcome: ConversationProfileOutcome
   decisions: ConversationItem[]
   commitments: ConversationItem[]
   open_questions: ConversationItem[]
@@ -461,6 +481,7 @@ export interface ConversationSessionContext {
     known_participants?: number
     contribution_candidates?: Array<{ text: string; source_refs: SourceRef[]; kind: string }>
   }
+  profile_playbook: ConversationProfilePlaybook
   sources: Array<{
     material_id: string
     version_id: string

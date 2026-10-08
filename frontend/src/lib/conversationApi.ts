@@ -191,6 +191,7 @@ export const conversationApi = {
     audience_concern?: string
     decision_authority?: string
     relationship_context?: string
+    audience_participant_id?: string
   }) => request<{ guidance: ConversationGuidance | null; suppressed: string | null; event?: ConversationGuidance }>(
     `${B}/sessions/${encodeURIComponent(id)}/guidance/evaluate`, json('POST', body),
   ),

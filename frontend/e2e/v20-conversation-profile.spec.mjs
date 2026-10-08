@@ -767,6 +767,38 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('SILENT · USER_SPEAKING')).toBeVisible()
   })
 
+  test('SILENT polling never revives an older shown Guidance card', async ({ context, page }) => {
+    const base = mocks()
+    let guidanceReads = 0
+    const prior = {
+      id: 'ge-older', session_id: SESSION.id, candidate_id: '',
+      kind: 'ANSWER_CUE', expression_action: 'ANSWER',
+      text: '过期提示绝不能复活', source_refs: [],
+      status: 'SHOWN', reason: 'DIRECT_QUESTION', score: {},
+      user_action: 'NONE', rendered_at: 1, created_at: 1,
+    }
+    const newest = {
+      ...prior, id: 'ge-silent', status: 'SUPPRESSED',
+      expression_action: 'SILENT', text: '', reason: 'USER_SPEAKING',
+      rendered_at: null, created_at: 2,
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/guidance`) {
+          guidanceReads += 1
+          return { items: [newest, prior] }
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect.poll(() => guidanceReads).toBeGreaterThan(0)
+    await expect(page.getByText('等待高价值 Guidance')).toBeVisible()
+    await expect(page.getByText(prior.text)).toHaveCount(0)
+  })
+
   test('Transcript mode uses Conversation-owned capture controls instead of Interview answering', async ({ context, page }) => {
     const base = mocks()
     let capture = {

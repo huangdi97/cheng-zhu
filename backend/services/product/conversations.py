@@ -2596,6 +2596,145 @@ def prepare_space(space_id: str) -> dict[str, Any]:
     }
 
 
+
+def search_items(
+    *,
+    query: str = "",
+    item_type: str = "",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Global Conversation search over item truth with provenance context.
+
+    Results always carry Space, Session, review/state and source refs so the
+    command/search surface cannot become an ungrounded AI answer box.
+    """
+    q = str(query or "").strip()
+    requested = str(item_type or "").strip()
+    allowed_types = {
+        "Decision", "Commitment", "Task", "Deadline", "Risk", "Assumption",
+        "OpenQuestion", "Proposal", "Objection", "Metric", "Status",
+    }
+    params: list[Any] = []
+    clauses = ["1=1"]
+
+    if requested:
+        if requested == "Commitment":
+            clauses.append("i.type IN ('Commitment','Task')")
+        else:
+            if requested not in allowed_types:
+                raise ValueError("不支持的 Conversation Item 类型")
+            clauses.append("i.type = ?")
+            params.append(requested)
+
+    if q:
+        like = f"%{q}%"
+        clauses.append("(i.title LIKE ? OR i.detail LIKE ? OR i.source_excerpt LIKE ?)")
+        params.extend([like, like, like])
+
+    params.append(max(1, min(200, int(limit))))
+    rows = store.rows(
+        "SELECT i.*, sp.title AS space_title, sp.profile AS space_profile, "
+        "s.title AS session_title, s.started_at AS session_started_at, "
+        "s.ended_at AS session_ended_at "
+        "FROM conversation_item i "
+        "JOIN conversation_space sp ON sp.id = i.space_id "
+        "JOIN conversation_session s ON s.id = i.session_id "
+        f"WHERE {' AND '.join(clauses)} "
+        "ORDER BY i.updated_at DESC, i.created_at DESC LIMIT ?",
+        tuple(params),
+    )
+    return rows
+
+
+def export_session(session_id: str) -> dict[str, Any]:
+    session = require_session(session_id)
+    space = require_space(session["space_id"])
+    transcript = store.select(
+        "conversation_transcript_segment",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    items = store.select(
+        "conversation_item",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    guidance = store.select(
+        "conversation_guidance_event",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    drafts = store.select(
+        "conversation_draft_action",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    packs = store.select(
+        "conversation_session_pack",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
+    confirmed = [
+        item for item in items
+        if item["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
+    ]
+    candidates = [item for item in items if item["review_status"] == "AI_EXTRACTED"]
+    source_manifest: list[dict[str, Any]] = []
+    quick_notes: list[dict[str, Any]] = []
+    for pack in packs:
+        payload = dict(pack.get("payload") or {})
+        for source in payload.get("sources") or []:
+            source_manifest.append({
+                "material_id": source.get("material_id") or "",
+                "version_id": source.get("version_id") or "",
+                "title": source.get("title") or "",
+                "kind": source.get("kind") or "",
+                "usage": source.get("usage") or "",
+                "content_hash": source.get("content_hash") or "",
+                "is_personal_evidence": bool(source.get("is_personal_evidence")),
+            })
+        for note in payload.get("quick_notes") or []:
+            quick_notes.append({
+                "id": note.get("id") or "",
+                "title": note.get("title") or "",
+                "content": note.get("content") or "",
+                "kind": "USER_NOTE",
+            })
+
+    return {
+        "kind": "CONVERSATION_SESSION",
+        "contract": "v2.0-R1",
+        "export_manifest": {
+            "categories": [
+                "session", "transcript", "quick_notes", "confirmed_items",
+                "unconfirmed_candidates", "guidance", "draft_actions",
+                "source_manifest", "session_packs",
+            ],
+            "privacy": "LOCAL_EXPORT",
+            "contains_external_secrets": False,
+        },
+        "space": {
+            "id": space["id"],
+            "title": space["title"],
+            "profile": space["profile"],
+        },
+        "session": session,
+        "transcript": transcript,
+        "quick_notes": quick_notes,
+        "confirmed_items": confirmed,
+        "unconfirmed_candidates": candidates,
+        "guidance": guidance,
+        "draft_actions": drafts,
+        "source_manifest": source_manifest,
+        "session_packs": packs,
+    }
+
+
 def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
     rows = store.rows(
         "SELECT s.*, sp.title AS space_title, sp.profile AS space_profile "

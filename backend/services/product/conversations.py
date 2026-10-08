@@ -415,6 +415,51 @@ def templates() -> list[dict[str, Any]]:
     ]
 
 
+def profile_playbook(profile_key: str) -> dict[str, Any]:
+    config = SPACE_PROFILES.get(str(profile_key or "").upper()) or {}
+    playbook = config.get("playbook") or {}
+    return {
+        "profile": str(profile_key or "").upper(),
+        "success_conditions": list(playbook.get("success_conditions") or []),
+        "priority_truth_types": list(playbook.get("priority_truth_types") or []),
+        "prepare_prompts": list(playbook.get("prepare_prompts") or []),
+        "closing_objective": str(playbook.get("closing_objective") or ""),
+        "boundaries": list(playbook.get("boundaries") or []),
+    }
+
+
+def _profile_outcome_evidence(session: dict[str, Any], items: list[dict[str, Any]]) -> dict[str, Any]:
+    """Reviewed output counts for this Profile, never a synthetic success score."""
+    space = require_space(session["space_id"])
+    playbook = profile_playbook(space["profile"])
+    allowed = set(playbook["priority_truth_types"])
+    counts: dict[str, int] = {kind: 0 for kind in playbook["priority_truth_types"]}
+    reviewed = []
+    for item in items:
+        if item.get("type") not in allowed:
+            continue
+        if item.get("review_status") not in THREAD_CONFIRMED_REVIEW:
+            continue
+        if item.get("state") in {"UNKNOWN"}:
+            continue
+        counts[item["type"]] = counts.get(item["type"], 0) + 1
+        reviewed.append({
+            "id": item["id"],
+            "type": item["type"],
+            "state": item["state"],
+            "title": item["title"],
+            "review_status": item["review_status"],
+        })
+    return {
+        "profile": space["profile"],
+        "closing_objective": playbook["closing_objective"],
+        "priority_truth_types": playbook["priority_truth_types"],
+        "reviewed_counts": counts,
+        "reviewed_outputs": reviewed[:20],
+        "interpretation": "Reviewed output evidence only; not a meeting-quality or success score.",
+    }
+
+
 def _require_choice(value: str, allowed: set[str], label: str) -> str:
     value = str(value or "").upper()
     if value not in allowed:
@@ -1205,6 +1250,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
+        "profile_playbook": profile_playbook(space["profile"]),
         "session_brief": {
             "title": session.get("title") or space.get("title") or "",
             "scheduled_at": session.get("scheduled_at"),
@@ -1417,6 +1463,7 @@ def session_context(session_id: str) -> dict[str, Any]:
         "conversation_state": conversation_state(session_id),
         "space": payload.get("space") or {"id": session["space_id"]},
         "brief": payload.get("session_brief") or {},
+        "profile_playbook": payload.get("profile_playbook") or profile_playbook((payload.get("space") or {}).get("profile") or ""),
         "sources": sources,
         "quick_notes": notes,
         "participants": participants,
@@ -2117,6 +2164,7 @@ def continue_summary(session_id: str) -> dict[str, Any]:
                 next_focus = {"kind": "COMMITMENT", "title": owed[0]["title"], "source_ref": owed[0]["id"]}
     return {
         "session": session,
+        "profile_outcome": _profile_outcome_evidence(session, items),
         "decisions": decisions,
         "commitments": commitments,
         "open_questions": reviewed_open_questions,
@@ -2800,6 +2848,7 @@ def prepare_space(space_id: str) -> dict[str, Any]:
             {"text": item["title"], "source_refs": item.get("source_refs") or [], "kind": "RECALL"}
             for item in decisions[:5] if item.get("source_refs")
         ],
+        "profile_playbook": profile_playbook(detail["profile"]),
     }
 
 

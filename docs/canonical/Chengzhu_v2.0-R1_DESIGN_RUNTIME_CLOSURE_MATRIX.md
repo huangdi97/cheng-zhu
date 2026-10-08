@@ -292,7 +292,7 @@ Conversation State
 → Guidance(kind / expression_action / text / source / reason)
 ```
 
-Expression Plan 是 Guidance 的派生展示层，不建立第二套持久化 truth table；长期审计仍以 Guidance event + frozen Session Pack 为准。
+Expression Plan 已成为 Guidance 的 service-boundary 派生 read model：SHOWN 与 SILENT 都返回 `action / kind / target / source / warnings / render_as / suppression`；target 只来自 explicit frozen participant selection，清空选择会清除旧 target。它不建立第二套持久化 truth table；长期审计仍以 Guidance event + frozen Session Pack 为准。
 
 ---
 

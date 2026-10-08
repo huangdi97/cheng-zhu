@@ -43,6 +43,14 @@ function writeBaseline(value: SharePrivacyMode | null) {
   } catch { /* storage unavailable */ }
 }
 
+export function hasActiveConversationSharePrivacyLeases(): boolean {
+  return Object.keys(readLeases()).length > 0
+}
+
+export function updateConversationSharePrivacyBaseline(mode: SharePrivacyMode): void {
+  if (hasActiveConversationSharePrivacyLeases()) writeBaseline(mode)
+}
+
 function bridge() {
   const api = window.electronAPI
   if (!api?.getSharePrivacy || !api?.setSharePrivacy) {

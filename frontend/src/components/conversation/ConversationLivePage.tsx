@@ -69,9 +69,13 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
     const sync = async () => {
       try {
-        const runtime = requested === 'PRIVATE_OVERLAY' && status === 'ACTIVE'
-          ? await activateConversationSharePrivacy(sessionId, 'PRIVATE_OVERLAY')
-          : await inspectConversationSharePrivacy(requested)
+        let runtime = await inspectConversationSharePrivacy(requested)
+        // The Session policy is stronger than tray/settings drift while ACTIVE.
+        // If another UI path drops content protection, re-assert it rather than
+        // continuing to show a stale "ACTIVE" badge.
+        if (requested === 'PRIVATE_OVERLAY' && status === 'ACTIVE' && !runtime.protected) {
+          runtime = await activateConversationSharePrivacy(sessionId, 'PRIVATE_OVERLAY')
+        }
         if (!alive) return
         setSharePrivacyRuntime(runtime)
         setSharePrivacyStatusError(false)
@@ -82,7 +86,13 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       }
     }
     void sync()
-    return () => { alive = false }
+    const timer = requested === 'PRIVATE_OVERLAY' && status === 'ACTIVE'
+      ? window.setInterval(() => void sync(), 2000)
+      : null
+    return () => {
+      alive = false
+      if (timer !== null) window.clearInterval(timer)
+    }
   }, [sessionId, session.data?.policy?.share_privacy, session.data?.status])
 
   useEffect(() => {

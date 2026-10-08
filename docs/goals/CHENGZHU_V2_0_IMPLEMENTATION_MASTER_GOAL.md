@@ -1,3 +1,18 @@
+> [!IMPORTANT]
+> **HISTORICAL IMPLEMENTATION PLAN — 不再是当前缺口清单。**
+>
+> 本文件记录 v2 从零实施时的 Stage 0–37 路线，保留用于 provenance。Conversation runtime 已由后续 PR 实现并合入；不要看到下面某个 Stage 就推断它“还没做”。
+>
+> 当前权威执行状态请按顺序读取：
+>
+> 1. `docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md`
+> 2. `docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md`
+> 3. `docs/canonical/Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md`
+> 4. `reports/CHENGZHU_V2_0_DESIGN_REALITY.md`
+> 5. 当前 `main` / 最新 CI / release evidence
+>
+> 2026-10-08 状态：`V2_RUNTIME_AVAILABLE=TRUE`；`V2_PRODUCTIZED_RELEASE=FALSE`；`REAL_CONVERSATION_USER_EVIDENCE_PENDING=TRUE`。
+
 # Chengzhu v2.0 — Personal Conversation Intelligence 全量实现总 Goal
 ## 目标：从 v1.4.2 Verified Interview Product 演进到第二 Profile，但不破坏 Interview Core
 

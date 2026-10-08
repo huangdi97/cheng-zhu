@@ -382,6 +382,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
                 <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
                 <span>Screen · {liveContext.data.screen_runtime?.mode === 'MANUAL' ? `${liveContext.data.screen_runtime.route ?? '—'} / ${liveContext.data.screen_runtime.model_id || liveContext.data.screen_runtime.model_name || 'vision'}` : liveContext.data.screen_runtime?.mode ?? 'OFF'}</span>
+                <span>Raw screen image · {liveContext.data.screen_runtime?.raw_image_persisted ? 'PERSISTED' : 'NOT STORED'}</span>
               </div>
             </div>
           </div> : null}

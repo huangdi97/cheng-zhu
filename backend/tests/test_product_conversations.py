@@ -373,6 +373,8 @@ def test_auto_screen_blank_frame_is_not_a_failure_but_three_real_errors_fail_sto
     assert conversation_screen._auto_consecutive_errors == conversation_screen._AUTO_MAX_CONSECUTIVE_ERRORS
     assert conversation_screen._auto_last_error == "vision unavailable"
     assert conversation_screen._auto_session_id == ""
+    assert conversation_screen._auto_thread is None
+    assert conversation_screen._auto_stop_event is None
 
 
 def test_auto_screen_frozen_vision_fingerprint_is_rechecked_on_explicit_start(product_env, monkeypatch):

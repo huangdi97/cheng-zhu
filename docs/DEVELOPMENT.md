@@ -5,9 +5,11 @@
 Use these in order:
 
 1. runtime / repository / CI facts;
-2. `docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md` — current product Canonical;
-3. `docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md` — current validation/hardening addendum;
-4. `docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md` — frozen Verified Core.
+2. `docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md` — Conversation Beta current Canonical;
+3. `docs/canonical/Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md` — design→runtime truth/evidence index;
+4. `docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md` — productization / rollout boundary;
+5. `docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md` + `Chengzhu_v1.4-R1_VALIDATION_HARDENING.md` — stable Interview product;
+6. `docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md` — frozen Verified Core.
 
 Do not rebuild the product from v1.0 / old Stage docs.
 
@@ -28,26 +30,33 @@ Do not rebuild the product from v1.0 / old Stage docs.
 
 ## Product architecture rule
 
-Current top-level IA:
+The shell is profile-aware and does not expose internal subsystems as top-level pages.
+
+Interview Profile:
 
 ```text
-首页
-求职目标
-我的成竹
-练习
-资料库
-历史
-设置
-
-                         [上场]
+首页 → 求职目标 → 我的成竹 → 练习 → 资料库 → 历史 → 设置
+                                      [上场]
 ```
 
-Do not add a top-level page for an internal subsystem.
+Conversation Profile:
 
-The product loop is:
+```text
+首页 → 对话空间 → 我的成竹 → 资料库 → 历史 → 设置
+                                  [开始]
+```
+
+Interview loop:
 
 ```text
 Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflection → Next Focus
+```
+
+Conversation loop:
+
+```text
+Conversation Home → Space → Prepare → Preflight → Frozen Session Pack
+→ Participate → Continue → Next Focus → same Space
 ```
 
 Verified Core must remain independent from the Studio UI.
@@ -149,6 +158,27 @@ python scripts/soak_sim.py
 
 v1.4 additionally requires 7-day / 30-session / 100-session synthetic continuity and 3-hour-equivalent soak evidence.
 
+Conversation v2 deterministic engineering evidence:
+
+```bash
+python scripts/v2_conversation_evidence.py --out-dir artifacts/v2-conversation-validation
+```
+
+Human-label workflow after real dogfood:
+
+```bash
+python scripts/v2_conversation_label_seed.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --out labels.seed.jsonl
+
+# Human reviewer fills reviewer + label fields, then:
+python scripts/v2_conversation_human_eval.py labels.jsonl \
+  --out report.json \
+  --markdown-out report.md
+```
+
+The seed file is not evidence; missing human labels remain N/A.
+
 ## Windows package
 
 ```bash
@@ -186,10 +216,24 @@ Tests enforce, among other things:
 - Reflection actions write through the real product loop;
 - synthetic evidence never becomes a PMF claim.
 
-## Future Conversation Profile
+## Conversation Beta truth
 
-Meeting / Presentation / 1:1 are not current top-level products.
+Conversation is no longer a future-placeholder contract. The shared runtime exists for Project Sync / Design Review / Presentation-Q&A / 1:1 / Client Call / Negotiation templates, but:
 
-v1.x should retain future-compatible contracts without building a parallel Meeting app.
+```text
+RUNTIME_AVAILABLE
+!= PRODUCTIZED_STABLE_RELEASE
+!= PROFILE_SPECIFIC_BEHAVIOR_VALIDATED
+!= REAL_USER_VALIDATED
+```
 
-See the Personal Conversation Intelligence sections in v1.3-R2 Canonical.
+Project Sync / Design Review remain the launch-validation wedge.
+
+Current fail-closed / external items include:
+- Conversation Screen Context;
+- Conversation Human Coach;
+- Conversation Private Overlay;
+- Calendar / Mail / Docs / project-tracker connectors;
+- actual external task/email/issue execution.
+
+Do not replace these blockers with placeholder success paths.

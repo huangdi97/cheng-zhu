@@ -3,9 +3,21 @@ import { buildApiUrl } from '@/lib/backendUrl'
 import { useInterviewStore } from '@/stores/configStore'
 
 // 教练建议：来源 HUMAN_COACH，只是建议，不是证据，也不是你本人的确认。
-export default function CoachCues() {
-  const cues = useInterviewStore((s) => s.coachCues)
+export default function CoachCues({
+  sessionKind,
+  targetSessionId = '',
+}: {
+  sessionKind?: 'practice' | 'live' | 'conversation'
+  targetSessionId?: string
+} = {}) {
+  const allCues = useInterviewStore((s) => s.coachCues)
   const dismiss = useInterviewStore((s) => s.dismissCoachCue)
+  const cues = allCues.filter((cue) => {
+    if (sessionKind === 'conversation') {
+      return cue.sessionKind === 'conversation' && cue.targetSessionId === targetSessionId
+    }
+    return cue.sessionKind !== 'conversation'
+  })
   if (!cues.length) return null
   return (
     <div className="px-3 md:px-5 pt-2 space-y-1.5" aria-live="polite" data-testid="coach-cues">

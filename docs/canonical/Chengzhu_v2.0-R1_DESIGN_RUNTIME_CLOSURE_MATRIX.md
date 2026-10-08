@@ -460,6 +460,50 @@ APPROVED
 
 ---
 
+# 12.5 Profile-specific Playbook Runtime
+
+六个 Conversation Profile 不再只区别于名称、default mode 与 Guidance allowlist。
+
+每个 Profile 现在都有冻结的 `Profile Playbook`：
+
+- success conditions；
+- priority truth types；
+- Prepare prompts；
+- closing objective；
+- explicit boundaries。
+
+Runtime 闭环：
+
+```text
+Template
+→ Prepare Playbook
+→ Frozen Session Pack
+→ Live Session Pulse
+→ Continue Reviewed Outcome Evidence
+```
+
+Continue 只统计各 Profile priority truth type 中**经过 review 的真实输出**，并显式声明：
+
+```text
+reviewed output evidence
+!= meeting-quality score
+!= success score
+!= real-user validation
+```
+
+当前 Playbook：
+
+- Project Sync：Status / Commitment / Task / Risk / OpenQuestion / Deadline / Decision；
+- Design Review：Decision / Proposal / Objection / Risk / Assumption / OpenQuestion / Metric；
+- Presentation / Q&A：Metric / Status / Decision / OpenQuestion / Commitment；
+- 1:1：Commitment / OpenQuestion / Status / Risk / Decision；
+- Client Call：OpenQuestion / Commitment / Risk / Decision / Status / Metric；
+- Negotiation：Proposal / Objection / Decision / Commitment / Risk / OpenQuestion。
+
+这关闭了“模板只是共享 runtime 名字不同”的纯仓库设计缺口，但仍不等于 profile-specific real-user behavior validated。
+
+---
+
 # 13. Profile Maturity
 
 | Profile | Shared runtime | Launch wedge | Specialized behavior validated | Stable v2 release | Real-user validated |

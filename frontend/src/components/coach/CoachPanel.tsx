@@ -43,7 +43,7 @@ export default function CoachPanel({
       ? { transcript: false, ai_cue: false, session_context: true }
       : { transcript: true, ai_cue: false, resume_jd: false },
   )
-  const [lan, setLan] = useState(true)
+  const [lan, setLan] = useState(sessionKind !== 'conversation')
   const [sessions, setSessions] = useState<CoachSessionView[]>([])
   const [links, setLinks] = useState<Record<string, string> | null>(null)
   const [relay, setRelay] = useState('BLOCKED-EXTERNAL')

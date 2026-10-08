@@ -133,7 +133,7 @@ Conversation Home
 当前能力边界：
 - Conversation MANUAL + explicit-start AUTO Screen Context 已实现；AUTO 不随 Session 静默启动，并要求用户报告 consent/allowance + transparency plan；
 - Conversation `PRIVATE_OVERLAY` 已有桌面 runtime：Start 时验证 Electron content protection，Live 可见，End 恢复会话前默认；Web fallback fail-closed；best-effort only，不承诺“不可检测”；
-- Conversation Human Coach 仍未接线；
+- Conversation Human Coach 已有真实 runtime：仅在 frozen policy = `HUMAN_ALLOWED` 且记录 transparency plan 时允许；Live 中显式生成一次性、session-scoped 教练链接，逐项授权 transcript / AI Guidance / frozen Session Context；helper 不读取 Interview Resume/JD；建议标记为 `HUMAN_COACH` 且 `is_evidence=false`，Session 结束/删除自动 revoke；runtime 可用不等于 beta.2 已发布、stable v2 或真实用户验证；
 - Calendar / Docs / Mail / project tracker connector runtime；
 - actual external email/task/issue write-back；
 - v2 packaged stable release；

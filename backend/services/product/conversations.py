@@ -690,6 +690,12 @@ def delete_space(space_id: str, *, confirm: bool = False) -> bool:
     require_space(space_id)
     if not confirm:
         raise ValueError("删除整个 Conversation Space 会彻底擦除其 Session、Items、Packs、Drafts 与 provenance tombstones；请明确确认")
+    try:
+        from services import coach as human_coach
+        for session in list_sessions(space_id):
+            human_coach.registry.revoke_for_target(session["id"], session_kind="conversation")
+    except Exception:
+        pass
     return store.delete("conversation_space", space_id)
 
 
@@ -1125,13 +1131,24 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         or (policy["screen_context"] in {"MANUAL", "AUTO"} and not screen_runtime["blockers"])
     )
 
-    human_ok = policy["human_assistance"] != "HUMAN_ALLOWED"
-    if not human_ok:
-        blockers.append({
-            "key": "human_assistance_runtime",
-            "label": "Human Assistance",
-            "message": "Conversation Human Coach runtime 尚未接线；当前只能使用 HUMAN_FORBIDDEN 或 HUMAN_PRACTICE_ONLY。",
-        })
+    human_ok = True
+    if policy["human_assistance"] == "HUMAN_ALLOWED":
+        if policy["participant_transparency_plan"] == "NOT_RECORDED":
+            human_ok = False
+            blockers.append({
+                "key": "human_assistance_transparency",
+                "label": "Human Assistance",
+                "message": "启用 Conversation Human Coach 前必须记录参与者透明告知计划；成竹不会自动通知其他参与者。",
+            })
+        else:
+            warnings.append({
+                "key": "human_coach_explicit_start",
+                "label": "Human Assistance",
+                "message": (
+                    "Human Coach 不会随 Session 自动连接。进入 Live 后必须显式生成一次性教练链接，"
+                    "并逐项授权 transcript / AI cue / frozen session context；建议始终标记为 HUMAN_COACH，绝不成为事实或证据。"
+                ),
+            })
 
     pack_inputs = _pack_inputs(space)
     for skipped in pack_inputs["skipped_sources"]:
@@ -1214,7 +1231,10 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             else "MANUAL_ONLY" if ai_behavior["manual_ask"]
             else "DISABLED"
         ), "ok": True},
-        {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": human_ok},
+        {"key": "human", "label": "Human Assistance", "value": (
+            "HUMAN_ALLOWED · EXPLICIT_LINK" if policy["human_assistance"] == "HUMAN_ALLOWED"
+            else policy["human_assistance"]
+        ), "ok": human_ok},
         {"key": "share", "label": "屏幕共享保护", "value": (
             "PRIVATE_OVERLAY · VERIFY_AT_START" if policy["share_privacy"] == "PRIVATE_OVERLAY" else "OFF"
         ), "ok": share_ok},
@@ -2297,6 +2317,11 @@ def end_session(session_id: str) -> dict[str, Any]:
         # available. It is idempotent and never upgrades truth state.
         extract_transcript_candidates(session_id)
         store.update("conversation_session", session_id, {"status": "ENDED", "ended_at": ts, "updated_at": ts})
+    try:
+        from services import coach as human_coach
+        human_coach.registry.revoke_for_target(session_id, session_kind="conversation")
+    except Exception:
+        pass
     return continue_summary(session_id)
 
 
@@ -2902,6 +2927,38 @@ def guidance_from_transcript(
         reason=reason,
     )
 
+def record_human_coach_cue(
+    session_id: str,
+    *,
+    text: str = "",
+    coach_session_id: str,
+    voice_id: str = "",
+) -> dict[str, Any]:
+    """Persist Human Coach advice as auditable Guidance, never as truth/evidence."""
+    session = require_session(session_id)
+    policy = _normalize_session_policy(session.get("policy"))
+    if session.get("status") != "ACTIVE":
+        raise ValueError("Conversation Session 未处于进行中")
+    if policy["human_assistance"] != "HUMAN_ALLOWED":
+        raise ValueError("本场 Human Assistance policy 不允许人工教练")
+    refs = [{
+        "kind": "HUMAN_COACH_SESSION",
+        "id": str(coach_session_id or ""),
+        "voice_id": str(voice_id or ""),
+        "visibility": "PRIVATE",
+        "is_evidence": False,
+    }]
+    return _persist_guidance(
+        session_id,
+        kind="HUMAN_COACH",
+        action="HUMAN_ADVICE",
+        text=(str(text or "").strip() or ("语音教练建议" if voice_id else "人工教练建议"))[:1200],
+        source_refs=refs,
+        status="SHOWN",
+        reason="HUMAN_COACH",
+    )
+
+
 def guidance_history(session_id: str, limit: int = 30) -> list[dict[str, Any]]:
     require_session(session_id)
     rows = store.select(
@@ -3411,6 +3468,11 @@ def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[
             conn.execute("DELETE FROM conversation_session WHERE id = ?", (session_id,))
     else:
         store.delete("conversation_session", session_id)
+    try:
+        from services import coach as human_coach
+        human_coach.registry.revoke_for_target(session_id, session_kind="conversation")
+    except Exception:
+        pass
     return {
         "deleted": True,
         "session_id": session_id,
@@ -3729,7 +3791,7 @@ def diagnostics() -> dict[str, Any]:
             "external_connectors": "NOT_CONFIGURED",
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
-            "conversation_human_coach": "BLOCKED_NOT_WIRED",
+            "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
         "evidence": {
@@ -3747,6 +3809,9 @@ def diagnostics() -> dict[str, Any]:
             "share_privacy_default": "OFF",
             "share_privacy_runtime": "ELECTRON_CONTENT_PROTECTION_BEST_EFFORT",
             "share_privacy_undetectability_claim": "NEVER",
+            "human_coach_default": "OFF_EXPLICIT_START_ONLY",
+            "human_coach_truth_authority": "ADVICE_ONLY_NOT_EVIDENCE",
+            "human_coach_public_relay": "BLOCKED_UNLESS_CONFIGURED",
         },
     }
 

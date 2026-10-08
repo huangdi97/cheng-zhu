@@ -890,7 +890,13 @@ export const api = {
   // R2 Human Coach (candidate side)
   coachSessions: () =>
     request<{ sessions: Array<Record<string, unknown>>; public_relay: string }>('/api/coach/sessions'),
-  coachCreate: (body: { session_kind: 'practice' | 'live'; permissions: Record<string, boolean>; lan?: boolean; ttl_min?: number }) =>
+  coachCreate: (body: {
+    session_kind: 'practice' | 'live' | 'conversation'
+    target_session_id?: string
+    permissions: Record<string, boolean>
+    lan?: boolean
+    ttl_min?: number
+  }) =>
     request<{ id: string; urls: Record<string, string>; public_relay: string }>('/api/coach/sessions', {
       method: 'POST',
       body: JSON.stringify(body),

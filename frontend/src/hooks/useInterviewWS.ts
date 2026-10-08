@@ -182,6 +182,8 @@ export function useInterviewWS(active = true) {
           text: String(msg.text ?? ''),
           voiceUrl: String(msg.voice_url ?? ''),
           createdAt: Number(msg.created_at ?? Date.now() / 1000),
+          sessionKind: String(msg.session_kind ?? '') as 'practice' | 'live' | 'conversation',
+          targetSessionId: String(msg.target_session_id ?? ''),
         })
         break
       case 'session_claim_warning':

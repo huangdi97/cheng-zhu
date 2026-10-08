@@ -37,6 +37,20 @@ def test_default_policy_refuses_live_and_allows_practice():
     live, _ = reg.create(human_policy="HUMAN_ALLOWED", session_kind="live")
     assert live.session_kind == "live"
 
+    with pytest.raises(CoachPolicyError):
+        reg.create(human_policy="HUMAN_PRACTICE_ONLY", session_kind="conversation", live_session_id="conv-1")
+    with pytest.raises(CoachPolicyError):
+        reg.create(human_policy="HUMAN_ALLOWED", session_kind="conversation")
+    conversation, _ = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-1",
+        permissions={"session_context": True, "transcript": False},
+    )
+    assert conversation.session_kind == "conversation"
+    assert conversation.live_session_id == "conv-1"
+    assert conversation.permissions["session_context"] is True
+
 
 def test_ai_allowed_does_not_imply_human_allowed():
     from services.intelligence.policy import human_coach_allowed
@@ -62,6 +76,32 @@ def test_token_is_hashed_ttl_and_revoke_fail_closed():
         reg.authenticate(t2)
 
 
+def test_revoke_for_target_is_scoped_to_exact_conversation_session():
+    reg = CoachRegistry()
+    conv_a, token_a = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-a",
+    )
+    conv_b, token_b = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-b",
+    )
+    interview, token_i = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="live",
+        live_session_id="interview-live",
+    )
+
+    assert reg.revoke_for_target("conv-a", session_kind="conversation") == 1
+    with pytest.raises(CoachAuthError):
+        reg.authenticate(token_a)
+    assert reg.authenticate(token_b).id == conv_b.id
+    assert reg.authenticate(token_i).id == interview.id
+    assert reg.revoke_for_target("conv-a", session_kind="conversation") == 0
+
+
 def test_rate_limit():
     clock = Clock()
     reg = CoachRegistry(clock=clock)
@@ -81,6 +121,16 @@ def test_coach_cue_is_advice_not_evidence():
     assert payload["source"] == "HUMAN_COACH" and payload["is_evidence"] is False
     assert len(payload["text"]) <= coach.MAX_TEXT_CHARS
 
+    conversation, _ = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-42",
+    )
+    scoped = coach.coach_cue_payload(conversation, text="只提醒当前这场")
+    assert scoped["session_kind"] == "conversation"
+    assert scoped["target_session_id"] == "conv-42"
+    assert scoped["is_evidence"] is False
+
 
 def test_public_relay_blocked_without_infrastructure(monkeypatch):
     monkeypatch.delenv("COACH_PUBLIC_BASE_URL", raising=False)
@@ -97,7 +147,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(coach, "registry", fresh)
     import api.coach.router as router
 
-    monkeypatch.setattr(router, "_human_policy_for", lambda kind: "HUMAN_PRACTICE_ONLY")
+    monkeypatch.setattr(router, "_human_policy_for", lambda kind, target="": "HUMAN_PRACTICE_ONLY")
     sent: list[dict] = []
     monkeypatch.setattr(router, "_broadcast", sent.append)
     import main
@@ -130,12 +180,80 @@ def test_api_flow_permissions_and_revoke(client):
     assert client.post("/coach/api/cue", json={"text": "x"}, headers={"X-Coach-Token": token}).status_code == 401
 
 
+def test_conversation_helper_state_is_session_scoped_and_never_exposes_interview_resume_jd(client, monkeypatch):
+    import api.coach.router as router
+    from services.product import conversation_capture, conversations
+
+    target = "conv-helper-boundary"
+    seen = []
+    monkeypatch.setattr(
+        router,
+        "_human_policy_for",
+        lambda kind, session_id="": "HUMAN_ALLOWED"
+        if kind == "conversation" and session_id == target
+        else "HUMAN_FORBIDDEN",
+    )
+    monkeypatch.setattr(
+        conversations,
+        "require_session",
+        lambda session_id: (
+            seen.append(("session", session_id))
+            or {"id": session_id, "status": "ACTIVE", "state": {"current_topic": "rollback owner"}}
+        ),
+    )
+    monkeypatch.setattr(
+        conversation_capture,
+        "transcript",
+        lambda session_id: seen.append(("transcript", session_id)) or [{"session_id": session_id, "text": "private transcript"}],
+    )
+    monkeypatch.setattr(
+        conversations,
+        "guidance_history",
+        lambda session_id, limit: seen.append(("guidance", session_id)) or [{"id": "g-1", "kind": "RECALL", "text": "private cue"}],
+    )
+    monkeypatch.setattr(
+        conversations,
+        "session_context",
+        lambda session_id: seen.append(("context", session_id)) or {
+            "space": {"id": "space-1", "title": "Design Review"},
+            "brief": {"goal": "decide rollback owner"},
+            "sources": [{"title": "Frozen source"}],
+            "participants": [{"display_name": "Alex", "role": "CTO"}],
+            "profile_playbook": {"closing_objective": "leave with an owner"},
+        },
+    )
+
+    _session, token = coach.registry.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id=target,
+        permissions={
+            "session_context": True,
+            "resume_jd": True,  # Must still be ignored for Conversation.
+            "transcript": False,
+            "ai_cue": False,
+        },
+    )
+    state = client.get("/coach/api/state", headers={"X-Coach-Token": token}).json()
+
+    assert state["session"]["kind"] == "conversation"
+    assert state["session"]["target_session_id"] == target
+    assert state["current_question"] == "rollback owner"
+    assert state["conversation_context"]["space"]["id"] == "space-1"
+    assert "resume_jd" not in state
+    assert "transcript" not in state
+    assert "ai_cue" not in state
+    assert ("context", target) in seen
+    assert not any(kind in {"transcript", "guidance"} for kind, _session_id in seen)
+    assert all(session_id == target for _kind, session_id in seen)
+
+
 def test_policy_tightened_mid_session_blocks_cues(client, monkeypatch):
     body = client.post("/api/coach/sessions", json={"session_kind": "practice"}).json()
     token = body["urls"]["local"].split("#t=")[1]
     import api.coach.router as router
 
-    monkeypatch.setattr(router, "_human_policy_for", lambda kind: "HUMAN_FORBIDDEN")
+    monkeypatch.setattr(router, "_human_policy_for", lambda kind, target="": "HUMAN_FORBIDDEN")
     assert client.post("/coach/api/cue", json={"text": "x"}, headers={"X-Coach-Token": token}).status_code == 403
 
 
@@ -143,6 +261,9 @@ def test_helper_page_keeps_token_out_of_requests(client):
     html = client.get("/coach").text
     assert "location.hash" in html and "history.replaceState" in html
     assert "X-Coach-Token" in html
+    assert "conversation_context" in html
+    assert "本场冻结上下文" in html
+    assert "本页不能控制对方电脑" in html
     assert client.get("/coach").headers.get("referrer-policy") == "no-referrer"
 
 

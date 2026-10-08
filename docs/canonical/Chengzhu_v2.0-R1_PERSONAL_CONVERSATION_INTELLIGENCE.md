@@ -895,7 +895,7 @@ Conversation Screen Context 已产品化 **MANUAL + explicit-start AUTO**。MANU
 
 Conversation `PRIVATE_OVERLAY` 已接入桌面 runtime：policy 选择本身不会被当成“已保护”；点击 Start 前前端必须通过 Electron bridge 临时启用 `setContentProtection`、回读验证，并把 runtime proof 交给 backend。proof 缺失/无效时 fail-closed；verified state 冻结进 Session Pack，Live 显示 ACTIVE / UNKNOWN；正常 End 后恢复会话开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不能以该 policy 开始。该机制只是受支持窗口捕获路径上的 best-effort content protection，**不构成安全、隐身或“不可检测”承诺**。
 
-Human Coach 与 external connector permission 仍保持 blocked / fail-closed。
+Conversation Human Coach 已进入真实 runtime：`HUMAN_ALLOWED` 只在本场 frozen policy + participant transparency plan 满足时可用；必须进入 Live 后显式创建一次性 session-scoped link，并逐项授权 transcript / AI Guidance / frozen Session Context。helper 不读取 Interview Resume/JD，未授权字段不会旁路暴露；每条 advice 同时通过 session-targeted realtime cue 与 `conversation_guidance_event(kind=HUMAN_COACH)` 审计，但 source 明确 `is_evidence=false`，不会进入 Conversation Item truth / memory / extraction。Session end/delete/Space erase 自动 revoke。`RUNTIME_AVAILABLE` 仍不等于 beta.2 public prerelease、stable v2 或真实用户验证。external connector permission 仍保持 blocked / fail-closed。
 
 外部 action 先进入 Review Queue，再由用户确认。
 

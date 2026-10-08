@@ -82,6 +82,7 @@ describe('useInterviewWS', () => {
       toastMessage: null,
       toasts: [],
       lastWSError: null,
+      coachCues: [],
     } as any)
     useUiPrefsStore.setState({ appMode: 'assist' } as any)
   })
@@ -232,6 +233,35 @@ describe('useInterviewWS', () => {
     const state = useInterviewStore.getState()
     expect(state.qaPairs.map((qa) => qa.id)).toEqual(['fresh'])
     expect(state.currentStreamingId).toBe('fresh')
+  })
+
+  it('keeps Human Coach session targeting metadata from realtime', () => {
+    render(<Harness />)
+    const ws = FakeWebSocket.instances[0]
+
+    act(() => {
+      ws.emitOpen()
+      ws.emitMessage({
+        type: 'coach_cue',
+        id: 'coach-conv-1',
+        source: 'HUMAN_COACH',
+        is_evidence: false,
+        session_kind: 'conversation',
+        target_session_id: 'csess-42',
+        text: '先确认 rollback owner',
+        voice_url: '',
+        created_at: 10,
+      })
+    })
+
+    expect(useInterviewStore.getState().coachCues).toEqual([
+      expect.objectContaining({
+        id: 'coach-conv-1',
+        text: '先确认 rollback owner',
+        sessionKind: 'conversation',
+        targetSessionId: 'csess-42',
+      }),
+    ])
   })
 
   it('warns when candidate microphone degrades safely', () => {

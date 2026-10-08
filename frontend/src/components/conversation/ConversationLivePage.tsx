@@ -50,6 +50,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [screenBusy, setScreenBusy] = useState(false)
   const [screenObservations, setScreenObservations] = useState<ConversationScreenContext[]>([])
   const [screenAuto, setScreenAuto] = useState<ConversationScreenAutoStatus | null>(null)
+  const [screenAutoStatusError, setScreenAutoStatusError] = useState(false)
   const [screenAutoInterval, setScreenAutoInterval] = useState('30')
   const capturePollGate = useRef(createLivePollGate()).current
 
@@ -88,6 +89,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     if (mode !== 'MANUAL' && mode !== 'AUTO') {
       setScreenObservations([])
       setScreenAuto(null)
+      setScreenAutoStatusError(false)
       return () => { alive = false }
     }
 
@@ -101,6 +103,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     void refreshObservations()
     if (mode !== 'AUTO') {
       setScreenAuto(null)
+      setScreenAutoStatusError(false)
       return () => { alive = false }
     }
 
@@ -109,9 +112,12 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         const status = await conversationApi.screenAutoStatus(sessionId)
         if (!alive) return
         setScreenAuto(status)
+        setScreenAutoStatusError(false)
         if (status.last_capture_at) await refreshObservations()
       } catch {
-        if (alive) setScreenAuto(null)
+        // UNKNOWN is not OFF. Preserve the last known ownership/state and
+        // prevent a second start until the backend can be queried again.
+        if (alive) setScreenAutoStatusError(true)
       }
     }
     void pollAuto()
@@ -272,7 +278,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     setScreenBusy(true); setError('')
     try {
       setScreenAuto(await conversationApi.screenAutoStart(sessionId, Number(screenAutoInterval), screenRegion))
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+      setScreenAutoStatusError(false)
+    } catch (e) { setScreenAutoStatusError(true); setError(e instanceof Error ? e.message : String(e)) }
     finally { setScreenBusy(false) }
   }
 
@@ -283,14 +290,15 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         ? await conversationApi.screenAutoResume(sessionId)
         : await conversationApi.screenAutoPause(sessionId)
       setScreenAuto(next)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+      setScreenAutoStatusError(false)
+    } catch (e) { setScreenAutoStatusError(true); setError(e instanceof Error ? e.message : String(e)) }
     finally { setScreenBusy(false) }
   }
 
   const stopAutoScreen = async () => {
     setScreenBusy(true); setError('')
-    try { setScreenAuto(await conversationApi.screenAutoStop(sessionId)) }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    try { setScreenAuto(await conversationApi.screenAutoStop(sessionId)); setScreenAutoStatusError(false) }
+    catch (e) { setScreenAutoStatusError(true); setError(e instanceof Error ? e.message : String(e)) }
     finally { setScreenBusy(false) }
   }
 
@@ -325,7 +333,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   return (
     <Page wide testId="conversation-live">
       <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode} · AI ${s.policy?.ai_assistance ?? 'AI_ALLOWED'} · Human ${s.policy?.human_assistance ?? 'HUMAN_PRACTICE_ONLY'}`}
-        actions={<PrimaryButton disabled={busy || captureBusy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>} />
+        actions={<div className="flex flex-wrap items-center gap-2">
+          {s.policy?.screen_context === 'AUTO' ? <StatusBadge tone={screenAutoStatusError ? 'warn' : screenAuto?.active ? (screenAuto.paused ? 'warn' : 'ok') : screenAuto?.last_error ? 'warn' : 'muted'}>SCREEN AUTO · {screenAutoStatusError ? 'UNKNOWN' : screenAuto?.active ? (screenAuto.paused ? 'OFF THE RECORD' : 'ACTIVE') : screenAuto?.last_error ? 'STOPPED' : 'NOT STARTED'}</StatusBadge> : null}
+          <PrimaryButton disabled={busy || captureBusy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>
+        </div>} />
 
       {error ? <ErrorState message={error} /> : null}
 
@@ -514,8 +525,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <div className="flex items-center gap-2"><Camera className="h-4 w-4 text-accent-blue" /><h2 className="text-sm font-semibold text-text-primary">Auto Screen Context</h2></div>
                 <p className="mt-1 text-[11px] text-text-muted">AUTO 只表示本场允许自动屏幕上下文；不会随会话自动启动。你必须在这里再次显式开始，且可以随时 Off the record。原图永不持久化。</p>
               </div>
-              <StatusBadge tone={screenAuto?.active ? (screenAuto.paused ? 'warn' : 'ok') : screenAuto?.last_error ? 'warn' : 'muted'}>
-                {screenAuto?.active ? (screenAuto.paused ? 'OFF THE RECORD' : 'ACTIVE') : screenAuto?.last_error ? 'AUTO STOPPED' : 'NOT STARTED'}
+              <StatusBadge tone={screenAutoStatusError ? 'warn' : screenAuto?.active ? (screenAuto.paused ? 'warn' : 'ok') : screenAuto?.last_error ? 'warn' : 'muted'}>
+                {screenAutoStatusError ? 'UNKNOWN' : screenAuto?.active ? (screenAuto.paused ? 'OFF THE RECORD' : 'ACTIVE') : screenAuto?.last_error ? 'AUTO STOPPED' : 'NOT STARTED'}
               </StatusBadge>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -527,10 +538,12 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               </select>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {!screenAuto?.active ? <PrimaryButton disabled={screenBusy || s.status !== 'ACTIVE'} onClick={startAutoScreen} icon={<Camera className="h-3.5 w-3.5" />}>{screenBusy ? '启动中…' : '开始自动屏幕上下文'}</PrimaryButton> : null}
-              {screenAuto?.active ? <SecondaryButton disabled={screenBusy} onClick={toggleAutoScreenPause}>{screenAuto.paused ? '恢复自动观察' : 'Off the record'}</SecondaryButton> : null}
+              {!screenAuto?.active && !screenAutoStatusError ? <PrimaryButton disabled={screenBusy || s.status !== 'ACTIVE'} onClick={startAutoScreen} icon={<Camera className="h-3.5 w-3.5" />}>{screenBusy ? '启动中…' : '开始自动屏幕上下文'}</PrimaryButton> : null}
+              {screenAuto?.active && !screenAutoStatusError ? <SecondaryButton disabled={screenBusy} onClick={toggleAutoScreenPause}>{screenAuto.paused ? '恢复自动观察' : 'Off the record'}</SecondaryButton> : null}
               {screenAuto?.active ? <SecondaryButton disabled={screenBusy} onClick={stopAutoScreen}>停止 AUTO</SecondaryButton> : null}
+              {screenAutoStatusError && !screenAuto?.active ? <SecondaryButton disabled={screenBusy} onClick={stopAutoScreen}>尝试停止 AUTO</SecondaryButton> : null}
             </div>
+            {screenAutoStatusError ? <p role="alert" className="mt-3 text-[11px] text-status-risk">无法确认后端 AUTO Screen Context 的当前状态。不要把连接中断视为屏幕捕获已经停止；恢复连接并确认，或尝试发送停止命令。</p> : null}
             <div className="mt-3 rounded-xl bg-bg-secondary/35 px-3 py-2 text-[10px] text-text-muted">
               <div>Model · {liveContext.data.screen_runtime.model_id || liveContext.data.screen_runtime.model_name || '—'} · route {liveContext.data.screen_runtime.route ?? 'UNAVAILABLE'} · raw image NOT STORED</div>
               <div className="mt-1">Interval · {screenAuto?.interval_seconds ?? Number(screenAutoInterval)}s · last observation {screenAuto?.last_capture_at ? new Date(screenAuto.last_capture_at * 1000).toLocaleTimeString() : '—'} · duplicate frames skipped</div>

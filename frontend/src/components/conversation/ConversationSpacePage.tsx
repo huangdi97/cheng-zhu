@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
+import { activateConversationSharePrivacy, restoreConversationSharePrivacy } from '@/lib/conversationSharePrivacy'
 import { productApi } from '@/lib/productApi'
 import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
@@ -360,13 +361,25 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   }
 
   const start = async () => {
-    if (!sessionId) return
+    if (!sessionId || !preflight) return
     setSessionBusy(true); setSessionError('')
+    const requested = preflight.policy.share_privacy
+    let privacyActivated = false
     try {
-      await conversationApi.start(sessionId)
+      let proof = ''
+      if (requested === 'PRIVATE_OVERLAY') {
+        const runtime = await activateConversationSharePrivacy(sessionId, 'PRIVATE_OVERLAY')
+        proof = runtime.proof
+        privacyActivated = runtime.protected
+      }
+      await conversationApi.start(sessionId, { share_privacy_runtime_proof: proof })
       navigate(paths.conversationLive(sessionId))
-    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
-    finally { setSessionBusy(false) }
+    } catch (e) {
+      if (privacyActivated) {
+        try { await restoreConversationSharePrivacy(sessionId) } catch { /* fail safer: protection may remain enabled */ }
+      }
+      setSessionError(e instanceof Error ? e.message : String(e))
+    } finally { setSessionBusy(false) }
   }
 
   return (
@@ -529,7 +542,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <Field label="屏幕上下文"><select className={inputCls} value={screenContext} onChange={(e) => setScreenContext(e.target.value as typeof screenContext)}><option value="OFF">Off</option><option value="MANUAL">Manual · 每次由我主动抓取</option><option value="AUTO">Auto · Live 中再次显式启动 / 可 Off the record</option></select></Field>
               <Field label="AI Assistance"><select className={inputCls} value={aiPolicy} onChange={(e) => setAiPolicy(e.target.value as typeof aiPolicy)}><option value="AI_FORBIDDEN">Forbidden · AI 全关闭</option><option value="AI_LIMITED">Limited · 仅用户主动调用</option><option value="AI_ALLOWED">Allowed · 允许自动辅助</option><option value="AI_EXPECTED">Expected · 用户报告本场预期自动辅助</option></select></Field>
               <Field label="Human Assistance"><select className={inputCls} value={humanPolicy} onChange={(e) => setHumanPolicy(e.target.value as typeof humanPolicy)}><option value="HUMAN_FORBIDDEN">Forbidden</option><option value="HUMAN_PRACTICE_ONLY">Practice only</option><option value="HUMAN_ALLOWED">Allowed（runtime 未接线，会阻止开始）</option></select></Field>
-              <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay（Conversation runtime 未接线，会阻止开始）</option></select></Field>
+              <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay（桌面开始时验证）</option></select></Field>
               <Field label="外部写回"><select className={inputCls} value={externalWriteback} onChange={(e) => setExternalWriteback(e.target.value as typeof externalWriteback)}><option value="REVIEW_REQUIRED">只生成草稿，必须确认</option><option value="OFF">完全关闭</option></select></Field>
               <Field label="参与者同意状态（仅用户报告）"><select className={inputCls} value={participantConsent} onChange={(e) => setParticipantConsent(e.target.value as typeof participantConsent)}><option value="NOT_RECORDED">未记录 / 未确认</option><option value="USER_REPORTS_ALLOWED">用户报告当前场景允许</option><option value="USER_REPORTS_CONSENTED">用户报告已取得所需参与者同意</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
               <Field label="透明告知计划（仅用户报告）"><select className={inputCls} value={participantTransparency} onChange={(e) => setParticipantTransparency(e.target.value as typeof participantTransparency)}><option value="NOT_RECORDED">尚未记录</option><option value="USER_WILL_NOTIFY_VERBALLY">我会口头告知</option><option value="USER_WILL_NOTIFY_IN_CHAT">我会在会议聊天中告知</option><option value="USER_REPORTS_ALREADY_NOTIFIED">我报告已完成告知</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
@@ -560,6 +573,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Write-back · {preflight.processing_runtime.data_path.writeback}</span>
                   <span>Audio retention · {preflight.processing_runtime.data_path.audio_retention}</span>
                   <span>Screen · {['MANUAL', 'AUTO'].includes(preflight.screen_runtime.mode) ? `${preflight.screen_runtime.mode} / ${preflight.screen_runtime.route} / ${preflight.screen_runtime.model_id || preflight.screen_runtime.model_name || 'vision'}` : preflight.screen_runtime.mode}</span>
+                  <span>Share Privacy · {preflight.share_privacy_runtime.requested === 'PRIVATE_OVERLAY' ? 'VERIFY_AT_START / Electron content protection' : 'OFF'}</span>
                   <span>Raw screen image · {preflight.screen_runtime.raw_image_persisted ? 'PERSISTED' : 'NOT STORED'}</span>
                 </div>
                 <p className="mt-2">“Local”不会把 capture / STT / inference / retention / write-back / vision 混成一个标签；任何一段与 policy 不一致都会 fail-closed。MANUAL 每次由你主动抓取；AUTO 即使通过 Preflight，也必须在 Live 再次显式启动并持续显示 ACTIVE / OFF THE RECORD 状态。两种模式都不把原图写入 product.db。</p>
@@ -580,6 +594,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Inference {preflight.pack_preview.processing_runtime.data_path.inference}</span>
                   <span>Write-back {preflight.pack_preview.processing_runtime.data_path.writeback}</span>
                   <span>Screen {preflight.pack_preview.screen_runtime.mode === 'MANUAL' ? `${preflight.pack_preview.screen_runtime.route} · ${preflight.pack_preview.screen_runtime.fingerprint.slice(0, 8)}` : preflight.pack_preview.screen_runtime.mode}</span>
+                  <span>Share Privacy {preflight.pack_preview.share_privacy_runtime.requested === 'PRIVATE_OVERLAY' ? 'verify at start' : 'off'}</span>
                   <span>Raw image {preflight.pack_preview.screen_runtime.raw_image_persisted ? 'stored' : 'not stored'}</span>
                 </div>
                 {preflight.pack_preview.sources.length ? <div className="mt-3">

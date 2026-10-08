@@ -11,12 +11,14 @@ export function captureViewState(
     owns_requested_session: boolean
     paused?: boolean
   } | null,
+  statusUnavailable = false,
 ): CaptureViewState {
   if (session.status === 'ENDED') return { label: '会话已结束', listening: false }
   if (session.status !== 'ACTIVE') return { label: '会话尚未开始', listening: false }
   if (session.capture_mode !== 'TRANSCRIPT') {
     return { label: session.capture_mode === 'NOTES_ONLY' ? '仅笔记 · 未采集音频' : '未采集音频', listening: false }
   }
+  if (statusUnavailable) return { label: '音频状态不可确认', listening: false }
   if (!capture) return { label: '正在确认音频状态', listening: false }
   if (capture.active && capture.owns_requested_session) {
     return capture.paused

@@ -12,7 +12,9 @@ Checks:
      answer_chunk, answer_done carries latency
   6. InterviewPack freeze persists across a sidecar restart
   7. nothing is written next to the executable (install dir stays clean)
-  8. LICENSE / THIRD_PARTY_NOTICES bundled
+  8. packaged Conversation Beta API loop (Space → Preflight → Start → Review → Continue → History)
+  9. Conversation product.db migration/version + review-only write-back truth
+ 10. LICENSE / THIRD_PARTY_NOTICES bundled
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -219,11 +221,152 @@ def main() -> int:
         checks["intelligence_schema_expected"] = expected_schema
         ok &= expected_schema is not None and user_version == expected_schema
 
+        product_db = home / "data" / "product.db"
+        product_user_version = sqlite3.connect(product_db).execute("PRAGMA user_version").fetchone()[0] if product_db.exists() else None
+        checks["product_schema_version"] = product_user_version
+        product_migrations_source = (Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "product_migrations.py").read_text(encoding="utf-8")
+        product_version_match = re.search(r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)", product_migrations_source, re.MULTILINE)
+        expected_product_schema = int(product_version_match.group(1)) if product_version_match else None
+        checks["product_schema_expected"] = expected_product_schema
+        ok &= expected_product_schema is not None and product_user_version == expected_product_schema
+
         if args.frontend_dist:
             with urllib.request.urlopen(f"{base}/", timeout=10) as resp:
                 html = resp.read().decode("utf-8", "replace")
             checks["frontend_served"] = "<div id=\"root\"" in html or "<!doctype html" in html.lower()
             ok &= bool(checks["frontend_served"])
+
+        # v2 Conversation packaged-runtime proof. Keep this NOTES_ONLY so the
+        # hosted Windows runner does not need a real audio device.
+        space = http_json(
+            f"{base}/api/product/conversation/spaces",
+            "POST",
+            {
+                "title": "Packaged Conversation Smoke",
+                "profile": "DESIGN_REVIEW",
+                "default_goal": "prove packaged Conversation continuity",
+            },
+        )
+        space_id = space.get("id")
+        checks["conversation_space_created"] = bool(space_id) and space.get("profile") == "DESIGN_REVIEW"
+        ok &= bool(checks["conversation_space_created"])
+
+        session = http_json(
+            f"{base}/api/product/conversation/spaces/{space_id}/sessions",
+            "POST",
+            {
+                "title": "Packaged Review",
+                "capture_mode": "NOTES_ONLY",
+                "processing_mode": "LOCAL",
+                "assistance_mode": "BALANCED",
+                "consent_ack": True,
+                "policy": {
+                    "ai_assistance": "AI_ALLOWED",
+                    "human_assistance": "HUMAN_PRACTICE_ONLY",
+                    "screen_context": "OFF",
+                    "share_privacy": "OFF",
+                    "external_writeback": "REVIEW_REQUIRED",
+                    "participant_consent_status": "NOT_APPLICABLE",
+                    "participant_transparency_plan": "NOT_APPLICABLE",
+                },
+            },
+        )
+        session_id = session.get("id")
+        checks["conversation_session_created"] = bool(session_id)
+        ok &= bool(checks["conversation_session_created"])
+
+        preflight = http_json(f"{base}/api/product/conversation/sessions/{session_id}/preflight")
+        checks["conversation_preflight_clear"] = preflight.get("blockers") == []
+        checks["conversation_preflight_local_path"] = (
+            (preflight.get("processing_runtime") or {}).get("data_path", {}).get("capture") == "STRUCTURED_NOTES_ONLY"
+            and (preflight.get("processing_runtime") or {}).get("data_path", {}).get("stt") == "NOT_USED"
+        )
+        ok &= bool(checks["conversation_preflight_clear"]) and bool(checks["conversation_preflight_local_path"])
+
+        started = http_json(f"{base}/api/product/conversation/sessions/{session_id}/start", "POST")
+        pack = started.get("pack") or {}
+        checks["conversation_pack_frozen"] = bool(pack.get("digest")) and (started.get("session") or {}).get("status") == "ACTIVE"
+        ok &= bool(checks["conversation_pack_frozen"])
+
+        context = http_json(f"{base}/api/product/conversation/sessions/{session_id}/context")
+        checks["conversation_session_context"] = (
+            context.get("pack_digest") == pack.get("digest")
+            and (context.get("policy") or {}).get("share_privacy") == "OFF"
+        )
+        ok &= bool(checks["conversation_session_context"])
+
+        item = http_json(
+            f"{base}/api/product/conversation/sessions/{session_id}/items",
+            "POST",
+            {
+                "item_type": "Decision",
+                "title": "packaged Conversation path works",
+                "source_refs": [{"kind": "USER_NOTE", "excerpt": "packaged smoke explicit source", "visibility": "PRIVATE"}],
+                "epistemic_status": "OBSERVED",
+            },
+        )
+        checks["conversation_candidate_not_truth"] = item.get("state") == "PROPOSED" and item.get("review_status") == "AI_EXTRACTED"
+        ok &= bool(checks["conversation_candidate_not_truth"])
+
+        reviewed = http_json(
+            f"{base}/api/product/conversation/items/{item.get('id')}/review",
+            "POST",
+            {"action": "CONFIRM", "patch": {}},
+        )
+        checks["conversation_review_promotes_truth"] = reviewed.get("state") == "AGREED" and reviewed.get("review_status") == "USER_CONFIRMED"
+        ok &= bool(checks["conversation_review_promotes_truth"])
+
+        silent = http_json(
+            f"{base}/api/product/conversation/sessions/{session_id}/guidance/evaluate",
+            "POST",
+            {
+                "candidate_text": "do not interrupt while user is speaking",
+                "source_refs": [{"kind": "USER_NOTE", "excerpt": "packaged source", "visibility": "PRIVATE"}],
+                "user_speaking": True,
+                "relevance": 1,
+                "novelty": 1,
+                "provenance_strength": 1,
+            },
+        )
+        checks["conversation_silent_is_first_class"] = silent.get("guidance") is None and silent.get("suppressed") == "USER_SPEAKING"
+        ok &= bool(checks["conversation_silent_is_first_class"])
+
+        ended = http_json(f"{base}/api/product/conversation/sessions/{session_id}/end", "POST")
+        checks["conversation_continue_has_reviewed_decision"] = any(
+            x.get("id") == reviewed.get("id") for x in (ended.get("decisions") or [])
+        )
+        ok &= bool(checks["conversation_continue_has_reviewed_decision"])
+
+        draft = http_json(
+            f"{base}/api/product/conversation/sessions/{session_id}/derived-draft",
+            "POST",
+            {"kind": "UPDATE_DECISION_LOG_DRAFT"},
+        )
+        approved = http_json(
+            f"{base}/api/product/conversation/draft-actions/{draft.get('id')}/review",
+            "POST",
+            {"action": "APPROVE"},
+        )
+        checks["conversation_writeback_is_review_only"] = (
+            approved.get("status") == "APPROVED"
+            and (approved.get("payload") or {}).get("external_execution") is False
+            and "external_id" not in approved
+        )
+        ok &= bool(checks["conversation_writeback_is_review_only"])
+
+        history = http_json(f"{base}/api/product/conversation/history?limit=10")
+        checks["conversation_history_profile_native"] = any(
+            row.get("id") == session_id and row.get("space_profile") == "DESIGN_REVIEW"
+            for row in (history.get("items") or [])
+        )
+        ok &= bool(checks["conversation_history_profile_native"])
+
+        diagnostics = http_json(f"{base}/api/product/conversation/diagnostics")
+        checks["conversation_diagnostics_truth_boundary"] = (
+            "opportunity_precision" in ((diagnostics.get("evaluation") or {}).get("requires_human_labels") or [])
+            and (diagnostics.get("health") or {}).get("external_writeback_execution") == "DRAFT_ONLY_NO_CONNECTOR_EXECUTION"
+        )
+        ok &= bool(checks["conversation_diagnostics_truth_boundary"])
 
         events = ws_collect(port, "RAG 和微调怎么选")
         types = [e.get("type") for e in events]

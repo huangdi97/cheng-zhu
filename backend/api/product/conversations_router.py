@@ -72,6 +72,12 @@ def history(limit: int = 100):
         return {"items": conversations.conversation_history(limit)}
 
 
+@router.get("/search")
+def search(query: str = "", item_type: str = "", limit: int = 50):
+    with domain_errors():
+        return {"items": conversations.search_items(query=query, item_type=item_type, limit=limit)}
+
+
 @router.get("/diagnostics")
 def diagnostics():
     return conversations.diagnostics()
@@ -243,6 +249,12 @@ def get_session(session_id: str):
 def get_session_context(session_id: str):
     with domain_errors():
         return conversations.session_context(session_id)
+
+
+@router.get("/sessions/{session_id}/export")
+def export_session(session_id: str):
+    with domain_errors():
+        return conversations.export_session(session_id)
 
 
 class SessionDelete(BaseModel):

@@ -754,8 +754,12 @@ PR 合并后至少要有：
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
 - unwired screen / coach / private overlay / connectors 明确 blocked；
-- diagnostics 分 observed proxy 与 human-label metrics；
-- README / canonical 不再写“v2 runtime 尚不存在”；
+- diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
+- 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
+- Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；
+- Deadline / temporal Commitment 使用 schema v6 time semantics，模糊时间 review-first；
+- ad-hoc 只使用 Space-backed continuity，不制造 standalone 第二真相；
+- README / canonical / Reality Report 不再写“v2 runtime 尚不存在”；
 - PR #19 最终 CI 全绿。
 
 ---

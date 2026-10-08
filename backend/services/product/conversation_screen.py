@@ -290,6 +290,7 @@ def _auto_worker(
     region: str,
     frozen_runtime: dict[str, Any],
 ) -> None:
+    global _auto_session_id, _auto_paused
     global _auto_last_capture_at, _auto_last_error, _auto_consecutive_errors, _auto_last_image_hash
     try:
         while not stop_event.is_set():
@@ -319,6 +320,22 @@ def _auto_worker(
                         _auto_last_image_hash = str(row.get("image_hash") or "")
                     _auto_last_error = ""
                     _auto_consecutive_errors = 0
+            except ValueError as exc:
+                message = str(exc)
+                # A blank/unreadable frame is a normal observation outcome,
+                # not a runtime failure. AUTO stays alive and simply waits for
+                # the next interval without persisting anything.
+                if "没有提取到足够可用且可追溯的上下文" in message:
+                    with _auto_lock:
+                        _auto_last_error = ""
+                        _auto_consecutive_errors = 0
+                else:
+                    with _auto_lock:
+                        _auto_last_error = message[:800]
+                        _auto_consecutive_errors += 1
+                        should_stop = _auto_consecutive_errors >= _AUTO_MAX_CONSECUTIVE_ERRORS
+                    if should_stop:
+                        break
             except Exception as exc:  # noqa: BLE001
                 with _auto_lock:
                     _auto_last_error = str(exc)[:800]
@@ -332,8 +349,8 @@ def _auto_worker(
         with _auto_lock:
             if session_id == _auto_session_id:
                 # Keep diagnostic error/last-capture fields, but release ownership.
-                globals()["_auto_session_id"] = ""
-                globals()["_auto_paused"] = False
+                _auto_session_id = ""
+                _auto_paused = False
 
 
 def start_auto(

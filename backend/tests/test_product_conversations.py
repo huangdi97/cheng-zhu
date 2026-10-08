@@ -2983,7 +2983,7 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert "opportunity_precision" in diag["evaluation"]["requires_human_labels"]
     assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
     assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
-    assert diag["health"]["conversation_screen_context"] == "MANUAL_AVAILABLE_AUTO_BLOCKED"
+    assert diag["health"]["conversation_screen_context"] == "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE"
     assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"

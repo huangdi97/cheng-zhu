@@ -33,7 +33,7 @@ Required path:
 6. frontend typecheck/unit/build;
 7. desktop unit tests;
 8. build backend sidecar in clean venv;
-9. packaged sidecar smoke;
+9. packaged sidecar smoke for both stable Interview and Conversation Beta API loop;
 10. build installer + portable;
 11. capture packaged runtime UI evidence;
 12. clean installer replay on a fresh Windows runner;
@@ -130,7 +130,13 @@ Engineering/release evidence can support:
 ENGINEERING_COMPLETE
 RELEASE_READY
 PRODUCT_VALIDATION_INFRA_COMPLETE
+V2_CONVERSATION_PACKAGED_RUNTIME_PROVEN
 ```
+
+For Conversation, packaged smoke now proves the real packaged sidecar can execute:
+Space → Session → Preflight → frozen Pack → reviewed truth → SILENT → Continue → review-only DraftAction → History.
+
+This still does **not** mean `V2_PRODUCTIZED_RELEASE=TRUE` unless a v2 stable release itself completes the installer/portable/download-back/provenance gates and is intentionally published.
 
 It cannot by itself support:
 

@@ -455,7 +455,7 @@ def test_preflight_blocks_unwired_auto_screen_and_human_runtime(product_env):
     keys = {item["key"] for item in check["blockers"]}
     assert {"screen_context_runtime", "human_assistance_runtime"} <= keys
     assert check["screen_runtime"]["mode"] == "AUTO"
-    with pytest.raises(ValueError, match="AUTO"):
+    with pytest.raises(ValueError, match="自动 Screen Context")
         conversations.start_session(session["id"])
 
 
@@ -2790,7 +2790,12 @@ def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(p
     with pytest.raises(ValueError, match="明确确认"):
         conversations.apply_retention(space["id"], confirm=False)
     result = conversations.apply_retention(space["id"], confirm=True)
-    assert result["deleted"] == {"transcript_segments": 1, "guidance_events": 1, "draft_actions": 1}
+    assert result["deleted"] == {
+        "transcript_segments": 1,
+        "guidance_events": 1,
+        "draft_actions": 1,
+        "screen_context_observations": 0,
+    }
     assert store.get("conversation_item", item["id"]) is not None
     assert store.get("conversation_draft_action", draft["id"]) is None
 

@@ -151,6 +151,38 @@ stable productized release
 
 每个模板只有在专属 E2E / policy / real-session evaluation 完成后，才能提高状态等级。
 
+
+## 3.3 Profile Playbook Gate
+
+所有 Profile 在 shared runtime 之上必须拥有真实、冻结、可测试的 Playbook，而不是只修改 label / default mode / Guidance allowlist。
+
+每个 Playbook 至少定义：
+
+- success conditions；
+- priority truth types；
+- Prepare prompts；
+- closing objective；
+- boundaries。
+
+必须贯穿：
+
+```text
+Template Picker
+→ Prepare
+→ Frozen Session Pack
+→ Live Session Pulse
+→ Continue Reviewed Outcome Evidence
+```
+
+Continue 只统计 review 后的 priority truth outputs；禁止生成：
+
+- meeting quality score；
+- success percentage；
+- pseudo-readiness；
+- 未经真实会话证据支持的“该模板已验证”。
+
+`runtime specialization exists != specialized behavior validated`。
+
 ---
 
 # 4. 必须存在的用户主循环

@@ -1700,6 +1700,11 @@ def add_item(
         raise ValueError("Decision 升级为 AGREED 需要来源与明确确认")
     if state == "COMMITTED" and not (owner_id and refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
         raise ValueError("Commitment 升级为 COMMITTED 需要 owner、来源与明确确认")
+    if item_type in {"Commitment", "Task"} and state == "COMMITTED" and temporal["original_text"] and temporal["ambiguity"] != "NOT_APPLICABLE" and not _time_semantics_resolved(temporal):
+        raise ValueError("Commitment 的时间仍有歧义；写入 COMMITTED 前请补 normalized datetime 与 timezone")
+    if item_type == "Deadline" and state in {"COMMITTED", "DONE"}:
+        if review_status not in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"} or not _time_semantics_resolved(temporal):
+            raise ValueError("Deadline 写入长期状态前需要明确 review、normalized datetime 与 timezone")
     title = str(title or "").strip()
     if not title:
         raise ValueError("事项内容不能为空")

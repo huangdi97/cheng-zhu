@@ -289,7 +289,7 @@ def _auto_worker(
     region: str,
     frozen_runtime: dict[str, Any],
 ) -> None:
-    global _auto_session_id, _auto_paused
+    global _auto_session_id, _auto_thread, _auto_stop_event, _auto_paused
     global _auto_last_capture_at, _auto_last_error, _auto_consecutive_errors, _auto_last_image_hash
     try:
         while not stop_event.is_set():
@@ -347,9 +347,12 @@ def _auto_worker(
     finally:
         with _auto_lock:
             if session_id == _auto_session_id:
-                # Keep diagnostic error/last-capture fields, but release ownership.
+                # Keep diagnostic error/last-capture fields, but release ownership
+                # and thread/event handles atomically.
                 _auto_session_id = ""
                 _auto_paused = False
+                _auto_thread = None
+                _auto_stop_event = None
 
 
 def start_auto(

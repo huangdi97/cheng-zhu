@@ -1,0 +1,60 @@
+name: publish-current-version-on-green-main
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-release:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Dispatch current version from exact green SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          actual="$(git rev-parse HEAD)"
+          if [ "$actual" != "$SOURCE_SHA" ]; then
+            echo "checkout drift: expected $SOURCE_SHA, got $actual" >&2
+            exit 1
+          fi
+
+          version="$(node -p "require('./desktop/package.json').version")"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "unsupported release version: $version" >&2
+            exit 1
+          fi
+
+          notes="docs/RELEASE_NOTES_v$version.md"
+          if [ ! -f "$notes" ]; then
+            echo "missing release notes: $notes" >&2
+            exit 1
+          fi
+
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$tag" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" = "false" ]; then
+              echo "$tag is already published; nothing to do"
+              exit 0
+            fi
+            echo "$tag exists only as a draft; release.yml will replace the draft after rebuilding from $SOURCE_SHA"
+          fi
+
+          gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"
+          echo "Dispatched verified release workflow for $tag from CI-proven SHA $SOURCE_SHA"

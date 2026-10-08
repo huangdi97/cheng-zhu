@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Camera, Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
+import { captureViewState, latestVisibleGuidance } from './liveViewState'
 import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationGuidance, ConversationItemType, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
@@ -100,8 +101,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         if (!alive) return
         setCapture(nextCapture)
         setSegments(transcript.items)
-        const latest = history.items.find((x) => x.status === 'SHOWN' && x.user_action !== 'DISMISSED')
-        if (latest) setGuidance((current) => current?.id === latest.id ? current : latest)
+        const latest = latestVisibleGuidance(history.items)
+        setGuidance((current) => current?.id === latest?.id ? current : latest)
       } catch {
         // Capture/timeline polling is additive. Manual Conversation Live stays usable
         // even if an older backend does not expose the v2 endpoints yet.
@@ -115,6 +116,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   if (session.loading) return <Page><Loading /></Page>
   if (session.error || !session.data) return <Page><ErrorState message={session.error ?? '会话不存在'} onRetry={session.reload} /></Page>
   const s = session.data
+  const captureView = captureViewState(s, capture)
 
   const startCapture = async () => {
     if (!primaryDevice) {
@@ -243,7 +245,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         <div className="space-y-4">
           <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/25 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><div className="flex items-center gap-2"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-green opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-accent-green" /></span><span className="text-xs font-semibold text-text-primary">Listening / Context</span></div><p className="mt-1 text-[11px] text-text-muted">一次只显示一个最高价值 Guidance；没有足够价值时保持 SILENT。</p></div>
+              <div><div className="flex items-center gap-2" role="status" aria-live="polite" data-testid="conversation-live-capture-status"><span className="relative flex h-2 w-2" aria-hidden="true">{captureView.listening ? <><span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-accent-green opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-accent-green" /></> : <span className="relative inline-flex h-2 w-2 rounded-full bg-text-muted" />}</span><span className="text-xs font-semibold text-text-primary">{captureView.label}</span></div><p className="mt-1 text-[11px] text-text-muted">一次只显示一个最高价值 Guidance；没有足够价值时保持 SILENT。</p></div>
               <div className="flex items-center gap-2">
                 <select value={mode} onChange={(e) => void changeMode(e.target.value as AssistanceMode)} aria-label="帮助方式"
                   className="rounded-xl border border-bg-hover bg-bg-primary px-2 py-1.5 text-xs text-text-primary outline-none">

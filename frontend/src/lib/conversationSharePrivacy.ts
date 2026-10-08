@@ -72,13 +72,14 @@ export async function inspectConversationSharePrivacy(requested: SharePrivacyMod
   }
   const api = bridge()
   const state = await api.getSharePrivacy!()
+  const verified = state.runtime_verified ?? (state.protected && state.mode === 'PRIVATE_OVERLAY')
   return {
     requested,
     available: true,
-    protected: Boolean(state.protected),
+    protected: Boolean(state.protected && verified),
     active_mode: String(state.mode || 'OFF'),
     note: String(state.note || ''),
-    proof: state.protected && state.mode === 'PRIVATE_OVERLAY' ? SHARE_PRIVACY_PROOF : '',
+    proof: verified && state.protected && state.mode === 'PRIVATE_OVERLAY' ? SHARE_PRIVACY_PROOF : '',
   }
 }
 
@@ -99,9 +100,14 @@ export async function activateConversationSharePrivacy(
 
   try {
     await api.setSharePrivacy!('PRIVATE_OVERLAY')
+    // Electron documents that Windows capture exclusion becomes effective on
+    // the next desktop composition. This short settle avoids treating the
+    // synchronous setter return as the runtime check.
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
     const after = await api.getSharePrivacy!()
-    if (after.mode !== 'PRIVATE_OVERLAY' || !after.protected) {
-      throw new Error('Electron 未确认 content protection 已启用。')
+    const verified = after.runtime_verified ?? (after.mode === 'PRIVATE_OVERLAY' && after.protected)
+    if (after.mode !== 'PRIVATE_OVERLAY' || !after.protected || !verified) {
+      throw new Error('Electron 未确认所有 Chengzhu 窗口的 content protection flag 已启用。')
     }
     return {
       requested,

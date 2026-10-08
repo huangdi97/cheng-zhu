@@ -15,6 +15,12 @@
 
 运行：python scripts/v2_conversation_human_eval.py labels.jsonl --out report.json --markdown-out report.md
 
+从本地 dogfood 数据先生成“待人工标注 seed”：
+
+python scripts/v2_conversation_label_seed.py --db <CHENGZHU_HOME>/data/product.db --out labels.seed.jsonl
+
+seed 中 reviewer、useful、actual_type、silence_correct、cognitive_load_delta 等标签字段都是空值；它只是 review queue，不是评测证据。
+
 没有有效 human label 时 status 必须是 INSUFFICIENT_EVIDENCE；不会生成 PASS。
 
 ## 3. guidance

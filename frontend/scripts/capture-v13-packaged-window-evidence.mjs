@@ -368,6 +368,78 @@ try {
   })
   await request(backendBase, 'POST', '/api/product/practice/' + practice.practice_id + '/finish', {})
 
+  // Seed a real Conversation Beta scenario through the packaged sidecar.
+  const conversationSpace = await request(backendBase, 'POST', '/api/product/conversation/spaces', {
+    title: 'Architecture Weekly',
+    profile: 'PROJECT_SYNC',
+    description: 'packaged Conversation UI evidence',
+    default_goal: '把 rollout 决策与未决 rollback owner 带到下一场',
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/spaces/' + conversationSpace.id + '/participants', {
+    display_name: 'Alex',
+    role: 'CTO',
+    explicit_priority: 'migration stability',
+    explicit_concern: 'rollback risk',
+    source_refs: [{ kind: 'USER_INPUT', excerpt: 'packaged evidence fixture', visibility: 'PRIVATE' }],
+  })
+
+  const endedConversation = await request(backendBase, 'POST', '/api/product/conversation/spaces/' + conversationSpace.id + '/sessions', {
+    title: 'Architecture Review #1',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + endedConversation.id + '/start', {})
+  const packagedDecision = await request(backendBase, 'POST', '/api/product/conversation/sessions/' + endedConversation.id + '/items', {
+    item_type: 'Decision',
+    title: '采用 staged rollout',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'reviewed packaged evidence', visibility: 'PRIVATE' }],
+    source_excerpt: 'reviewed packaged evidence',
+    epistemic_status: 'OBSERVED',
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/items/' + packagedDecision.id + '/review', {
+    action: 'CONFIRM', patch: {},
+  })
+  const packagedQuestion = await request(backendBase, 'POST', '/api/product/conversation/sessions/' + endedConversation.id + '/items', {
+    item_type: 'OpenQuestion',
+    title: '谁负责 rollback drill？',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'owner unresolved', visibility: 'PRIVATE' }],
+    source_excerpt: 'owner unresolved',
+    epistemic_status: 'OBSERVED',
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/items/' + packagedQuestion.id + '/review', {
+    action: 'CONFIRM', patch: {},
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + endedConversation.id + '/end', {})
+
+  const activeConversation = await request(backendBase, 'POST', '/api/product/conversation/spaces/' + conversationSpace.id + '/sessions', {
+    title: 'Architecture Review #2',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + activeConversation.id + '/start', {})
+
   // Launch 2: real packaged BrowserWindow, real routes and real UI interactions.
   const steps = [
     { kind: 'wait', selector: '[data-testid="action-home"]', timeout_ms: 30000 },
@@ -452,7 +524,26 @@ try {
     { kind: 'navigate', hash: '#/goals/' + goal.id + '/prepare', selector: '[data-testid="goal-room"]' },
     { kind: 'capture', name: '28-mobile-390-goal-prepare', note: '390px Goal Prepare' },
     { kind: 'navigate', hash: '#/history', selector: '[data-testid="history-page"]' },
-    { kind: 'capture', name: '29-history', note: 'Unified History' },
+    { kind: 'capture', name: '29-history', note: 'Unified Interview History' },
+
+    // Switch the same packaged renderer into Conversation Profile. These
+    // captures are backed by the real packaged sidecar and product.db.
+    { kind: 'storage', key: 'chengzhu-product-profile', value: 'conversation' },
+    { kind: 'storage', key: 'chengzhu-conversation-optin', value: '1' },
+    { kind: 'reload', selector: '[data-testid="conversation-history"]', timeout_ms: 30000 },
+    { kind: 'navigate', hash: '#/conversation', selector: '[data-testid="conversation-home"]' },
+    { kind: 'capture', name: '30-conversation-home', note: 'Conversation Beta Home from packaged BrowserWindow' },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id, selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '31-conversation-space', note: 'Conversation Space overview with reviewed continuity' },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id + '/prepare', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '32-conversation-prepare', note: 'Conversation Prepare and frozen-context preview' },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + conversationSpace.id + '/decisions', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '33-conversation-decisions', note: 'Conversation Decisions/Open Threads truth surface' },
+    { kind: 'navigate', hash: '#/conversation/live/' + activeConversation.id, selector: '[data-testid="conversation-live"]' },
+    { kind: 'wait', selector: '[data-testid="conversation-session-pulse"]', timeout_ms: 15000 },
+    { kind: 'capture', name: '34-conversation-live', note: 'Conversation Live with frozen Session Pulse' },
+    { kind: 'navigate', hash: '#/history', selector: '[data-testid="conversation-history"]' },
+    { kind: 'capture', name: '35-conversation-history', note: 'Profile-aware Conversation History in packaged BrowserWindow' },
   ]
 
   const second = await runPlan({ name: 'product-loop', userData, backendBase, nonce, token, steps })
@@ -463,10 +554,13 @@ try {
     backend_executable: BACKEND_EXE,
     goal_id: goal.id,
     practice_id: practice.practice_id,
+    conversation_space_id: conversationSpace.id,
+    conversation_ended_session_id: endedConversation.id,
+    conversation_active_session_id: activeConversation.id,
     entries: [...(first.entries || []), ...(second.entries || [])],
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (manifest.entries.length < 36) throw new Error('expected at least 36 packaged UI captures, got ' + manifest.entries.length)
+  if (manifest.entries.length < 42) throw new Error('expected at least 42 packaged UI captures including Conversation Beta, got ' + manifest.entries.length)
   console.log('done', OUT, 'captures=' + manifest.entries.length)
 } catch (error) {
   console.error(error)

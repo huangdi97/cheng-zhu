@@ -150,9 +150,28 @@ try {
   await page.waitForSelector('[data-testid="conversation-home"]', { timeout: 30000 })
 
   async function capture(name, note) {
+    // The packaged UI used to auto-open Interview Model Settings when no API
+    // key existed, obscuring every Conversation screenshot. Never call a
+    // masked screenshot "Conversation visual evidence" again.
+    const dialogs = page.locator('[role="dialog"][aria-modal="true"]:visible')
+    const dimmers = page.locator('div.fixed.inset-0.z-40:visible')
+    const dialogCount = await dialogs.count()
+    const dimmerCount = await dimmers.count()
+    if (dialogCount || dimmerCount) {
+      const blocked = path.join(OUT, name + '-BLOCKED.png')
+      await page.screenshot({ path: blocked, fullPage: true })
+      throw new Error(
+        'Conversation evidence blocked by overlay at ' + name +
+        ' (dialogs=' + dialogCount + ', dimmers=' + dimmerCount + '); ' +
+        'diagnostic screenshot: ' + blocked
+      )
+    }
     const file = path.join(OUT, name + '.png')
     await page.screenshot({ path: file, fullPage: true })
-    screenshots.push({ name, note, file: path.relative(ROOT, file), sha256: sha256(file), url: page.url() })
+    screenshots.push({
+      name, note, file: path.relative(ROOT, file), sha256: sha256(file),
+      url: page.url(), overlays_detected: 0,
+    })
   }
 
   await capture('01-conversation-home', 'real packaged Conversation Home')
@@ -192,6 +211,8 @@ try {
     space_id: space.id,
     pack_digest: context.pack_digest,
     started_status: started.session?.status,
+    surface_visibility: 'UNOBSTRUCTED_BY_MODAL',
+    human_visual_acceptance: false,
     history_contains_session: (history.items || []).some((x) => x.id === session.id),
     screenshots,
     source_sha: process.env.CHENGZHU_RELEASE_SOURCE_SHA || process.env.GITHUB_SHA || '',

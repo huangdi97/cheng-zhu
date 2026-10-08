@@ -431,7 +431,13 @@ def profile_playbook(profile_key: str) -> dict[str, Any]:
 def _profile_outcome_evidence(session: dict[str, Any], items: list[dict[str, Any]]) -> dict[str, Any]:
     """Reviewed output counts for this Profile, never a synthetic success score."""
     space = require_space(session["space_id"])
-    playbook = profile_playbook(space["profile"])
+    # Continue must use the Playbook frozen at Session start. Today's template
+    # cannot retroactively reclassify prior reviewed output.
+    frozen = _frozen_pack_payload(session).get("profile_playbook")
+    if isinstance(frozen, dict) and frozen.get("profile") == space["profile"]:
+        playbook = dict(frozen)
+    else:
+        playbook = profile_playbook(space["profile"])
     allowed = set(playbook["priority_truth_types"])
     counts: dict[str, int] = {kind: 0 for kind in playbook["priority_truth_types"]}
     reviewed = []

@@ -1619,12 +1619,14 @@ THREAD_CONFIRMED_REVIEW = {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
 
 
 def _thread_for_item(item: dict[str, Any]) -> Optional[dict[str, Any]]:
+    # Scan the item's own session, not an arbitrary latest-500 window across
+    # the entire Space. A long-lived Space must never re-create an older Thread
+    # just because 500 newer projections have been stored.
     for thread in store.select(
         "conversation_open_thread",
-        where="space_id = ?",
-        params=(item["space_id"],),
+        where="space_id = ? AND session_id = ?",
+        params=(item["space_id"], item["session_id"]),
         order="created_at DESC",
-        limit=500,
     ):
         for ref in thread.get("source_refs") or []:
             if str(ref.get("kind") or "") == "CONVERSATION_ITEM" and str(ref.get("id") or "") == item["id"]:
@@ -3092,11 +3094,21 @@ def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[
     if confirmed and policy != "TOMBSTONE":
         raise ValueError("这场包含已确认事项；删除前必须选择 TOMBSTONE 保留 provenance 标记")
     tombstones = 0
+    # One bounded-to-session read, instead of an O(items × Space threads)
+    # provenance scan for every confirmed item being deleted.
+    confirmed_ids = {item["id"] for item in confirmed}
     projected_thread_ids = [
         thread["id"]
-        for item in confirmed
-        for thread in [_thread_for_item(item)]
-        if thread
+        for thread in store.select(
+            "conversation_open_thread",
+            where="space_id = ? AND session_id = ?",
+            params=(session["space_id"], session_id),
+        )
+        if any(
+            str(ref.get("kind") or "") == "CONVERSATION_ITEM"
+            and str(ref.get("id") or "") in confirmed_ids
+            for ref in (thread.get("source_refs") or [])
+        )
     ]
     if confirmed:
         ts = store.now()

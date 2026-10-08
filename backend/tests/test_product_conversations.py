@@ -10,7 +10,7 @@ from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 5
+    assert store.schema_version() == 6
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -32,10 +32,12 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
     try:
         session_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_session)")}
         participant_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_participant)")}
+        item_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_item)")}
     finally:
         conn.close()
     assert "policy_json" in session_cols
     assert "counterparty_state_json" in participant_cols
+    assert "time_semantics_json" in item_cols
 
 
 
@@ -1086,6 +1088,77 @@ def test_deadline_requires_provenance(product_env):
     assert deadline["type"] == "Deadline"
     assert deadline["source_refs"]
 
+
+
+
+
+def test_deadline_time_semantics_stay_review_only_until_datetime_and_timezone_are_explicit(product_env):
+    space = conversations.create_space("Temporal Truth", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    deadline = conversations.add_item(
+        session["id"],
+        item_type="Deadline",
+        title="下周五前上线",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "下周五前上线"}],
+        time_semantics={
+            "original_text": "下周五前上线",
+            "normalized_datetime": "",
+            "timezone": "",
+            "ambiguity": "AMBIGUOUS",
+        },
+    )
+    assert deadline["time_semantics"]["original_text"] == "下周五前上线"
+    assert deadline["time_semantics"]["ambiguity"] == "AMBIGUOUS"
+    assert deadline["state"] == "PROPOSED"
+    assert deadline["review_status"] == "AI_EXTRACTED"
+
+    with pytest.raises(ValueError, match="时间仍有歧义"):
+        conversations.review_item(deadline["id"], "CONFIRM")
+
+    confirmed = conversations.review_item(deadline["id"], "CONFIRM", {
+        "due_at": "2026-10-16T18:00",
+        "time_semantics": {
+            "original_text": "下周五前上线",
+            "normalized_datetime": "2026-10-16T18:00",
+            "timezone": "Asia/Shanghai",
+            "ambiguity": "EXACT",
+        },
+    })
+    assert confirmed["state"] == "COMMITTED"
+    assert confirmed["review_status"] == "USER_CONFIRMED"
+    assert confirmed["due_at"] == "2026-10-16T18:00"
+    assert confirmed["time_semantics"] == {
+        "original_text": "下周五前上线",
+        "normalized_datetime": "2026-10-16T18:00",
+        "timezone": "Asia/Shanghai",
+        "ambiguity": "EXACT",
+    }
+
+
+def test_transcript_deadline_candidate_preserves_original_time_text_as_ambiguous(product_env):
+    space = conversations.create_space("Transcript Temporal", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], capture_mode="TRANSCRIPT", consent_ack=True)
+    conversations.start_session(session["id"])
+    store.insert("conversation_transcript_segment", {
+        "id": "cts_deadline_time",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我们周五前完成 rollout。",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    candidates = conversations.extract_transcript_candidates(session["id"])
+    deadline = next(item for item in candidates if item["type"] == "Deadline")
+    assert deadline["time_semantics"]["original_text"] == "我们周五前完成 rollout"
+    assert deadline["time_semantics"]["normalized_datetime"] == ""
+    assert deadline["time_semantics"]["timezone"] == ""
+    assert deadline["time_semantics"]["ambiguity"] == "AMBIGUOUS"
+    with pytest.raises(ValueError, match="时间仍有歧义"):
+        conversations.review_item(deadline["id"], "CONFIRM")
 
 
 def test_session_delete_removes_projected_open_thread_but_keeps_tombstone(product_env):
@@ -2317,7 +2390,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 5
+    assert diag["schema_version"] == 6
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

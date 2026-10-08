@@ -2426,9 +2426,12 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     }
     if any(audience_context.values()):
         state["audience_context"] = {k: v for k, v in audience_context.items() if v}
-    if str(body.get("audience_participant_id") or "").strip():
+    if "audience_participant_id" in body:
+        # API model_dump always carries this key. An explicit empty value means
+        # "do not bind this guidance to a known participant" and must clear a
+        # prior target instead of leaking it across later turns.
         state["audience_participant_id"] = str(body.get("audience_participant_id") or "").strip()[:160]
-    if current_topic or any(audience_context.values()) or state.get("audience_participant_id"):
+    if current_topic or any(audience_context.values()) or "audience_participant_id" in body:
         store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
     source_refs = list(body.get("source_refs") or [])

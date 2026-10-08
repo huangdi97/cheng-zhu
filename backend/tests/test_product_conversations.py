@@ -2598,3 +2598,88 @@ def test_one_hundred_session_state_reliability(product_env):
     pack = conversations.start_session(latest["id"])["pack"]
     ids = {x["id"] for x in pack["payload"]["confirmed_items"]}
     assert len(ids) == 5
+
+
+def test_global_conversation_search_returns_grounded_space_session_and_source_context(product_env):
+    space = conversations.create_space("Architecture", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], title="Review #42", consent_ack=True)
+    conversations.start_session(session["id"])
+    decision = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="offline migration 采用 v2",
+        detail="Q4 benchmark 已验证",
+        source_refs=[{"kind": "DOCUMENT", "id": "bench", "visibility": "PRIVATE"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    commitment = conversations.add_item(
+        session["id"],
+        item_type="Commitment",
+        title="补 rollout plan",
+        owner_id="me",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "我来补 rollout plan"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(commitment["id"], "CONFIRM", {"owner_id": "me"})
+
+    found = conversations.search_items(query="offline", item_type="Decision")
+    assert len(found) == 1
+    row = found[0]
+    assert row["id"] == decision["id"]
+    assert row["space_title"] == "Architecture"
+    assert row["space_profile"] == "DESIGN_REVIEW"
+    assert row["session_title"] == "Review #42"
+    assert row["source_refs"][0]["kind"] == "DOCUMENT"
+    assert row["review_status"] == "USER_CONFIRMED"
+
+    commitments = conversations.search_items(item_type="Commitment")
+    assert [x["id"] for x in commitments] == [commitment["id"]]
+
+    assert conversations.search_items(query="does-not-exist", item_type="Decision") == []
+
+
+def test_session_export_is_categorized_local_and_scoped_to_current_session(product_env):
+    space = conversations.create_space("Export", "PROJECT_SYNC")
+    first = conversations.create_session(space["id"], title="First", consent_ack=True)
+    conversations.start_session(first["id"])
+    item = conversations.add_item(
+        first["id"],
+        item_type="Decision",
+        title="采用方案 A",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确 A"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    store.insert("conversation_transcript_segment", {
+        "id": store.new_id("cts_"),
+        "space_id": space["id"],
+        "session_id": first["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "这是一段本场转写",
+        "provider": "test",
+        "source": "TEST",
+        "is_final": True,
+        "created_at": store.now(),
+    })
+    conversations.end_session(first["id"])
+
+    second = conversations.create_session(space["id"], title="Second", consent_ack=True)
+    conversations.start_session(second["id"])
+    conversations.add_item(
+        second["id"],
+        item_type="OpenQuestion",
+        title="第二场的问题不应混入第一场导出",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "second"}],
+    )
+
+    exported = conversations.export_session(first["id"])
+    assert exported["kind"] == "CONVERSATION_SESSION"
+    assert exported["export_manifest"]["privacy"] == "LOCAL_EXPORT"
+    assert exported["export_manifest"]["contains_external_secrets"] is False
+    assert exported["session"]["id"] == first["id"]
+    assert exported["space"]["id"] == space["id"]
+    assert [x["id"] for x in exported["confirmed_items"]] == [item["id"]]
+    assert [x["text"] for x in exported["transcript"]] == ["这是一段本场转写"]
+    assert all(x["session_id"] == first["id"] for x in exported["guidance"])
+    assert "第二场的问题不应混入第一场导出" not in str(exported)

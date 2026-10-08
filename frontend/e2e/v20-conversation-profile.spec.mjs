@@ -951,7 +951,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('查找长期对话事实')).toBeVisible()
     await expect(page.getByText('offline migration 采用 v2')).toBeVisible()
     await expect(page.getByText(/PDIG · Android Architecture · Architecture Review/)).toBeVisible()
-    await expect(page.getByText(/来源：DOCUMENT/)).toBeVisible()
+    await expect(page.getByText(/来源：TRANSCRIPT_SEGMENT/)).toBeVisible()
     await page.getByRole('button', { name: /offline migration 采用 v2/ }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/spaces/${SPACE.id}/decisions`))
   })

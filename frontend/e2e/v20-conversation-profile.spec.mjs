@@ -994,6 +994,68 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('转写未启动')
   })
 
+  test('HUMAN_ALLOWED exposes an explicit session-scoped Human Coach link with minimum default permissions', async ({ context, page }) => {
+    const base = mocks()
+    let createBody = null
+    const humanSession = {
+      ...SESSION,
+      policy: {
+        ...SESSION.policy,
+        human_assistance: 'HUMAN_ALLOWED',
+        participant_transparency_plan: 'USER_WILL_NOTIFY_VERBALLY',
+      },
+    }
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') return humanSession
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') {
+          const original = await base(pathname, method, request)
+          return { ...original, policy: humanSession.policy }
+        }
+        if (pathname === '/api/coach/sessions' && method === 'GET') {
+          return { sessions: [], public_relay: 'BLOCKED-EXTERNAL' }
+        }
+        if (pathname === '/api/coach/sessions' && method === 'POST') {
+          createBody = request.postDataJSON()
+          return {
+            id: 'coach-conversation',
+            urls: {
+              local: 'http://127.0.0.1:8000/coach#t=one-time-token',
+              lan: '',
+              public: '',
+            },
+            public_relay: 'BLOCKED-EXTERNAL',
+          }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect(page.getByRole('heading', { name: '人工教练（Conversation）' })).toBeVisible()
+    const panel = page.getByTestId('coach-panel')
+    await expect(panel.getByText(/链接只绑定当前 Conversation Session/)).toBeVisible()
+    await expect(panel.getByLabel('冻结 Session Context')).toBeChecked()
+    await expect(panel.getByLabel('本场转写')).not.toBeChecked()
+    await expect(panel.getByLabel('当前 AI Guidance')).not.toBeChecked()
+
+    await panel.getByRole('button', { name: '生成教练链接' }).click()
+    await expect(panel.getByText('链接只显示这一次（含一次性令牌）：')).toBeVisible()
+    expect(createBody).toMatchObject({
+      session_kind: 'conversation',
+      target_session_id: SESSION.id,
+      permissions: {
+        transcript: false,
+        ai_cue: false,
+        session_context: true,
+      },
+    })
+  })
+
+
   test('PRIVATE_OVERLAY verifies Electron protection before start and restores baseline after end', async ({ context, page }) => {
     const base = mocks()
     let startBody = null

@@ -58,3 +58,39 @@ def test_route_ordering_and_misc_endpoints(product_env):
     assert layers["items"]["answer_language"]["origin"] in ("GLOBAL", "SYSTEM")
     assert c.put("/api/product/settings/layers", json={"scope": "GOAL", "scope_id": "g", "key": "api_key",
                                                        "value": "x"}).status_code == 400
+
+
+def test_conversation_participant_and_guidance_http_contracts_do_not_cross_fields(product_env):
+    c = _client()
+    space = c.post("/api/product/conversation/spaces", json={
+        "title": "Packaged Evidence",
+        "profile": "PROJECT_SYNC",
+    }).json()
+    participant = c.post(f"/api/product/conversation/spaces/{space['id']}/participants", json={
+        "display_name": "Alex",
+        "role": "CTO",
+        "explicit_priority": "稳定性",
+        "explicit_concern": "回滚风险",
+        "relationship_context": "客户技术负责人",
+    })
+    assert participant.status_code == 200
+    pid = participant.json()["id"]
+
+    session = c.post(f"/api/product/conversation/spaces/{space['id']}/sessions", json={
+        "title": "Review",
+        "capture_mode": "NOTES_ONLY",
+        "processing_mode": "LOCAL",
+        "consent_ack": True,
+    }).json()
+    started = c.post(f"/api/product/conversation/sessions/{session['id']}/start")
+    assert started.status_code == 200
+
+    guidance = c.post(f"/api/product/conversation/sessions/{session['id']}/guidance/evaluate", json={
+        "current_topic": "迁移稳定性",
+        "direct_question": "现在主要看什么？",
+        "audience_participant_id": pid,
+        "audience_role": "CTO",
+        "audience_priority": "稳定性",
+        "audience_concern": "回滚风险",
+    })
+    assert guidance.status_code == 200

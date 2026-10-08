@@ -39,10 +39,13 @@ export function captureViewState(
  * The Guidance history is newest-first. A later SILENT/suppressed event must
  * clear the prior card instead of resurrecting an older SHOWN event.
  */
-export function latestVisibleGuidance<T extends { status: string; user_action: string }>(
+export function latestVisibleGuidance<T extends { status: string; user_action: string; kind?: string }>(
   events: readonly T[],
 ): T | null {
-  const newest = events[0]
+  // Human Coach advice has its own session-scoped realtime surface. It is also
+  // retained in guidance_history for audit, but must never masquerade as the
+  // AI primary card or clear an existing AI card.
+  const newest = events.find((event) => event.kind !== 'HUMAN_COACH')
   if (!newest || newest.status !== 'SHOWN') return null
   return ['NONE', 'EXPANDED', 'PINNED'].includes(newest.user_action) ? newest : null
 }

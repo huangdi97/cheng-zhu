@@ -456,6 +456,34 @@ export interface ConversationCaptureStatus {
   paused?: boolean
 }
 
+export interface ConversationSearchItem extends ConversationItem {
+  space_title: string
+  space_profile: ConversationProfile
+  session_title: string
+  session_started_at: number | null
+  session_ended_at: number | null
+}
+
+export interface ConversationSessionExport {
+  kind: 'CONVERSATION_SESSION'
+  contract: string
+  export_manifest: {
+    categories: string[]
+    privacy: string
+    contains_external_secrets: boolean
+  }
+  space: { id: string; title: string; profile: ConversationProfile }
+  session: ConversationSession
+  transcript: ConversationTranscriptSegment[]
+  quick_notes: Array<{ id: string; title: string; content: string; kind: 'USER_NOTE' }>
+  confirmed_items: ConversationItem[]
+  unconfirmed_candidates: ConversationItem[]
+  guidance: ConversationGuidance[]
+  draft_actions: ConversationDraftAction[]
+  source_manifest: Array<Record<string, unknown>>
+  session_packs: Array<Record<string, unknown>>
+}
+
 export interface ConversationHistoryItem extends ConversationSession {
   space_title: string
   space_profile: ConversationProfile

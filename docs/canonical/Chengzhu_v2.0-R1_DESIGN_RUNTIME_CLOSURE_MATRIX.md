@@ -620,7 +620,17 @@ REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-直到完成独立 Windows Conversation Beta packaged runtime evidence、clean-install replay、artifact hash、download-back 与 release provenance。
+PR #27 已实现独立 Conversation packaged-runtime gate，但在该 PR 的 CI + Release Windows job 最终通过前，`PACKAGED_CONVERSATION_EVIDENCE_PROVEN` 仍是 PENDING。
+
+PR #27 gate 直接覆盖：
+- built sidecar 中的 product.db latest schema；
+- Space → Session → Preflight → frozen Pack → reviewed Decision/Open Thread → Continue / History / Diagnostics；
+- packaged sidecar restart 后 Conversation persistence；
+- real packaged BrowserWindow 的 Conversation Home / Space / Prepare / Decisions / Live / History；
+- BrowserWindow 被 hosted runner 阻塞时的 packaged sidecar + packaged frontend-dist fallback；
+- 后续 clean-install / installed-layout / download-back 对同一 `packaged_smoke.py` 的复用。
+
+即使 PR #27 全绿并合并，也仍需真正发布 verified v2 artifact + release provenance 才能声明 `V2_PRODUCTIZED_RELEASE=TRUE`。
 
 ---
 

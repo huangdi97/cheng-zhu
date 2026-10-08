@@ -126,6 +126,28 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      - name: Validate Conversation Beta packaged UI evidence contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $manifestPath = "artifacts/release-evidence/v$version/manifest.json"
+          if (-not (Test-Path $manifestPath)) { throw "missing packaged UI evidence manifest: $manifestPath" }
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          if (-not $manifest.conversation_beta) { throw "packaged UI evidence missing conversation_beta block" }
+          foreach ($field in @('space_id','prior_session_id','live_session_id')) {
+            if (-not $manifest.conversation_beta.$field) { throw "conversation_beta missing $field" }
+          }
+          if ($manifest.conversation_beta.evidence_boundary -ne 'PACKAGED_BETA_ENGINEERING_EVIDENCE_NOT_REAL_USER_VALIDATION') {
+            throw "Conversation Beta evidence boundary drifted"
+          }
+          $entries = @($manifest.entries)
+          $conversationEntries = @($entries | Where-Object { $_.name -match 'conversation' })
+          if ($conversationEntries.Count -lt 9) {
+            throw "expected >= 9 Conversation packaged UI captures, got $($conversationEntries.Count)"
+          }
+          Write-Host "Conversation Beta packaged UI evidence OK: $($conversationEntries.Count) captures"
+
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4
         with:

@@ -377,6 +377,143 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
   if (overflow) throw new Error('390px Goal Prepare has horizontal overflow')
 
+  // Conversation Beta fallback evidence. This still uses the packaged sidecar
+  // and packaged production frontend; only the Electron BrowserWindow itself
+  // is unavailable on this hosted runner.
+  const convSpace = await request(base, 'POST', '/api/product/conversation/spaces', {
+    title: 'Release Architecture Sync',
+    profile: 'PROJECT_SYNC',
+    description: 'Packaged Conversation Beta fallback evidence',
+    default_goal: 'Decide the migration rollout and keep provenance across sessions.',
+    default_mode: 'BALANCED',
+  })
+  await request(base, 'POST', '/api/product/conversation/spaces/' + convSpace.id + '/participants', {
+    display_name: 'Alex',
+    role: 'CTO',
+    organization: 'Demo Client',
+    explicit_priority: 'migration stability',
+    explicit_concern: 'rollback risk',
+    stated_position: 'start with a canary',
+    decision_authority: 'architecture approval',
+    relationship_context: 'client technical lead',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'Alex explicitly prioritizes rollback safety.', visibility: 'PRIVATE' }],
+  })
+
+  const prior = await request(base, 'POST', '/api/product/conversation/spaces/' + convSpace.id + '/sessions', {
+    title: 'Architecture Review · Prior',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  await request(base, 'POST', '/api/product/conversation/sessions/' + prior.id + '/start', {})
+  const decision = await request(base, 'POST', '/api/product/conversation/sessions/' + prior.id + '/items', {
+    item_type: 'Decision',
+    title: 'Use canary rollout for offline migration v2',
+    state: 'PROPOSED',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'We explicitly decided on canary rollout.', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(base, 'POST', '/api/product/conversation/items/' + decision.id + '/review', { action: 'CONFIRM', patch: {} })
+  const question = await request(base, 'POST', '/api/product/conversation/sessions/' + prior.id + '/items', {
+    item_type: 'OpenQuestion',
+    title: 'Who owns the rollback drill?',
+    state: 'PROPOSED',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'Rollback owner remains unresolved.', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(base, 'POST', '/api/product/conversation/items/' + question.id + '/review', { action: 'CONFIRM', patch: {} })
+  await request(base, 'POST', '/api/product/conversation/sessions/' + prior.id + '/end', {})
+
+  const liveSession = await request(base, 'POST', '/api/product/conversation/spaces/' + convSpace.id + '/sessions', {
+    title: 'Architecture Review · Current',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  const convPreflight = await request(base, 'GET', '/api/product/conversation/sessions/' + liveSession.id + '/preflight')
+  if ((convPreflight.blockers || []).length) throw new Error('Conversation fallback preflight blocked: ' + JSON.stringify(convPreflight.blockers))
+  await request(base, 'POST', '/api/product/conversation/sessions/' + liveSession.id + '/start', {})
+  await request(base, 'POST', '/api/product/conversation/sessions/' + liveSession.id + '/guidance/evaluate', {
+    current_topic: 'rollback ownership',
+    direct_question: 'Why did we choose canary rollout?',
+    answer_cue: 'Answer directly: the reviewed prior Decision chose canary rollout; then clarify the unresolved rollback owner.',
+    source_refs: [{ kind: 'CONVERSATION_ITEM', id: decision.id, visibility: 'PRIVATE' }],
+    audience_role: 'CTO',
+    audience_priority: 'migration stability',
+    audience_concern: 'rollback risk',
+    decision_authority: 'architecture approval',
+    relationship_context: 'client technical lead',
+  })
+
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.evaluate(() => {
+    localStorage.setItem('ia-color-scheme', 'vscode-light-plus')
+    localStorage.setItem('chengzhu-product-profile', 'conversation')
+    localStorage.setItem('chengzhu-conversation-optin', '1')
+  })
+  await go(page, '#/conversation', '[data-testid="conversation-home"]')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByTestId('conversation-home').waitFor({ timeout: 30000 })
+  await shot(page, '30-conversation-home-web-fallback', 'Conversation Home from packaged production bundle')
+
+  const conversationRoutes = [
+    ['#/conversation/spaces', '[data-testid="conversation-spaces"]', '31-conversation-spaces-web-fallback', 'Conversation Spaces'],
+    ['#/conversation/spaces/' + convSpace.id, '[data-testid="conversation-space"]', '32-conversation-overview-web-fallback', 'Conversation Space overview'],
+    ['#/conversation/spaces/' + convSpace.id + '/prepare', '[data-testid="conversation-space"]', '33-conversation-prepare-web-fallback', 'Conversation Prepare'],
+    ['#/conversation/spaces/' + convSpace.id + '/decisions', '[data-testid="conversation-space"]', '34-conversation-decisions-web-fallback', 'Conversation Decision timeline'],
+  ]
+  for (const [hash, selector, name, noteText] of conversationRoutes) {
+    await go(page, hash, selector)
+    await shot(page, name, noteText)
+  }
+
+  await go(page, '#/conversation/spaces/' + convSpace.id + '/sessions', '[data-testid="conversation-space"]')
+  await page.locator('[data-testid="conversation-continue-' + prior.id + '"] button').click()
+  await page.getByTestId('conversation-continue-panel').waitFor({ timeout: 10000 })
+  await shot(page, '35-conversation-continue-web-fallback', 'Conversation Continue')
+
+  await go(page, '#/conversation/live/' + liveSession.id, '[data-testid="conversation-live"]')
+  await page.getByTestId('conversation-session-pulse').waitFor({ timeout: 10000 })
+  await shot(page, '36-conversation-live-web-fallback', 'Conversation Guidance-first Live + frozen Session Pulse')
+
+  await go(page, '#/history', '[data-testid="conversation-history"]')
+  await shot(page, '37-conversation-history-web-fallback', 'Profile-aware Conversation History')
+
+  await go(page, '#/settings/diagnostics', '[data-testid="settings-page"]')
+  await shot(page, '38-conversation-diagnostics-web-fallback', 'Conversation subsystem diagnostics')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await go(page, '#/conversation/spaces/' + convSpace.id + '/prepare', '[data-testid="conversation-space"]')
+  await shot(page, '39-conversation-390-prepare-web-fallback', '390px Conversation Prepare')
+  const conversationOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+  if (conversationOverflow) throw new Error('390px Conversation Prepare has horizontal overflow')
+
+  await request(base, 'POST', '/api/product/conversation/sessions/' + liveSession.id + '/end', {})
+  const convDiagnostics = await request(base, 'GET', '/api/product/conversation/diagnostics')
+  if (convDiagnostics.evidence?.real_conversation_user_evidence !== 'REAL_CONVERSATION_USER_EVIDENCE_PENDING') {
+    throw new Error('Conversation fallback evidence boundary drifted: ' + JSON.stringify(convDiagnostics.evidence))
+  }
+
   const manifest = {
     captured_at: new Date().toISOString(),
     evidence_type: 'PACKAGED_FRONTEND_DIST_VIA_PACKAGED_SIDECAR_HEADLESS_CHROMIUM',
@@ -385,10 +522,16 @@ try {
     frontend_dist: FRONTEND_DIST,
     goal_id: goal.id,
     practice_id: practice.practice_id,
+    conversation_beta: {
+      space_id: convSpace.id,
+      prior_session_id: prior.id,
+      live_session_id: liveSession.id,
+      evidence_boundary: 'PACKAGED_BETA_ENGINEERING_EVIDENCE_NOT_REAL_USER_VALIDATION',
+    },
     entries,
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (entries.length < 29) throw new Error('expected at least 29 packaged fallback captures, got ' + entries.length)
+  if (entries.length < 39) throw new Error('expected at least 39 packaged fallback captures including Conversation Beta, got ' + entries.length)
   console.log('packaged web fallback evidence complete captures=' + entries.length)
 } catch (error) {
   console.error(error)

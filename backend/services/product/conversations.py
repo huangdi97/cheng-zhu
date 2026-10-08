@@ -690,6 +690,12 @@ def delete_space(space_id: str, *, confirm: bool = False) -> bool:
     require_space(space_id)
     if not confirm:
         raise ValueError("删除整个 Conversation Space 会彻底擦除其 Session、Items、Packs、Drafts 与 provenance tombstones；请明确确认")
+    try:
+        from services import coach as human_coach
+        for session in list_sessions(space_id):
+            human_coach.registry.revoke_for_target(session["id"], session_kind="conversation")
+    except Exception:
+        pass
     return store.delete("conversation_space", space_id)
 
 
@@ -2311,6 +2317,11 @@ def end_session(session_id: str) -> dict[str, Any]:
         # available. It is idempotent and never upgrades truth state.
         extract_transcript_candidates(session_id)
         store.update("conversation_session", session_id, {"status": "ENDED", "ended_at": ts, "updated_at": ts})
+    try:
+        from services import coach as human_coach
+        human_coach.registry.revoke_for_target(session_id, session_kind="conversation")
+    except Exception:
+        pass
     return continue_summary(session_id)
 
 
@@ -3457,6 +3468,11 @@ def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[
             conn.execute("DELETE FROM conversation_session WHERE id = ?", (session_id,))
     else:
         store.delete("conversation_session", session_id)
+    try:
+        from services import coach as human_coach
+        human_coach.registry.revoke_for_target(session_id, session_kind="conversation")
+    except Exception:
+        pass
     return {
         "deleted": True,
         "session_id": session_id,

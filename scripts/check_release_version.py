@@ -27,8 +27,12 @@ def sidecar_version(path: Path) -> str:
 def main() -> int:
     frontend = str(read_json(ROOT / "frontend" / "package.json").get("version") or "")
     desktop = str(read_json(ROOT / "desktop" / "package.json").get("version") or "")
-    frontend_lock = str(read_json(ROOT / "frontend" / "package-lock.json").get("version") or "")
-    desktop_lock = str(read_json(ROOT / "desktop" / "package-lock.json").get("version") or "")
+    frontend_lock_json = read_json(ROOT / "frontend" / "package-lock.json")
+    desktop_lock_json = read_json(ROOT / "desktop" / "package-lock.json")
+    frontend_lock = str(frontend_lock_json.get("version") or "")
+    desktop_lock = str(desktop_lock_json.get("version") or "")
+    frontend_lock_root = str((frontend_lock_json.get("packages") or {}).get("", {}).get("version") or "")
+    desktop_lock_root = str((desktop_lock_json.get("packages") or {}).get("", {}).get("version") or "")
     backend = sidecar_version(ROOT / "backend" / "sidecar.py")
     errors: list[str] = []
 
@@ -36,7 +40,9 @@ def main() -> int:
         "frontend": frontend,
         "desktop": desktop,
         "frontend_lock": frontend_lock,
+        "frontend_lock_root": frontend_lock_root,
         "desktop_lock": desktop_lock,
+        "desktop_lock_root": desktop_lock_root,
         "backend_sidecar": backend,
     }
 
@@ -45,6 +51,11 @@ def main() -> int:
             errors.append(f"{name} version is empty")
 
     expected = desktop
+    semver = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$")
+    if expected and not semver.fullmatch(expected):
+        errors.append(f"desktop version {expected!r} is not a supported SemVer release version")
+    is_prerelease = bool(expected and "-" in expected)
+
     for name, version in versions.items():
         if expected and version and version != expected:
             errors.append(f"{name} version {version!r} != desktop version {expected!r}")
@@ -59,22 +70,28 @@ def main() -> int:
     # tag for newer source than the installer/portable binaries actually used.
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     publisher_workflow = (
-        ROOT / ".github" / "workflows" / "publish-v1.4.2-on-green-main.yml"
+        ROOT / ".github" / "workflows" / "publish-current-version-on-green-main.yml"
     ).read_text(encoding="utf-8")
     for token in (
         "source_sha:",
         "CHENGZHU_RELEASE_SOURCE_SHA",
         "--target $sourceSha",
         "tag $tag points to $tagSha but binaries were built from $sourceSha",
+        "$version.Contains('-')",
+        "--prerelease",
+        "--latest=false",
+        "release channel mismatch",
+        "prerelease $tag incorrectly replaced the stable Latest release",
     ):
         if token not in release_workflow:
             errors.append(f"release workflow missing provenance invariant: {token}")
     for token in (
         "github.event.workflow_run.head_sha",
         'gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"',
+        "RELEASE_NOTES_v$version.md",
     ):
         if token not in publisher_workflow:
-            errors.append(f"v1.4.2 publisher missing exact-SHA invariant: {token}")
+            errors.append(f"current-version publisher missing exact-SHA invariant: {token}")
 
     if errors:
         print(json.dumps({"ok": False, "versions": versions, "errors": errors}, ensure_ascii=False, indent=2))
@@ -83,6 +100,7 @@ def main() -> int:
     print(json.dumps({
         "ok": True,
         "version": expected,
+        "release_channel": "PRERELEASE" if is_prerelease else "STABLE",
         "versions": versions,
         "release_notes": str(notes.relative_to(ROOT)),
     }, ensure_ascii=False))

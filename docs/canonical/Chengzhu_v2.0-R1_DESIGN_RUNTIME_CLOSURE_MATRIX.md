@@ -28,12 +28,14 @@ REAL_USER_VALIDATED
 V2_DESIGN_COMPLETE = TRUE
 V2_CONTRACT_COMPLETE = TRUE
 V2_RUNTIME_AVAILABLE = TRUE
+V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
+V2_BETA_PRERELEASE_CANDIDATE = TRUE
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path；不等于 Windows v2 stable release，也不等于真实用户价值已经验证。
+`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前主线已经进一步具备 Windows packaged Conversation Beta engineering evidence 与独立 screenshot evidence，因此允许进入 `v2.0.0-beta.1` prerelease candidate；这仍不等于 stable v2，也不等于真实用户价值已经验证。
 
 ---
 
@@ -683,15 +685,27 @@ CODE_CLOSURE_CI_GATE = PASS
 
 PR #19 已合并到 main。post-merge 对象闭环由 PR #24 承接；PR #24 只包含 Open Thread Resolve / derived Conversation State / Expression Plan truth-boundary 及其测试/文档增量。它必须以自己的 final-head CI 作为合并证据。
 
-即使最终 PR 全绿并合并，也仍然：
+PR #19 之后，main 已继续补齐：
+
+- Conversation Beta packaged smoke；
+- Windows packaged Conversation UI evidence；
+- 独立 Conversation screenshot evidence；
+- clean-install / installed-layout release gate；
+- human-label evaluation tooling；
+- schema v7 Manual Screen Context；
+- long-lived Open Thread provenance correctness。
+
+因此当前发布层允许升级为：
 
 ```text
+V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
+V2_BETA_PRERELEASE_CANDIDATE = TRUE
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-直到完成独立 Windows Conversation Beta packaged runtime evidence、clean-install replay、artifact hash、download-back 与 release provenance。
+`v2.0.0-beta.1` 必须通过与 stable 相同的 exact-SHA / installer / portable / SHA256 / download-back / provenance gate，并以 GitHub `prerelease=true, latest=false` 发布。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
 
 ---
 
@@ -732,4 +746,4 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - README 不夸大 release / validation；
 - CI 全绿。
 
-这之后的下一阶段是 **Conversation Beta productization / dogfood / real-user evidence**，不是继续靠文档把成熟度写高。
+这之后的下一阶段已经从“是否有 packaged evidence”推进为 **Conversation Beta public prerelease / dogfood / real-user evidence**。packaged evidence 与 human-eval tooling 已进入 main；剩余成熟度只能由公开 prerelease provenance、真实 dogfood 和真实用户研究继续推进，不能继续靠文档把状态写高。

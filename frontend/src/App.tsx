@@ -21,6 +21,7 @@ import { useT, useUiLanguage, type StringKey } from '@/lib/i18n'
 import WorkbenchPopover from '@/components/WorkbenchPopover'
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard'
 import SettingsDrawer from '@/components/SettingsDrawer'
+import { shouldPromptForInterviewModel } from '@/lib/modelSetupNudge'
 import SessionSettingsPopover from '@/components/SessionSettingsPopover'
 import KnowledgeButton from '@/components/kb/KnowledgeButton'
 import KnowledgeDrawer from '@/components/kb/KnowledgeDrawer'
@@ -233,12 +234,14 @@ export default function App() {
 
   const hasGuided = useRef(false)
   useEffect(() => {
-    if (!config || hasGuided.current) return
-    if (!config.api_key_set) {
+    if (hasGuided.current) return
+    // Conversation Beta can run on local deterministic logic without any LLM
+    // API key. Never block its deep-linked pages with the Interview model drawer.
+    if (shouldPromptForInterviewModel(config, productProfile, route.name)) {
       hasGuided.current = true
       openModelsDrawer()
     }
-  }, [config, openModelsDrawer])
+  }, [config, productProfile, route.name, openModelsDrawer])
 
   // Global shortcuts: Ctrl+K command palette · Ctrl+, settings · Ctrl+P pin (practice/live) ·
   // Ctrl+Shift+J transcript panel (live).

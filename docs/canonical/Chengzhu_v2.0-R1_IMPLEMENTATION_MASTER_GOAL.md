@@ -46,10 +46,13 @@ team workspace clone
 ## 1.2 RUNTIME_AVAILABLE
 仓库里存在真实 route / UI / API / persistence / test 路径，可以运行。
 
-## 1.3 PRODUCTIZED_RELEASE
-经过正式 packaged release、runtime evidence、download-back、release provenance gate，对公众作为稳定产品发布。
+## 1.3 BETA_PRERELEASE
+经过 packaged runtime evidence、installer / portable、download-back 与 release provenance gate，以 GitHub Prerelease 公开，可供真实 dogfood；不得成为 Stable Latest。
 
-## 1.4 REAL_USER_VALIDATED
+## 1.4 PRODUCTIZED_RELEASE
+经过稳定版 packaged release、runtime evidence、download-back、release provenance gate，对公众作为 stable 产品发布。
+
+## 1.5 REAL_USER_VALIDATED
 真实用户在真实对话中证明：
 - Recall 有用；
 - Opportunity precision 足够高；
@@ -107,6 +110,8 @@ PR #19 负责 canonical closure，不得重新定义成第三套产品。
 V2_DESIGN_COMPLETE = TRUE
 V2_CONTRACT_COMPLETE = TRUE
 V2_RUNTIME_AVAILABLE = TRUE
+V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
+V2_BETA_PRERELEASE_CANDIDATE = TRUE
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
@@ -151,6 +156,7 @@ stable productized release
 
 每个模板只有在专属 E2E / policy / real-session evaluation 完成后，才能提高状态等级。
 
+---
 
 ## 3.3 Profile Playbook Gate
 
@@ -183,7 +189,6 @@ Continue 只统计 review 后的 priority truth outputs；禁止生成：
 
 `runtime specialization exists != specialized behavior validated`。
 
----
 
 # 4. 必须存在的用户主循环
 
@@ -714,6 +719,38 @@ PR 合并后至少要有：
 - export/delete；
 - privacy fail-closed evidence。
 
+## Public Conversation Beta Prerelease Gate
+
+`v2.0.0-beta.1` 只允许在以下条件同时成立时发布：
+
+- exact green main SHA；
+- Windows installer + portable；
+- Conversation packaged runtime UI evidence；
+- independent Conversation screenshot evidence；
+- clean installer replay；
+- installed-layout smoke；
+- SHA256；
+- GitHub draft download-back；
+- downloaded installer replay；
+- tag/source provenance；
+- `prerelease=true`；
+- `latest=false`；
+- GitHub Stable Latest 仍不是该 Beta tag。
+
+只有公开 prerelease 实际完成后，才允许：
+
+```text
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
+```
+
+仍不允许：
+
+```text
+V2_PRODUCTIZED_RELEASE = TRUE
+REAL_USER_VALIDATED = TRUE
+PMF_PROVEN = TRUE
+```
+
 ## Stable v2 Productized Release Gate
 
 在宣称 `V2_PRODUCTIZED_RELEASE=TRUE` 前还需要：
@@ -796,21 +833,29 @@ PR 合并后至少要有：
 
 ---
 
-# 20. 合并后的下一阶段，不属于本 PR 的假完成项
+# 20. 当前下一阶段
 
-只有在 PR #19 全绿并合并后才进入：
+PR #19 后，以下已经进入 main，不再列为未来项：
 
-1. Windows packaged Conversation Beta runtime evidence；
-2. Conversation 专属 README runtime screenshots；
-3. local dogfood；
-4. 真实 Project Sync / Design Review 小规模使用；
-5. human-labeled Guidance evaluation；
-6. 再决定：
-   - Screen Context；
+- Windows packaged Conversation Beta evidence；
+- independent Conversation screenshot evidence；
+- local human-evaluation tooling；
+- Manual Screen Context；
+- Conversation search/export；
+- long-lived Open Thread correctness。
+
+当前下一阶段按顺序是：
+
+1. 发布 `v2.0.0-beta.1` GitHub Prerelease，保持 v1.4.2 为 Stable Latest；
+2. 用该可下载安装包进行 local dogfood；
+3. 真实 Project Sync / Design Review 小规模使用；
+4. 收集 human-labeled Guidance / missed-moment / continuity evidence；
+5. 根据真实证据再决定是否继续投入：
+   - AUTO Screen Context；
    - Human Coach；
    - Private Overlay；
-   - Calendar / Docs connector；
-   - external write-back execution；
-   - Presentation / 1:1 / Client Call / Negotiation 的专属优化。
+   - Calendar / Docs / Mail / project-tracker connectors；
+   - actual external write-back；
+   - Presentation / 1:1 / Client Call / Negotiation 专属行为优化。
 
-这些不是“本轮遗漏”，而是需要真实 runtime / external dependency / user evidence 才能合法升级状态的下一阶段。
+后四类不是“源码里再补几个字段就能完成”的缺口，而是需要真实 runtime、外部权限或真实用户证据才能合法升级状态。

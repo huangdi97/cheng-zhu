@@ -153,6 +153,15 @@ jobs:
         working-directory: frontend
         run: node scripts/capture-v20-conversation-packaged-evidence.mjs
 
+      - name: Upload failed Conversation visual diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chengzhu-conversation-blocked-visual
+          path: artifacts/release-evidence/v*/conversation-beta/*-BLOCKED.png
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4
         with:
@@ -276,17 +285,34 @@ jobs:
           }
           $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
           if (-not $sourceSha) { throw "CHENGZHU_RELEASE_SOURCE_SHA is empty" }
-          gh release create $tag `
-            dist/release/Chengzhu-Setup-x64.exe `
-            dist/release/Chengzhu-Portable-x64.zip `
-            dist/release/SHA256SUMS.txt `
-            dist/release/LICENSE.txt `
-            dist/release/THIRD_PARTY_NOTICES.md `
-            "dist/release/RELEASE_NOTES_v$version.md" `
-            --target $sourceSha `
-            --draft `
-            --title "成竹 Chengzhu $tag" `
-            --notes-file "dist/release/RELEASE_NOTES_v$version.md"
+          $isPrerelease = $version.Contains('-')
+          if ($isPrerelease) {
+            gh release create $tag `
+              dist/release/Chengzhu-Setup-x64.exe `
+              dist/release/Chengzhu-Portable-x64.zip `
+              dist/release/SHA256SUMS.txt `
+              dist/release/LICENSE.txt `
+              dist/release/THIRD_PARTY_NOTICES.md `
+              "dist/release/RELEASE_NOTES_v$version.md" `
+              --target $sourceSha `
+              --draft `
+              --prerelease `
+              --latest=false `
+              --title "成竹 Chengzhu $tag" `
+              --notes-file "dist/release/RELEASE_NOTES_v$version.md"
+          } else {
+            gh release create $tag `
+              dist/release/Chengzhu-Setup-x64.exe `
+              dist/release/Chengzhu-Portable-x64.zip `
+              dist/release/SHA256SUMS.txt `
+              dist/release/LICENSE.txt `
+              dist/release/THIRD_PARTY_NOTICES.md `
+              "dist/release/RELEASE_NOTES_v$version.md" `
+              --target $sourceSha `
+              --draft `
+              --title "成竹 Chengzhu $tag" `
+              --notes-file "dist/release/RELEASE_NOTES_v$version.md"
+          }
 
           # Important GitHub behavior: a draft Release does not create the
           # refs/tags/<tag> git ref yet. Therefore validating the git ref here
@@ -396,9 +422,25 @@ jobs:
           }
 
           # Publishing the draft is the operation that materializes the git tag.
-          gh release edit $tag --draft=false --latest --target $sourceSha
-          $isDraft = gh release view $tag --json isDraft --jq '.isDraft'
-          if ($isDraft -ne 'false') { throw "verified release $tag did not publish" }
+          # SemVer prereleases are public Beta artifacts, never the stable Latest.
+          $isPrerelease = $version.Contains('-')
+          if ($isPrerelease) {
+            gh release edit $tag --draft=false --prerelease --latest=false --target $sourceSha
+          } else {
+            gh release edit $tag --draft=false --latest --target $sourceSha
+          }
+          $releaseState = gh release view $tag --json isDraft,isPrerelease --jq '{isDraft: .isDraft, isPrerelease: .isPrerelease}' | ConvertFrom-Json
+          if ($releaseState.isDraft) { throw "verified release $tag did not publish" }
+          if ([bool]$releaseState.isPrerelease -ne $isPrerelease) {
+            throw "release channel mismatch for $tag: expected prerelease=$isPrerelease"
+          }
+          if ($isPrerelease) {
+            $latestStable = (gh api "repos/${{ github.repository }}/releases/latest" --jq '.tag_name').Trim()
+            if ($latestStable -eq $tag) {
+              throw "prerelease $tag incorrectly replaced the stable Latest release"
+            }
+            Write-Host "prerelease channel invariant: $tag is prerelease; stable Latest remains $latestStable"
+          }
 
           $tagSha = (gh api "repos/${{ github.repository }}/git/ref/tags/$tag" --jq '.object.sha').Trim()
           if ($tagSha -ne $sourceSha) {
@@ -411,6 +453,8 @@ jobs:
           if (Test-Path $verificationPath) {
             $verification = Get-Content $verificationPath -Raw | ConvertFrom-Json
             $verification.tag_sha = $tagSha
+            $verification.release_channel = $(if ($isPrerelease) { "PRERELEASE" } else { "STABLE" })
+            $verification.is_prerelease = $isPrerelease
             $verification | ConvertTo-Json -Depth 6 | Set-Content $verificationPath -Encoding utf8
           }
           Write-Host "published release tag/source invariant: $tag -> $tagSha"

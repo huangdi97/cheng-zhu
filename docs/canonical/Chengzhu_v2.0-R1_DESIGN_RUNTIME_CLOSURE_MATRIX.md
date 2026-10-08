@@ -482,7 +482,8 @@ APPROVED
 
 | 能力 | 当前状态 | 为什么不伪装 |
 | --- | --- | --- |
-| Conversation Screen Context | BLOCKED | Interview screenshot path 不能无条件复用到第三方会话 |
+| Conversation Manual Screen Context | RUNTIME_AVAILABLE | 独立 Conversation namespace；单次用户触发；raw image 不持久化；提取文本为 OBSERVED_NOT_CONFIRMED；vision route/fingerprint 冻结并受 processing policy 约束 |
+| Conversation AUTO Screen Context | BLOCKED | 连续/自动第三方屏幕采集尚无独立 disclosure / off-the-record / runtime evidence |
 | Conversation Human Coach | BLOCKED | 需要独立 policy / disclosure / runtime evidence |
 | Conversation Private Overlay / Share Privacy | BLOCKED | 需要 presenter-visible control 与 Conversation namespace |
 | Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |
@@ -665,7 +666,7 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 - Calendar / Mail / Docs / project tracker connector；
 - OS notification/discovery；
-- Conversation Screen Context；
+- Conversation AUTO Screen Context；
 - Human Coach；
 - Private Overlay；
 - actual external write-back execution；

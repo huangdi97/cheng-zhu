@@ -866,7 +866,7 @@ Audio store = OFF
 
 这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
 
-当前未接线的 Conversation Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 必须显式阻断，不能把 policy 选择伪装成已生效能力。
+Conversation Screen Context 当前只产品化 **MANUAL**：用户每次主动抓取一次，原图仅在内存中送入冻结的 vision route，不落库；product.db 只保存提取文本、image hash、vision model/route/fingerprint，并作为 `OBSERVED_NOT_CONFIRMED` source 进入 Manual Ask。LOCAL processing 下 remote vision 必须 fail-closed，Session 开始后 vision fingerprint 变化也必须拒绝继续抓取。AUTO Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 仍必须显式阻断。
 
 外部 action 先进入 Review Queue，再由用户确认。
 
@@ -889,9 +889,9 @@ Audio store = OFF
 以下能力不能因为 Interview 已有就直接复用：
 
 - overlay / Private Share；
-- screenshot / screen context。
+- automatic screenshot / screen monitoring。
 
-它们进入 Conversation 前必须同时满足：
+Manual Screen Context 已以独立 Conversation namespace 落地；任何进一步的自动 screen capture 或 overlay 进入 Conversation 前仍必须同时满足：
 
 1. 独立 Conversation namespace，不写入 Interview state / history；
 2. 独立 Session Policy / source visibility；
@@ -899,7 +899,7 @@ Audio store = OFF
 4. 可暂停 / off-the-record；
 5. runtime evidence 能证明没有静默捕获或共享。
 
-在这些条件满足前保持 Preflight blocked。
+Manual Screen Context 已满足这些边界并只允许显式单次抓取；AUTO Screen Context 与 Private Overlay 在这些条件满足前继续保持 Preflight blocked。
 
 ## Phase 2 — Read-only Context Connectors
 

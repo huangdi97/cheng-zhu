@@ -124,13 +124,14 @@ Conversation Home
 - grounded global Decision / Commitment / Open Question search + Ctrl+K entry；
 - categorized current Session / Space local export；
 - schema v6 temporal provenance：original text / normalized datetime / timezone / ambiguity；
+- schema v7 Manual Screen Context：仅用户主动抓取，原图不落库，只保留提取文本 + image hash + vision route/model provenance；
 - subsystem-level Conversation Diagnostics；
 - retention / export / deletion provenance；
 - reviewed local DraftActions。
 
-当前明确 **不可伪装为已完成**：
-- Conversation Screen Context；
-- Conversation Human Coach；
+当前能力边界：
+- Conversation Manual Screen Context 已实现；AUTO Screen Context 仍未接线并 fail-closed；
+- Conversation Human Coach 仍未接线；
 - Conversation Private Overlay / Share Privacy；
 - Calendar / Docs / Mail / project tracker connector runtime；
 - actual external email/task/issue write-back；

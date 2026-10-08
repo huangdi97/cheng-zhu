@@ -721,16 +721,21 @@ def test_auto_screen_preflight_requires_explicit_consent_transparency_and_never_
     assert conversations.screen_auto_status(session["id"])["active"] is False
 
 
-def test_human_assistance_runtime_remains_blocked(product_env):
+def test_human_assistance_fails_closed_without_participant_transparency(product_env):
     space = conversations.create_space("Human Boundary", "PROJECT_SYNC")
     session = conversations.create_session(
         space["id"],
         consent_ack=True,
-        policy={"human_assistance": "HUMAN_ALLOWED"},
+        policy={
+            "human_assistance": "HUMAN_ALLOWED",
+            "participant_transparency_plan": "NOT_RECORDED",
+        },
     )
     check = conversations.preflight(session["id"])
-    assert any(item["key"] == "human_assistance_runtime" for item in check["blockers"])
-    with pytest.raises(ValueError, match="Human Coach runtime"):
+    assert any(item["key"] == "human_assistance_transparency" for item in check["blockers"])
+    human = next(item for item in check["items"] if item["key"] == "human")
+    assert human["ok"] is False
+    with pytest.raises(ValueError, match="透明告知计划"):
         conversations.start_session(session["id"])
 
 

@@ -690,6 +690,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '开始会话' }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/live/${SESSION.id}`))
     await expect(page.getByTestId('conversation-live')).toBeVisible()
+    await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('仅笔记 · 未采集音频')
     await expect(page.getByTestId('conversation-session-pulse')).toBeVisible()
     await expect(page.getByText('Session Pulse')).toBeVisible()
     await expect(page.getByText(SPACE.default_goal)).toBeVisible()
@@ -766,6 +767,38 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('SILENT · USER_SPEAKING')).toBeVisible()
   })
 
+  test('SILENT polling never revives an older shown Guidance card', async ({ context, page }) => {
+    const base = mocks()
+    let guidanceReads = 0
+    const prior = {
+      id: 'ge-older', session_id: SESSION.id, candidate_id: '',
+      kind: 'ANSWER_CUE', expression_action: 'ANSWER',
+      text: '过期提示绝不能复活', source_refs: [],
+      status: 'SHOWN', reason: 'DIRECT_QUESTION', score: {},
+      user_action: 'NONE', rendered_at: 1, created_at: 1,
+    }
+    const newest = {
+      ...prior, id: 'ge-silent', status: 'SUPPRESSED',
+      expression_action: 'SILENT', text: '', reason: 'USER_SPEAKING',
+      rendered_at: null, created_at: 2,
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/guidance`) {
+          guidanceReads += 1
+          return { items: [newest, prior] }
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect.poll(() => guidanceReads).toBeGreaterThan(0)
+    await expect(page.getByText('等待高价值 Guidance')).toBeVisible()
+    await expect(page.getByText(prior.text)).toHaveCount(0)
+  })
+
   test('Transcript mode uses Conversation-owned capture controls instead of Interview answering', async ({ context, page }) => {
     const base = mocks()
     let capture = {
@@ -829,17 +862,22 @@ test.describe('v2.0 Conversation Profile', () => {
 
     await page.goto(`/#/conversation/live/${SESSION.id}`)
     await expect(page.getByText('真实转写', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('转写未启动')
     await expect(page.getByLabel('主音频（优先系统/会议音频）')).toHaveValue('1001')
     await page.getByLabel('我的麦克风（可选）').selectOption('1002')
     await page.getByRole('button', { name: '开始转写' }).click()
     await expect(page.getByText('CAPTURING')).toBeVisible()
+    await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('正在采集并转写')
     await expect(page.getByText('只复用 Audio/VAD/STT；不会启动 Interview 自动答题、Fast Cue 或 Interview Review。')).toBeVisible()
     await expect.poll(async () => page.getByText('我们回到 offline migration').count()).toBeGreaterThan(0)
     await page.getByRole('button', { name: '暂停' }).click()
     await expect(page.getByText('PAUSED')).toBeVisible()
+    await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('转写已暂停')
     await page.getByRole('button', { name: '继续' }).click()
+    await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('正在采集并转写')
     await page.getByRole('button', { name: '停止转写' }).click()
     await expect(page.getByText('OFF', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('转写未启动')
   })
 
   test('Review Queue never silently assigns unknown commitment owner to me', async ({ context, page }) => {

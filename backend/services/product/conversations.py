@@ -3728,6 +3728,7 @@ def diagnostics() -> dict[str, Any]:
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": "NOT_CONFIGURED",
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
+            "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
@@ -3743,6 +3744,9 @@ def diagnostics() -> dict[str, Any]:
             "emotion_sentiment_profiling": "OFF",
             "hidden_intent_claims": "OFF",
             "screen_raw_image_persistence": "OFF",
+            "share_privacy_default": "OFF",
+            "share_privacy_runtime": "ELECTRON_CONTENT_PROTECTION_BEST_EFFORT",
+            "share_privacy_undetectability_claim": "NEVER",
         },
     }
 

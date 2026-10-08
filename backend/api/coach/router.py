@@ -38,13 +38,27 @@ def remember_fast_cue(payload: dict[str, Any]) -> None:
     _last_fast_cue.update({k: payload.get(k) for k in ("id", "direction", "cues", "cautions", "resolved_question")})
 
 
-def _human_policy_for(session_kind: str) -> str:
+def _human_policy_for(session_kind: str, target_session_id: str = "") -> str:
+    kind = str(session_kind or "").strip().lower()
+    if kind == "conversation":
+        if not target_session_id:
+            return "HUMAN_FORBIDDEN"
+        try:
+            from services.product import conversations
+
+            session = conversations.require_session(target_session_id)
+            if session.get("status") != "ACTIVE":
+                return "HUMAN_FORBIDDEN"
+            return str((session.get("policy") or {}).get("human_assistance") or "HUMAN_PRACTICE_ONLY")
+        except Exception:
+            return "HUMAN_FORBIDDEN"
+
     from core.config import get_config
     from core.session import session_id
     from services.intelligence.interview_pack import load_frozen_pack
 
     cfg = get_config()
-    if session_kind == "live":
+    if kind == "live":
         pack = load_frozen_pack(session_id())
         if pack is not None:
             return pack.human_assistance_policy
@@ -85,7 +99,8 @@ def _stop_lan_listener_if_idle() -> None:
 
 
 class CreateCoachSession(BaseModel):
-    session_kind: str = Field(default="practice", pattern="^(practice|live)$")
+    session_kind: str = Field(default="practice", pattern="^(practice|live|conversation)$")
+    target_session_id: str = Field(default="", max_length=160)
     permissions: dict[str, bool] = Field(default_factory=lambda: {"transcript": True})
     ttl_min: int = Field(default=coach.DEFAULT_TTL_MIN, ge=5, le=coach.MAX_TTL_MIN)
     lan: bool = False
@@ -95,14 +110,19 @@ class CreateCoachSession(BaseModel):
 def create_session(body: CreateCoachSession, request: Request):
     from core.session import session_id
 
-    policy = _human_policy_for(body.session_kind)
+    target_session_id = (
+        str(body.target_session_id or "").strip()
+        if body.session_kind == "conversation"
+        else session_id()
+    )
+    policy = _human_policy_for(body.session_kind, target_session_id)
     try:
         session, token = coach.registry.create(
             human_policy=policy,
             session_kind=body.session_kind,
             permissions=body.permissions,
             ttl_min=body.ttl_min,
-            live_session_id=session_id(),
+            live_session_id=target_session_id,
         )
     except CoachPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
@@ -177,14 +197,53 @@ def helper_page():
 @helper_router.get("/coach/api/state")
 def helper_state(x_coach_token: Optional[str] = Header(default=None)):
     session = _auth(x_coach_token)
+    state: dict[str, Any] = {
+        "session": {
+            "kind": session.session_kind,
+            "expires_at": session.expires_at,
+            "permissions": session.permissions,
+            "target_session_id": session.live_session_id,
+        },
+        "current_question": "",
+    }
+
+    if session.session_kind == "conversation":
+        try:
+            from services.product import conversation_capture, conversations
+
+            target = conversations.require_session(session.live_session_id)
+            if target.get("status") != "ACTIVE":
+                raise CoachPolicyError("Conversation Session 已结束")
+            target_state = dict(target.get("state") or {})
+            state["current_question"] = str(target_state.get("current_topic") or "")
+            if session.permissions.get("transcript"):
+                state["transcript"] = conversation_capture.transcript(session.live_session_id)[-6:]
+            if session.permissions.get("ai_cue"):
+                latest = [
+                    row for row in conversations.guidance_history(session.live_session_id, 8)
+                    if row.get("kind") != "HUMAN_COACH"
+                ]
+                state["ai_cue"] = latest[0] if latest else {}
+            if session.permissions.get("session_context"):
+                context = conversations.session_context(session.live_session_id)
+                state["conversation_context"] = {
+                    "space": context.get("space") or {},
+                    "brief": context.get("brief") or {},
+                    "sources": context.get("sources") or [],
+                    "participants": context.get("participants") or [],
+                    "profile_playbook": context.get("profile_playbook") or {},
+                }
+            return state
+        except CoachPolicyError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=409, detail=f"Conversation 教练上下文不可用：{exc}") from None
+
     from core.session import get_session
 
     live = get_session()
     qa = live.qa_pairs[-1] if getattr(live, "qa_pairs", None) else None
-    state: dict[str, Any] = {
-        "session": {"kind": session.session_kind, "expires_at": session.expires_at, "permissions": session.permissions},
-        "current_question": getattr(qa, "question", "") if qa else "",
-    }
+    state["current_question"] = getattr(qa, "question", "") if qa else ""
     if session.permissions.get("transcript"):
         state["transcript"] = list(getattr(live, "transcription_history", []) or [])[-6:]
     if session.permissions.get("ai_cue"):
@@ -210,7 +269,10 @@ class HelperCue(BaseModel):
 
 def _guard(session: coach.CoachSession) -> None:
     try:
-        coach.registry.check_policy(session, _human_policy_for(session.session_kind))
+        coach.registry.check_policy(
+            session,
+            _human_policy_for(session.session_kind, session.live_session_id),
+        )
         coach.registry.take_rate(session)
     except CoachPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
@@ -223,6 +285,15 @@ def helper_cue(body: HelperCue, x_coach_token: Optional[str] = Header(default=No
     session = _auth(x_coach_token)
     _guard(session)
     payload = coach.coach_cue_payload(session, text=body.text.strip())
+    if session.session_kind == "conversation":
+        from services.product import conversations
+
+        event = conversations.record_human_coach_cue(
+            session.live_session_id,
+            text=body.text.strip(),
+            coach_session_id=session.id,
+        )
+        payload["id"] = event["id"]
     _broadcast(payload)
     return {"ok": True, "id": payload["id"]}
 
@@ -237,6 +308,16 @@ async def helper_voice(request: Request, x_coach_token: Optional[str] = Header(d
     except ValueError:
         raise HTTPException(status_code=413, detail="语音太长") from None
     payload = coach.coach_cue_payload(session, voice_id=vid)
+    if session.session_kind == "conversation":
+        from services.product import conversations
+
+        event = conversations.record_human_coach_cue(
+            session.live_session_id,
+            text="",
+            coach_session_id=session.id,
+            voice_id=vid,
+        )
+        payload["id"] = event["id"]
     _broadcast(payload)
     return {"ok": True, "id": payload["id"]}
 

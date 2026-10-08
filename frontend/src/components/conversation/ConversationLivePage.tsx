@@ -7,6 +7,8 @@ import { captureViewState, createLivePollGate, latestVisibleGuidance } from './l
 import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationExpressionPlan, ConversationGuidance, ConversationItemType, ConversationScreenAutoStatus, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
+import CoachPanel from '@/components/coach/CoachPanel'
+import CoachCues from '@/components/coach/CoachCues'
 
 type AudioDevice = { id: number; name: string; is_loopback?: boolean }
 type DevicePayload = { devices?: AudioDevice[] }
@@ -397,6 +399,9 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
+          {s.policy?.human_assistance === 'HUMAN_ALLOWED'
+            ? <CoachCues sessionKind="conversation" targetSessionId={sessionId} />
+            : null}
           <div className="rounded-2xl border border-bg-tertiary bg-bg-secondary/25 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><div className="flex items-center gap-2" role="status" aria-live="polite" data-testid="conversation-live-capture-status"><span className="relative flex h-2 w-2" aria-hidden="true">{captureView.listening ? <><span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-accent-green opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-accent-green" /></> : <span className="relative inline-flex h-2 w-2 rounded-full bg-text-muted" />}</span><span className="text-xs font-semibold text-text-primary">{captureView.label}</span></div><p className="mt-1 text-[11px] text-text-muted">一次只显示一个最高价值 Guidance；没有足够价值时保持 SILENT。</p></div>
@@ -551,6 +556,10 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               </div>
             </div>
           </div> : null}
+
+          {s.policy?.human_assistance === 'HUMAN_ALLOWED'
+            ? <CoachPanel sessionKind="conversation" targetSessionId={sessionId} />
+            : null}
 
           {liveContext.data?.screen_runtime?.mode === 'MANUAL' ? <div className="rounded-2xl border border-bg-tertiary p-4" data-testid="conversation-screen-context">
             <div className="flex items-start justify-between gap-3">

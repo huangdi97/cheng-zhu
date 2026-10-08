@@ -3,7 +3,7 @@ import { Camera, Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-rea
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
 import { captureViewState, createLivePollGate, latestVisibleGuidance } from './liveViewState'
-import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationExpressionPlan, ConversationGuidance, ConversationItemType, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
+import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationExpressionPlan, ConversationGuidance, ConversationItemType, ConversationScreenAutoStatus, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 
@@ -49,6 +49,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [screenRegion, setScreenRegion] = useState<'configured' | 'full' | 'left_half' | 'right_half' | 'top_half' | 'bottom_half'>('configured')
   const [screenBusy, setScreenBusy] = useState(false)
   const [screenObservations, setScreenObservations] = useState<ConversationScreenContext[]>([])
+  const [screenAuto, setScreenAuto] = useState<ConversationScreenAutoStatus | null>(null)
+  const [screenAutoInterval, setScreenAutoInterval] = useState('30')
   const capturePollGate = useRef(createLivePollGate()).current
 
   useEffect(() => {
@@ -82,14 +84,39 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
 
   useEffect(() => {
     let alive = true
-    if (liveContext.data?.screen_runtime?.mode !== 'MANUAL') {
+    const mode = liveContext.data?.screen_runtime?.mode
+    if (mode !== 'MANUAL' && mode !== 'AUTO') {
       setScreenObservations([])
+      setScreenAuto(null)
       return () => { alive = false }
     }
-    conversationApi.screenContext(sessionId, 12)
-      .then((payload) => { if (alive) setScreenObservations(payload.items) })
-      .catch(() => {})
-    return () => { alive = false }
+
+    const refreshObservations = async () => {
+      try {
+        const payload = await conversationApi.screenContext(sessionId, 12)
+        if (alive) setScreenObservations(payload.items)
+      } catch { /* optional observation surface */ }
+    }
+
+    void refreshObservations()
+    if (mode !== 'AUTO') {
+      setScreenAuto(null)
+      return () => { alive = false }
+    }
+
+    const pollAuto = async () => {
+      try {
+        const status = await conversationApi.screenAutoStatus(sessionId)
+        if (!alive) return
+        setScreenAuto(status)
+        if (status.last_capture_at) await refreshObservations()
+      } catch {
+        if (alive) setScreenAuto(null)
+      }
+    }
+    void pollAuto()
+    const timer = window.setInterval(() => void pollAuto(), 1500)
+    return () => { alive = false; window.clearInterval(timer) }
   }, [sessionId, liveContext.data?.screen_runtime?.mode])
 
   useEffect(() => {
@@ -238,6 +265,32 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
       const saved = await conversationApi.captureScreenContext(sessionId, screenRegion)
       setScreenObservations((current) => [saved, ...current.filter((item) => item.id !== saved.id)].slice(0, 12))
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setScreenBusy(false) }
+  }
+
+  const startAutoScreen = async () => {
+    setScreenBusy(true); setError('')
+    try {
+      setScreenAuto(await conversationApi.screenAutoStart(sessionId, Number(screenAutoInterval), screenRegion))
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setScreenBusy(false) }
+  }
+
+  const toggleAutoScreenPause = async () => {
+    setScreenBusy(true); setError('')
+    try {
+      const next = screenAuto?.paused
+        ? await conversationApi.screenAutoResume(sessionId)
+        : await conversationApi.screenAutoPause(sessionId)
+      setScreenAuto(next)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    finally { setScreenBusy(false) }
+  }
+
+  const stopAutoScreen = async () => {
+    setScreenBusy(true); setError('')
+    try { setScreenAuto(await conversationApi.screenAutoStop(sessionId)) }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setScreenBusy(false) }
   }
 
@@ -452,6 +505,41 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <div className="flex flex-wrap items-center gap-2"><StatusBadge tone="muted">OBSERVED_NOT_CONFIRMED</StatusBadge><span className="text-[10px] text-text-muted">{item.vision_route} · {item.vision_model} · {item.region}</span></div>
               <p className="mt-1 text-xs leading-relaxed text-text-primary">{item.text}</p>
             </div>)}</div> : <p className="mt-3 text-[11px] text-text-muted">本场还没有屏幕观察。截图提取结果不会自动升级成 Decision / Commitment。</p>}
+          </div> : null}
+
+
+          {liveContext.data?.screen_runtime?.mode === 'AUTO' ? <div className="rounded-2xl border border-bg-tertiary p-4" data-testid="conversation-screen-context-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2"><Camera className="h-4 w-4 text-accent-blue" /><h2 className="text-sm font-semibold text-text-primary">Auto Screen Context</h2></div>
+                <p className="mt-1 text-[11px] text-text-muted">AUTO 只表示本场允许自动屏幕上下文；不会随会话自动启动。你必须在这里再次显式开始，且可以随时 Off the record。原图永不持久化。</p>
+              </div>
+              <StatusBadge tone={screenAuto?.active ? (screenAuto.paused ? 'warn' : 'ok') : screenAuto?.last_error ? 'warn' : 'muted'}>
+                {screenAuto?.active ? (screenAuto.paused ? 'OFF THE RECORD' : 'ACTIVE') : screenAuto?.last_error ? 'AUTO STOPPED' : 'NOT STARTED'}
+              </StatusBadge>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <select className={inputCls} value={screenRegion} onChange={(e) => setScreenRegion(e.target.value as typeof screenRegion)} aria-label="自动屏幕区域" disabled={Boolean(screenAuto?.active)}>
+                <option value="configured">使用设置中的区域</option><option value="full">全屏</option><option value="left_half">左半屏</option><option value="right_half">右半屏</option><option value="top_half">上半屏</option><option value="bottom_half">下半屏</option>
+              </select>
+              <select className={inputCls} value={screenAutoInterval} onChange={(e) => setScreenAutoInterval(e.target.value)} aria-label="自动屏幕间隔" disabled={Boolean(screenAuto?.active)}>
+                <option value="15">每 15 秒</option><option value="30">每 30 秒</option><option value="60">每 60 秒</option>
+              </select>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {!screenAuto?.active ? <PrimaryButton disabled={screenBusy || s.status !== 'ACTIVE'} onClick={startAutoScreen} icon={<Camera className="h-3.5 w-3.5" />}>{screenBusy ? '启动中…' : '开始自动屏幕上下文'}</PrimaryButton> : null}
+              {screenAuto?.active ? <SecondaryButton disabled={screenBusy} onClick={toggleAutoScreenPause}>{screenAuto.paused ? '恢复自动观察' : 'Off the record'}</SecondaryButton> : null}
+              {screenAuto?.active ? <SecondaryButton disabled={screenBusy} onClick={stopAutoScreen}>停止 AUTO</SecondaryButton> : null}
+            </div>
+            <div className="mt-3 rounded-xl bg-bg-secondary/35 px-3 py-2 text-[10px] text-text-muted">
+              <div>Model · {liveContext.data.screen_runtime.model_id || liveContext.data.screen_runtime.model_name || '—'} · route {liveContext.data.screen_runtime.route ?? 'UNAVAILABLE'} · raw image NOT STORED</div>
+              <div className="mt-1">Interval · {screenAuto?.interval_seconds ?? Number(screenAutoInterval)}s · last observation {screenAuto?.last_capture_at ? new Date(screenAuto.last_capture_at * 1000).toLocaleTimeString() : '—'} · duplicate frames skipped</div>
+              {screenAuto?.last_error ? <div className="mt-1 text-status-risk">AUTO 已因错误停止/受限：{screenAuto.last_error}</div> : null}
+            </div>
+            {screenObservations.length ? <div className="mt-3 space-y-2">{screenObservations.map((item) => <div key={item.id} className="rounded-xl bg-bg-secondary/40 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2"><StatusBadge tone="muted">OBSERVED_NOT_CONFIRMED</StatusBadge><span className="text-[10px] text-text-muted">{item.capture_mode} · {item.vision_route} · {item.vision_model} · {item.region}</span></div>
+              <p className="mt-1 text-xs leading-relaxed text-text-primary">{item.text}</p>
+            </div>)}</div> : <p className="mt-3 text-[11px] text-text-muted">尚无自动屏幕观察。AUTO 不会把屏幕内容自动升级成 Decision / Commitment。</p>}
           </div> : null}
 
           <div className="rounded-2xl border border-bg-tertiary p-4">

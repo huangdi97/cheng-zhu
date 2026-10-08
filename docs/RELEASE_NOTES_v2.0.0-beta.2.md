@@ -56,6 +56,6 @@ Conversation Home → Space → Next Focus → Prepare → Preflight
 
 ## 下载与回滚
 
-从对应的 `v2.0.0-beta.2` GitHub **Pre-release** 页面下载签名/校验元数据与 Windows 安装包或便携版。仅当发布资产存在且下载回验通过时才可称为 Beta 发布。测试前备份本地数据，关闭正在进行的转写会话；如需稳定通道，回到 `v1.4.2` Stable Latest。
+从对应的 `v2.0.0-beta.2` GitHub **Pre-release** 页面下载 SHA256 校验文件与 Windows 安装包或便携版。仅当发布资产存在且下载回验通过时才可称为 Beta 发布。测试前备份本地数据，关闭正在进行的转写会话；如需稳定通道，回到 `v1.4.2` Stable Latest。
 
 `BETA_ENGINEERING_EVIDENCE != REAL_USER_VALIDATED`。

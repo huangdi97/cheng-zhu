@@ -1114,6 +1114,12 @@ test.describe('v2.0 Conversation Profile', () => {
     expect(startBody?.share_privacy_runtime_proof).toBe('ELECTRON_CONTENT_PROTECTION_ACTIVE')
     expect(await page.evaluate(() => window.__sharePrivacyMode)).toBe('PRIVATE_OVERLAY')
 
+    // Simulate tray/other-runtime drift. The ACTIVE Session policy must
+    // reassert protection instead of leaving a stale ACTIVE badge.
+    await page.evaluate(() => { window.__sharePrivacyMode = 'OFF' })
+    await expect.poll(async () => page.evaluate(() => window.__sharePrivacyMode)).toBe('PRIVATE_OVERLAY')
+    await expect(page.getByTestId('conversation-share-privacy-status')).toContainText('ACTIVE')
+
     await page.getByRole('button', { name: '结束并 Continue' }).click()
     await expect(page.getByText('这场之后')).toBeVisible()
     await expect.poll(async () => page.evaluate(() => window.__sharePrivacyMode)).toBe('OFF')

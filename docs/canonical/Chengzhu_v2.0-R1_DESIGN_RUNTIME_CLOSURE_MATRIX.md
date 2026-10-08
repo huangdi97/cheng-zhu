@@ -530,7 +530,7 @@ reviewed output evidence
 | 能力 | 当前状态 | 为什么不伪装 |
 | --- | --- | --- |
 | Conversation Manual Screen Context | RUNTIME_AVAILABLE | 独立 Conversation namespace；单次用户触发；raw image 不持久化；提取文本为 OBSERVED_NOT_CONFIRMED；vision route/fingerprint 冻结并受 processing policy 约束 |
-| Conversation AUTO Screen Context | BLOCKED | 连续/自动第三方屏幕采集尚无独立 disclosure / off-the-record / runtime evidence |
+| Conversation AUTO Screen Context | RUNTIME_AVAILABLE | policy 允许 ≠ 自动启动；Live 二次显式 start；ACTIVE/OFF THE RECORD 可见；consent/transparency user-report gate；同帧去重/限频/连续错误 fail-stop；raw image 不持久化；frozen vision route；Session/Space lifecycle 强制 stop |
 | Conversation Human Coach | BLOCKED | 需要独立 policy / disclosure / runtime evidence |
 | Conversation Private Overlay / Share Privacy | BLOCKED | 需要 presenter-visible control 与 Conversation namespace |
 | Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |
@@ -725,7 +725,6 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 - Calendar / Mail / Docs / project tracker connector；
 - OS notification/discovery；
-- Conversation AUTO Screen Context；
 - Human Coach；
 - Private Overlay；
 - actual external write-back execution；

@@ -36,7 +36,7 @@ MAX_TTL_MIN = 480
 RATE_LIMIT_PER_MIN = 20
 MAX_TEXT_CHARS = 280
 MAX_VOICE_BYTES = 1_000_000
-PERMISSIONS = ("transcript", "ai_cue", "resume_jd")
+PERMISSIONS = ("transcript", "ai_cue", "resume_jd", "session_context")
 
 
 class CoachPolicyError(PermissionError):
@@ -59,7 +59,7 @@ def _hash(token: str) -> str:
 class CoachSession:
     id: str
     token_hash: str
-    session_kind: str  # "practice" | "live"
+    session_kind: str  # "practice" | "live" | "conversation"
     permissions: dict[str, bool]
     created_at: float
     expires_at: float
@@ -83,6 +83,7 @@ class CoachSession:
             "active": self.active(),
             "cue_count": self.cue_count,
             "connected": bool(self.last_seen_at and time.time() - self.last_seen_at < 15),
+            "target_session_id": self.live_session_id,
         }
 
 
@@ -104,7 +105,12 @@ class CoachRegistry:
         ttl_min: int = DEFAULT_TTL_MIN,
         live_session_id: str = "",
     ) -> tuple[CoachSession, str]:
-        kind = "live" if session_kind == "live" else "practice"
+        requested_kind = str(session_kind or "").strip().lower()
+        if requested_kind not in {"practice", "live", "conversation"}:
+            raise CoachPolicyError("不支持的人工教练场景")
+        kind = requested_kind
+        if kind == "conversation" and not str(live_session_id or "").strip():
+            raise CoachPolicyError("Conversation Human Coach 必须绑定明确的 Conversation Session")
         if not human_coach_allowed(human_policy, session_kind=kind):
             policy = resolve_human_policy(human_policy)
             reason = (
@@ -150,6 +156,22 @@ class CoachRegistry:
                 if not s.revoked:
                     s.revoked = True
                     count += 1
+            return count
+
+    def revoke_for_target(self, live_session_id: str, *, session_kind: str = "") -> int:
+        target = str(live_session_id or "").strip()
+        if not target:
+            return 0
+        kind = str(session_kind or "").strip().lower()
+        with self._lock:
+            count = 0
+            for s in self._by_id.values():
+                if s.revoked or s.live_session_id != target:
+                    continue
+                if kind and s.session_kind != kind:
+                    continue
+                s.revoked = True
+                count += 1
             return count
 
     # -- helper side --------------------------------------------------------
@@ -203,6 +225,8 @@ def coach_cue_payload(session: CoachSession, *, text: str = "", voice_id: str = 
         "type": "coach_cue",
         "id": f"cc-{uuid.uuid4().hex[:10]}",
         "coach_session_id": session.id,
+        "session_kind": session.session_kind,
+        "target_session_id": session.live_session_id,
         "text": text[:MAX_TEXT_CHARS],
         "voice_url": f"/api/coach/voice/{voice_id}" if voice_id else "",
         "source": "HUMAN_COACH",

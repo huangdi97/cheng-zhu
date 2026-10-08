@@ -480,6 +480,25 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             {prepare.data?.contribution_candidates?.length ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3"><div className="text-xs font-semibold text-text-secondary">Precomputed Contribution Candidates</div><div className="mt-2 space-y-1">{(prepare.data.contribution_candidates ?? []).map((x) => <div key={x.text} className="text-xs text-text-primary">• {x.text}</div>)}</div><p className="mt-2 text-[11px] text-text-muted">这里只是候选；Live 仍必须经过 provenance、novelty 与 interruption arbitration。</p></div> : null}
             {prepare.data?.open_threads?.length ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3"><div className="text-xs font-semibold text-text-secondary">Open Threads · 已确认</div><div className="mt-2 space-y-1">{prepare.data.open_threads.slice(0, 6).map((thread) => <div key={thread.id} className="text-xs text-text-primary">• {thread.kind} · {thread.text}</div>)}</div></div> : null}
           </Section>
+          {prepare.data?.profile_playbook ? <Section title={`${prepare.data.profile_playbook.profile} · Profile Playbook`}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl bg-bg-secondary/40 p-3">
+                <div className="text-[11px] font-semibold text-text-secondary">Success Conditions</div>
+                <div className="mt-2 space-y-1">{prepare.data.profile_playbook.success_conditions.map((item) => <div key={item} className="text-xs text-text-primary">• {item}</div>)}</div>
+              </div>
+              <div className="rounded-xl bg-bg-secondary/40 p-3">
+                <div className="text-[11px] font-semibold text-text-secondary">Prepare Prompts</div>
+                <div className="mt-2 space-y-1">{prepare.data.profile_playbook.prepare_prompts.map((item) => <div key={item} className="text-xs text-text-primary">• {item}</div>)}</div>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-bg-tertiary/70 p-3">
+              <div className="text-[11px] font-semibold text-text-secondary">Closing Objective</div>
+              <p className="mt-1 text-xs text-text-primary">{prepare.data.profile_playbook.closing_objective}</p>
+              <div className="mt-2 text-[11px] text-text-muted">Priority truth · {prepare.data.profile_playbook.priority_truth_types.join(' · ')}</div>
+              <div className="mt-2 space-y-1">{prepare.data.profile_playbook.boundaries.map((item) => <div key={item} className="text-[11px] text-status-inferred">边界 · {item}</div>)}</div>
+            </div>
+            <p className="mt-2 text-[11px] text-text-muted">Playbook 会随 Session Pack 冻结；它是本 Profile 的工作框架，不是“会议成功评分”。</p>
+          </Section> : null}
           <Section title="本场带入来源">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
@@ -592,6 +611,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           {continueData ? <div data-testid="conversation-continue-panel" className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">
             <h3 className="text-sm font-semibold text-text-primary">这场之后</h3>
             <p className="mt-1 text-xs text-text-muted">Decision {continueData.decisions.length} · Commitment {continueData.commitments.length} · Open Question {continueData.open_questions.length} · 待确认 {continueData.review_required}</p>
+            {continueData.profile_outcome ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/45 p-3">
+              <div className="text-xs font-semibold text-text-secondary">{continueData.profile_outcome.profile} · Reviewed Outcome Evidence</div>
+              <p className="mt-1 text-[11px] text-text-muted">{continueData.profile_outcome.closing_objective}</p>
+              <div className="mt-2 flex flex-wrap gap-2">{continueData.profile_outcome.priority_truth_types.map((kind) => <StatusBadge key={kind} tone={continueData.profile_outcome.reviewed_counts[kind] ? 'ok' : 'muted'}>{kind} {continueData.profile_outcome.reviewed_counts[kind] ?? 0}</StatusBadge>)}</div>
+              <p className="mt-2 text-[10px] text-text-muted">{continueData.profile_outcome.interpretation}</p>
+            </div> : null}
             {continueData.what_changed?.length ? <div className="mt-3"><div className="text-xs font-semibold text-text-secondary">What changed</div><div className="mt-1 space-y-1">{continueData.what_changed.map((item) => <div key={item.id} className="text-xs text-text-primary">• {item.title} · {item.state}</div>)}</div></div> : null}
             {continueData.pins?.length ? <div className="mt-3"><div className="text-xs font-semibold text-text-secondary">Pins</div><div className="mt-1 space-y-1">{continueData.pins.map((pin) => <div key={pin.id} className="text-xs text-text-primary">• {pin.text || pin.kind}</div>)}</div></div> : null}
             {continueData.next_focus ? <p className="mt-3 text-sm text-text-primary">Next Focus · {continueData.next_focus.title}</p> : null}

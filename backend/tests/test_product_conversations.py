@@ -2397,6 +2397,13 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
     assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
     assert diag["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
     assert diag["privacy"]["auto_external_writeback"] == "OFF"
+    assert diag["health"]["session_pack_context"] == "AVAILABLE"
+    assert diag["health"]["retrieval"] == "AVAILABLE"
+    assert diag["health"]["state_engine"] == "AVAILABLE"
+    assert diag["health"]["guidance_arbiter"] == "AVAILABLE"
+    assert diag["health"]["export_delete_integrity"] == "AVAILABLE"
+    assert diag["health"]["processing_policy"] == "AVAILABLE"
+    assert diag["health"]["speaker_diarization"] == "LIMITED_CHANNEL_ONLY"
 
 
 

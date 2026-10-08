@@ -16,6 +16,7 @@ import type {
   ConversationPrepare,
   ConversationProfile,
   ConversationSearchItem,
+  ConversationScreenAutoStatus,
   ConversationScreenContext,
   ConversationSession,
   ConversationSessionContext,
@@ -119,6 +120,16 @@ export const conversationApi = {
     request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/screen-context?limit=${limit}`).then((p) => list<ConversationScreenContext>(p)),
   captureScreenContext: (id: string, region = 'configured') =>
     request<ConversationScreenContext>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/capture`, json('POST', { region })),
+  screenAutoStatus: (id: string) =>
+    request<ConversationScreenAutoStatus>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/auto`),
+  screenAutoStart: (id: string, interval_seconds = 30, region = 'configured') =>
+    request<ConversationScreenAutoStatus>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/auto/start`, json('POST', { interval_seconds, region })),
+  screenAutoPause: (id: string) =>
+    request<ConversationScreenAutoStatus>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/auto/pause`, json('POST')),
+  screenAutoResume: (id: string) =>
+    request<ConversationScreenAutoStatus>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/auto/resume`, json('POST')),
+  screenAutoStop: (id: string) =>
+    request<ConversationScreenAutoStatus>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/auto/stop`, json('POST')),
   sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
   exportSession: (id: string) => request<ConversationSessionExport>(`${B}/sessions/${encodeURIComponent(id)}/export`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>

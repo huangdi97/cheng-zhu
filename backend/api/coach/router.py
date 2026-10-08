@@ -234,8 +234,8 @@ def helper_state(x_coach_token: Optional[str] = Header(default=None)):
                     "profile_playbook": context.get("profile_playbook") or {},
                 }
             return state
-        except CoachPolicyError:
-            raise
+        except CoachPolicyError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=409, detail=f"Conversation 教练上下文不可用：{exc}") from None
 

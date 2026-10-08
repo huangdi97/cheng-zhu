@@ -67,6 +67,18 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: v2 Conversation deterministic engineering evidence
+        working-directory: .
+        run: python scripts/v2_conversation_evidence.py --out-dir artifacts/v2-conversation-validation
+
+      - name: Upload v2 Conversation engineering evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-conversation-engineering-validation
+          path: artifacts/v2-conversation-validation
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Release version consistency
         working-directory: .
         run: python scripts/check_release_version.py

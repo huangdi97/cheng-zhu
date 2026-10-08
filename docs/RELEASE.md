@@ -6,6 +6,36 @@ A successful local build is **not** a release.
 
 A release is complete only when GitHub contains the published assets and the workflow has downloaded them back, verified them and replayed installation/smoke from the downloaded files.
 
+## Release channels
+
+Chengzhu has two independent public channels:
+
+```text
+Stable
+Prerelease / Beta
+```
+
+Rules:
+
+- a stable SemVer such as `1.4.2` publishes as a normal GitHub Release and may become `Latest`;
+- a SemVer prerelease such as `2.0.0-beta.1` publishes with `prerelease=true` and `latest=false`;
+- publishing a Beta must never replace the current stable `/releases/latest`;
+- a Beta uses the same exact-SHA, clean-install, SHA256, download-back and provenance gates as stable;
+- a public Beta proves productization engineering, not real-user value or PMF.
+
+Current channel truth for this candidate:
+
+```text
+Stable Latest = v1.4.2
+Conversation Beta Candidate = v2.0.0-beta.1
+Stable v2 = NOT CLAIMED
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
+
+
 ## Windows artifacts
 
 | File | Purpose |
@@ -64,7 +94,9 @@ Retry must never become “ignore installer failure”.
 
 ## Version consistency
 
-Before release, all version-bearing surfaces must agree:
+Before release, all version-bearing surfaces must agree. The version may be stable (`X.Y.Z`) or prerelease (`X.Y.Z-<label>`); release notes must use the exact same version string.
+
+
 
 ```text
 frontend/package.json
@@ -120,7 +152,7 @@ Required:
 - expected assets exist;
 - release download-back verification succeeds.
 
-Only after this may the version become Current Stable.
+Only after this may a **stable-channel** version become Current Stable. A prerelease that passes the same gate becomes a verified public Beta, remains `prerelease=true`, and must not become GitHub Latest.
 
 ## Evidence boundary
 

@@ -1451,6 +1451,107 @@ def test_continue_profile_outcome_is_reviewed_evidence_not_success_score(product
     assert "not a meeting-quality or success score" in outcome["interpretation"]
 
 
+
+
+def test_conversation_human_coach_requires_transparency_and_explicit_start(product_env):
+    space = conversations.create_space("Coach", "PROJECT_SYNC")
+    blocked = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={
+            "human_assistance": "HUMAN_ALLOWED",
+            "participant_transparency_plan": "NOT_RECORDED",
+        },
+    )
+    check = conversations.preflight(blocked["id"])
+    assert any(x["key"] == "human_assistance_transparency" for x in check["blockers"])
+    assert next(x for x in check["items"] if x["key"] == "human")["ok"] is False
+
+    updated = conversations.update_session(blocked["id"], {
+        "policy": {"participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY"},
+    })
+    assert updated["policy"]["human_assistance"] == "HUMAN_ALLOWED"
+    ready = conversations.preflight(blocked["id"])
+    assert not any(x["key"].startswith("human_assistance") for x in ready["blockers"])
+    assert any(x["key"] == "human_coach_explicit_start" for x in ready["warnings"])
+    human = next(x for x in ready["items"] if x["key"] == "human")
+    assert human["ok"] is True
+    assert human["value"] == "HUMAN_ALLOWED · EXPLICIT_LINK"
+
+
+def test_conversation_human_coach_cue_is_audited_but_never_truth(product_env):
+    space = conversations.create_space("Coach Audit", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={
+            "human_assistance": "HUMAN_ALLOWED",
+            "participant_transparency_plan": "USER_REPORTS_ALREADY_NOTIFIED",
+        },
+    )
+    conversations.start_session(session["id"])
+    before_items = store.select("conversation_item", where="session_id = ?", params=(session["id"],))
+
+    event = conversations.record_human_coach_cue(
+        session["id"],
+        text="先问清 rollback owner，再给建议",
+        coach_session_id="coach-1",
+    )
+    assert event["kind"] == "HUMAN_COACH"
+    assert event["reason"] == "HUMAN_COACH"
+    assert event["text"] == "先问清 rollback owner，再给建议"
+    assert event["source_refs"][0]["kind"] == "HUMAN_COACH_SESSION"
+    assert event["source_refs"][0]["is_evidence"] is False
+
+    after_items = store.select("conversation_item", where="session_id = ?", params=(session["id"],))
+    assert after_items == before_items
+    history = conversations.guidance_history(session["id"], 10)
+    assert history[0]["id"] == event["id"]
+    assert history[0]["kind"] == "HUMAN_COACH"
+
+
+def test_conversation_human_coach_policy_resolves_from_target_session(product_env):
+    from api.coach import router as coach_router
+
+    space = conversations.create_space("Coach Policy", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={
+            "human_assistance": "HUMAN_ALLOWED",
+            "participant_transparency_plan": "USER_WILL_NOTIFY_IN_CHAT",
+        },
+    )
+    assert coach_router._human_policy_for("conversation", session["id"]) == "HUMAN_FORBIDDEN"
+    conversations.start_session(session["id"])
+    assert coach_router._human_policy_for("conversation", session["id"]) == "HUMAN_ALLOWED"
+    conversations.end_session(session["id"])
+    assert coach_router._human_policy_for("conversation", session["id"]) == "HUMAN_FORBIDDEN"
+
+
+def test_conversation_human_coach_lease_revoked_on_end(product_env, monkeypatch):
+    from services import coach as human_coach
+
+    calls = []
+    monkeypatch.setattr(
+        human_coach.registry,
+        "revoke_for_target",
+        lambda target, session_kind="": calls.append((target, session_kind)) or 1,
+    )
+    space = conversations.create_space("Coach Revoke", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={
+            "human_assistance": "HUMAN_ALLOWED",
+            "participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY",
+        },
+    )
+    conversations.start_session(session["id"])
+    conversations.end_session(session["id"])
+    assert (session["id"], "conversation") in calls
+
+
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
     space = conversations.create_space("Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

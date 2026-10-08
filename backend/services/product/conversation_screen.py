@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import hashlib
 import threading
-import time
 from typing import Any
 from urllib.parse import urlparse
 

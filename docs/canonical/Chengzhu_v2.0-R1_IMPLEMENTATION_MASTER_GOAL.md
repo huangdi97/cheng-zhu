@@ -567,7 +567,7 @@ Capture start 必须二次校验，防止 Preflight 后配置改变。
 以下能力在真实 runtime 未接线前必须阻止开始或标明 unavailable：
 
 ## Conversation Screen Context
-MANUAL 已实现为 Conversation-owned capability：每次由用户主动抓取，原图不落库，保存的只是 observation text + image/model-route provenance；LOCAL processing 下 remote vision fail-closed，冻结 vision fingerprint 在会中变化时拒绝继续抓取。AUTO 仍未接线，不能直接假设 Interview screenshot pipeline 可以安全复用。
+MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。MANUAL 每次由用户主动抓取；AUTO 的 policy 选择不会启动捕获，必须进入 Live 后再次显式 start，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED。AUTO 要求 participant consent/allowance status 与 transparency plan（均为用户报告），支持 duplicate-frame suppression、rate limit、bounded error fail-stop，Session end/delete/Space erase 强制停止。两种模式都不落原图，只保存 observation text + image/model-route provenance；LOCAL processing 下 remote vision fail-closed，冻结 vision fingerprint 在会中变化时拒绝继续抓取。
 
 ## Conversation Human Coach
 不能把 Interview practice/live Coach 权限直接映射到 Conversation。
@@ -831,7 +831,7 @@ PMF_PROVEN = TRUE
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- Manual Screen Context 可用且 AUTO screen / coach / private overlay / connectors 明确 blocked；
+- Manual + explicit-start AUTO Screen Context 可用；coach / private overlay / connectors 明确 blocked；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；
@@ -860,7 +860,6 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 3. 真实 Project Sync / Design Review 小规模使用；
 4. 收集 human-labeled Guidance / missed-moment / continuity evidence；
 5. 根据真实证据再决定是否继续投入：
-   - AUTO Screen Context；
    - Human Coach；
    - Private Overlay；
    - Calendar / Docs / Mail / project-tracker connectors；

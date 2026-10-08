@@ -204,6 +204,18 @@ export interface ConversationItem {
   updated_at: number
 }
 
+export interface ConversationExpressionPlan {
+  action: ExpressionAction
+  guidance_kind: GuidanceKind | null
+  target_participant_id: string
+  text: string
+  source_refs: SourceRef[]
+  warnings: string[]
+  max_length: number
+  render_as: 'PRIMARY_CARD' | 'SILENCE' | string
+  suppression_reasons: string[]
+}
+
 export interface ConversationGuidance {
   id: string
   session_id: string
@@ -217,6 +229,7 @@ export interface ConversationGuidance {
   score: Record<string, number>
   user_action: string
   rendered_at: number | null
+  expression_plan: ConversationExpressionPlan
   created_at: number
 }
 

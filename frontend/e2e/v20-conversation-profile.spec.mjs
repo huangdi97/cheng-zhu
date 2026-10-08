@@ -52,6 +52,17 @@ const SESSION = {
   updated_at: 2,
 }
 
+const SCREEN_RUNTIME_OFF = {
+  mode: 'OFF',
+  available: true,
+  route: 'UNAVAILABLE',
+  model_name: '',
+  model_id: '',
+  fingerprint: '',
+  raw_image_persisted: false,
+  blockers: [],
+}
+
 const DECISION = {
   id: 'ci-decision',
   space_id: SPACE.id,
@@ -235,7 +246,7 @@ function mocks() {
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
       policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30 },
-      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0 },
+      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0 },
       kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP' },
       destructive: false,
     }
@@ -276,6 +287,7 @@ function mocks() {
         },
         blockers: [],
       },
+      screen_runtime: SCREEN_RUNTIME_OFF,
       pack_preview: {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
@@ -321,6 +333,7 @@ function mocks() {
           },
           blockers: [],
         },
+        screen_runtime: SCREEN_RUNTIME_OFF,
         policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
       },
       privacy_note: '记录规则依场景与组织政策而异。',
@@ -416,6 +429,7 @@ function mocks() {
         },
         blockers: [],
       },
+      screen_runtime: SCREEN_RUNTIME_OFF,
       policy: SESSION.policy,
       pack_digest: 'abcdef1234567890',
     }
@@ -685,6 +699,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Inference · LOCAL_DETERMINISTIC')).toBeVisible()
     await expect(page.getByText('Retention · LOCAL_PRODUCT_DB')).toBeVisible()
     await expect(page.getByText('Write-back · LOCAL_REVIEWED_DRAFT_ONLY')).toBeVisible()
+    await expect(page.getByText('Screen · OFF')).toBeVisible()
+    await expect(page.getByText('Raw screen image · NOT STORED')).toBeVisible()
     await expect(page.getByText('Frozen AI behavior')).toBeVisible()
     await expect(page.getByText('Policy · AI_ALLOWED')).toBeVisible()
     await expect(page.getByText('Auto Guidance · ON')).toBeVisible()
@@ -954,6 +970,65 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(/来源：TRANSCRIPT_SEGMENT/)).toBeVisible()
     await page.getByRole('button', { name: /offline migration 采用 v2/ }).click()
     await expect(page).toHaveURL(new RegExp(`#/conversation/spaces/${SPACE.id}/decisions`))
+  })
+
+
+  test('MANUAL Screen Context stays in Conversation namespace and never returns raw screenshot bytes', async ({ context, page }) => {
+    const base = mocks()
+    const manualScreen = async (pathname, method, request) => {
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') {
+        return { ...SESSION, policy: { ...SESSION.policy, screen_context: 'MANUAL' } }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') {
+        const original = await base(pathname, method, request)
+        return {
+          ...original,
+          policy: { ...SESSION.policy, screen_context: 'MANUAL' },
+          screen_runtime: {
+            mode: 'MANUAL',
+            available: true,
+            route: 'LOCAL',
+            model_name: 'local-vision',
+            model_id: 'vision-local',
+            fingerprint: 'vision-fp',
+            raw_image_persisted: false,
+            blockers: [],
+          },
+        }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context` && method === 'GET') return { items: [] }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/capture` && method === 'POST') {
+        return {
+          id: 'csc-e2e',
+          space_id: SPACE.id,
+          session_id: SESSION.id,
+          capture_mode: 'MANUAL',
+          region: request.postDataJSON().region === 'configured' ? 'left_half' : request.postDataJSON().region,
+          text: '截图可见：rollback owner = Alex；版本 v2。',
+          image_hash: 'abcdef1234567890abcdef1234567890',
+          vision_model: 'vision-local',
+          vision_route: 'LOCAL',
+          vision_fingerprint: 'vision-fp',
+          source: 'LOCAL_SCREEN_CAPTURE',
+          created_at: 4,
+        }
+      }
+      return base(pathname, method, request)
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: manualScreen,
+    })
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect(page.getByTestId('conversation-screen-context')).toBeVisible()
+    await expect(page.getByText(/原图不保存/)).toBeVisible()
+    await expect(page.getByText('LOCAL', { exact: true }).last()).toBeVisible()
+    await page.getByRole('button', { name: '抓取一次' }).click()
+    await expect(page.getByText('截图可见：rollback owner = Alex；版本 v2。')).toBeVisible()
+    await expect(page.getByText('OBSERVED_NOT_CONFIRMED')).toBeVisible()
+    await expect(page.getByText(/raw image NOT STORED/)).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('data:image/')
   })
 
 

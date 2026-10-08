@@ -27,8 +27,12 @@ def sidecar_version(path: Path) -> str:
 def main() -> int:
     frontend = str(read_json(ROOT / "frontend" / "package.json").get("version") or "")
     desktop = str(read_json(ROOT / "desktop" / "package.json").get("version") or "")
-    frontend_lock = str(read_json(ROOT / "frontend" / "package-lock.json").get("version") or "")
-    desktop_lock = str(read_json(ROOT / "desktop" / "package-lock.json").get("version") or "")
+    frontend_lock_json = read_json(ROOT / "frontend" / "package-lock.json")
+    desktop_lock_json = read_json(ROOT / "desktop" / "package-lock.json")
+    frontend_lock = str(frontend_lock_json.get("version") or "")
+    desktop_lock = str(desktop_lock_json.get("version") or "")
+    frontend_lock_root = str((frontend_lock_json.get("packages") or {}).get("", {}).get("version") or "")
+    desktop_lock_root = str((desktop_lock_json.get("packages") or {}).get("", {}).get("version") or "")
     backend = sidecar_version(ROOT / "backend" / "sidecar.py")
     errors: list[str] = []
 
@@ -36,7 +40,9 @@ def main() -> int:
         "frontend": frontend,
         "desktop": desktop,
         "frontend_lock": frontend_lock,
+        "frontend_lock_root": frontend_lock_root,
         "desktop_lock": desktop_lock,
+        "desktop_lock_root": desktop_lock_root,
         "backend_sidecar": backend,
     }
 

@@ -42,6 +42,21 @@ from pathlib import Path
 SMOKE_NONCE = "smoke-nonce-0123456789abcdef"
 
 
+def configure_console_utf8() -> None:
+    """Make evidence reporting safe on non-UTF-8 Windows hosted runners.
+
+    Product payloads intentionally contain Chinese text.  A cp1252 console must
+    never turn a successful packaged runtime check into a false release failure.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="backslashreplace")
+            except (OSError, ValueError):
+                pass
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -151,6 +166,7 @@ def ws_collect(port: int, ask_text: str, timeout: float = 40) -> list[dict]:
 
 
 def main() -> int:
+    configure_console_utf8()
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
     ap.add_argument("--frontend-dist", default="")
@@ -359,10 +375,12 @@ def main() -> int:
 
     results["passed"] = bool(ok)
     text = json.dumps(results, ensure_ascii=False, indent=2)
-    print(text)
+    # Persist first so a console-encoding problem can never erase the evidence
+    # artifact. configure_console_utf8() should make print safe as well.
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(text, encoding="utf-8")
+    print(text)
     shutil.rmtree(home, ignore_errors=True)
     return 0 if ok else 1
 

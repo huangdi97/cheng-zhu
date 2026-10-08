@@ -488,9 +488,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/25 p-3 text-[11px] text-text-muted">Speaker biometric identity、emotion/sentiment profiling、hidden-intent claims 在 v2 中固定为 OFF，不能由会话设置放开。</div>
             </div>
             <label className="mt-4 flex items-start gap-2 text-xs text-text-secondary"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" /><span>我已确认当前场景允许我使用所选择的记录/转写方式。这个勾选不代表其他参与者已经同意，也不代表成竹已自动通知他们；上方“透明告知计划”只记录我的计划/报告。</span></label>
-            <div className="mt-4 flex gap-2"><PrimaryButton disabled={sessionBusy} onClick={makePreflight} icon={<ShieldCheck className="h-3.5 w-3.5" />}>{sessionBusy ? '检查中…' : '生成本场并检查'}</PrimaryButton>{preflight && !preflight.blockers.length ? <PrimaryButton disabled={sessionBusy} onClick={start}>开始会话</PrimaryButton> : null}</div>
+            <div className="mt-4 flex gap-2"><PrimaryButton testId="conversation-preflight-generate" disabled={sessionBusy} onClick={makePreflight} icon={<ShieldCheck className="h-3.5 w-3.5" />}>{sessionBusy ? '检查中…' : '生成本场并检查'}</PrimaryButton>{preflight && !preflight.blockers.length ? <PrimaryButton testId="conversation-preflight-start" disabled={sessionBusy} onClick={start}>开始会话</PrimaryButton> : null}</div>
             {sessionError ? <div className="mt-3"><ErrorState message={sessionError} /></div> : null}
-            {preflight ? <div className="mt-4 rounded-2xl border border-bg-tertiary p-3">
+            {preflight ? <div data-testid="conversation-preflight-result" className="mt-4 rounded-2xl border border-bg-tertiary p-3">
               <div className="space-y-1">{preflight.items.map((x) => <div key={x.key} className="flex items-center justify-between gap-3 text-xs"><span className="text-text-muted">{x.label}</span><span className={x.ok ? 'text-status-direct' : 'text-status-risk'}>{x.ok ? '✓ ' : '! '}{String(x.value)}</span></div>)}</div>
               <div className="mt-3 rounded-xl bg-bg-secondary/35 p-3 text-[11px] text-text-muted">
                 <div className="font-semibold text-text-secondary">Resolved AI Behavior</div>
@@ -552,11 +552,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           {space.sessions.length ? <div className="space-y-2">{space.sessions.map((s) => (
             <div key={s.id} className="rounded-xl border border-bg-tertiary/70 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-medium text-text-primary">{s.title}</div><div className="text-[11px] text-text-muted">{s.status} · {s.assistance_mode} · {s.capture_mode}</div></div>
-                <div className="flex gap-2">{s.status !== 'ENDED' ? <SecondaryButton onClick={() => navigate(paths.conversationLive(s.id))}>进入</SecondaryButton> : <><SecondaryButton onClick={async () => setContinueData(await conversationApi.continue(s.id))}>Continue</SecondaryButton><SecondaryButton disabled={sessionBusy} onClick={() => removeSession(s.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton></>}</div>
+                <div className="flex gap-2">{s.status !== 'ENDED' ? <SecondaryButton testId={`conversation-enter-${s.id}`} onClick={() => navigate(paths.conversationLive(s.id))}>进入</SecondaryButton> : <><SecondaryButton testId={`conversation-continue-${s.id}`} onClick={async () => setContinueData(await conversationApi.continue(s.id))}>Continue</SecondaryButton><SecondaryButton disabled={sessionBusy} onClick={() => removeSession(s.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton></>}</div>
               </div>
             </div>
           ))}</div> : <EmptyState title="还没有会话" body="从“准备”创建本场 Preflight。" />}
-          {continueData ? <div className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">
+          {continueData ? <div data-testid="conversation-continue-panel" className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">
             <h3 className="text-sm font-semibold text-text-primary">这场之后</h3>
             <p className="mt-1 text-xs text-text-muted">Decision {continueData.decisions.length} · Commitment {continueData.commitments.length} · Open Question {continueData.open_questions.length} · 待确认 {continueData.review_required}</p>
             {continueData.what_changed?.length ? <div className="mt-3"><div className="text-xs font-semibold text-text-secondary">What changed</div><div className="mt-1 space-y-1">{continueData.what_changed.map((item) => <div key={item.id} className="text-xs text-text-primary">• {item.title} · {item.state}</div>)}</div></div> : null}

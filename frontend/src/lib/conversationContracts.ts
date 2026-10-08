@@ -97,6 +97,7 @@ export interface ConversationTemplate {
   label: string
   default_mode: AssistanceMode
   guidance: GuidanceKind[]
+  playbook: ConversationProfilePlaybook
   runtime_available: boolean
   launch_wedge: boolean
   specialized_behavior_validated: boolean

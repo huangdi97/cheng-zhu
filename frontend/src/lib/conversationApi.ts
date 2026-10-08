@@ -15,8 +15,10 @@ import type {
   ConversationPreflight,
   ConversationPrepare,
   ConversationProfile,
+  ConversationSearchItem,
   ConversationSession,
   ConversationSessionContext,
+  ConversationSessionExport,
   ConversationTranscriptSegment,
   ConversationSpace,
   ConversationSpaceDetail,
@@ -37,6 +39,9 @@ export const conversationApi = {
   templates: () => request<unknown>(`${B}/templates`).then((p) => list<ConversationTemplate>(p)),
   home: () => request<ConversationHome>(`${B}/home`),
   history: (limit = 100) => request<{ items: ConversationHistoryItem[] }>(`${B}/history?limit=${limit}`),
+  searchItems: (query = '', itemType = '', limit = 50) => request<{ items: ConversationSearchItem[] }>(
+    `${B}/search?query=${encodeURIComponent(query)}&item_type=${encodeURIComponent(itemType)}&limit=${limit}`,
+  ),
   diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
@@ -110,6 +115,7 @@ export const conversationApi = {
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
   sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
+  exportSession: (id: string) => request<ConversationSessionExport>(`${B}/sessions/${encodeURIComponent(id)}/export`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>
     request<{ deleted: boolean; session_id: string; provenance_tombstones: number; removed_open_thread_projections: number }>(`${B}/sessions/${encodeURIComponent(id)}/delete`, json('POST', { confirmed_policy })),
 

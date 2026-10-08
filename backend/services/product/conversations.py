@@ -3657,7 +3657,7 @@ def diagnostics() -> dict[str, Any]:
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": "NOT_CONFIGURED",
-            "conversation_screen_context": "MANUAL_AVAILABLE_AUTO_BLOCKED",
+            "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },

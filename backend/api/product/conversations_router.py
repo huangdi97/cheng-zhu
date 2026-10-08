@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.product.common import domain_errors
-from services.product import conversation_capture, conversations
+from services.product import conversation_capture, conversation_screen, conversations
 
 router = APIRouter(prefix="/conversation", tags=["product-conversation"])
 
@@ -29,6 +29,26 @@ def _stop_capture_for_space(space_id: str) -> None:
         return
     if session.get("space_id") == space_id:
         conversation_capture.stop(active_session_id)
+
+
+def _stop_screen_auto_for_session(session_id: str) -> None:
+    state = conversation_screen.auto_status(session_id)
+    if state.get("owns_requested_session"):
+        conversation_screen.stop_auto(session_id)
+
+
+def _stop_screen_auto_for_space(space_id: str) -> None:
+    state = conversation_screen.auto_status()
+    active_session_id = str(state.get("session_id") or "")
+    if not active_session_id:
+        return
+    try:
+        session = conversations.require_session(active_session_id)
+    except ValueError:
+        conversation_screen.stop_auto(active_session_id)
+        return
+    if session.get("space_id") == space_id:
+        conversation_screen.stop_auto(active_session_id)
 
 
 class SpaceCreate(BaseModel):
@@ -128,6 +148,7 @@ def delete_space(space_id: str, confirm: bool = False):
     with domain_errors():
         if confirm:
             _stop_capture_for_space(space_id)
+            _stop_screen_auto_for_space(space_id)
         return {"deleted": conversations.delete_space(space_id, confirm=confirm)}
 
 
@@ -266,6 +287,7 @@ class SessionDelete(BaseModel):
 def delete_session(session_id: str, body: SessionDelete):
     with domain_errors():
         _stop_capture_for_session(session_id)
+        _stop_screen_auto_for_session(session_id)
         return conversations.delete_session(session_id, confirmed_policy=body.confirmed_policy)
 
 
@@ -307,6 +329,45 @@ def list_screen_context(session_id: str, limit: int = 20):
 def capture_screen_context(session_id: str, body: ScreenContextCapture):
     with domain_errors():
         return conversations.capture_screen_context(session_id, region=body.region)
+
+
+class ScreenContextAutoStart(BaseModel):
+    interval_seconds: int = Field(default=30, ge=10, le=300)
+    region: str = Field(default="configured", max_length=40)
+
+
+@router.get("/sessions/{session_id}/screen-context/auto")
+def screen_context_auto_status(session_id: str):
+    with domain_errors():
+        return conversations.screen_auto_status(session_id)
+
+
+@router.post("/sessions/{session_id}/screen-context/auto/start")
+def screen_context_auto_start(session_id: str, body: ScreenContextAutoStart):
+    with domain_errors():
+        return conversations.start_auto_screen_context(
+            session_id,
+            interval_seconds=body.interval_seconds,
+            region=body.region,
+        )
+
+
+@router.post("/sessions/{session_id}/screen-context/auto/pause")
+def screen_context_auto_pause(session_id: str):
+    with domain_errors():
+        return conversations.pause_auto_screen_context(session_id)
+
+
+@router.post("/sessions/{session_id}/screen-context/auto/resume")
+def screen_context_auto_resume(session_id: str):
+    with domain_errors():
+        return conversations.resume_auto_screen_context(session_id)
+
+
+@router.post("/sessions/{session_id}/screen-context/auto/stop")
+def screen_context_auto_stop(session_id: str):
+    with domain_errors():
+        return conversations.stop_auto_screen_context(session_id)
 
 
 class CaptureStart(BaseModel):
@@ -367,6 +428,7 @@ def start_session(session_id: str):
 def end_session(session_id: str):
     with domain_errors():
         _stop_capture_for_session(session_id)
+        _stop_screen_auto_for_session(session_id)
         return conversations.end_session(session_id)
 
 

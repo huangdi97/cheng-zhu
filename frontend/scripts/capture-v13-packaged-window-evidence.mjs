@@ -456,6 +456,144 @@ try {
   ]
 
   const second = await runPlan({ name: 'product-loop', userData, backendBase, nonce, token, steps })
+
+  // Conversation Beta packaged evidence uses the same installed app, sidecar,
+  // and user-data directory. Seed reviewed longitudinal truth through the real
+  // packaged backend, then prove the actual packaged BrowserWindow renders the
+  // Profile loop without mocks.
+  const convSpace = await request(backendBase, 'POST', '/api/product/conversation/spaces', {
+    title: 'Release Architecture Sync',
+    profile: 'PROJECT_SYNC',
+    description: 'Packaged Conversation Beta evidence',
+    default_goal: 'Decide the migration rollout and keep provenance across sessions.',
+    default_mode: 'BALANCED',
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/spaces/' + convSpace.id + '/participants', {
+    display_name: 'Alex',
+    role: 'CTO',
+    organization: 'Demo Client',
+    explicit_priority: 'migration stability',
+    explicit_concern: 'rollback risk',
+    stated_position: 'start with a canary',
+    decision_authority: 'architecture approval',
+    relationship_context: 'client technical lead',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'Alex explicitly prioritizes rollback safety.', visibility: 'PRIVATE' }],
+  })
+
+  const prior = await request(backendBase, 'POST', '/api/product/conversation/spaces/' + convSpace.id + '/sessions', {
+    title: 'Architecture Review · Prior',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + prior.id + '/start', {})
+  const priorDecision = await request(backendBase, 'POST', '/api/product/conversation/sessions/' + prior.id + '/items', {
+    item_type: 'Decision',
+    title: 'Use canary rollout for offline migration v2',
+    state: 'PROPOSED',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'We explicitly decided on canary rollout.', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/items/' + priorDecision.id + '/review', { action: 'CONFIRM', patch: {} })
+  const priorQuestion = await request(backendBase, 'POST', '/api/product/conversation/sessions/' + prior.id + '/items', {
+    item_type: 'OpenQuestion',
+    title: 'Who owns the rollback drill?',
+    state: 'PROPOSED',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'Rollback owner remains unresolved.', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(backendBase, 'POST', '/api/product/conversation/items/' + priorQuestion.id + '/review', { action: 'CONFIRM', patch: {} })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + prior.id + '/end', {})
+
+  const liveSession = await request(backendBase, 'POST', '/api/product/conversation/spaces/' + convSpace.id + '/sessions', {
+    title: 'Architecture Review · Current',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  const convPreflight = await request(backendBase, 'GET', '/api/product/conversation/sessions/' + liveSession.id + '/preflight')
+  if ((convPreflight.blockers || []).length) throw new Error('Conversation packaged preflight unexpectedly blocked: ' + JSON.stringify(convPreflight.blockers))
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + liveSession.id + '/start', {})
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + liveSession.id + '/guidance/evaluate', {
+    current_topic: 'rollback ownership',
+    direct_question: 'Why did we choose canary rollout?',
+    answer_cue: 'Answer directly: the reviewed prior Decision chose canary rollout; then clarify the unresolved rollback owner.',
+    source_refs: [{ kind: 'CONVERSATION_ITEM', id: priorDecision.id, visibility: 'PRIVATE' }],
+    audience_role: 'CTO',
+    audience_priority: 'migration stability',
+    audience_concern: 'rollback risk',
+    decision_authority: 'architecture approval',
+    relationship_context: 'client technical lead',
+  })
+
+  const conversationSteps = [
+    { kind: 'resize', width: 1440, height: 960 },
+    { kind: 'storage', key: 'ia-color-scheme', value: 'vscode-light-plus' },
+    { kind: 'storage', key: 'chengzhu-product-profile', value: 'conversation' },
+    { kind: 'storage', key: 'chengzhu-conversation-optin', value: '1' },
+    { kind: 'navigate', hash: '#/conversation', selector: '[data-testid="conversation-home"]' },
+    { kind: 'reload', selector: '[data-testid="conversation-home"]', timeout_ms: 30000 },
+    { kind: 'capture', name: '30-conversation-home', note: 'Conversation Home from packaged BrowserWindow' },
+
+    { kind: 'navigate', hash: '#/conversation/spaces', selector: '[data-testid="conversation-spaces"]' },
+    { kind: 'capture', name: '31-conversation-spaces', note: 'Conversation Spaces continuity list' },
+
+    { kind: 'navigate', hash: '#/conversation/spaces/' + convSpace.id, selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '32-conversation-overview', note: 'Conversation Space overview with reviewed continuity and stakeholder state' },
+
+    { kind: 'navigate', hash: '#/conversation/spaces/' + convSpace.id + '/prepare', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '33-conversation-prepare', note: 'Prepare with Brief, Agenda, Preflight policy and Pack context' },
+
+    { kind: 'navigate', hash: '#/conversation/spaces/' + convSpace.id + '/decisions', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '34-conversation-decisions', note: 'Decision timeline and reviewed truth' },
+
+    { kind: 'navigate', hash: '#/conversation/spaces/' + convSpace.id + '/sessions', selector: '[data-testid="conversation-space"]' },
+    { kind: 'click', selector: '[data-testid="conversation-continue-' + prior.id + '"] button' },
+    { kind: 'wait', selector: '[data-testid="conversation-continue-panel"]', timeout_ms: 10000 },
+    { kind: 'capture', name: '35-conversation-continue', note: 'Continue with What changed, reviewed Open Questions and local DraftActions' },
+
+    { kind: 'navigate', hash: '#/conversation/live/' + liveSession.id, selector: '[data-testid="conversation-live"]' },
+    { kind: 'wait', selector: '[data-testid="conversation-session-pulse"]', timeout_ms: 10000 },
+    { kind: 'capture', name: '36-conversation-live', note: 'Guidance-first Live with frozen Session Pulse and explicit stakeholder context' },
+
+    { kind: 'navigate', hash: '#/history', selector: '[data-testid="conversation-history"]' },
+    { kind: 'capture', name: '37-conversation-history', note: 'Profile-aware Conversation History' },
+
+    { kind: 'navigate', hash: '#/settings/diagnostics', selector: '[data-testid="settings-page"]' },
+    { kind: 'capture', name: '38-conversation-diagnostics', note: 'Conversation subsystem diagnostics and evidence boundaries' },
+
+    { kind: 'resize', width: 390, height: 844 },
+    { kind: 'navigate', hash: '#/conversation/spaces/' + convSpace.id + '/prepare', selector: '[data-testid="conversation-space"]' },
+    { kind: 'capture', name: '39-conversation-390-prepare', note: '390px Conversation Prepare' },
+  ]
+  const third = await runPlan({ name: 'conversation-beta', userData, backendBase, nonce, token, steps: conversationSteps })
+  await request(backendBase, 'POST', '/api/product/conversation/sessions/' + liveSession.id + '/end', {})
+
+  const convDiagnostics = await request(backendBase, 'GET', '/api/product/conversation/diagnostics')
+  if (convDiagnostics.evidence?.real_conversation_user_evidence !== 'REAL_CONVERSATION_USER_EVIDENCE_PENDING') {
+    throw new Error('Conversation evidence boundary drifted: ' + JSON.stringify(convDiagnostics.evidence))
+  }
+
   const manifest = {
     captured_at: new Date().toISOString(),
     evidence_type: 'PACKAGED_BROWSERWINDOW_FILE_PLAN_WITH_PACKAGED_SIDECAR',
@@ -463,10 +601,16 @@ try {
     backend_executable: BACKEND_EXE,
     goal_id: goal.id,
     practice_id: practice.practice_id,
-    entries: [...(first.entries || []), ...(second.entries || [])],
+    conversation_beta: {
+      space_id: convSpace.id,
+      prior_session_id: prior.id,
+      live_session_id: liveSession.id,
+      evidence_boundary: 'PACKAGED_BETA_ENGINEERING_EVIDENCE_NOT_REAL_USER_VALIDATION',
+    },
+    entries: [...(first.entries || []), ...(second.entries || []), ...(third.entries || [])],
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (manifest.entries.length < 36) throw new Error('expected at least 36 packaged UI captures, got ' + manifest.entries.length)
+  if (manifest.entries.length < 45) throw new Error('expected at least 45 packaged UI captures including Conversation Beta, got ' + manifest.entries.length)
   console.log('done', OUT, 'captures=' + manifest.entries.length)
 } catch (error) {
   console.error(error)

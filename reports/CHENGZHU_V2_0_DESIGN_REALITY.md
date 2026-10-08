@@ -62,7 +62,8 @@ Conversation Profile now has real:
 - grounded global Decision / Commitment / Open Question search;
 - current Session export;
 - Conversation subsystem diagnostics;
-- additive schema v6 temporal provenance for Deadline / Commitment review.
+- additive schema v6 temporal provenance for Deadline / Commitment review;
+- additive schema v7 Manual Screen Context observations with raw-image non-persistence and frozen vision-route provenance.
 
 Therefore these old statements are **false** and must not be repeated:
 
@@ -86,10 +87,10 @@ runtime available != stable packaged release
 synthetic green != real-user value
 ```
 
-Current fail-closed / unavailable boundaries:
+Current capability / fail-closed boundaries:
 
-- Conversation Screen Context;
-- Conversation Human Coach;
+- Conversation Manual Screen Context = AVAILABLE when the frozen vision route satisfies processing policy; AUTO remains BLOCKED;
+- Conversation Human Coach = BLOCKED;
 - Conversation Private Overlay / Share Privacy;
 - Calendar / Mail / Docs / project-tracker connectors;
 - actual external email/task/issue/decision-log execution;
@@ -109,6 +110,7 @@ The final audit closes canonical items that were still implementable without ext
 - time/date provenance: original text + normalized datetime + timezone + ambiguity;
 - ambiguous Deadline cannot enter reviewed long-term truth until explicitly resolved;
 - subsystem-level Conversation Diagnostics with user-facing 可用 / 受限 / 需要处理 states;
+- Manual Screen Context with session-scoped observation truth, frozen vision fingerprint, retention/export integration and no raw screenshot persistence;
 - stale public-truth documents aligned with current runtime.
 
 ## 5. What may be claimed after final audit CI is green

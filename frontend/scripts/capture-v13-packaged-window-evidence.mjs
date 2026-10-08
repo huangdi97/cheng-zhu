@@ -526,8 +526,11 @@ try {
     { kind: 'navigate', hash: '#/history', selector: '[data-testid="history-page"]' },
     { kind: 'capture', name: '29-history', note: 'Unified Interview History' },
 
-    // Switch the same packaged renderer into Conversation Profile. These
-    // captures are backed by the real packaged sidecar and product.db.
+    // Switch the same packaged renderer into Conversation Profile. Restore
+    // the default desktop viewport first; the immediately preceding evidence
+    // intentionally proved the 390px Interview surface.
+    { kind: 'resize', width: 1440, height: 1000 },
+    // Captures below are backed by the real packaged sidecar and product.db.
     { kind: 'storage', key: 'chengzhu-product-profile', value: 'conversation' },
     { kind: 'storage', key: 'chengzhu-conversation-optin', value: '1' },
     { kind: 'reload', selector: '[data-testid="conversation-history"]', timeout_ms: 30000 },

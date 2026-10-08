@@ -1075,7 +1075,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
 
     screen_ok = (
         policy["screen_context"] == "OFF"
-        or (policy["screen_context"] == "MANUAL" and not screen_runtime["blockers"])
+        or (policy["screen_context"] in {"MANUAL", "AUTO"} and not screen_runtime["blockers"])
     )
 
     human_ok = policy["human_assistance"] != "HUMAN_ALLOWED"
@@ -1158,7 +1158,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
         {"key": "screen", "label": "屏幕上下文", "value": (
             f"{policy['screen_context']} · {screen_runtime['route']}"
-            if policy["screen_context"] == "MANUAL"
+            if policy["screen_context"] in {"MANUAL", "AUTO"}
             else policy["screen_context"]
         ), "ok": screen_ok},
         {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": ai_ok},
@@ -1496,6 +1496,43 @@ def capture_screen_context(session_id: str, *, region: str = "configured") -> di
         region=region,
         frozen_runtime=frozen_runtime,
     )
+
+
+def screen_auto_status(session_id: str) -> dict[str, Any]:
+    require_session(session_id)
+    return conversation_screen.auto_status(session_id)
+
+
+def start_auto_screen_context(
+    session_id: str,
+    *,
+    interval_seconds: int = 30,
+    region: str = "configured",
+) -> dict[str, Any]:
+    session = require_session(session_id)
+    payload = _frozen_pack_payload(session)
+    frozen_runtime = dict(payload.get("screen_runtime") or {})
+    return conversation_screen.start_auto(
+        session,
+        interval_seconds=interval_seconds,
+        region=region,
+        frozen_runtime=frozen_runtime,
+    )
+
+
+def pause_auto_screen_context(session_id: str) -> dict[str, Any]:
+    require_session(session_id)
+    return conversation_screen.pause_auto(session_id)
+
+
+def resume_auto_screen_context(session_id: str) -> dict[str, Any]:
+    require_session(session_id)
+    return conversation_screen.resume_auto(session_id)
+
+
+def stop_auto_screen_context(session_id: str) -> dict[str, Any]:
+    require_session(session_id)
+    return conversation_screen.stop_auto(session_id)
 
 
 def _query_tokens(text: str) -> set[str]:
@@ -3620,7 +3657,7 @@ def diagnostics() -> dict[str, Any]:
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": "NOT_CONFIGURED",
-            "conversation_screen_context": "MANUAL_AVAILABLE_AUTO_BLOCKED",
+            "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },

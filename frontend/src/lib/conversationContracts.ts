@@ -338,6 +338,8 @@ export interface ConversationScreenRuntime {
   model_id: string
   fingerprint: string
   raw_image_persisted: boolean
+  auto_requires_explicit_start?: boolean
+  auto_default_interval_seconds?: number
   blockers: string[]
 }
 
@@ -345,7 +347,7 @@ export interface ConversationScreenContext {
   id: string
   space_id: string
   session_id: string
-  capture_mode: 'MANUAL' | string
+  capture_mode: 'MANUAL' | 'AUTO' | string
   region: string
   text: string
   image_hash: string
@@ -354,6 +356,20 @@ export interface ConversationScreenContext {
   vision_fingerprint: string
   source: string
   created_at: number
+}
+
+export interface ConversationScreenAutoStatus {
+  active: boolean
+  session_id: string
+  owns_requested_session: boolean
+  paused: boolean
+  interval_seconds: number
+  region: string
+  last_capture_at: number | null
+  last_error: string
+  consecutive_errors: number
+  raw_image_persisted: boolean
+  explicit_start_required: boolean
 }
 
 export interface ConversationResolvedAiBehavior {

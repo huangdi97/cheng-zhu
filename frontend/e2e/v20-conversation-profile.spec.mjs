@@ -1154,6 +1154,124 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('AUTO Screen Context requires explicit Live start and supports Off the record without raw image persistence', async ({ context, page }) => {
+    const base = mocks()
+    let autoStatus = {
+      active: false,
+      session_id: '',
+      owns_requested_session: false,
+      paused: false,
+      interval_seconds: 30,
+      region: 'configured',
+      last_capture_at: null,
+      last_error: '',
+      consecutive_errors: 0,
+      raw_image_persisted: false,
+      explicit_start_required: true,
+    }
+    let observations = []
+
+    const autoScreen = async (pathname, method, request) => {
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') {
+        return { ...SESSION, policy: { ...SESSION.policy, screen_context: 'AUTO' } }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') {
+        const original = await base(pathname, method, request)
+        return {
+          ...original,
+          policy: { ...SESSION.policy, screen_context: 'AUTO' },
+          screen_runtime: {
+            mode: 'AUTO',
+            available: true,
+            route: 'LOCAL',
+            model_name: 'local-vision',
+            model_id: 'vision-local',
+            fingerprint: 'vision-auto-fp',
+            raw_image_persisted: false,
+            auto_requires_explicit_start: true,
+            auto_default_interval_seconds: 30,
+            blockers: [],
+          },
+        }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context` && method === 'GET') {
+        return { items: observations }
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/auto` && method === 'GET') {
+        return autoStatus
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/auto/start` && method === 'POST') {
+        const body = request.postDataJSON()
+        autoStatus = {
+          ...autoStatus,
+          active: true,
+          session_id: SESSION.id,
+          owns_requested_session: true,
+          paused: false,
+          interval_seconds: body.interval_seconds,
+          region: body.region,
+          last_capture_at: 5,
+          last_error: '',
+        }
+        observations = [{
+          id: 'csc-auto-e2e',
+          space_id: SPACE.id,
+          session_id: SESSION.id,
+          capture_mode: 'AUTO',
+          region: body.region === 'configured' ? 'left_half' : body.region,
+          text: '自动观察：rollback owner = Alex；版本 v2。',
+          image_hash: 'autoabcdef1234567890',
+          vision_model: 'vision-local',
+          vision_route: 'LOCAL',
+          vision_fingerprint: 'vision-auto-fp',
+          source: 'LOCAL_SCREEN_CAPTURE',
+          created_at: 5,
+        }]
+        return autoStatus
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/auto/pause` && method === 'POST') {
+        autoStatus = { ...autoStatus, paused: true }
+        return autoStatus
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/auto/resume` && method === 'POST') {
+        autoStatus = { ...autoStatus, paused: false }
+        return autoStatus
+      }
+      if (pathname === `/api/product/conversation/sessions/${SESSION.id}/screen-context/auto/stop` && method === 'POST') {
+        autoStatus = { ...autoStatus, active: false, session_id: '', owns_requested_session: false, paused: false }
+        return autoStatus
+      }
+      return base(pathname, method, request)
+    }
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: autoScreen,
+    })
+    await page.goto(`/#/conversation/live/${SESSION.id}`)
+    await expect(page.getByTestId('conversation-screen-context-auto')).toBeVisible()
+    await expect(page.getByText('NOT STARTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/不会随会话自动启动/)).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('data:image/')
+
+    await page.getByRole('button', { name: '开始自动屏幕上下文' }).click()
+    await expect(page.getByText('ACTIVE', { exact: true })).toBeVisible()
+    await expect(page.getByText('自动观察：rollback owner = Alex；版本 v2。')).toBeVisible()
+    await expect(page.getByText('OBSERVED_NOT_CONFIRMED')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Off the record' }).click()
+    await expect(page.getByText('OFF THE RECORD', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '恢复自动观察' }).click()
+    await expect(page.getByText('ACTIVE', { exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: '停止 AUTO' }).click()
+    await expect(page.getByText('NOT STARTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/raw image NOT STORED/)).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('data:image/')
+  })
+
+
   test('Conversation History stays inside Conversation Profile and returns to the same Space', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,

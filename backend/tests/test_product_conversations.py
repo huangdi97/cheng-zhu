@@ -189,6 +189,237 @@ def test_manual_screen_context_rejects_vision_route_change_after_session_start(p
         conversations.capture_screen_context(session["id"])
 
 
+def test_auto_screen_service_start_pause_resume_stop_owns_only_explicit_live_session(product_env, monkeypatch):
+    from types import SimpleNamespace
+
+    local = SimpleNamespace(
+        name="local-vision",
+        model="vision-local",
+        api_base_url="http://127.0.0.1:8080/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [local])
+
+    worker_started = threading.Event()
+
+    def idle_worker(session_id, stop_event, **kwargs):
+        worker_started.set()
+        stop_event.wait(2.0)
+        # Mirror production ownership release when the worker exits.
+        with conversation_screen._auto_lock:
+            if conversation_screen._auto_session_id == session_id:
+                conversation_screen._auto_session_id = ""
+                conversation_screen._auto_paused = False
+
+    monkeypatch.setattr(conversation_screen, "_auto_worker", idle_worker)
+
+    space = conversations.create_space("AUTO State Machine", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={
+            "screen_context": "AUTO",
+            "participant_consent_status": "USER_REPORTS_ALLOWED",
+            "participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY",
+        },
+    )
+    conversations.start_session(session["id"])
+    assert conversations.screen_auto_status(session["id"])["active"] is False
+
+    started = conversations.start_auto_screen_context(session["id"], interval_seconds=30)
+    assert worker_started.wait(timeout=1.0)
+    started = conversations.screen_auto_status(session["id"])
+    assert started["active"] is True
+    assert started["owns_requested_session"] is True
+    assert started["paused"] is False
+
+    paused = conversations.pause_auto_screen_context(session["id"])
+    assert paused["active"] is True
+    assert paused["paused"] is True
+
+    # Off the record means screen capture is paused, including manual fallback.
+    with pytest.raises(ValueError, match="Off the record"):
+        conversations.capture_screen_context(session["id"])
+
+    resumed = conversations.resume_auto_screen_context(session["id"])
+    assert resumed["active"] is True
+    assert resumed["paused"] is False
+
+    stopped = conversations.stop_auto_screen_context(session["id"])
+    assert stopped["active"] is False
+    assert stopped["owns_requested_session"] is False
+    assert conversation_screen._auto_session_id == ""
+
+
+def test_auto_screen_same_frame_is_deduped_before_vision_call(product_env, monkeypatch):
+    from types import SimpleNamespace
+    from services.capture import screen_capture
+
+    local = SimpleNamespace(
+        name="local-vision",
+        model="vision-local",
+        api_base_url="http://127.0.0.1:8080/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [local])
+
+    class Cfg:
+        screen_capture_region = "left_half"
+        screen_capture_max_long_edge = 1600
+
+    monkeypatch.setattr(conversation_screen, "get_config", lambda: Cfg())
+    fake_image = "data:image/png;base64,U0FNRUZSQU1F"
+    monkeypatch.setattr(screen_capture, "capture_primary_region_data_url", lambda region, max_long_edge=1600: fake_image)
+    calls = []
+    monkeypatch.setattr(conversation_screen, "_analyze_image", lambda image, model: calls.append(image) or "visible text")
+
+    space = conversations.create_space("AUTO Dedupe", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={
+            "screen_context": "AUTO",
+            "participant_consent_status": "USER_REPORTS_ALLOWED",
+            "participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY",
+        },
+    )
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["screen_runtime"]
+
+    first = conversation_screen._capture_once(
+        conversations.require_session(session["id"]),
+        requested_mode="AUTO",
+        region="left_half",
+        frozen_runtime=frozen,
+        dedupe_image=True,
+    )
+    assert first is not None
+    assert calls == [fake_image]
+
+    conversation_screen._auto_session_id = session["id"]
+    conversation_screen._auto_last_image_hash = first["image_hash"]
+    second = conversation_screen._capture_once(
+        conversations.require_session(session["id"]),
+        requested_mode="AUTO",
+        region="left_half",
+        frozen_runtime=frozen,
+        dedupe_image=True,
+    )
+    assert second is None
+    assert calls == [fake_image]
+    conversation_screen._auto_session_id = ""
+    conversation_screen._auto_last_image_hash = ""
+
+
+def test_auto_screen_blank_frame_is_not_a_failure_but_three_real_errors_fail_stop(product_env, monkeypatch):
+    space = conversations.create_space("AUTO Failure Policy", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    # Empty/unreadable screen observations are normal and must not consume the
+    # consecutive-error budget.
+    blank_stop = threading.Event()
+    blank_calls = {"count": 0}
+
+    def blank_capture(*args, **kwargs):
+        blank_calls["count"] += 1
+        if blank_calls["count"] >= 2:
+            blank_stop.set()
+        raise ValueError("截图中没有提取到足够可用且可追溯的上下文")
+
+    monkeypatch.setattr(conversation_screen, "_capture_once", blank_capture)
+    conversation_screen._auto_session_id = session["id"]
+    conversation_screen._auto_paused = False
+    conversation_screen._auto_consecutive_errors = 0
+    conversation_screen._auto_last_error = ""
+    conversation_screen._auto_worker(
+        session["id"],
+        blank_stop,
+        interval_seconds=0,
+        region="configured",
+        frozen_runtime={},
+    )
+    assert blank_calls["count"] == 2
+    assert conversation_screen._auto_consecutive_errors == 0
+    assert conversation_screen._auto_last_error == ""
+
+    # Real capture/model errors stop after the bounded retry budget and release
+    # ownership instead of leaving an invisible background worker.
+    real_calls = {"count": 0}
+
+    def broken_capture(*args, **kwargs):
+        real_calls["count"] += 1
+        raise RuntimeError("vision unavailable")
+
+    monkeypatch.setattr(conversation_screen, "_capture_once", broken_capture)
+    conversation_screen._auto_session_id = session["id"]
+    conversation_screen._auto_paused = False
+    conversation_screen._auto_consecutive_errors = 0
+    conversation_screen._auto_last_error = ""
+    conversation_screen._auto_worker(
+        session["id"],
+        threading.Event(),
+        interval_seconds=0,
+        region="configured",
+        frozen_runtime={},
+    )
+    assert real_calls["count"] == conversation_screen._AUTO_MAX_CONSECUTIVE_ERRORS
+    assert conversation_screen._auto_consecutive_errors == conversation_screen._AUTO_MAX_CONSECUTIVE_ERRORS
+    assert conversation_screen._auto_last_error == "vision unavailable"
+    assert conversation_screen._auto_session_id == ""
+    assert conversation_screen._auto_thread is None
+    assert conversation_screen._auto_stop_event is None
+
+
+def test_auto_screen_frozen_vision_fingerprint_is_rechecked_on_explicit_start(product_env, monkeypatch):
+    from types import SimpleNamespace
+
+    current = {
+        "model": SimpleNamespace(
+            name="local-a",
+            model="vision-a",
+            api_base_url="http://127.0.0.1:8080/v1",
+            api_key="local-key",
+            enabled=True,
+            supports_vision=True,
+        )
+    }
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [current["model"]])
+
+    space = conversations.create_space("AUTO Frozen Vision", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={
+            "screen_context": "AUTO",
+            "participant_consent_status": "USER_REPORTS_ALLOWED",
+            "participant_transparency_plan": "USER_REPORTS_ALREADY_NOTIFIED",
+        },
+    )
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["screen_runtime"]
+    old_fp = frozen["fingerprint"]
+
+    current["model"] = SimpleNamespace(
+        name="local-b",
+        model="vision-b",
+        api_base_url="http://127.0.0.1:9090/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    assert conversation_screen.vision_runtime_status(conversations.require_session(session["id"]))["fingerprint"] != old_fp
+    with pytest.raises(ValueError, match="视觉模型/数据路径已在本场开始后变化"):
+        conversations.start_auto_screen_context(session["id"], interval_seconds=30)
+
+
 def test_screen_context_retention_uses_transcript_window(product_env, monkeypatch):
     space = conversations.create_space("Screen Retention", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True)
@@ -444,18 +675,62 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
         conversations.followup_draft(session["id"])
 
 
-def test_preflight_blocks_unwired_auto_screen_and_human_runtime(product_env):
-    space = conversations.create_space("Truthful Preflight", "PROJECT_SYNC")
+def test_auto_screen_preflight_requires_explicit_consent_transparency_and_never_autostarts(product_env, monkeypatch):
+    from types import SimpleNamespace
+
+    local = SimpleNamespace(
+        name="local-vision",
+        model="vision-local",
+        api_base_url="http://127.0.0.1:8080/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [local])
+
+    space = conversations.create_space("Truthful AUTO", "PROJECT_SYNC")
     session = conversations.create_session(
         space["id"],
         consent_ack=True,
-        policy={"screen_context": "AUTO", "human_assistance": "HUMAN_ALLOWED"},
+        policy={"screen_context": "AUTO"},
+    )
+    blocked = conversations.preflight(session["id"])
+    messages = [item["message"] for item in blocked["blockers"]]
+    assert any("consent/allowance" in message for message in messages)
+    assert any("透明告知计划" in message for message in messages)
+    assert blocked["screen_runtime"]["mode"] == "AUTO"
+    assert blocked["screen_runtime"]["auto_requires_explicit_start"] is True
+    with pytest.raises(ValueError, match="consent/allowance"):
+        conversations.start_session(session["id"])
+
+    updated = conversations.update_session(session["id"], {
+        "policy": {
+            "participant_consent_status": "USER_REPORTS_ALLOWED",
+            "participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY",
+        }
+    })
+    assert updated["policy"]["screen_context"] == "AUTO"
+    check = conversations.preflight(session["id"])
+    assert check["blockers"] == []
+    assert check["screen_runtime"]["available"] is True
+
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["screen_runtime"]
+    assert frozen["mode"] == "AUTO"
+    assert frozen["auto_requires_explicit_start"] is True
+    assert conversations.screen_auto_status(session["id"])["active"] is False
+
+
+def test_human_assistance_runtime_remains_blocked(product_env):
+    space = conversations.create_space("Human Boundary", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"human_assistance": "HUMAN_ALLOWED"},
     )
     check = conversations.preflight(session["id"])
-    keys = {item["key"] for item in check["blockers"]}
-    assert {"screen_context_runtime", "human_assistance_runtime"} <= keys
-    assert check["screen_runtime"]["mode"] == "AUTO"
-    with pytest.raises(ValueError, match="自动 Screen Context"):
+    assert any(item["key"] == "human_assistance_runtime" for item in check["blockers"])
+    with pytest.raises(ValueError, match="Human Coach runtime"):
         conversations.start_session(session["id"])
 
 
@@ -2674,6 +2949,35 @@ def test_conversation_router_lifecycle_exit_stops_owned_capture(product_env, mon
     _stop_capture_for_space(space["id"])
     assert stopped == [session["id"]]
 
+
+def test_conversation_router_lifecycle_exit_stops_owned_auto_screen(product_env, monkeypatch):
+    from api.product.conversations_router import _stop_screen_auto_for_session, _stop_screen_auto_for_space
+
+    space = conversations.create_space("Screen Lifecycle", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    stopped = []
+    monkeypatch.setattr(
+        conversation_screen,
+        "auto_status",
+        lambda session_id="": {
+            "active": True,
+            "session_id": session["id"],
+            "owns_requested_session": session_id == session["id"] if session_id else False,
+        },
+    )
+    monkeypatch.setattr(conversation_screen, "stop_auto", lambda session_id="": stopped.append(session_id) or {"active": False})
+
+    _stop_screen_auto_for_session(session["id"])
+    assert stopped == [session["id"]]
+
+    stopped.clear()
+    _stop_screen_auto_for_space(space["id"])
+    assert stopped == [session["id"]]
+
+
+
 def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_env):
     space = conversations.create_space("Continuity", "DESIGN_REVIEW")
     old = conversations.create_session(space["id"], consent_ack=True)
@@ -2746,7 +3050,7 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert "opportunity_precision" in diag["evaluation"]["requires_human_labels"]
     assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
     assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
-    assert diag["health"]["conversation_screen_context"] == "MANUAL_AVAILABLE_AUTO_BLOCKED"
+    assert diag["health"]["conversation_screen_context"] == "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE"
     assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"

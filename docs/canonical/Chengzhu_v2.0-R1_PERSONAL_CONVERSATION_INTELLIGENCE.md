@@ -891,7 +891,7 @@ Audio store = OFF
 
 这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
 
-Conversation Screen Context 当前只产品化 **MANUAL**：用户每次主动抓取一次，原图仅在内存中送入冻结的 vision route，不落库；product.db 只保存提取文本、image hash、vision model/route/fingerprint，并作为 `OBSERVED_NOT_CONFIRMED` source 进入 Manual Ask。LOCAL processing 下 remote vision 必须 fail-closed，Session 开始后 vision fingerprint 变化也必须拒绝继续抓取。AUTO Screen Context、Human Coach、Private Overlay / Share Privacy 与 external connector permission 仍必须显式阻断。
+Conversation Screen Context 已产品化 **MANUAL + explicit-start AUTO**。MANUAL 每次由用户主动抓取一次；AUTO 只表示本场 policy 允许自动观察，**不会随 Session 自动启动**，进入 Live 后仍要求用户第二次显式启动，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED 状态。AUTO 要求用户报告 participant consent/allowance 与 transparency plan；支持一键 Off the record、显式停止、同帧去重、限频、连续错误 fail-stop，Session end/delete/Space erase 强制停止。两种模式的原图都只在内存中送入冻结的 vision route，不落库；product.db 只保存提取文本、image hash、vision model/route/fingerprint，并作为 `OBSERVED_NOT_CONFIRMED` source。LOCAL processing 下 remote vision 必须 fail-closed，Session 开始后 vision fingerprint 变化也必须拒绝继续。Human Coach、Private Overlay / Share Privacy 与 external connector permission 仍保持 blocked / fail-closed。
 
 外部 action 先进入 Review Queue，再由用户确认。
 
@@ -916,15 +916,20 @@ Conversation Screen Context 当前只产品化 **MANUAL**：用户每次主动�
 - overlay / Private Share；
 - automatic screenshot / screen monitoring。
 
-Manual Screen Context 已以独立 Conversation namespace 落地；任何进一步的自动 screen capture 或 overlay 进入 Conversation 前仍必须同时满足：
+Manual 与 AUTO Screen Context 都已使用独立 Conversation namespace。AUTO 的进入条件冻结为：
 
-1. 独立 Conversation namespace，不写入 Interview state / history；
+1. 不写入 Interview state / history；
 2. 独立 Session Policy / source visibility；
-3. participant transparency / presenter-visible control；
-4. 可暂停 / off-the-record；
-5. runtime evidence 能证明没有静默捕获或共享。
+3. participant consent/allowance status + transparency plan 均由用户显式报告；
+4. policy 选择 AUTO 后仍需在 Live 再次显式启动，不得随 Session 静默开始；
+5. 持续可见 ACTIVE 状态，可一键 Off the record / stop；
+6. raw image 不持久化，只保存 observation text + hash + vision provenance；
+7. frozen vision route/fingerprint、LOCAL fail-closed；
+8. duplicate-frame suppression、rate limit、bounded error fail-stop；
+9. Session end/delete/Space erase 强制停止；
+10. runtime evidence 必须证明没有静默捕获或共享。
 
-Manual Screen Context 已满足这些边界并只允许显式单次抓取；AUTO Screen Context 与 Private Overlay 在这些条件满足前继续保持 Preflight blocked。
+Private Overlay 仍未满足独立 Conversation presenter-visible runtime，因此继续保持 Preflight blocked。
 
 ## Phase 2 — Read-only Context Connectors
 

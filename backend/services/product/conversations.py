@@ -111,6 +111,51 @@ DEFAULT_SESSION_POLICY: dict[str, Any] = {
     "hidden_intent_claims": "OFF",
 }
 
+TIME_AMBIGUITY_STATES = {"EXACT", "AMBIGUOUS", "UNSPECIFIED_TIMEZONE", "NOT_PARSED", "NOT_APPLICABLE"}
+
+
+def _normalize_time_semantics(
+    raw: Optional[dict[str, Any]],
+    *,
+    original_text: str = "",
+    normalized_datetime: str = "",
+    timezone: str = "",
+    ambiguity: str = "",
+) -> dict[str, str]:
+    source = dict(raw or {})
+    original = str(source.get("original_text") or original_text or "")[:1200]
+    normalized = str(source.get("normalized_datetime") or normalized_datetime or "")[:160]
+    zone = str(source.get("timezone") or timezone or "")[:120]
+    state = str(source.get("ambiguity") or ambiguity or "").upper().strip()
+    if not state:
+        if not original and not normalized:
+            state = "NOT_APPLICABLE"
+        elif normalized and zone:
+            state = "EXACT"
+        elif normalized:
+            state = "UNSPECIFIED_TIMEZONE"
+        else:
+            state = "AMBIGUOUS"
+    if state not in TIME_AMBIGUITY_STATES:
+        raise ValueError("时间歧义状态不支持")
+    return {
+        "original_text": original,
+        "normalized_datetime": normalized,
+        "timezone": zone,
+        "ambiguity": state,
+    }
+
+
+def _time_semantics_resolved(value: Optional[dict[str, Any]]) -> bool:
+    ts = _normalize_time_semantics(value)
+    return bool(
+        ts["ambiguity"] == "EXACT"
+        and ts["normalized_datetime"]
+        and ts["timezone"]
+    )
+
+
+
 
 def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     source = {**DEFAULT_SESSION_POLICY, **dict(base or {}), **dict(raw or {})}
@@ -1628,6 +1673,7 @@ def add_item(
     owner_id: str = "",
     speaker_id: str = "",
     due_at: str = "",
+    time_semantics: Optional[dict[str, Any]] = None,
     source_refs: Optional[list[dict[str, Any]]] = None,
     source_excerpt: str = "",
     confidence: float = 0.0,
@@ -1643,6 +1689,11 @@ def add_item(
     review_status = _require_choice(review_status, REVIEW_STATUSES, "审核状态")
     epistemic_status = _require_choice(epistemic_status, EPISTEMIC_STATUSES, "认知状态")
     refs = list(source_refs or [])
+    temporal = _normalize_time_semantics(
+        time_semantics,
+        original_text=(title if item_type == "Deadline" else ""),
+        normalized_datetime=str(due_at or ""),
+    )
     if item_type == "Deadline" and not refs:
         raise ValueError("Deadline 必须带来源")
     if state == "AGREED" and not (refs and review_status in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}):
@@ -1663,7 +1714,8 @@ def add_item(
         "detail": str(detail or "")[:5000],
         "speaker_id": str(speaker_id or "")[:120],
         "owner_id": str(owner_id or "")[:120],
-        "due_at": str(due_at or "")[:120],
+        "due_at": str(due_at or temporal.get("normalized_datetime") or "")[:120],
+        "time_semantics": temporal,
         "source_refs": refs,
         "source_excerpt": str(source_excerpt or "")[:3000],
         "confidence": max(0.0, min(1.0, float(confidence or 0.0))),
@@ -1685,6 +1737,14 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
     action = str(action or "").upper()
     patch = dict(patch or {})
     update: dict[str, Any] = {}
+    temporal = _normalize_time_semantics(
+        patch.get("time_semantics") if isinstance(patch.get("time_semantics"), dict) else item.get("time_semantics"),
+        original_text=str(item.get("title") or ""),
+        normalized_datetime=str(patch.get("due_at") or item.get("due_at") or ""),
+    )
+    if "time_semantics" in patch or "due_at" in patch:
+        update["time_semantics"] = temporal
+        update["due_at"] = temporal.get("normalized_datetime") or str(patch.get("due_at") or item.get("due_at") or "")
     if action == "CONFIRM":
         update["review_status"] = "USER_CONFIRMED"
         if item["type"] == "Decision" and item["state"] == "PROPOSED":
@@ -1695,12 +1755,23 @@ def review_item(item_id: str, action: str, patch: Optional[dict[str, Any]] = Non
             owner = str(patch.get("owner_id") or item.get("owner_id") or "")
             if not owner or not item.get("source_refs"):
                 raise ValueError("Commitment 确认前需要 owner 与来源")
+            if temporal["original_text"] and temporal["ambiguity"] != "NOT_APPLICABLE" and not _time_semantics_resolved(temporal):
+                raise ValueError("Commitment 的时间仍有歧义；确认前请补 normalized datetime 与 timezone")
             update["owner_id"] = owner
             update["state"] = "COMMITTED"
+        elif item["type"] == "Deadline" and item["state"] == "PROPOSED":
+            if not item.get("source_refs"):
+                raise ValueError("Deadline 确认前需要来源")
+            if not _time_semantics_resolved(temporal):
+                raise ValueError("Deadline 时间仍有歧义；确认前请补 normalized datetime 与 timezone")
+            update["state"] = "COMMITTED"
     elif action == "EDIT":
-        for key in ("title", "detail", "owner_id", "speaker_id", "due_at", "source_excerpt"):
+        for key in ("title", "detail", "owner_id", "speaker_id", "source_excerpt"):
             if key in patch:
                 update[key] = patch[key]
+        if "time_semantics" in patch or "due_at" in patch:
+            update["time_semantics"] = temporal
+            update["due_at"] = temporal.get("normalized_datetime") or str(patch.get("due_at") or "")
         update["review_status"] = "USER_EDITED"
     elif action == "REJECT":
         update.update({"review_status": "USER_REJECTED", "state": "UNKNOWN"})
@@ -1861,6 +1932,12 @@ def extract_transcript_candidates(session_id: str) -> list[dict[str, Any]]:
                     title=sentence[:1000],
                     state="PROPOSED",
                     owner_id=owner_id,
+                    time_semantics=({
+                        "original_text": sentence[:1000],
+                        "normalized_datetime": "",
+                        "timezone": "",
+                        "ambiguity": "AMBIGUOUS",
+                    } if item_type == "Deadline" else None),
                     source_refs=[ref],
                     source_excerpt=sentence[:500],
                     confidence=0.85,

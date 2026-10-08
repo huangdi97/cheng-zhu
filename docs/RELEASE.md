@@ -18,7 +18,7 @@ Prerelease / Beta
 Rules:
 
 - a stable SemVer such as `1.4.2` publishes as a normal GitHub Release and may become `Latest`;
-- a SemVer prerelease such as `2.0.0-beta.1` publishes with `prerelease=true` and `latest=false`;
+- a SemVer prerelease such as `2.0.0-beta.2` publishes with `prerelease=true` and `latest=false`;
 - publishing a Beta must never replace the current stable `/releases/latest`;
 - a Beta uses the same exact-SHA, clean-install, SHA256, download-back and provenance gates as stable;
 - a public Beta proves productization engineering, not real-user value or PMF.
@@ -27,7 +27,7 @@ Current channel truth for this candidate:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Candidate = v2.0.0-beta.1
+Conversation Beta Candidate = v2.0.0-beta.2
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE

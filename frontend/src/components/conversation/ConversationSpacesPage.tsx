@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { ArrowRight, Plus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Plus, Search } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import type { ConversationProfile } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
@@ -14,6 +14,11 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
   const [goal, setGoal] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [searchType, setSearchType] = useState(query.find ?? '')
+  const [searchText, setSearchText] = useState(query.q ?? '')
+  const [searchBusy, setSearchBusy] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [searchResults, setSearchResults] = useState<Awaited<ReturnType<typeof conversationApi.searchItems>>['items']>([])
   const templateMap = useMemo(() => new Map((templates.data?.items ?? []).map((x) => [x.key, x])), [templates.data])
   const groups = useMemo(() => {
     const now = Date.now() / 1000
@@ -33,6 +38,22 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
     return result.filter((group) => group.items.length)
   }, [spaces.data])
 
+  const searchItems = async (type = searchType, q = searchText) => {
+    setSearchBusy(true); setSearchError('')
+    try {
+      const result = await conversationApi.searchItems(q.trim(), type, 80)
+      setSearchResults(result.items)
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : String(e))
+    } finally { setSearchBusy(false) }
+  }
+
+  useEffect(() => {
+    if (query.find || query.q) void searchItems(query.find ?? '', query.q ?? '')
+    // Route query is the command-palette entry point; do not re-run on typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.find, query.q])
+
   const create = async () => {
     if (!title.trim()) return
     setSaving(true); setSaveError('')
@@ -50,6 +71,42 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
     <Page testId="conversation-spaces">
       <PageHeader title="对话空间" subtitle="一个 Space 承载多场连续对话，而不是一张会议文件夹。"
         actions={<PrimaryButton onClick={() => setShowCreate(true)} icon={<Plus className="h-3.5 w-3.5" />}>新建空间</PrimaryButton>} />
+
+      <section className="mb-5 rounded-2xl border border-bg-tertiary/70 bg-bg-secondary/20 p-4" aria-label="Conversation 全局查找" data-testid="conversation-search">
+        <div className="flex flex-wrap items-center gap-2">
+          <Search className="h-4 w-4 text-accent-blue" aria-hidden />
+          <h2 className="text-sm font-semibold text-text-primary">查找长期对话事实</h2>
+          <span className="text-[11px] text-text-muted">只返回结构化 Item；每条结果带 Space / Session / 时间 / provenance。</span>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
+          <select className={inputCls} value={searchType} onChange={(e) => setSearchType(e.target.value)}>
+            <option value="">全部 Item</option>
+            <option value="Decision">Decision</option>
+            <option value="Commitment">Commitment / Task</option>
+            <option value="OpenQuestion">Open Question</option>
+          </select>
+          <input className={inputCls} value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="关键词可为空；为空时按最近更新返回" onKeyDown={(e) => { if (e.key === 'Enter') void searchItems() }} />
+          <SecondaryButton onClick={() => void searchItems()} disabled={searchBusy}>{searchBusy ? '查找中…' : '查找'}</SecondaryButton>
+        </div>
+        {searchError ? <div className="mt-3"><ErrorState message={searchError} /></div> : null}
+        {(query.find || query.q || searchResults.length > 0) ? (
+          <div className="mt-4 space-y-2">
+            {searchResults.length ? searchResults.map((item) => (
+              <button key={item.id} type="button"
+                onClick={() => navigate(paths.conversationSpace(item.space_id, item.type === 'Decision' ? 'decisions' : 'overview'))}
+                className="w-full rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2 text-left hover:bg-bg-hover/45">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={item.review_status === 'AI_EXTRACTED' ? 'warn' : 'ok'}>{item.type}</StatusBadge>
+                  <StatusBadge tone="muted">{item.state}</StatusBadge>
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold text-text-primary">{item.title}</span>
+                </div>
+                <div className="mt-1 text-[11px] text-text-muted">{item.space_title} · {item.session_title || '未命名 Session'} · {formatWhen(item.updated_at || item.created_at)}</div>
+                <div className="mt-1 text-[10px] text-text-muted">来源：{item.source_refs.length ? item.source_refs.map((ref) => ref.kind).join(' · ') : '未附来源'} · review={item.review_status}</div>
+              </button>
+            )) : <p className="text-xs text-text-muted">没有找到符合条件的结构化 Conversation Item。</p>}
+          </div>
+        ) : null}
+      </section>
 
       {showCreate ? (
         <div className="mb-5 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">

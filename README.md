@@ -298,6 +298,17 @@ python -m pytest backend/tests -q
 `http://localhost:18080`。只有 `python start.py --mode network`、`IA_AUTH_ENABLE=1`
 或设置了 `IA_AUTH_TOKEN` 时，才会要求局域网请求携带 token。
 
+### Conversation Beta 人工评测（仅本地）
+
+工程通过不代表真实用户价值。对于自行授权的真实或内部试用会话，可先在**本机**导出未标注复核队列，再由评审者填写标签：
+
+```bash
+python scripts/v2_conversation_label_seed.py --db /path/to/product.db --out ./local-review-seed.jsonl
+python scripts/v2_conversation_human_eval.py ./reviewed-labels.jsonl --out ./local-eval.json
+```
+
+模板与说明见 [Conversation Human-label Evaluation Protocol](docs/evals/V2_CONVERSATION_HUMAN_LABEL_PROTOCOL.md)。原始标签可能含私人会议事实，请勿上传到公开仓库或 CI。缺少标签的指标保持 N/A；有人工标签也**不自动代表**真实外部用户验证、稳定发布或 PMF。
+
 ## 文档
 
 canonical：Interview 当前稳定产品以 [v1.3-R2](docs/canonical/Chengzhu_v1.3-R2_CANONICAL.md) / [v1.4-R1](docs/canonical/Chengzhu_v1.4-R1_VALIDATION_HARDENING.md) 为准；Conversation v2 以 [v2.0-R1 Personal Conversation Intelligence](docs/canonical/Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md) + [Implementation Master Goal](docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md) + [Design → Runtime Closure Matrix](docs/canonical/Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md) 为准；冻结核心：[v1.2-R2](docs/canonical/Chengzhu_v1.2-R2_CANONICAL.md)（v1.0-R1 仅作历史来源）；开发 / 发布 / 排障：[DEVELOPMENT](docs/DEVELOPMENT.md) · [RELEASE](docs/RELEASE.md) · [TROUBLESHOOTING](docs/TROUBLESHOOTING.md)；架构与专题文档：

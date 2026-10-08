@@ -119,9 +119,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   if (session.loading) return <Page><Loading /></Page>
   if (session.error || !session.data) return <Page><ErrorState message={session.error ?? '会话不存在'} onRetry={session.reload} /></Page>
   const s = session.data
-  const captureView = captureStatusError && s.status === 'ACTIVE' && s.capture_mode === 'TRANSCRIPT'
-    ? { label: '音频状态不可确认', listening: false }
-    : captureViewState(s, capture)
+  const captureView = captureViewState(s, capture, captureStatusError)
 
   const startCapture = async () => {
     if (!primaryDevice) {

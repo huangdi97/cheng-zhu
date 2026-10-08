@@ -292,6 +292,22 @@ def ask_session(session_id: str, body: AskBody):
         return conversations.ask(session_id, body.question)
 
 
+class ScreenContextCapture(BaseModel):
+    region: str = Field(default="configured", max_length=40)
+
+
+@router.get("/sessions/{session_id}/screen-context")
+def list_screen_context(session_id: str, limit: int = 20):
+    with domain_errors():
+        return {"items": conversations.screen_context(session_id, limit)}
+
+
+@router.post("/sessions/{session_id}/screen-context/capture")
+def capture_screen_context(session_id: str, body: ScreenContextCapture):
+    with domain_errors():
+        return conversations.capture_screen_context(session_id, region=body.region)
+
+
 class CaptureStart(BaseModel):
     device_id: int
     candidate_mic_device_id: Optional[int] = None

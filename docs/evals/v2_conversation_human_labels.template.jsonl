@@ -1,0 +1,10 @@
+# Chengzhu v2 Conversation human-label template.
+# Replace placeholder ids/values. Comments beginning with # are ignored.
+
+{"kind":"guidance","session_id":"REPLACE","event_id":"REPLACE","reviewer":"REPLACE","guidance_class":"PROACTIVE","useful":true,"interruption_regret":false,"source_correct":true,"notes":""}
+{"kind":"guidance","session_id":"REPLACE","event_id":"REPLACE","reviewer":"REPLACE","guidance_class":"RECALL","recall_correct":true,"source_correct":true,"notes":""}
+{"kind":"silence","session_id":"REPLACE","event_id":"REPLACE","reviewer":"REPLACE","silence_correct":true,"notes":""}
+{"kind":"direct_question","session_id":"REPLACE","event_id":"REPLACE","reviewer":"REPLACE","predicted":true,"actual":true}
+{"kind":"truth_item","session_id":"REPLACE","event_id":"REPLACE","reviewer":"REPLACE","predicted_type":"Decision","actual_type":"Decision","predicted_state":"AGREED","actual_state":"AGREED"}
+{"kind":"continue","session_id":"REPLACE","reviewer":"REPLACE","writeback_accurate":true,"notes":""}
+{"kind":"session_outcome","session_id":"REPLACE","reviewer":"REPLACE","cognitive_load_delta":-1,"would_reuse_space":true,"notes":""}

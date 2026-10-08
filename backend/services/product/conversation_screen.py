@@ -241,7 +241,7 @@ def capture_manual(
     """Capture one explicit screenshot and persist only its extracted observation."""
     with _auto_lock:
         if _auto_session_id == session.get("id"):
-            raise ValueError("AUTO Screen Context 正在运行；请先 Off the record 或停止 AUTO，再执行手动截图")
+            raise ValueError("AUTO Screen Context 已占用本场屏幕捕获；Off the record 期间也不允许手动抓取，请先停止 AUTO")
     row = _capture_once(
         session,
         requested_mode="MANUAL",

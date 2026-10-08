@@ -521,7 +521,7 @@ Capture start 必须二次校验，防止 Preflight 后配置改变。
 以下能力在真实 runtime 未接线前必须阻止开始或标明 unavailable：
 
 ## Conversation Screen Context
-不能直接假设 Interview screenshot pipeline 可以安全复用。
+MANUAL 已实现为 Conversation-owned capability：每次由用户主动抓取，原图不落库，保存的只是 observation text + image/model-route provenance；LOCAL processing 下 remote vision fail-closed，冻结 vision fingerprint 在会中变化时拒绝继续抓取。AUTO 仍未接线，不能直接假设 Interview screenshot pipeline 可以安全复用。
 
 ## Conversation Human Coach
 不能把 Interview practice/live Coach 权限直接映射到 Conversation。
@@ -753,7 +753,7 @@ PR 合并后至少要有：
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- unwired screen / coach / private overlay / connectors 明确 blocked；
+- Manual Screen Context 可用且 AUTO screen / coach / private overlay / connectors 明确 blocked；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；

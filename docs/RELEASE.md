@@ -6,6 +6,36 @@ A successful local build is **not** a release.
 
 A release is complete only when GitHub contains the published assets and the workflow has downloaded them back, verified them and replayed installation/smoke from the downloaded files.
 
+## Release channels
+
+Chengzhu has two independent public channels:
+
+```text
+Stable
+Prerelease / Beta
+```
+
+Rules:
+
+- a stable SemVer such as `1.4.2` publishes as a normal GitHub Release and may become `Latest`;
+- a SemVer prerelease such as `2.0.0-beta.1` publishes with `prerelease=true` and `latest=false`;
+- publishing a Beta must never replace the current stable `/releases/latest`;
+- a Beta uses the same exact-SHA, clean-install, SHA256, download-back and provenance gates as stable;
+- a public Beta proves productization engineering, not real-user value or PMF.
+
+Current channel truth for this candidate:
+
+```text
+Stable Latest = v1.4.2
+Conversation Beta Candidate = v2.0.0-beta.1
+Stable v2 = NOT CLAIMED
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
+
+
 ## Windows artifacts
 
 | File | Purpose |
@@ -48,6 +78,15 @@ Required path:
 
 A failing clean-install, download-back or source/tag provenance gate is a release failure.
 
+### Conversation packaged UI evidence visibility
+
+Conversation Beta captures from `frontend/scripts/capture-v20-conversation-packaged-evidence.mjs` use the built Windows backend sidecar and built `frontend-dist`. They are **packaged web-runtime screenshots**, not proof of native Electron window ergonomics or human visual acceptance.
+
+Before every Home / Space / Prepare / Live / Sessions / History screenshot, the harness must assert that no `aria-modal` dialog or full-screen dimming backdrop obstructs the surface. If the Interview model drawer or any other blocking dialog appears, save a clearly marked `-BLOCKED.png` diagnostic and **fail** the evidence gate. A screenshot+SHA256 of an obscured page is not acceptable UI evidence.
+
+The Conversation Beta local deterministic runtime must be accessible with no Interview model API key; Interview's first-run model-setup nudge cannot automatically hijack Conversation routes. The manifest explicitly records `surface_visibility = UNOBSTRUCTED_BY_MODAL` and `human_visual_acceptance = false`. Native Windows interactive visual acceptance remains a separate real-desktop evidence gate.
+
+
 ## NSIS hosted-runner reliability
 
 Hosted Windows runners can occasionally fail before target files are written.
@@ -64,7 +103,9 @@ Retry must never become “ignore installer failure”.
 
 ## Version consistency
 
-Before release, all version-bearing surfaces must agree:
+Before release, all version-bearing surfaces must agree. The version may be stable (`X.Y.Z`) or prerelease (`X.Y.Z-<label>`); release notes must use the exact same version string.
+
+
 
 ```text
 frontend/package.json
@@ -120,7 +161,7 @@ Required:
 - expected assets exist;
 - release download-back verification succeeds.
 
-Only after this may the version become Current Stable.
+Only after this may a **stable-channel** version become Current Stable. A prerelease that passes the same gate becomes a verified public Beta, remains `prerelease=true`, and must not become GitHub Latest.
 
 ## Evidence boundary
 

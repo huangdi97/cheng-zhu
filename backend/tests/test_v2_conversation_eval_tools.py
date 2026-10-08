@@ -115,3 +115,103 @@ def test_label_seed_is_unlabeled_review_queue(product_env, tmp_path):
     assert truth["actual_state"] is None
     assert outcome["cognitive_load_delta"] is None
     assert outcome["would_reuse_space"] is None
+
+
+def test_seed_cli_refuses_to_overwrite_source_database_or_existing_labels(tmp_path, monkeypatch):
+    import sys
+
+    import pytest
+
+    seed = _load("v2_label_seed_safe_output", "scripts/v2_conversation_label_seed.py")
+    db = tmp_path / "product.db"
+    original_db = b"existing-private-database"
+    db.write_bytes(original_db)
+    monkeypatch.setattr(sys, "argv", ["seed", "--db", str(db), "--out", str(db)])
+    with pytest.raises(SystemExit):
+        seed.main()
+    assert db.read_bytes() == original_db
+
+    existing = tmp_path / "labels.seed.jsonl"
+    existing.write_text('{"reviewer":"human","useful":true}\n', encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["seed", "--db", str(db), "--out", str(existing)])
+    with pytest.raises(SystemExit):
+        seed.main()
+    assert existing.read_text(encoding="utf-8") == '{"reviewer":"human","useful":true}\n'
+
+
+def test_human_eval_rejects_duplicate_reviewer_event(tmp_path):
+    import json
+
+    import pytest
+
+    human_eval = _load("v2_human_eval_dedup", "scripts/v2_conversation_human_eval.py")
+    row = {
+        "kind": "guidance",
+        "session_id": "cs_1",
+        "event_id": "g_1",
+        "reviewer": "Alice",
+        "guidance_class": "PROACTIVE",
+        "useful": True,
+    }
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(json.dumps(row) + "\n" + json.dumps({**row, "reviewer": "alice"}) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate label"):
+        human_eval.load_rows(labels)
+
+    labels.write_text(json.dumps(row) + "\n" + json.dumps({**row, "reviewer": "Bob"}) + "\n", encoding="utf-8")
+    assert len(human_eval.load_rows(labels)) == 2
+
+
+def test_human_eval_rejects_non_rubric_or_nonfinite_cognitive_labels(tmp_path):
+    import json
+
+    import pytest
+
+    human_eval = _load("v2_human_eval_cognitive", "scripts/v2_conversation_human_eval.py")
+    labels = tmp_path / "labels.jsonl"
+    base = {"kind": "session_outcome", "session_id": "cs_1", "reviewer": "Alice"}
+    for invalid in (True, 3, -3, "1", float("nan"), float("inf")):
+        labels.write_text(
+            json.dumps({**base, "cognitive_load_delta": invalid}) + "\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError):
+            human_eval.load_rows(labels)
+
+    rows = [
+        {**base, "cognitive_load_delta": True},
+        {**base, "cognitive_load_delta": 99},
+        {**base, "cognitive_load_delta": float("nan")},
+        {**base, "cognitive_load_delta": -2},
+        {**base, "cognitive_load_delta": 2},
+    ]
+    assert human_eval.aggregate(rows)["metrics"]["mean_cognitive_load_delta"] == {"value": 0.0, "n": 2}
+
+
+def test_human_eval_cli_never_overwrites_its_labels(tmp_path, monkeypatch):
+    import json
+    import sys
+
+    import pytest
+
+    human_eval = _load("v2_human_eval_safe_output", "scripts/v2_conversation_human_eval.py")
+    labels = tmp_path / "labeled.jsonl"
+    original = json.dumps({
+        "kind": "silence",
+        "session_id": "cs_1",
+        "reviewer": "Alice",
+        "silence_correct": True,
+    }) + "\n"
+    labels.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["human-eval", str(labels), "--out", str(labels)])
+    with pytest.raises(SystemExit):
+        human_eval.main()
+    assert labels.read_text(encoding="utf-8") == original
+
+    report = tmp_path / "report.txt"
+    monkeypatch.setattr(sys, "argv", [
+        "human-eval", str(labels), "--out", str(report), "--markdown-out", str(report),
+    ])
+    with pytest.raises(SystemExit):
+        human_eval.main()
+    assert not report.exists()

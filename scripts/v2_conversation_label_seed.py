@@ -160,10 +160,19 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    rows = export_rows(Path(args.db), space_id=args.space_id)
+    db = Path(args.db)
     out = Path(args.out)
+    # A human-label seed contains potentially private transcript excerpts. Never
+    # destroy the source DB or overwrite an existing, possibly reviewed, seed.
+    if db.resolve() == out.resolve():
+        parser.error("--out must not overwrite the source product.db")
+    if out.exists():
+        parser.error("--out already exists; choose a new path to preserve labels")
+
+    rows = export_rows(db, space_id=args.space_id)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", encoding="utf-8") as fh:
+    # Exclusive creation also protects against a race between the check and open.
+    with out.open("x", encoding="utf-8") as fh:
         fh.write("# UNLABELED REVIEW SEED — fill reviewer + label fields before evaluation.\n")
         fh.write("# This file is not real-user evidence until a human reviews the rows.\n")
         for row in rows:

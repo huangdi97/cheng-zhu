@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -43,15 +44,28 @@ def _boolean(row: dict[str, Any], key: str) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _cognitive_delta(row: dict[str, Any]) -> float | None:
+    """Human rubric permits numeric -2..2 only, excluding booleans and NaN."""
+    value = row.get("cognitive_load_delta")
+    if type(value) not in (int, float) or not -2 <= value <= 2:
+        return None
+    return float(value) if math.isfinite(value) else None
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON number {value!r} is not allowed")
+
+
 def load_rows(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         text = raw.strip()
         if not text or text.startswith("#"):
             continue
         try:
-            row = json.loads(text)
-        except json.JSONDecodeError as exc:
+            row = json.loads(text, parse_constant=_reject_nonfinite_json)
+        except ValueError as exc:
             raise ValueError(f"line {lineno}: invalid JSON: {exc}") from exc
         if not isinstance(row, dict):
             raise ValueError(f"line {lineno}: row must be an object")
@@ -62,6 +76,22 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"line {lineno}: reviewer is required")
         if str(row.get("session_id") or "").strip().upper() in {"", "REPLACE", "TBD", "PLACEHOLDER"}:
             raise ValueError(f"line {lineno}: session_id is required")
+        if kind == "session_outcome" and row.get("cognitive_load_delta") is not None:
+            if _cognitive_delta(row) is None:
+                raise ValueError(f"line {lineno}: cognitive_load_delta must be a number in [-2, 2]")
+        # One reviewer must not inflate a metric by pasting the same event twice.
+        # Different reviewers can still independently label the same event.
+        event_id = str(row.get("event_id") or "").strip()
+        if event_id or kind in {"continue", "session_outcome"}:
+            key = (
+                str(row["reviewer"]).strip().casefold(),
+                str(row["session_id"]).strip(),
+                kind,
+                event_id,
+            )
+            if key in seen:
+                raise ValueError(f"line {lineno}: duplicate label for reviewer/session/kind/event")
+            seen.add(key)
         rows.append(row)
     return rows
 
@@ -107,9 +137,9 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
     outcome_rows = [r for r in rows if r["kind"] == "session_outcome"]
     cognitive = [
-        float(r["cognitive_load_delta"])
+        value
         for r in outcome_rows
-        if isinstance(r.get("cognitive_load_delta"), (int, float))
+        if (value := _cognitive_delta(r)) is not None
     ]
     reuse = [r for r in outcome_rows if _boolean(r, "would_reuse_space") is not None]
 
@@ -207,7 +237,13 @@ def main() -> int:
     parser.add_argument("--markdown-out", default="")
     args = parser.parse_args()
 
-    rows = load_rows(Path(args.labels))
+    labels_path = Path(args.labels)
+    output_paths = [Path(path) for path in (args.out, args.markdown_out) if path]
+    resolved = [labels_path.resolve(), *(path.resolve() for path in output_paths)]
+    if len(resolved) != len(set(resolved)):
+        parser.error("evaluation outputs must not overwrite the labels or each other")
+
+    rows = load_rows(labels_path)
     report = aggregate(rows)
     payload = json.dumps(report, ensure_ascii=False, indent=2)
     print(payload)

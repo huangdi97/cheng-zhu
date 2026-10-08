@@ -793,6 +793,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByLabel('来源 / 依据').fill('Benchmark Note · confirmed')
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
     await expect(page.getByText('CONTRIBUTION_OPPORTUNITY')).toBeVisible()
+    await expect(page.getByText('PRIMARY_CARD', { exact: true })).toBeVisible()
+    await expect(page.getByText('target cp-1', { exact: true })).toBeVisible()
     await expect(page.getByRole('paragraph').filter({ hasText: 'Q4 benchmark 已覆盖 10x data scale' })).toBeVisible()
 
     await testInfo.attach('v2-live-guidance', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
@@ -842,6 +844,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '评估当前 Guidance' }).click()
     await expect(page.getByText('这一次选择不打扰你')).toBeVisible()
     await expect(page.getByText('SILENT · USER_SPEAKING')).toBeVisible()
+    await expect(page.getByText(/Expression Plan · SILENCE/)).toBeVisible()
   })
 
   test('SILENT polling never revives an older shown Guidance card', async ({ context, page }) => {
@@ -874,7 +877,9 @@ test.describe('v2.0 Conversation Profile', () => {
     })
     await page.goto(`/#/conversation/live/${SESSION.id}`)
     await expect.poll(() => guidanceReads).toBeGreaterThan(0)
-    await expect(page.getByText('等待高价值 Guidance')).toBeVisible()
+    await expect(page.getByText('这一次选择不打扰你')).toBeVisible()
+    await expect(page.getByText('SILENT · USER_SPEAKING')).toBeVisible()
+    await expect(page.getByText(/Expression Plan · SILENCE/)).toBeVisible()
     await expect(page.getByText(prior.text)).toHaveCount(0)
   })
 

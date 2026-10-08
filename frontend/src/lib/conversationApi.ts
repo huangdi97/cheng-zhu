@@ -157,7 +157,11 @@ export const conversationApi = {
   guidanceHistory: (id: string, limit = 30) =>
     request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/guidance?limit=${limit}`).then((p) => list<ConversationGuidance>(p)),
   preflight: (id: string) => request<ConversationPreflight>(`${B}/sessions/${encodeURIComponent(id)}/preflight`),
-  start: (id: string) => request<{ session: ConversationSession; pack: Record<string, unknown> }>(`${B}/sessions/${encodeURIComponent(id)}/start`, json('POST')),
+  start: (id: string, body: { share_privacy_runtime_proof?: string } = {}) =>
+    request<{ session: ConversationSession; pack: Record<string, unknown> }>(
+      `${B}/sessions/${encodeURIComponent(id)}/start`,
+      json('POST', body),
+    ),
   end: (id: string) => request<ConversationContinue>(`${B}/sessions/${encodeURIComponent(id)}/end`, json('POST')),
   continue: (id: string) => request<ConversationContinue>(`${B}/sessions/${encodeURIComponent(id)}/continue`),
   addItem: (id: string, body: {

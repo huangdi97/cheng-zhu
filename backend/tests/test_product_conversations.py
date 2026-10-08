@@ -1091,22 +1091,64 @@ def test_capture_rechecks_processing_policy_after_preflight(product_env, monkeyp
         conversation_capture.start(session["id"], 1001)
 
 
-def test_unwired_share_privacy_and_connector_permissions_block_preflight(product_env):
+def test_private_overlay_is_available_but_start_requires_verified_desktop_runtime(product_env):
     space = conversations.create_space("Privacy Truth", "CLIENT_CALL")
     session = conversations.create_session(
         space["id"],
         consent_ack=True,
-        policy={
-            "share_privacy": "PRIVATE_OVERLAY",
-            "connector_permissions": ["calendar.read"],
-        },
+        policy={"share_privacy": "PRIVATE_OVERLAY"},
+    )
+    check = conversations.preflight(session["id"])
+    assert not any(x["key"] == "share_privacy_runtime" for x in check["blockers"])
+    assert any(x["key"] == "share_privacy_verify_at_start" for x in check["warnings"])
+    share_item = next(x for x in check["items"] if x["key"] == "share")
+    assert share_item["ok"] is True
+    assert "VERIFY_AT_START" in share_item["value"]
+    assert check["share_privacy_runtime"]["requested"] == "PRIVATE_OVERLAY"
+    assert check["share_privacy_runtime"]["proof_required"] is True
+    assert check["share_privacy_runtime"]["verified"] is False
+
+    with pytest.raises(ValueError, match="Electron content protection"):
+        conversations.start_session(session["id"])
+
+    started = conversations.start_session(
+        session["id"],
+        share_privacy_runtime_proof=conversations.SHARE_PRIVACY_RUNTIME_PROOF,
+    )
+    frozen = started["pack"]["payload"]["share_privacy_runtime"]
+    assert frozen["requested"] == "PRIVATE_OVERLAY"
+    assert frozen["verified"] is True
+    assert frozen["runtime"] == "ELECTRON_SET_CONTENT_PROTECTION"
+    context = conversations.session_context(session["id"])
+    assert context["share_privacy_runtime"]["verified"] is True
+
+
+def test_connector_permission_remains_a_real_preflight_blocker(product_env):
+    space = conversations.create_space("Connector Truth", "CLIENT_CALL")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"connector_permissions": ["calendar.read"]},
     )
     check = conversations.preflight(session["id"])
     keys = {x["key"] for x in check["blockers"]}
-    assert {"share_privacy_runtime", "connector_runtime"} <= keys
+    assert "connector_runtime" in keys
     item_state = {x["key"]: x["ok"] for x in check["items"]}
-    assert item_state["share"] is False
     assert item_state["connectors"] is False
+
+
+def test_share_privacy_off_does_not_require_runtime_proof(product_env):
+    space = conversations.create_space("No Share Privacy", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"share_privacy": "OFF"},
+    )
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["share_privacy_runtime"]
+    assert frozen["requested"] == "OFF"
+    assert frozen["verified"] is True
+    assert frozen["proof_required"] is False
 
 
 def test_processing_off_requires_no_transcript_and_ai_forbidden(product_env):

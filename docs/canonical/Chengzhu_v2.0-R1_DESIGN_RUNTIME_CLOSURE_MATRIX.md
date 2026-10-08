@@ -532,7 +532,7 @@ reviewed output evidence
 | Conversation Manual Screen Context | RUNTIME_AVAILABLE | 独立 Conversation namespace；单次用户触发；raw image 不持久化；提取文本为 OBSERVED_NOT_CONFIRMED；vision route/fingerprint 冻结并受 processing policy 约束 |
 | Conversation AUTO Screen Context | RUNTIME_AVAILABLE | policy 允许 ≠ 自动启动；Live 二次显式 start；ACTIVE/OFF THE RECORD 可见；consent/transparency user-report gate；同帧去重/限频/连续错误 fail-stop；raw image 不持久化；frozen vision route；Session/Space lifecycle 强制 stop |
 | Conversation Human Coach | BLOCKED | 需要独立 policy / disclosure / runtime evidence |
-| Conversation Private Overlay / Share Privacy | BLOCKED | 需要 presenter-visible control 与 Conversation namespace |
+| Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
 | Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |
 | External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
@@ -726,7 +726,6 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 - Calendar / Mail / Docs / project tracker connector；
 - OS notification/discovery；
 - Human Coach；
-- Private Overlay；
 - actual external write-back execution；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；

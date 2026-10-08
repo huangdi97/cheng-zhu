@@ -28,6 +28,36 @@ test('share privacy copy never promises undetectability', () => {
   assert.match(sharePrivacy.SHARE_PRIVACY_COPY, /不是安全或“不可检测”保证/);
 });
 
+test('share privacy runtime snapshot verifies actual live window flags', () => {
+  const protectedWindow = { isDestroyed: () => false, isContentProtected: () => true };
+  const unprotectedWindow = { isDestroyed: () => false, isContentProtected: () => false };
+
+  const privateOk = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', protectedWindow, protectedWindow, 'win32');
+  assert.equal(privateOk.protected, true);
+  assert.equal(privateOk.runtime_verified, true);
+  assert.equal(privateOk.main_window_protected, true);
+  assert.equal(privateOk.overlay_window_protected, true);
+  assert.equal(privateOk.windows_capture_exclusion_may_lag, true);
+
+  const partial = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', protectedWindow, unprotectedWindow, 'win32');
+  assert.equal(partial.protected, false);
+  assert.equal(partial.runtime_verified, false);
+
+  const mainOnly = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', protectedWindow, null, 'win32');
+  assert.equal(mainOnly.runtime_verified, true);
+
+  const staleOff = sharePrivacy.runtimeSnapshot('OFF', protectedWindow, null, 'win32');
+  assert.equal(staleOff.protected, true);
+  assert.equal(staleOff.runtime_verified, false);
+});
+
+test('share privacy runtime snapshot surfaces macOS ScreenCaptureKit limitation', () => {
+  const protectedWindow = { isDestroyed: () => false, isContentProtected: () => true };
+  const snapshot = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', protectedWindow, null, 'darwin');
+  assert.equal(snapshot.runtime_verified, true);
+  assert.equal(snapshot.macos_screencapturekit_limitation, true);
+});
+
 test('state notifies listeners on change', () => {
   const state = sharePrivacy.createSharePrivacyState('OFF');
   const seen = [];

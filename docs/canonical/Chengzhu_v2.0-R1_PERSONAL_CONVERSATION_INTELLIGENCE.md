@@ -891,7 +891,11 @@ Audio store = OFF
 
 这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
 
-Conversation Screen Context 已产品化 **MANUAL + explicit-start AUTO**。MANUAL 每次由用户主动抓取一次；AUTO 只表示本场 policy 允许自动观察，**不会随 Session 自动启动**，进入 Live 后仍要求用户第二次显式启动，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED 状态。AUTO 要求用户报告 participant consent/allowance 与 transparency plan；支持一键 Off the record、显式停止、同帧去重、限频、连续错误 fail-stop，Session end/delete/Space erase 强制停止。两种模式的原图都只在内存中送入冻结的 vision route，不落库；product.db 只保存提取文本、image hash、vision model/route/fingerprint，并作为 `OBSERVED_NOT_CONFIRMED` source。LOCAL processing 下 remote vision 必须 fail-closed，Session 开始后 vision fingerprint 变化也必须拒绝继续。Human Coach、Private Overlay / Share Privacy 与 external connector permission 仍保持 blocked / fail-closed。
+Conversation Screen Context 已产品化 **MANUAL + explicit-start AUTO**。MANUAL 每次由用户主动抓取一次；AUTO 只表示本场 policy 允许自动观察，**不会随 Session 自动启动**，进入 Live 后仍要求用户第二次显式启动，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED 状态。AUTO 要求用户报告 participant consent/allowance 与 transparency plan；支持一键 Off the record、显式停止、同帧去重、限频、连续错误 fail-stop，Session end/delete/Space erase 强制停止。两种模式的原图都只在内存中送入冻结的 vision route，不落库；product.db 只保存提取文本、image hash、vision model/route/fingerprint，并作为 `OBSERVED_NOT_CONFIRMED` source。LOCAL processing 下 remote vision 必须 fail-closed，Session 开始后 vision fingerprint 变化也必须拒绝继续。
+
+Conversation `PRIVATE_OVERLAY` 已接入桌面 runtime：policy 选择本身不会被当成“已保护”；点击 Start 前前端必须通过 Electron bridge 临时启用 `setContentProtection`、回读验证，并把 runtime proof 交给 backend。proof 缺失/无效时 fail-closed；verified state 冻结进 Session Pack，Live 显示 ACTIVE / UNKNOWN；正常 End 后恢复会话开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不能以该 policy 开始。该机制只是受支持窗口捕获路径上的 best-effort content protection，**不构成安全、隐身或“不可检测”承诺**。
+
+Human Coach 与 external connector permission 仍保持 blocked / fail-closed。
 
 外部 action 先进入 Review Queue，再由用户确认。
 
@@ -911,10 +915,10 @@ Conversation Screen Context 已产品化 **MANUAL + explicit-start AUTO**。MANU
 
 平台层目标仍是跨 Zoom / Teams / Meet / 腾讯会议 / 飞书等工作，但 **不等于已针对每个平台分别验证**。
 
-以下能力不能因为 Interview 已有就直接复用：
+以下能力不能因为 Interview 已有就直接复用，而必须通过 Conversation 自己的 policy / runtime proof：
 
-- overlay / Private Share；
-- automatic screenshot / screen monitoring。
+- Share Privacy / Private Overlay；
+- screenshot / screen monitoring。
 
 Manual 与 AUTO Screen Context 都已使用独立 Conversation namespace。AUTO 的进入条件冻结为：
 
@@ -929,7 +933,7 @@ Manual 与 AUTO Screen Context 都已使用独立 Conversation namespace。AUTO 
 9. Session end/delete/Space erase 强制停止；
 10. runtime evidence 必须证明没有静默捕获或共享。
 
-Private Overlay 仍未满足独立 Conversation presenter-visible runtime，因此继续保持 Preflight blocked。
+Private Overlay 已满足 Conversation desktop runtime：Preflight 只声明“Start 时验证”，实际 Start 必须由 Electron runtime proof 证明 content protection 已启用；Live 持续可见保护状态，End 恢复 baseline。
 
 ## Phase 2 — Read-only Context Connectors
 

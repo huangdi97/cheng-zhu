@@ -573,7 +573,7 @@ MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。M
 不能把 Interview practice/live Coach 权限直接映射到 Conversation。
 
 ## Conversation Private Overlay / Share Privacy
-现有 overlay 仍是 Interview Live 语义；没有 Conversation 独立证明前，`PRIVATE_OVERLAY` 不得伪装为有效。
+已实现桌面 runtime：Conversation Session Policy 可请求 `PRIVATE_OVERLAY`；Preflight 只声明“Start 时验证”，点击开始前前端通过 Electron bridge 临时启用 `setContentProtection` 并再次读取状态，随后把 runtime proof 交给 backend。proof 缺失/无效时 Start fail-closed。verified state 冻结进 Session Pack，Live 显示保护状态；会话正常结束后恢复开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不得开始该 policy。该能力只降低受支持捕获路径中的意外暴露，不是安全、隐身或“不可检测”保证。
 
 ## External connectors
 Calendar / mail / project tracker read path 未接线时，非空 connector permission 必须阻断或保持 unavailable。

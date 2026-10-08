@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Camera, Mic, PauseCircle, Pin, Play, Square, Volume2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { conversationApi } from '@/lib/conversationApi'
+import { activateConversationSharePrivacy, inspectConversationSharePrivacy, restoreConversationSharePrivacy, type ConversationSharePrivacyRuntime } from '@/lib/conversationSharePrivacy'
 import { captureViewState, createLivePollGate, latestVisibleGuidance } from './liveViewState'
 import type { AssistanceMode, ConversationAskResult, ConversationCaptureStatus, ConversationContinue, ConversationExpressionPlan, ConversationGuidance, ConversationItemType, ConversationScreenAutoStatus, ConversationScreenContext, ConversationTranscriptSegment } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
@@ -52,11 +53,47 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [screenAuto, setScreenAuto] = useState<ConversationScreenAutoStatus | null>(null)
   const [screenAutoStatusError, setScreenAutoStatusError] = useState(true)
   const [screenAutoInterval, setScreenAutoInterval] = useState('30')
+  const [sharePrivacyRuntime, setSharePrivacyRuntime] = useState<ConversationSharePrivacyRuntime | null>(null)
+  const [sharePrivacyStatusError, setSharePrivacyStatusError] = useState(false)
   const capturePollGate = useRef(createLivePollGate()).current
 
   useEffect(() => {
     if (session.data?.assistance_mode) setMode(session.data.assistance_mode)
   }, [session.data?.assistance_mode])
+
+  useEffect(() => {
+    let alive = true
+    const requested = session.data?.policy?.share_privacy
+    const status = session.data?.status
+    if (!requested) return () => { alive = false }
+
+    const sync = async () => {
+      try {
+        let runtime = await inspectConversationSharePrivacy(requested)
+        // The Session policy is stronger than tray/settings drift while ACTIVE.
+        // If another UI path drops content protection, re-assert it rather than
+        // continuing to show a stale "ACTIVE" badge.
+        if (requested === 'PRIVATE_OVERLAY' && status === 'ACTIVE' && !runtime.protected) {
+          runtime = await activateConversationSharePrivacy(sessionId, 'PRIVATE_OVERLAY')
+        }
+        if (!alive) return
+        setSharePrivacyRuntime(runtime)
+        setSharePrivacyStatusError(false)
+      } catch {
+        if (!alive) return
+        setSharePrivacyRuntime(null)
+        setSharePrivacyStatusError(true)
+      }
+    }
+    void sync()
+    const timer = requested === 'PRIVATE_OVERLAY' && status === 'ACTIVE'
+      ? window.setInterval(() => void sync(), 2000)
+      : null
+    return () => {
+      alive = false
+      if (timer !== null) window.clearInterval(timer)
+    }
+  }, [sessionId, session.data?.policy?.share_privacy, session.data?.status])
 
   useEffect(() => {
     const participants = liveContext.data?.participants ?? []
@@ -324,7 +361,19 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     setBusy(true); setError('')
     try {
       if (captureOwned) setCapture(await conversationApi.captureStop(sessionId))
-      setSummary(await conversationApi.end(sessionId)); await session.reload()
+      const ended = await conversationApi.end(sessionId)
+      setSummary(ended)
+      if (s.policy?.share_privacy === 'PRIVATE_OVERLAY') {
+        try {
+          const restored = await restoreConversationSharePrivacy(sessionId)
+          setSharePrivacyRuntime(restored)
+          setSharePrivacyStatusError(false)
+        } catch {
+          setSharePrivacyStatusError(true)
+          setError('会话已结束，但无法确认 Share Privacy 已恢复到会话前状态。为安全起见，请在设置或托盘中检查共享隐私状态。')
+        }
+      }
+      await session.reload()
     }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
@@ -334,11 +383,17 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
     <Page wide testId="conversation-live">
       <PageHeader eyebrow="Conversation Beta" title={s.title} subtitle={`${s.status} · ${s.assistance_mode} · ${s.processing_mode} · AI ${s.policy?.ai_assistance ?? 'AI_ALLOWED'} · Human ${s.policy?.human_assistance ?? 'HUMAN_PRACTICE_ONLY'}`}
         actions={<div className="flex flex-wrap items-center gap-2">
+          {s.policy?.share_privacy === 'PRIVATE_OVERLAY' ? <StatusBadge tone={sharePrivacyStatusError ? 'warn' : sharePrivacyRuntime?.protected ? 'ok' : 'warn'}>SHARE PRIVACY · {sharePrivacyStatusError ? 'UNKNOWN' : sharePrivacyRuntime?.protected ? 'ACTIVE' : 'NOT VERIFIED'}</StatusBadge> : null}
           {s.policy?.screen_context === 'AUTO' ? <StatusBadge tone={screenAutoStatusError ? 'warn' : screenAuto?.active ? (screenAuto.paused ? 'warn' : 'ok') : screenAuto?.last_error ? 'warn' : 'muted'}>SCREEN AUTO · {screenAutoStatusError ? 'UNKNOWN' : screenAuto?.active ? (screenAuto.paused ? 'OFF THE RECORD' : 'ACTIVE') : screenAuto?.last_error ? 'STOPPED' : 'NOT STARTED'}</StatusBadge> : null}
           <PrimaryButton disabled={busy || captureBusy || s.status === 'ENDED'} onClick={end} icon={<Square className="h-3.5 w-3.5" />}>结束并 Continue</PrimaryButton>
         </div>} />
 
       {error ? <ErrorState message={error} /> : null}
+
+      {s.policy?.share_privacy === 'PRIVATE_OVERLAY' ? <div className="mb-4 rounded-xl border border-bg-tertiary bg-bg-secondary/35 px-3 py-2 text-[11px] text-text-muted" data-testid="conversation-share-privacy-status">
+        <span className="font-semibold text-text-secondary">Share Privacy · {sharePrivacyStatusError ? 'UNKNOWN' : sharePrivacyRuntime?.protected ? 'ACTIVE' : 'NOT VERIFIED'}</span>
+        <span> · Electron content protection is best-effort and only reduces accidental exposure on supported capture paths; it is not a security or “undetectable” guarantee.</span>
+      </div> : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">

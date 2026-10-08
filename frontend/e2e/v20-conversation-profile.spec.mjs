@@ -317,6 +317,16 @@ function mocks() {
         blockers: [],
       },
       screen_runtime: SCREEN_RUNTIME_OFF,
+      share_privacy_runtime: {
+        requested: 'OFF',
+        available: true,
+        requires_desktop: false,
+        proof_required: false,
+        verified: true,
+        runtime: 'OFF',
+        proof_kind: '',
+        note: '本场未请求 Share Privacy。',
+      },
       pack_preview: {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
@@ -363,6 +373,16 @@ function mocks() {
           blockers: [],
         },
         screen_runtime: SCREEN_RUNTIME_OFF,
+        share_privacy_runtime: {
+        requested: 'OFF',
+        available: true,
+        requires_desktop: false,
+        proof_required: false,
+        verified: true,
+        runtime: 'OFF',
+        proof_kind: '',
+        note: '本场未请求 Share Privacy。',
+      },
         policy: { ...SESSION.policy, capture_mode: 'NOTES_ONLY', processing_mode: 'LOCAL', assistance_mode: 'BALANCED' },
       },
       privacy_note: '记录规则依场景与组织政策而异。',
@@ -460,6 +480,16 @@ function mocks() {
         blockers: [],
       },
       screen_runtime: SCREEN_RUNTIME_OFF,
+      share_privacy_runtime: {
+        requested: 'OFF',
+        available: true,
+        requires_desktop: false,
+        proof_required: false,
+        verified: true,
+        runtime: 'OFF',
+        proof_kind: '',
+        note: '本场未请求 Share Privacy。',
+      },
       policy: SESSION.policy,
       pack_digest: 'abcdef1234567890',
     }
@@ -963,6 +993,139 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('OFF', { exact: true })).toBeVisible()
     await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('转写未启动')
   })
+
+  test('PRIVATE_OVERLAY verifies Electron protection before start and restores baseline after end', async ({ context, page }) => {
+    const base = mocks()
+    let startBody = null
+    let privateSession = {
+      ...SESSION,
+      status: 'UPCOMING',
+      started_at: null,
+      pack_id: '',
+      policy: { ...SESSION.policy, share_privacy: 'PRIVATE_OVERLAY' },
+    }
+    const pendingRuntime = {
+      requested: 'PRIVATE_OVERLAY',
+      available: true,
+      requires_desktop: true,
+      proof_required: true,
+      verified: false,
+      runtime: 'ELECTRON_SET_CONTENT_PROTECTION',
+      proof_kind: 'ELECTRON_CONTENT_PROTECTION_ACTIVE',
+      note: 'best effort only',
+    }
+    const verifiedRuntime = { ...pendingRuntime, verified: true }
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/sessions` && method === 'POST') {
+          const body = request.postDataJSON()
+          privateSession = {
+            ...privateSession,
+            title: body.title || privateSession.title,
+            capture_mode: body.capture_mode,
+            processing_mode: body.processing_mode,
+            assistance_mode: body.assistance_mode,
+            consent_ack: body.consent_ack,
+            policy: { ...privateSession.policy, ...body.policy, share_privacy: 'PRIVATE_OVERLAY' },
+          }
+          return privateSession
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/preflight`) {
+          const original = await base(pathname, method, request)
+          return {
+            ...original,
+            session: privateSession,
+            policy: privateSession.policy,
+            warnings: [{
+              key: 'share_privacy_verify_at_start',
+              label: '屏幕共享保护',
+              message: '本场将在桌面端点击“开始会话”时临时启用并验证 Electron content protection。',
+            }],
+            share_privacy_runtime: pendingRuntime,
+            pack_preview: {
+              ...original.pack_preview,
+              share_privacy_runtime: pendingRuntime,
+              policy: { ...original.pack_preview.policy, share_privacy: 'PRIVATE_OVERLAY' },
+            },
+          }
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/start` && method === 'POST') {
+          startBody = request.postDataJSON()
+          privateSession = { ...privateSession, status: 'ACTIVE', started_at: 2, pack_id: 'cpack-private' }
+          return { session: privateSession, pack: { id: 'cpack-private', digest: 'private-pack' } }
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}` && method === 'GET') return privateSession
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/context` && method === 'GET') {
+          const original = await base(pathname, method, request)
+          return {
+            ...original,
+            policy: privateSession.policy,
+            share_privacy_runtime: verifiedRuntime,
+            pack_digest: 'private-pack',
+          }
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/end` && method === 'POST') {
+          const original = await base(pathname, method, request)
+          privateSession = { ...privateSession, status: 'ENDED', ended_at: 3 }
+          return { ...original, session: privateSession }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await context.addInitScript(() => {
+      window.__sharePrivacyMode = 'OFF'
+      window.__sharePrivacyCalls = []
+      window.electronAPI = {
+        hideWindow: async () => {},
+        minimizeWindow: async () => {},
+        quitApp: async () => {},
+        showWindow: async () => {},
+        getShortcuts: async () => ({}),
+        updateShortcuts: async () => ({ ok: true, shortcuts: {} }),
+        resetShortcuts: async () => ({ ok: true, shortcuts: {} }),
+        toggleAlwaysOnTop: async () => false,
+        toggleContentProtection: async () => false,
+        getWindowState: async () => ({ alwaysOnTop: false, contentProtection: window.__sharePrivacyMode === 'PRIVATE_OVERLAY', visible: true }),
+        setSharePrivacy: async (mode) => {
+          window.__sharePrivacyMode = mode === 'PRIVATE_OVERLAY' ? 'PRIVATE_OVERLAY' : 'OFF'
+          window.__sharePrivacyCalls.push(window.__sharePrivacyMode)
+          return window.__sharePrivacyMode
+        },
+        getSharePrivacy: async () => ({
+          mode: window.__sharePrivacyMode,
+          protected: window.__sharePrivacyMode === 'PRIVATE_OVERLAY',
+          note: 'best effort only',
+        }),
+      }
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    await page.getByLabel('屏幕共享保护').selectOption('PRIVATE_OVERLAY')
+    await page.getByRole('button', { name: '生成本场并检查' }).click()
+    await expect(page.getByText(/桌面端点击“开始会话”时临时启用并验证/)).toBeVisible()
+    await page.getByRole('button', { name: '开始会话' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`#/conversation/live/${SESSION.id}`))
+    await expect(page.getByTestId('conversation-share-privacy-status')).toContainText('ACTIVE')
+    expect(startBody?.share_privacy_runtime_proof).toBe('ELECTRON_CONTENT_PROTECTION_ACTIVE')
+    expect(await page.evaluate(() => window.__sharePrivacyMode)).toBe('PRIVATE_OVERLAY')
+
+    // Simulate tray/other-runtime drift. The ACTIVE Session policy must
+    // reassert protection instead of leaving a stale ACTIVE badge.
+    await page.evaluate(() => { window.__sharePrivacyMode = 'OFF' })
+    await expect.poll(async () => page.evaluate(() => window.__sharePrivacyMode)).toBe('PRIVATE_OVERLAY')
+    await expect(page.getByTestId('conversation-share-privacy-status')).toContainText('ACTIVE')
+
+    await page.getByRole('button', { name: '结束并 Continue' }).click()
+    await expect(page.getByText('这场之后')).toBeVisible()
+    await expect.poll(async () => page.evaluate(() => window.__sharePrivacyMode)).toBe('OFF')
+    expect(await page.evaluate(() => window.__sharePrivacyCalls)).toEqual(['PRIVATE_OVERLAY', 'PRIVATE_OVERLAY', 'OFF'])
+  })
+
 
   test('Review Queue never silently assigns unknown commitment owner to me', async ({ context, page }) => {
     const base = mocks()

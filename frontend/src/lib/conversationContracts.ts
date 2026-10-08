@@ -382,6 +382,17 @@ export interface ConversationResolvedAiBehavior {
   engine: string
 }
 
+export interface ConversationSharePrivacyRuntime {
+  requested: 'OFF' | 'PRIVATE_OVERLAY'
+  available: boolean
+  requires_desktop: boolean
+  proof_required: boolean
+  verified: boolean
+  runtime: 'OFF' | 'ELECTRON_SET_CONTENT_PROTECTION' | string
+  proof_kind: string
+  note: string
+}
+
 export interface ConversationPreflight {
   session: ConversationSession
   space: ConversationSpace
@@ -392,6 +403,7 @@ export interface ConversationPreflight {
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: ConversationProcessingRuntime
   screen_runtime: ConversationScreenRuntime
+  share_privacy_runtime: ConversationSharePrivacyRuntime
   pack_preview: {
     goal_ids: string[]
     selected_source_ids: string[]
@@ -414,6 +426,7 @@ export interface ConversationPreflight {
     resolved_ai_behavior: ConversationResolvedAiBehavior
     processing_runtime: ConversationProcessingRuntime
     screen_runtime: ConversationScreenRuntime
+    share_privacy_runtime: ConversationSharePrivacyRuntime
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
   privacy_note: string
@@ -533,6 +546,7 @@ export interface ConversationSessionContext {
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: Partial<ConversationProcessingRuntime>
   screen_runtime: Partial<ConversationScreenRuntime>
+  share_privacy_runtime: Partial<ConversationSharePrivacyRuntime>
   policy: ConversationSessionPolicy
   pack_digest: string
 }

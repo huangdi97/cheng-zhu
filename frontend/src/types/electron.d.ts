@@ -15,7 +15,17 @@ declare global {
       toggleAlwaysOnTop: () => Promise<boolean>
       toggleContentProtection: () => Promise<boolean>
       setSharePrivacy?: (mode: 'OFF' | 'PRIVATE_OVERLAY' | string) => Promise<string>
-      getSharePrivacy?: () => Promise<{ mode: string; protected: boolean; note: string }>
+      getSharePrivacy?: () => Promise<{
+        mode: string
+        protected: boolean
+        runtime_verified?: boolean
+        main_window_protected?: boolean | null
+        overlay_window_protected?: boolean | null
+        platform?: string
+        windows_capture_exclusion_may_lag?: boolean
+        macos_screencapturekit_limitation?: boolean
+        note: string
+      }>
       getWindowState: () => Promise<{ alwaysOnTop: boolean; contentProtection: boolean; visible: boolean }>
       captureRegion?: () => Promise<{ left: number; top: number; width: number; height: number } | null>
       syncOverlayWindow?: (payload: Partial<OverlayStatePayload> & { visible?: boolean }) => Promise<{ ok: boolean; visible: boolean }>

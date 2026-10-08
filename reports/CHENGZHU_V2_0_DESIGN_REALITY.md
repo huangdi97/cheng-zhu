@@ -89,9 +89,10 @@ synthetic green != real-user value
 
 Current capability / fail-closed boundaries:
 
-- Conversation Manual Screen Context = AVAILABLE when the frozen vision route satisfies processing policy; AUTO remains BLOCKED;
+- Conversation Manual Screen Context = AVAILABLE when the frozen vision route satisfies processing policy;
+- Conversation AUTO Screen Context = AVAILABLE with Live explicit-start / off-the-record / fail-stop semantics;
+- Conversation Share Privacy / PRIVATE_OVERLAY = DESKTOP RUNTIME AVAILABLE, verify-at-start with Electron content-protection proof, Live-visible, session-scoped restoration, best-effort only;
 - Conversation Human Coach = BLOCKED;
-- Conversation Private Overlay / Share Privacy;
 - Calendar / Mail / Docs / project-tracker connectors;
 - actual external email/task/issue/decision-log execution;
 - automatic participant chat notice / watermark;
@@ -110,7 +111,8 @@ The final audit closes canonical items that were still implementable without ext
 - time/date provenance: original text + normalized datetime + timezone + ambiguity;
 - ambiguous Deadline cannot enter reviewed long-term truth until explicitly resolved;
 - subsystem-level Conversation Diagnostics with user-facing 可用 / 受限 / 需要处理 states;
-- Manual Screen Context with session-scoped observation truth, frozen vision fingerprint, retention/export integration and no raw screenshot persistence;
+- Manual + explicit-start AUTO Screen Context with session-scoped observation truth, frozen vision fingerprint, retention/export integration and no raw screenshot persistence;
+- desktop Conversation Share Privacy with verify-at-start runtime proof and baseline restoration;
 - stale public-truth documents aligned with current runtime.
 
 ## 5. What may be claimed after final audit CI is green

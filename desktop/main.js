@@ -1017,6 +1017,15 @@ function setSharePrivacyMode(mode) {
   return sharePrivacyState.mode;
 }
 
+function getSharePrivacyRuntimeSnapshot() {
+  return sharePrivacy.runtimeSnapshot(
+    sharePrivacyState.mode,
+    mainWindow,
+    overlayWindow,
+    process.platform,
+  );
+}
+
 function createWindow() {
   const isWindows = process.platform === 'win32';
   mainWindow = new BrowserWindow({
@@ -1595,17 +1604,16 @@ ipcMain.handle('toggle-always-on-top', () => {
 });
 ipcMain.handle('toggle-content-protection', () => {
   const next = sharePrivacyState.protected ? 'OFF' : 'PRIVATE_OVERLAY';
-  return sharePrivacy.isProtected(setSharePrivacyMode(next));
+  setSharePrivacyMode(next);
+  return getSharePrivacyRuntimeSnapshot().protected;
 });
 ipcMain.handle('set-share-privacy', (_event, mode) => setSharePrivacyMode(mode));
-ipcMain.handle('get-share-privacy', () => ({
-  mode: sharePrivacyState.mode,
-  protected: sharePrivacyState.protected,
-  note: sharePrivacy.SHARE_PRIVACY_COPY,
-}));
+ipcMain.handle('get-share-privacy', () => getSharePrivacyRuntimeSnapshot());
 ipcMain.handle('get-window-state', () => ({
   alwaysOnTop: mainWindow?.isAlwaysOnTop() ?? false,
-  contentProtection: sharePrivacyState.protected,
+  contentProtection: (() => {
+    try { return mainWindow?.isContentProtected?.() ?? false; } catch { return false; }
+  })(),
   visible: mainWindow?.isVisible() ?? false,
 }));
 ipcMain.handle('sync-overlay-window', (_event, payload = {}) => {

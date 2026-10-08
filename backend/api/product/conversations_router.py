@@ -216,7 +216,6 @@ class ParticipantCreate(BaseModel):
     stated_position: str = Field(default="", max_length=1600)
     decision_authority: str = Field(default="", max_length=500)
     relationship_context: str = Field(default="", max_length=800)
-    audience_participant_id: str = Field(default="", max_length=160)
     source_refs: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -418,10 +417,17 @@ def preflight(session_id: str):
         return conversations.preflight(session_id)
 
 
+class SessionStart(BaseModel):
+    share_privacy_runtime_proof: str = Field(default="", max_length=120)
+
+
 @router.post("/sessions/{session_id}/start")
-def start_session(session_id: str):
+def start_session(session_id: str, body: Optional[SessionStart] = None):
     with domain_errors():
-        return conversations.start_session(session_id)
+        return conversations.start_session(
+            session_id,
+            share_privacy_runtime_proof=(body.share_privacy_runtime_proof if body else ""),
+        )
 
 
 @router.post("/sessions/{session_id}/end")
@@ -552,6 +558,7 @@ class GuidanceBody(BaseModel):
     audience_concern: str = Field(default="", max_length=1200)
     decision_authority: str = Field(default="", max_length=500)
     relationship_context: str = Field(default="", max_length=800)
+    audience_participant_id: str = Field(default="", max_length=160)
 
 
 @router.post("/sessions/{session_id}/guidance/evaluate")

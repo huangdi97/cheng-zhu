@@ -55,6 +55,39 @@ function applyToWindow(win, mode) {
   return on;
 }
 
+function readWindowProtection(win) {
+  if (!win || (typeof win.isDestroyed === 'function' && win.isDestroyed())) return null;
+  if (typeof win.isContentProtected !== 'function') return null;
+  try {
+    return Boolean(win.isContentProtected());
+  } catch {
+    return null;
+  }
+}
+
+function runtimeSnapshot(mode, mainWindow, overlayWindow, platform = process.platform) {
+  const normalized = normalizeMode(mode);
+  const requested = isProtected(normalized);
+  const mainProtected = readWindowProtection(mainWindow);
+  const overlayProtected = readWindowProtection(overlayWindow);
+  const liveFlags = [mainProtected, overlayProtected].filter((value) => value !== null);
+  const anyProtected = liveFlags.some(Boolean);
+  const allProtected = liveFlags.length > 0 && liveFlags.every(Boolean);
+  const runtimeVerified = requested ? allProtected : !anyProtected;
+
+  return {
+    mode: normalized,
+    protected: requested ? allProtected : anyProtected,
+    runtime_verified: runtimeVerified,
+    main_window_protected: mainProtected,
+    overlay_window_protected: overlayProtected,
+    platform,
+    windows_capture_exclusion_may_lag: platform === 'win32' && requested,
+    macos_screencapturekit_limitation: platform === 'darwin' && requested,
+    note: SHARE_PRIVACY_COPY,
+  };
+}
+
 module.exports = {
   MODES,
   DEFAULT_MODE,
@@ -63,4 +96,6 @@ module.exports = {
   isProtected,
   createSharePrivacyState,
   applyToWindow,
+  readWindowProtection,
+  runtimeSnapshot,
 };

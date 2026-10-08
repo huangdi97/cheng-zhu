@@ -34,33 +34,100 @@ SPACE_PROFILES = {
         "label": "项目同步",
         "default_mode": "BALANCED",
         "guidance": ["RECALL", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
+        "playbook": {
+            "success_conditions": [
+                "明确本期状态变化与关键阻塞",
+                "确认需要继续推进的 owner / commitment / deadline",
+                "把未解决问题带入下一次同步",
+            ],
+            "priority_truth_types": ["Status", "Commitment", "Task", "Risk", "OpenQuestion", "Deadline", "Decision"],
+            "prepare_prompts": ["哪里发生了变化？", "当前最大的 blocker 是什么？", "谁需要在何时完成下一步？"],
+            "closing_objective": "形成可追溯的状态变化、owner 明确的下一步与未解决事项。",
+            "boundaries": ["不把无来源的进度判断写成事实", "不把模糊时间直接升级成 reviewed Deadline"],
+        },
     },
     "DESIGN_REVIEW": {
         "label": "设计评审",
         "default_mode": "BALANCED",
         "guidance": ["RECALL", "TALKING_POINT", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
+        "playbook": {
+            "success_conditions": [
+                "把设计选择与证据/约束放在同一上下文",
+                "显式保留 objection / risk / unresolved trade-off",
+                "若形成决策，保留 supersession 与后续验证项",
+            ],
+            "priority_truth_types": ["Decision", "Proposal", "Objection", "Risk", "Assumption", "OpenQuestion", "Metric"],
+            "prepare_prompts": ["本次要决定什么？", "关键 trade-off / objection 是什么？", "哪条证据最能改变决策？"],
+            "closing_objective": "得到有 provenance 的 Decision，或明确留下仍未解决的 trade-off / objection。",
+            "boundaries": ["不把 Proposal 当 Decision", "不把模型推断的 trade-off 当成参与者明确立场"],
+        },
     },
     "PRESENTATION_QA": {
         "label": "演示 / Q&A",
         "default_mode": "PRESENTATION",
         "guidance": ["ANSWER_CUE", "RECALL", "QUESTION", "DELIVERY"],
+        "playbook": {
+            "success_conditions": [
+                "保持核心主张与最强证据一致",
+                "回答问题时区分已知、未知与待补证据",
+                "把 follow-up 问题和承诺带到会后",
+            ],
+            "priority_truth_types": ["Metric", "Status", "Decision", "OpenQuestion", "Commitment"],
+            "prepare_prompts": ["最可能被追问的证据是什么？", "哪些数字/版本必须准确？", "答不上来时下一步承诺是什么？"],
+            "closing_objective": "清楚回答已知问题，并把未知项与 follow-up 明确留下。",
+            "boundaries": ["不为了完整回答而补造数字", "Quick Note / transcript 不自动升级成 confirmed fact"],
+        },
     },
     "ONE_ON_ONE": {
         "label": "1:1",
         "default_mode": "ONE_ON_ONE",
         "guidance": ["RECALL", "QUESTION", "TALKING_POINT"],
+        "playbook": {
+            "success_conditions": [
+                "明确双方已表达的目标、阻塞与期望",
+                "把承诺与 follow-up 归属到明确 owner",
+                "保留未知，不推断情绪、人格或隐藏意图",
+            ],
+            "priority_truth_types": ["Commitment", "OpenQuestion", "Status", "Risk", "Decision"],
+            "prepare_prompts": ["上次未解决的 thread 是什么？", "对方明确表达过哪些 concern？", "本次需要确认的下一步是什么？"],
+            "closing_objective": "形成双方都能回看的明确下一步，同时保留未解决问题。",
+            "boundaries": ["不保存心理画像", "不把语气/情绪推断写成长久 Counterparty truth"],
+        },
     },
     "CLIENT_CALL": {
         "label": "客户会",
         "default_mode": "BALANCED",
         "guidance": ["RECALL", "ANSWER_CUE", "QUESTION", "RISK", "CONTRIBUTION_OPPORTUNITY"],
+        "playbook": {
+            "success_conditions": [
+                "准确回应客户明确提出的问题与 concern",
+                "区分需求、承诺、风险与尚未确认事项",
+                "所有 follow-up 都保留 owner / source / review 边界",
+            ],
+            "priority_truth_types": ["OpenQuestion", "Commitment", "Risk", "Decision", "Status", "Metric"],
+            "prepare_prompts": ["客户明确关心什么？", "哪些承诺必须避免过度承诺？", "哪些问题需要会后补证据？"],
+            "closing_objective": "留下来源清楚的客户问题、承诺与 follow-up，而不是一份模糊纪要。",
+            "boundaries": ["不自动把客户话语解释成购买意向", "不自动执行 CRM / 邮件 / task 写回"],
+        },
     },
     "NEGOTIATION": {
         "label": "谈判",
         "default_mode": "QUIET",
         "guidance": ["RECALL", "TALKING_POINT", "QUESTION", "RISK"],
+        "playbook": {
+            "success_conditions": [
+                "只使用明确立场、约束、提议和来源清楚的事实",
+                "区分 Proposal、Objection、Decision 与 Commitment",
+                "在高 social-risk 时宁可 SILENT",
+            ],
+            "priority_truth_types": ["Proposal", "Objection", "Decision", "Commitment", "Risk", "OpenQuestion"],
+            "prepare_prompts": ["双方明确提出了什么？", "哪些约束是已知事实？", "哪些条款仍未达成一致？"],
+            "closing_objective": "精确记录已表达立场与达成/未达成事项，不推断隐藏底线。",
+            "boundaries": ["不推断 hidden intent / bottom line", "不因谈判语气推断人格、压力或让步意愿"],
+        },
     },
 }
+
 ASSISTANCE_MODES = {m.value for m in AssistanceMode}
 CAPTURE_MODES = {"TRANSCRIPT", "NOTES_ONLY", "NO_CAPTURE"}
 PROCESSING_MODES = {"LOCAL", "CLOUD", "OFF"}

@@ -76,6 +76,32 @@ def test_token_is_hashed_ttl_and_revoke_fail_closed():
         reg.authenticate(t2)
 
 
+def test_revoke_for_target_is_scoped_to_exact_conversation_session():
+    reg = CoachRegistry()
+    conv_a, token_a = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-a",
+    )
+    conv_b, token_b = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id="conv-b",
+    )
+    interview, token_i = reg.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="live",
+        live_session_id="interview-live",
+    )
+
+    assert reg.revoke_for_target("conv-a", session_kind="conversation") == 1
+    with pytest.raises(CoachAuthError):
+        reg.authenticate(token_a)
+    assert reg.authenticate(token_b).id == conv_b.id
+    assert reg.authenticate(token_i).id == interview.id
+    assert reg.revoke_for_target("conv-a", session_kind="conversation") == 0
+
+
 def test_rate_limit():
     clock = Clock()
     reg = CoachRegistry(clock=clock)

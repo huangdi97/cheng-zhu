@@ -2,7 +2,7 @@
   "name": "cheng-zhu-frontend",
   "private": true,
   "license": "MIT",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "type": "module",
   "scripts": {
     "dev": "vite",

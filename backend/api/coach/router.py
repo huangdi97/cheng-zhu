@@ -347,7 +347,8 @@ button.secondary{background:transparent;color:var(--accent)}
 <p id="status" class="muted">连接中…</p>
 <section><h2>当前问题</h2><div id="q">—</div></section>
 <section id="tr" hidden><h2>转写</h2><ul id="trl"></ul></section>
-<section id="cue" hidden><h2>AI Cue</h2><ul id="cuel"></ul></section>
+<section id="cue" hidden><h2>AI Cue / Guidance</h2><ul id="cuel"></ul></section>
+<section id="ctx" hidden><h2>本场冻结上下文</h2><div id="ctxd"></div></section>
 <section id="rj" hidden><h2>简历 / 岗位</h2><div id="rjd"></div></section>
 <section><h2>发送文字建议（最多 280 字）</h2>
 <textarea id="t" maxlength="280" aria-label="建议内容"></textarea>
@@ -360,12 +361,25 @@ history.replaceState(null,'',location.pathname);
 const H={'X-Coach-Token':token};
 const $=id=>document.getElementById(id);
 function li(list,items){list.textContent='';for(const x of items||[]){const e=document.createElement('li');e.textContent=typeof x==='string'?x:x.text;list.appendChild(e)}}
+function line(parent,text){const e=document.createElement('div');e.textContent=text;parent.appendChild(e)}
+function renderConversationContext(ctx){
+  const root=$('ctxd');root.textContent='';
+  if(!ctx)return;
+  const brief=ctx.brief||{},space=ctx.space||{},playbook=ctx.profile_playbook||{};
+  line(root,'Space · '+(space.title||space.id||'—'));
+  if(brief.goal)line(root,'Goal · '+brief.goal);
+  if(Array.isArray(brief.agenda)&&brief.agenda.length)line(root,'Agenda · '+brief.agenda.slice(0,5).join(' / '));
+  if(playbook.closing_objective)line(root,'Playbook · '+playbook.closing_objective);
+  if(Array.isArray(ctx.sources)&&ctx.sources.length)line(root,'Sources · '+ctx.sources.slice(0,8).map(x=>x.title||x.material_id).join(' / '));
+  if(Array.isArray(ctx.participants)&&ctx.participants.length)line(root,'Participants · '+ctx.participants.slice(0,8).map(x=>(x.display_name||'未命名')+(x.role?' · '+x.role:'')).join(' / '));
+}
 async function poll(){try{const r=await fetch('/coach/api/state',{headers:H});if(!r.ok){$('status').textContent=(await r.json()).detail||'链接不可用';$('status').className='err';return}
-const s=await r.json();$('status').textContent='已连接 · '+(s.session.kind==='live'?'允许协助的正式场次':'练习')+' · 有效期至 '+new Date(s.session.expires_at*1000).toLocaleTimeString();
+const s=await r.json();const kindLabel=s.session.kind==='conversation'?'Conversation Session':s.session.kind==='live'?'允许协助的正式面试':'练习';$('status').textContent='已连接 · '+kindLabel+' · 有效期至 '+new Date(s.session.expires_at*1000).toLocaleTimeString();
 $('q').textContent=s.current_question||'—';
-if(s.transcript){$('tr').hidden=false;li($('trl'),s.transcript)}
-if(s.ai_cue&&s.ai_cue.cues){$('cue').hidden=false;li($('cuel'),s.ai_cue.cues)}
-if(s.resume_jd){$('rj').hidden=false;$('rjd').textContent=((s.resume_jd.job||{}).title||'')+' '+((s.resume_jd.job||{}).requirements||[]).join('、')}
+if(s.transcript){$('tr').hidden=false;li($('trl'),s.transcript)}else{$('tr').hidden=true}
+if(s.ai_cue){$('cue').hidden=false;const items=Array.isArray(s.ai_cue.cues)?s.ai_cue.cues:[{text:s.ai_cue.text||s.ai_cue.expression_plan?.text||s.ai_cue.kind||'当前 Guidance'}];li($('cuel'),items)}else{$('cue').hidden=true}
+if(s.conversation_context){$('ctx').hidden=false;renderConversationContext(s.conversation_context)}else{$('ctx').hidden=true}
+if(s.resume_jd){$('rj').hidden=false;$('rjd').textContent=((s.resume_jd.job||{}).title||'')+' '+((s.resume_jd.job||{}).requirements||[]).join('、')}else{$('rj').hidden=true}
 }catch(e){$('status').textContent='连接中断，重试中…'}setTimeout(poll,2000)}
 $('send').onclick=async()=>{const text=$('t').value.trim();if(!text)return;const r=await fetch('/coach/api/cue',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({text})});
 $('msg').textContent=r.ok?'已发送':((await r.json()).detail||'发送失败');if(r.ok)$('t').value=''};

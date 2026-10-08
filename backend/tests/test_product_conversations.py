@@ -1048,6 +1048,92 @@ def test_primary_audio_commitment_does_not_infer_owner(product_env):
         conversations.review_item(commitment["id"], "CONFIRM")
 
 
+
+
+def test_all_conversation_profiles_have_distinct_runtime_playbooks(product_env):
+    profiles = [
+        "PROJECT_SYNC", "DESIGN_REVIEW", "PRESENTATION_QA",
+        "ONE_ON_ONE", "CLIENT_CALL", "NEGOTIATION",
+    ]
+    objectives = set()
+    for profile in profiles:
+        space = conversations.create_space(f"Space {profile}", profile)
+        prepared = conversations.prepare_space(space["id"])
+        playbook = prepared["profile_playbook"]
+        assert playbook["profile"] == profile
+        assert playbook["success_conditions"]
+        assert playbook["priority_truth_types"]
+        assert playbook["prepare_prompts"]
+        assert playbook["closing_objective"]
+        assert playbook["boundaries"]
+        objectives.add(playbook["closing_objective"])
+    assert len(objectives) == len(profiles)
+
+
+def test_profile_playbook_is_frozen_in_session_pack(product_env, monkeypatch):
+    space = conversations.create_space("Design Freeze", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["profile_playbook"]
+    assert frozen["profile"] == "DESIGN_REVIEW"
+    original_objective = frozen["closing_objective"]
+
+    mutated = dict(conversations.SPACE_PROFILES["DESIGN_REVIEW"]["playbook"])
+    mutated["closing_objective"] = "NEW TEMPLATE OBJECTIVE"
+    mutated["priority_truth_types"] = ["Status"]
+    monkeypatch.setitem(conversations.SPACE_PROFILES["DESIGN_REVIEW"], "playbook", mutated)
+
+    assert conversations.prepare_space(space["id"])["profile_playbook"]["closing_objective"] == "NEW TEMPLATE OBJECTIVE"
+    context = conversations.session_context(session["id"])
+    assert context["profile_playbook"]["closing_objective"] == original_objective
+    assert context["profile_playbook"]["closing_objective"] != "NEW TEMPLATE OBJECTIVE"
+
+    # Reviewing the ended Session is judged against its frozen Playbook,
+    # even if the current Space template has changed its priorities.
+    outcome = conversations.end_session(session["id"])["profile_outcome"]
+    assert outcome["closing_objective"] == original_objective
+    assert outcome["priority_truth_types"] == frozen["priority_truth_types"]
+
+
+def test_continue_profile_outcome_is_reviewed_evidence_not_success_score(product_env):
+    space = conversations.create_space("Design Evidence", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    decision = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="采用方案 B",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确选择 B"}],
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+
+    risk = conversations.add_item(
+        session["id"],
+        item_type="Risk",
+        title="回滚窗口不足",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确指出回滚窗口不足"}],
+    )
+    conversations.review_item(risk["id"], "CONFIRM")
+
+    # Unreviewed proposal must not inflate reviewed Profile evidence.
+    conversations.add_item(
+        session["id"],
+        item_type="Proposal",
+        title="也许改成方案 C",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "只是提议"}],
+    )
+
+    summary = conversations.end_session(session["id"])
+    outcome = summary["profile_outcome"]
+    assert outcome["profile"] == "DESIGN_REVIEW"
+    assert outcome["reviewed_counts"]["Decision"] == 1
+    assert outcome["reviewed_counts"]["Risk"] == 1
+    assert outcome["reviewed_counts"]["Proposal"] == 0
+    assert "score" not in outcome
+    assert "not a meeting-quality or success score" in outcome["interpretation"]
+
+
 def test_model_extraction_cannot_assert_agreement_or_commitment(product_env):
     space = conversations.create_space("Review", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

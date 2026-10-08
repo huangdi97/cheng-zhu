@@ -18,6 +18,19 @@ const SPACE = {
   updated_at: 2,
 }
 
+const DESIGN_REVIEW_PLAYBOOK = {
+  profile: 'DESIGN_REVIEW',
+  success_conditions: [
+    '把设计选择与证据/约束放在同一上下文',
+    '显式保留 objection / risk / unresolved trade-off',
+    '若形成决策，保留 supersession 与后续验证项',
+  ],
+  priority_truth_types: ['Decision', 'Proposal', 'Objection', 'Risk', 'Assumption', 'OpenQuestion', 'Metric'],
+  prepare_prompts: ['本次要决定什么？', '关键 trade-off / objection 是什么？', '哪条证据最能改变决策？'],
+  closing_objective: '得到有 provenance 的 Decision，或明确留下仍未解决的 trade-off / objection。',
+  boundaries: ['不把 Proposal 当 Decision', '不把模型推断的 trade-off 当成参与者明确立场'],
+}
+
 const SESSION = {
   id: 'cv-v2',
   space_id: SPACE.id,
@@ -238,6 +251,7 @@ function mocks() {
       agenda: threadOpen ? [THREAD.text] : [],
       expected_questions: [REVIEWED_OPEN.title],
       contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
+      profile_playbook: DESIGN_REVIEW_PLAYBOOK,
     }
     if (pathname === `/api/product/conversation/threads/${THREAD.id}/resolve` && method === 'POST') {
       threadOpen = false
@@ -373,6 +387,7 @@ function mocks() {
         known_participants: 1,
         contribution_candidates: [{ text: DECISION.title, source_refs: DECISION.source_refs, kind: 'RECALL' }],
       },
+      profile_playbook: DESIGN_REVIEW_PLAYBOOK,
       sources: [{
         material_id: 'benchmark-note',
         version_id: 'mv-benchmark-v1',
@@ -488,10 +503,25 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/end` && method === 'POST') {
       session = { ...session, status: 'ENDED', ended_at: 3 }
-      return { session, decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1 }
+      return { session, profile_outcome: {
+        profile: 'DESIGN_REVIEW',
+        closing_objective: DESIGN_REVIEW_PLAYBOOK.closing_objective,
+        priority_truth_types: DESIGN_REVIEW_PLAYBOOK.priority_truth_types,
+        reviewed_counts: { Decision: 1, Proposal: 0, Objection: 0, Risk: 0, Assumption: 0, OpenQuestion: 1, Metric: 0 },
+        reviewed_outputs: [DECISION, REVIEWED_OPEN].map((item) => ({ id: item.id, type: item.type, state: item.state, title: item.title, review_status: item.review_status })),
+        interpretation: 'Reviewed output evidence only; not a meeting-quality or success score.',
+      }, decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN], candidates: [OPEN], what_changed: [DECISION], pins: [], next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1 }
     }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) return {
       session: { ...session, status: 'ENDED', ended_at: 3 },
+      profile_outcome: {
+        profile: 'DESIGN_REVIEW',
+        closing_objective: DESIGN_REVIEW_PLAYBOOK.closing_objective,
+        priority_truth_types: DESIGN_REVIEW_PLAYBOOK.priority_truth_types,
+        reviewed_counts: { Decision: 1, Proposal: 0, Objection: 0, Risk: 0, Assumption: 0, OpenQuestion: 1, Metric: 0 },
+        reviewed_outputs: [DECISION, REVIEWED_OPEN].map((item) => ({ id: item.id, type: item.type, state: item.state, title: item.title, review_status: item.review_status })),
+        interpretation: 'Reviewed output evidence only; not a meeting-quality or success score.',
+      }, 
       decisions: [DECISION], commitments: [], open_questions: [REVIEWED_OPEN], candidates: [OPEN],
       what_changed: [DECISION], pins: [],
       next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1,
@@ -678,6 +708,9 @@ test.describe('v2.0 Conversation Profile', () => {
     })
     await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
     await expect(page.getByRole('heading', { name: SPACE.title })).toBeVisible()
+    await expect(page.getByText('DESIGN_REVIEW · Profile Playbook')).toBeVisible()
+    await expect(page.getByText(DESIGN_REVIEW_PLAYBOOK.closing_objective)).toBeVisible()
+    await expect(page.getByText('不把 Proposal 当 Decision')).toBeVisible()
     await page.getByRole('button', { name: '生成本场并检查' }).click()
     await expect(page.getByText('Session Pack Preview')).toBeVisible()
     await expect(page.getByText('Q4 Benchmark')).toBeVisible()
@@ -693,6 +726,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByTestId('conversation-live-capture-status')).toHaveText('仅笔记 · 未采集音频')
     await expect(page.getByTestId('conversation-session-pulse')).toBeVisible()
     await expect(page.getByText('Session Pulse')).toBeVisible()
+    await expect(page.getByText('Frozen Profile Playbook')).toBeVisible()
+    await expect(page.getByText(DESIGN_REVIEW_PLAYBOOK.closing_objective)).toBeVisible()
     await expect(page.getByText(SPACE.default_goal)).toBeVisible()
     await expect(page.getByText('PACK abcdef12')).toBeVisible()
     await expect(page.getByText('Frozen Open Threads')).toBeVisible()
@@ -725,6 +760,9 @@ test.describe('v2.0 Conversation Profile', () => {
 
     await page.getByRole('button', { name: '结束并 Continue' }).click()
     await expect(page.getByText('这场之后')).toBeVisible()
+    await expect(page.getByText('DESIGN_REVIEW · Reviewed Outcome Evidence')).toBeVisible()
+    await expect(page.getByText('Decision 1', { exact: true })).toBeVisible()
+    await expect(page.getByText(/not a meeting-quality or success score/)).toBeVisible()
     await expect(page.getByText('Next Focus · rollback owner 还没有明确')).toBeVisible()
   })
 

@@ -570,7 +570,21 @@ Capture start 必须二次校验，防止 Preflight 后配置改变。
 MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。MANUAL 每次由用户主动抓取；AUTO 的 policy 选择不会启动捕获，必须进入 Live 后再次显式 start，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED。AUTO 要求 participant consent/allowance status 与 transparency plan（均为用户报告），支持 duplicate-frame suppression、rate limit、bounded error fail-stop，Session end/delete/Space erase 强制停止。两种模式都不落原图，只保存 observation text + image/model-route provenance；LOCAL processing 下 remote vision fail-closed，冻结 vision fingerprint 在会中变化时拒绝继续抓取。
 
 ## Conversation Human Coach
-不能把 Interview practice/live Coach 权限直接映射到 Conversation。
+已形成独立 runtime candidate，不直接映射 Interview global session：
+
+- `session_kind=conversation`；
+- 必须绑定明确 `target_session_id`；
+- frozen `HUMAN_ALLOWED` policy + participant transparency plan；
+- Live 后显式生成一次性链接，不随 Session 自动连接；
+- transcript / AI Guidance / frozen Session Context 逐项授权；
+- helper 不读取 Interview Resume/JD；
+- Human advice → `HUMAN_COACH` audit，`is_evidence=false`；
+- 不进入 Conversation Item / Memory / automatic extraction；
+- Session end/delete/Space erase 自动 revoke；
+- 无键鼠远控；
+- public relay 未配置时继续 BLOCKED-EXTERNAL。
+
+只有 final-head CI + packaged runtime evidence 通过后，才允许从 RUNTIME_CANDIDATE 升级为 packaged beta capability。
 
 ## Conversation Private Overlay / Share Privacy
 已实现桌面 runtime：Conversation Session Policy 可请求 `PRIVATE_OVERLAY`；Preflight 只声明“Start 时验证”，点击开始前前端通过 Electron bridge 临时启用 `setContentProtection` 并再次读取状态，随后把 runtime proof 交给 backend。proof 缺失/无效时 Start fail-closed。verified state 冻结进 Session Pack，Live 显示保护状态；会话正常结束后恢复开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不得开始该 policy。该能力只降低受支持捕获路径中的意外暴露，不是安全、隐身或“不可检测”保证。
@@ -860,7 +874,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 3. 真实 Project Sync / Design Review 小规模使用；
 4. 收集 human-labeled Guidance / missed-moment / continuity evidence；
 5. 根据真实证据再决定是否继续投入：
-   - Human Coach；
+   - Human Coach 的 packaged/real-session evidence；
    - Private Overlay；
    - Calendar / Docs / Mail / project-tracker connectors；
    - actual external write-back；

@@ -82,17 +82,18 @@ PDIG Design Review · 10 分钟后
 
 ```text
 [开始临时会话]
-→ 选择/新建 Space
-→ Template
-→ Preflight
+→ 创建一个本地临时 Space-backed continuity container
+→ 使用选择的 Template
 → Start
 ```
 
-结束后可：
+当前 runtime 不建立第二套“standalone Session”真相模型。临时会话从创建起就属于一个普通本地 Space，因此结束后：
 
-- 保存进 Space；
-- 保持 standalone；
-- 删除。
+- 可以继续保留这个临时 Space，下一场沿用 continuity；
+- 可以重命名 / 调整 Goal / Sources，使它成为长期 Space；
+- 不需要保留时，显式删除该临时 Space（遵循现有 provenance / tombstone / destructive confirmation 规则）。
+
+这避免同一套 Decision / Commitment / provenance 在“Space Session”和“standalone Session”之间出现双真相。
 
 # 6. Global Search / Command
 

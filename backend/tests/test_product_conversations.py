@@ -189,6 +189,71 @@ def test_manual_screen_context_rejects_vision_route_change_after_session_start(p
         conversations.capture_screen_context(session["id"])
 
 
+def test_auto_screen_service_start_pause_resume_stop_owns_only_explicit_live_session(product_env, monkeypatch):
+    from types import SimpleNamespace
+
+    local = SimpleNamespace(
+        name="local-vision",
+        model="vision-local",
+        api_base_url="http://127.0.0.1:8080/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [local])
+
+    worker_started = threading.Event()
+
+    def idle_worker(session_id, stop_event, **kwargs):
+        worker_started.set()
+        stop_event.wait(2.0)
+        # Mirror production ownership release when the worker exits.
+        with conversation_screen._auto_lock:
+            if conversation_screen._auto_session_id == session_id:
+                conversation_screen._auto_session_id = ""
+                conversation_screen._auto_paused = False
+
+    monkeypatch.setattr(conversation_screen, "_auto_worker", idle_worker)
+
+    space = conversations.create_space("AUTO State Machine", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={
+            "screen_context": "AUTO",
+            "participant_consent_status": "USER_REPORTS_ALLOWED",
+            "participant_transparency_plan": "USER_WILL_NOTIFY_VERBALLY",
+        },
+    )
+    conversations.start_session(session["id"])
+    assert conversations.screen_auto_status(session["id"])["active"] is False
+
+    started = conversations.start_auto_screen_context(session["id"], interval_seconds=30)
+    assert worker_started.wait(timeout=1.0)
+    started = conversations.screen_auto_status(session["id"])
+    assert started["active"] is True
+    assert started["owns_requested_session"] is True
+    assert started["paused"] is False
+
+    paused = conversations.pause_auto_screen_context(session["id"])
+    assert paused["active"] is True
+    assert paused["paused"] is True
+
+    # Off the record means screen capture is paused, including manual fallback.
+    with pytest.raises(ValueError, match="Off the record"):
+        conversations.capture_screen_context(session["id"])
+
+    resumed = conversations.resume_auto_screen_context(session["id"])
+    assert resumed["active"] is True
+    assert resumed["paused"] is False
+
+    stopped = conversations.stop_auto_screen_context(session["id"])
+    assert stopped["active"] is False
+    assert stopped["owns_requested_session"] is False
+    assert conversation_screen._auto_session_id == ""
+
+
 def test_auto_screen_same_frame_is_deduped_before_vision_call(product_env, monkeypatch):
     from types import SimpleNamespace
     from services.capture import screen_capture

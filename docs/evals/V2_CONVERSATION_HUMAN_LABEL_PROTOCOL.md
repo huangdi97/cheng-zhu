@@ -23,6 +23,13 @@ seed 中 reviewer、useful、actual_type、silence_correct、cognitive_load_delt
 
 没有有效 human label 时 status 必须是 INSUFFICIENT_EVIDENCE；不会生成 PASS。
 
+**标注文件保护与校验**：
+- `--out` 不能指向输入 `product.db`；导出种子不会覆盖已存在的 JSONL 或人工标注文件。重复导出应使用新的文件名。
+- 汇总工具的 `--out` / `--markdown-out` 不能覆盖输入标签，也不能互相指向同一文件。
+- 同一个 reviewer 对同一 session/kind/event 的重复标注会被拒绝；不同 reviewer 可分别标注同一事件。
+- `cognitive_load_delta` 只允许 -2 到 +2 的有限数值，不能使用布尔值、NaN、Infinity 或超出量表的分值。无标签仍为 null，不计入分母。
+- 含 transcript/source excerpt 的种子和标注仅保存在本地受控路径，不应进入公开仓库或 CI artifact。
+
 ## 3. guidance
 
 guidance_class 可取 PROACTIVE、RECALL、DIRECT_QUESTION、CRITICAL_RISK、DELIVERY。

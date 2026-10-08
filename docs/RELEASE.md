@@ -95,6 +95,54 @@ For automated publishing, the `workflow_run.head_sha` that just passed main CI i
 
 Do not create a release tag from a moving `main` branch after a long package build. A release where the tag points to newer source than the binary build is not a valid reproducible release, even if both commits individually pass CI.
 
+## Conversation Beta packaged evidence
+
+Conversation v2 shares the same signed/unsigned Windows package and release pipeline as Interview. It does **not** get a second installer or a second release truth model.
+
+Every release candidate that includes Conversation runtime must prove both layers:
+
+1. **packaged sidecar truth**
+   - latest `product.db` schema applies inside the built sidecar;
+   - create Conversation Space / Session through the real packaged API;
+   - Preflight is unblocked for a safe Notes-only/Local policy;
+   - Session Pack has a digest;
+   - reviewed Decision survives Continue;
+   - Space / History / reviewed truth survive packaged-sidecar restart.
+
+2. **packaged UI truth**
+   - use the packaged backend executable and packaged `frontend-dist`, not source-tree dev servers;
+   - capture Conversation Home;
+   - Space;
+   - Prepare;
+   - Live Session Pulse;
+   - Sessions / Continue entry;
+   - Conversation-only History;
+   - write screenshot SHA256 plus frozen Pack digest into an evidence manifest.
+
+The release workflow runs:
+
+```text
+frontend/scripts/capture-v20-conversation-packaged-evidence.mjs
+```
+
+and uploads its output under:
+
+```text
+artifacts/release-evidence/v<version>/conversation-beta/
+```
+
+A green PR Release workflow proves a **Conversation Beta packaged runtime candidate** only.
+
+It does not by itself prove:
+
+```text
+V2_PRODUCTIZED_RELEASE = TRUE
+REAL_USER_VALIDATED = TRUE
+PMF_PROVEN = TRUE
+```
+
+Stable v2 release still requires merge → green main CI → exact-source Release build → installer/portable hashes → clean-install replay → draft Release → download-back verification → exact tag/source provenance → publish.
+
 ## Before merge
 
 Required:

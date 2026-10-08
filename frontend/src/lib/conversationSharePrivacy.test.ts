@@ -4,6 +4,7 @@ import {
   activateConversationSharePrivacy,
   inspectConversationSharePrivacy,
   restoreConversationSharePrivacy,
+  updateConversationSharePrivacyBaseline,
 } from './conversationSharePrivacy'
 
 type RuntimeState = { mode: 'OFF' | 'PRIVATE_OVERLAY'; protected: boolean; note: string }
@@ -70,6 +71,19 @@ describe('Conversation Share Privacy session lease', () => {
     await activateConversationSharePrivacy('s1', 'PRIVATE_OVERLAY')
     await restoreConversationSharePrivacy('s1')
     expect(runtime.mode).toBe('PRIVATE_OVERLAY')
+  })
+
+  it('lets Settings change the post-session baseline without dropping active protection', async () => {
+    const runtime = installBridge('PRIVATE_OVERLAY')
+    await activateConversationSharePrivacy('s1', 'PRIVATE_OVERLAY')
+
+    // The user changes the global default to OFF while this Session still
+    // requires PRIVATE_OVERLAY. Runtime remains protected until release.
+    updateConversationSharePrivacyBaseline('OFF')
+    expect(runtime.mode).toBe('PRIVATE_OVERLAY')
+
+    await restoreConversationSharePrivacy('s1')
+    expect(runtime.mode).toBe('OFF')
   })
 
   it('reports OFF without requiring Electron bridge', async () => {

@@ -581,11 +581,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           {space.sessions.length ? <div className="space-y-2">{space.sessions.map((s) => (
             <div key={s.id} className="rounded-xl border border-bg-tertiary/70 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-medium text-text-primary">{s.title}</div><div className="text-[11px] text-text-muted">{s.status} · {s.assistance_mode} · {s.capture_mode}</div></div>
-                <div className="flex gap-2">{s.status !== 'ENDED' ? <SecondaryButton onClick={() => navigate(paths.conversationLive(s.id))}>进入</SecondaryButton> : <><SecondaryButton onClick={async () => setContinueData(await conversationApi.continue(s.id))}>Continue</SecondaryButton><SecondaryButton disabled={sessionBusy} onClick={() => removeSession(s.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton></>}</div>
+                <div className="flex gap-2">{s.status !== 'ENDED' ? <SecondaryButton onClick={() => navigate(paths.conversationLive(s.id))}>进入</SecondaryButton> : <><span data-testid={`conversation-continue-${s.id}`}><SecondaryButton onClick={async () => setContinueData(await conversationApi.continue(s.id))}>Continue</SecondaryButton></span><SecondaryButton disabled={sessionBusy} onClick={() => removeSession(s.id)} icon={<Trash2 className="h-3.5 w-3.5" />}>删除</SecondaryButton></>}</div>
               </div>
             </div>
           ))}</div> : <EmptyState title="还没有会话" body="从“准备”创建本场 Preflight。" />}
-          {continueData ? <div className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">
+          {continueData ? <div data-testid="conversation-continue-panel" className="mt-4 rounded-2xl border border-accent-blue/25 bg-accent-blue/5 p-4">
             <h3 className="text-sm font-semibold text-text-primary">这场之后</h3>
             <p className="mt-1 text-xs text-text-muted">Decision {continueData.decisions.length} · Commitment {continueData.commitments.length} · Open Question {continueData.open_questions.length} · 待确认 {continueData.review_required}</p>
             {continueData.what_changed?.length ? <div className="mt-3"><div className="text-xs font-semibold text-text-secondary">What changed</div><div className="mt-1 space-y-1">{continueData.what_changed.map((item) => <div key={item.id} className="text-xs text-text-primary">• {item.title} · {item.state}</div>)}</div></div> : null}

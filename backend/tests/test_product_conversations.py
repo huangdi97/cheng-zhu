@@ -1080,12 +1080,19 @@ def test_profile_playbook_is_frozen_in_session_pack(product_env, monkeypatch):
 
     mutated = dict(conversations.SPACE_PROFILES["DESIGN_REVIEW"]["playbook"])
     mutated["closing_objective"] = "NEW TEMPLATE OBJECTIVE"
+    mutated["priority_truth_types"] = ["Status"]
     monkeypatch.setitem(conversations.SPACE_PROFILES["DESIGN_REVIEW"], "playbook", mutated)
 
     assert conversations.prepare_space(space["id"])["profile_playbook"]["closing_objective"] == "NEW TEMPLATE OBJECTIVE"
     context = conversations.session_context(session["id"])
     assert context["profile_playbook"]["closing_objective"] == original_objective
     assert context["profile_playbook"]["closing_objective"] != "NEW TEMPLATE OBJECTIVE"
+
+    # Post-session review must use the same frozen criteria as Prepare/Live;
+    # a later template edit cannot retroactively change what counts as output.
+    outcome = conversations.end_session(session["id"])["profile_outcome"]
+    assert outcome["closing_objective"] == original_objective
+    assert outcome["priority_truth_types"] == frozen["priority_truth_types"]
 
 
 def test_continue_profile_outcome_is_reviewed_evidence_not_success_score(product_env):

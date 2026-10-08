@@ -13,6 +13,8 @@ Checks:
   6. InterviewPack freeze persists across a sidecar restart
   7. nothing is written next to the executable (install dir stays clean)
   8. LICENSE / THIRD_PARTY_NOTICES bundled
+  9. Conversation Beta packaged loop: Space → Preflight → frozen Session Pack →
+     reviewed Decision → grounded Ask/Search → Continue/Export → restart persistence
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -33,6 +35,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+from urllib.parse import quote_plus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -236,6 +239,151 @@ def main() -> int:
 
         pack = http_json(f"{base}/api/intelligence/pack/freeze", "POST", {"share_privacy_policy": "OFF"})
         checks["pack_frozen_id"] = pack.get("id")
+
+        # Conversation Beta: prove the packaged sidecar carries the additive
+        # v2 runtime, not only the Interview core.
+        conv_space = http_json(
+            f"{base}/api/product/conversation/spaces",
+            "POST",
+            {
+                "title": "Packaged Conversation Beta",
+                "profile": "PROJECT_SYNC",
+                "description": "Windows packaged smoke",
+                "default_goal": "Close the packaged beta loop with reviewed truth",
+                "default_mode": "BALANCED",
+            },
+        )
+        conv_space_id = str(conv_space.get("id") or "")
+        checks["conversation_space_created"] = bool(conv_space_id)
+        ok &= bool(checks["conversation_space_created"])
+
+        conv_session = http_json(
+            f"{base}/api/product/conversation/spaces/{conv_space_id}/sessions",
+            "POST",
+            {
+                "title": "Packaged Beta Session",
+                "capture_mode": "NOTES_ONLY",
+                "processing_mode": "LOCAL",
+                "assistance_mode": "BALANCED",
+                "consent_ack": True,
+                "policy": {
+                    "ai_assistance": "AI_ALLOWED",
+                    "human_assistance": "HUMAN_PRACTICE_ONLY",
+                    "screen_context": "OFF",
+                    "share_privacy": "OFF",
+                    "external_writeback": "REVIEW_REQUIRED",
+                    "participant_consent_status": "NOT_APPLICABLE",
+                    "participant_transparency_plan": "NOT_APPLICABLE",
+                },
+            },
+        )
+        conv_session_id = str(conv_session.get("id") or "")
+        checks["conversation_session_created"] = bool(conv_session_id)
+        ok &= bool(checks["conversation_session_created"])
+
+        conv_preflight = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/preflight"
+        )
+        checks["conversation_preflight_blockers"] = conv_preflight.get("blockers")
+        checks["conversation_preflight_ready"] = (
+            conv_preflight.get("blockers") == []
+            and bool(conv_preflight.get("pack_preview"))
+            and conv_preflight.get("processing_runtime", {}).get("mode") == "LOCAL"
+        )
+        ok &= bool(checks["conversation_preflight_ready"])
+
+        conv_started = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/start",
+            "POST",
+            {},
+        )
+        conv_pack = conv_started.get("pack") or {}
+        conv_digest = str(conv_pack.get("digest") or "")
+        checks["conversation_pack_digest"] = conv_digest
+        checks["conversation_pack_frozen"] = bool(conv_digest and conv_pack.get("payload"))
+        ok &= bool(checks["conversation_pack_frozen"])
+
+        conv_decision = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/items",
+            "POST",
+            {
+                "item_type": "Decision",
+                "title": "Packaged beta decision uses reviewed local continuity",
+                "state": "PROPOSED",
+                "source_refs": [
+                    {
+                        "kind": "USER_NOTE",
+                        "excerpt": "packaged beta smoke source",
+                        "visibility": "PRIVATE",
+                    }
+                ],
+                "epistemic_status": "OBSERVED",
+            },
+        )
+        conv_decision_id = str(conv_decision.get("id") or "")
+        conv_reviewed = http_json(
+            f"{base}/api/product/conversation/items/{conv_decision_id}/review",
+            "POST",
+            {"action": "CONFIRM", "patch": {}},
+        )
+        checks["conversation_decision_reviewed"] = (
+            conv_reviewed.get("state") == "AGREED"
+            and conv_reviewed.get("review_status") == "USER_CONFIRMED"
+        )
+        ok &= bool(checks["conversation_decision_reviewed"])
+
+        conv_ask = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/ask",
+            "POST",
+            {"question": "Packaged beta decision"},
+        )
+        checks["conversation_ask_grounded"] = bool(
+            conv_ask.get("grounded")
+            and conv_ask.get("truth_confirmed")
+            and conv_ask.get("matches")
+        )
+        ok &= bool(checks["conversation_ask_grounded"])
+
+        search_q = quote_plus("Packaged beta decision")
+        conv_search = http_json(
+            f"{base}/api/product/conversation/search?query={search_q}&item_type=Decision&limit=10"
+        )
+        checks["conversation_global_search_grounded"] = any(
+            item.get("id") == conv_decision_id and item.get("source_refs")
+            for item in conv_search.get("items", [])
+        )
+        ok &= bool(checks["conversation_global_search_grounded"])
+
+        conv_ended = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/end",
+            "POST",
+            {},
+        )
+        checks["conversation_continue_reviewed_truth"] = any(
+            item.get("id") == conv_decision_id
+            for item in conv_ended.get("decisions", [])
+        )
+        ok &= bool(checks["conversation_continue_reviewed_truth"])
+
+        conv_export = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/export"
+        )
+        export_categories = set((conv_export.get("export_manifest") or {}).get("categories") or [])
+        checks["conversation_export_scoped"] = (
+            conv_export.get("kind") == "CONVERSATION_SESSION"
+            and conv_export.get("contract") == "v2.0-R1"
+            and conv_export.get("space", {}).get("id") == conv_space_id
+            and conv_export.get("session", {}).get("id") == conv_session_id
+            and {"confirmed_items", "unconfirmed_candidates", "source_manifest", "session_packs"} <= export_categories
+        )
+        ok &= bool(checks["conversation_export_scoped"])
+
+        conv_context_before = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/context"
+        )
+        checks["conversation_context_digest_before_restart"] = conv_context_before.get("pack_digest")
+        ok &= conv_context_before.get("pack_digest") == conv_digest
+
         stop(proc)
 
         proc = start(exe, port, home, args.frontend_dist)
@@ -243,6 +391,45 @@ def main() -> int:
         after = http_json(f"{base}/api/intelligence/pack")
         checks["pack_persisted_after_restart"] = bool(after.get("frozen")) and after["pack"]["id"] == pack.get("id")
         ok &= bool(checks["pack_persisted_after_restart"])
+
+        conv_context_after = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session_id}/context"
+        )
+        checks["conversation_pack_persisted_after_restart"] = (
+            conv_context_after.get("pack_digest") == conv_digest
+        )
+        ok &= bool(checks["conversation_pack_persisted_after_restart"])
+
+        conv_history = http_json(f"{base}/api/product/conversation/history?limit=20")
+        checks["conversation_history_persisted"] = any(
+            item.get("id") == conv_session_id and item.get("space_id") == conv_space_id
+            for item in conv_history.get("items", [])
+        )
+        ok &= bool(checks["conversation_history_persisted"])
+
+        conv_search_after = http_json(
+            f"{base}/api/product/conversation/search?query={search_q}&item_type=Decision&limit=10"
+        )
+        checks["conversation_reviewed_truth_persisted"] = any(
+            item.get("id") == conv_decision_id
+            and item.get("state") == "AGREED"
+            and item.get("review_status") == "USER_CONFIRMED"
+            for item in conv_search_after.get("items", [])
+        )
+        ok &= bool(checks["conversation_reviewed_truth_persisted"])
+
+        conv_diag = http_json(f"{base}/api/product/conversation/diagnostics")
+        checks["conversation_schema_version"] = conv_diag.get("schema_version")
+        checks["conversation_schema_expected"] = conv_diag.get("expected_schema_version")
+        checks["conversation_diagnostics_healthy"] = (
+            conv_diag.get("schema_version") == conv_diag.get("expected_schema_version")
+            and conv_diag.get("health", {}).get("database") == "AVAILABLE"
+            and conv_diag.get("health", {}).get("session_pack_context") == "AVAILABLE"
+            and conv_diag.get("health", {}).get("guidance_arbiter") == "AVAILABLE"
+            and conv_diag.get("evidence", {}).get("real_conversation_user_evidence")
+                == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
+        )
+        ok &= bool(checks["conversation_diagnostics_healthy"])
     except Exception as exc:  # noqa: BLE001
         checks["error"] = f"{type(exc).__name__}: {exc}"
         ok = False

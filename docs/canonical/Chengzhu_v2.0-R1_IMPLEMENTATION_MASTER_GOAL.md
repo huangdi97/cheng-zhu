@@ -2,8 +2,9 @@
 ## Personal Conversation Intelligence｜Implementation & Rollout Master Goal
 **日期**：2026-10-06  
 **状态**：CANONICAL IMPLEMENTATION GOAL  
-**工作分支**：`feat/chengzhu-v2-conversation-design-closure`  
-**当前 PR**：#19（承接已合入的 Conversation runtime PR #18）  
+**v2.0 设计/runtime closure**：PR #19 已合并  
+**当前 productization 分支**：`feat/chengzhu-v21-conversation-final-closure`  
+**当前 packaged-runtime gate PR**：#27  
 **最高设计依据**：`Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md`
 
 ---
@@ -663,7 +664,16 @@ Draft
 
 ## Conversation Beta Runtime Candidate Gate
 
-PR 合并后至少要有：
+PR #27 已把 Conversation 纳入现有 Windows packaged / release 验证链。在该 PR 的 CI + Release Windows job 最终通过前，只允许声明：
+
+```text
+PACKAGED_CONVERSATION_GATE_IMPLEMENTED = TRUE
+PACKAGED_CONVERSATION_EVIDENCE_PROVEN = PENDING
+```
+
+该 gate 复用同一 `scripts/packaged_smoke.py` 与 packaged UI evidence harness，因此会同时覆盖 CI Windows sidecar smoke、Release PR build、clean-install replay、installed-layout smoke、download-back smoke、packaged BrowserWindow evidence，以及 hosted-runner packaged frontend fallback。
+
+必须证明：
 - clean source checkout；
 - Windows desktop startup；
 - Conversation opt-in；
@@ -685,7 +695,8 @@ PR 合并后至少要有：
 ## Stable v2 Productized Release Gate
 
 在宣称 `V2_PRODUCTIZED_RELEASE=TRUE` 前还需要：
-- packaged Windows runtime evidence；
+- PR #27 packaged Conversation evidence 全绿；
+- packaged Windows runtime evidence（API + BrowserWindow/fallback UI）；
 - clean install replay；
 - installer/portable artifacts；
 - SHA256；
@@ -762,10 +773,10 @@ PR 合并后至少要有：
 
 # 20. 合并后的下一阶段，不属于本 PR 的假完成项
 
-只有在 PR #19 全绿并合并后才进入：
+PR #19 已全绿并合并。当前正在进入：
 
-1. Windows packaged Conversation Beta runtime evidence；
-2. Conversation 专属 README runtime screenshots；
+1. Windows packaged Conversation Beta runtime evidence（PR #27 已实现 gate，证据等待当前 CI/Release workflow）；
+2. Conversation 专属 packaged runtime screenshots（PR #27 已加入 BrowserWindow + fallback capture，等待 workflow 证据）；
 3. local dogfood；
 4. 真实 Project Sync / Design Review 小规模使用；
 5. human-labeled Guidance evaluation；

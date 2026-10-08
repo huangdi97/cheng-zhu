@@ -1490,6 +1490,47 @@ def test_started_session_keeps_frozen_open_thread_after_space_thread_is_resolved
 
 
 
+
+
+def test_http_models_keep_audience_target_on_guidance_not_participant_create(product_env):
+    from api.product.conversations_router import (
+        GuidanceBody,
+        ParticipantCreate,
+        add_participant as route_add_participant,
+        evaluate_guidance as route_evaluate_guidance,
+    )
+
+    assert "audience_participant_id" not in ParticipantCreate.model_fields
+    assert "audience_participant_id" in GuidanceBody.model_fields
+
+    space = conversations.create_space("HTTP Target", "DESIGN_REVIEW")
+    participant = route_add_participant(
+        space["id"],
+        ParticipantCreate(
+            display_name="Alex",
+            role="CTO",
+            explicit_concern="rollback risk",
+            source_refs=[{"kind": "USER_NOTE", "excerpt": "Alex 明确关注 rollback risk"}],
+        ),
+    )
+    assert participant["display_name"] == "Alex"
+
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    result = route_evaluate_guidance(
+        session["id"],
+        GuidanceBody(
+            talking_point="只补一条有来源的 benchmark",
+            source_refs=[{"kind": "DOCUMENT", "id": "bench", "visibility": "PRIVATE"}],
+            audience_participant_id=participant["id"],
+            audience_role="CTO",
+            audience_concern="rollback risk",
+        ),
+    )
+    assert result["guidance"] is not None
+    assert result["guidance"]["expression_plan"]["target_participant_id"] == participant["id"]
+
+
 def test_expression_plan_is_derived_from_guidance_and_explicit_audience_only(product_env):
     space = conversations.create_space("Plan", "DESIGN_REVIEW")
     session = conversations.create_session(space["id"], consent_ack=True)

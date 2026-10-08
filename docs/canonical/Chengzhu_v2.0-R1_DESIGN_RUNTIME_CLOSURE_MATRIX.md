@@ -204,6 +204,7 @@ Thread 是 read-model projection，不替代 Conversation Item truth。
 - tombstone 保留删除 provenance，但不会留下可行动的幽灵 Thread；
 - Space Overview 可直接 Resolve reviewed Open Thread；
 - thread-level Resolve 不自己改 truth，而是沿 `CONVERSATION_ITEM` provenance 调用原 Item 的 reviewed resolve transition。
+- Thread projection lookup 按源 Session 的完整记录检索，不再使用 Space 最新 500 条的截断窗口；Session 删除基于一次性 provenance 映射移除派生 Thread（长期 Space 超过 500 条的回归测试见 `test_long_lived_space_open_thread_lookup_survives_over_500_other_threads`）。
 
 ---
 

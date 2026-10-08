@@ -2944,3 +2944,50 @@ def test_session_export_is_categorized_local_and_scoped_to_current_session(produ
     assert [x["text"] for x in exported["transcript"]] == ["这是一段本场转写"]
     assert all(x["session_id"] == first["id"] for x in exported["guidance"])
     assert "第二场的问题不应混入第一场导出" not in str(exported)
+
+
+def test_long_lived_space_open_thread_lookup_survives_over_500_other_threads(product_env):
+    """Review and deletion must preserve the provenance of an older open thread."""
+    space = conversations.create_space("Longitudinal Thread Stress", "PROJECT_SYNC")
+    old_session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(old_session["id"])
+    item = conversations.add_item(
+        old_session["id"],
+        item_type="OpenQuestion",
+        title="Who owns rollback?",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "rollback owner unknown"}],
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    original = conversations._thread_for_item(conversations.require_item(item["id"]))
+    assert original and original["status"] == "OPEN"
+
+    newer_session = conversations.create_session(space["id"], consent_ack=True)
+    # Populate one Space with >500 more recent projections to reproduce the old
+    # truncated latest-500 query, without generating unrelated AI/confirmed truth.
+    with store.connect() as conn:
+        for index in range(501):
+            store.insert("conversation_open_thread", {
+                "id": store.new_id("cot_"),
+                "space_id": space["id"],
+                "session_id": newer_session["id"],
+                "kind": "Risk",
+                "text": f"old resolved projection {index}",
+                "owner_id": "",
+                "status": "RESOLVED",
+                "source_refs": [{"kind": "CONVERSATION_ITEM", "id": f"historic-{index}"}],
+                "created_at": store.now() + index + 1,
+                "resolved_at": store.now() + index + 1,
+            }, conn=conn)
+
+    found = conversations._thread_for_item(conversations.require_item(item["id"]))
+    assert found and found["id"] == original["id"]
+
+    conversations.review_item(item["id"], "EDIT", {"title": "Who owns the rollback drill?"})
+    updated = conversations._thread_for_item(conversations.require_item(item["id"]))
+    assert updated and updated["id"] == original["id"]
+    assert updated["text"] == "Who owns the rollback drill?"
+
+    conversations.end_session(old_session["id"])
+    result = conversations.delete_session(old_session["id"], confirmed_policy="TOMBSTONE")
+    assert result["removed_open_thread_projections"] == 1
+    assert store.get("conversation_open_thread", original["id"]) is None

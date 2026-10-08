@@ -46,6 +46,8 @@ jobs:
             exit 1
           fi
 
+          python3 scripts/check_release_version.py
+
           tag="v$version"
           if gh release view "$tag" >/dev/null 2>&1; then
             is_draft="$(gh release view "$tag" --json isDraft --jq '.isDraft')"

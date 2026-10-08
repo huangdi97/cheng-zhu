@@ -16,6 +16,7 @@ import type {
   ConversationPrepare,
   ConversationProfile,
   ConversationSearchItem,
+  ConversationScreenContext,
   ConversationSession,
   ConversationSessionContext,
   ConversationSessionExport,
@@ -70,7 +71,7 @@ export const conversationApi = {
   retentionPreview: (id: string) => request<{
     space_id: string
     policy: Record<string, unknown>
-    would_delete: { transcript_segments: number; guidance_events: number; draft_actions: number }
+    would_delete: { transcript_segments: number; guidance_events: number; draft_actions: number; screen_context_observations: number }
     kept: Record<string, string>
     destructive: boolean
   }>(`${B}/spaces/${encodeURIComponent(id)}/retention`),
@@ -114,6 +115,10 @@ export const conversationApi = {
     policy?: Partial<ConversationSession['policy']>
   }) => request<ConversationSession>(`${B}/spaces/${encodeURIComponent(id)}/sessions`, json('POST', body)),
   session: (id: string) => request<ConversationSession>(`${B}/sessions/${encodeURIComponent(id)}`),
+  screenContext: (id: string, limit = 20) =>
+    request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/screen-context?limit=${limit}`).then((p) => list<ConversationScreenContext>(p)),
+  captureScreenContext: (id: string, region = 'configured') =>
+    request<ConversationScreenContext>(`${B}/sessions/${encodeURIComponent(id)}/screen-context/capture`, json('POST', { region })),
   sessionContext: (id: string) => request<ConversationSessionContext>(`${B}/sessions/${encodeURIComponent(id)}/context`),
   exportSession: (id: string) => request<ConversationSessionExport>(`${B}/sessions/${encodeURIComponent(id)}/export`),
   deleteSession: (id: string, confirmed_policy: 'BLOCK' | 'TOMBSTONE' = 'BLOCK') =>

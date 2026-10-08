@@ -334,6 +334,41 @@ Decision / Commitment / Task 等结构化状态。
 
 ---
 
+
+### 4.8 Profile Playbook：共享 Core，不共享“本场工作定义”
+
+六个 Profile 继续共用同一套 Truth / Provenance / Session Pack / Guidance Arbiter / Continue runtime，但每个 Profile 必须有自己的冻结 Playbook：
+
+```text
+success conditions
+priority truth types
+prepare prompts
+closing objective
+boundaries
+```
+
+Runtime 要求：
+
+1. Template Picker 在创建 Space 前显示 closing objective 与 success conditions；
+2. Prepare 显示 Profile Playbook；
+3. Session 开始时把 Playbook 冻结进 Session Pack；
+4. Live Session Pulse 只读取 frozen Playbook；
+5. Continue 只显示 priority truth types 中的 reviewed output evidence；
+6. Playbook 后续修改不得改写已开始 Session；
+7. 不生成 meeting success score / quality score / readiness percentage；
+8. `specialized behavior validated` 只有在专属 E2E + 真实场景标注完成后才能升级。
+
+当前六类 Playbook：
+
+- Project Sync：状态变化、blocker、owner / commitment / deadline、下一步；
+- Design Review：Decision / Proposal / Objection / Risk / Assumption / trade-off；
+- Presentation / Q&A：准确 evidence、未知边界、follow-up；
+- 1:1：明确目标/concern/commitment，不做心理画像；
+- Client Call：客户问题、承诺、风险与 follow-up，不推断购买意向；
+- Negotiation：明确 Proposal / Objection / constraint / Decision，social-risk 高时优先 SILENT，不推断 hidden bottom line。
+
+这样既避免“六个模板只是改名字”，也避免为了场景差异复制六套 Conversation 产品。
+
 # 5. v2 IA：Profile Switcher，而不是导航爆炸
 
 全局 Shell 保留品牌、Person、Library、History、Settings。

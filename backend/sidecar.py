@@ -21,7 +21,7 @@ import argparse
 import os
 import sys
 
-APP_VERSION = "2.0.0-beta.1"
+APP_VERSION = "2.0.0-beta.2"
 
 
 def _run_screen_capture_worker(argv: list[str]) -> int:

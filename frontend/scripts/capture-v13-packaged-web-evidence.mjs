@@ -377,6 +377,99 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
   if (overflow) throw new Error('390px Goal Prepare has horizontal overflow')
 
+  // Conversation Beta packaged fallback evidence. This still uses the real
+  // packaged sidecar and packaged frontend-dist; only Electron BrowserWindow
+  // capture is unavailable on this hosted-runner fallback path.
+  const conversationSpace = await request(base, 'POST', '/api/product/conversation/spaces', {
+    title: 'PDIG Architecture Review',
+    profile: 'DESIGN_REVIEW',
+    default_goal: '决定 offline migration 方案并确认 rollback owner',
+  })
+  await request(base, 'POST', '/api/product/conversation/spaces/' + conversationSpace.id + '/participants', {
+    display_name: 'Alex',
+    role: 'CTO',
+    explicit_priority: '迁移稳定性',
+    explicit_concern: 'rollback 风险',
+    decision_authority: '架构方案批准人',
+    relationship_context: '客户技术负责人',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'Alex 明确关注 rollback 风险', visibility: 'PRIVATE' }],
+  })
+  const priorConversation = await request(base, 'POST', '/api/product/conversation/spaces/' + conversationSpace.id + '/sessions', {
+    title: 'Prior Architecture Review',
+    capture_mode: 'NOTES_ONLY',
+    processing_mode: 'LOCAL',
+    assistance_mode: 'BALANCED',
+    consent_ack: true,
+    policy: {
+      ai_assistance: 'AI_ALLOWED',
+      human_assistance: 'HUMAN_PRACTICE_ONLY',
+      screen_context: 'OFF',
+      share_privacy: 'OFF',
+      external_writeback: 'REVIEW_REQUIRED',
+      participant_consent_status: 'NOT_APPLICABLE',
+      participant_transparency_plan: 'NOT_APPLICABLE',
+    },
+  })
+  await request(base, 'POST', '/api/product/conversation/sessions/' + priorConversation.id + '/start', {})
+  const priorDecision = await request(base, 'POST', '/api/product/conversation/sessions/' + priorConversation.id + '/items', {
+    item_type: 'Decision',
+    title: 'offline migration 采用 v2',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: '明确采用 v2', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(base, 'POST', '/api/product/conversation/items/' + priorDecision.id + '/review', { action: 'CONFIRM', patch: {} })
+  const priorQuestion = await request(base, 'POST', '/api/product/conversation/sessions/' + priorConversation.id + '/items', {
+    item_type: 'OpenQuestion',
+    title: '谁负责 rollback drill？',
+    source_refs: [{ kind: 'USER_NOTE', excerpt: 'owner 尚未明确', visibility: 'PRIVATE' }],
+    epistemic_status: 'OBSERVED',
+  })
+  await request(base, 'POST', '/api/product/conversation/items/' + priorQuestion.id + '/review', { action: 'CONFIRM', patch: {} })
+  await request(base, 'POST', '/api/product/conversation/sessions/' + priorConversation.id + '/end', {})
+
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.evaluate(() => {
+    localStorage.setItem('chengzhu-product-profile', 'conversation')
+    localStorage.setItem('chengzhu-conversation-optin', '1')
+    localStorage.setItem('ia-color-scheme', 'vscode-light-plus')
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await go(page, '#/conversation', '[data-testid="conversation-home"]')
+  await shot(page, '30-conversation-home-web-fallback', 'Conversation Beta Home via packaged sidecar + packaged frontend')
+
+  await go(page, '#/conversation/spaces/' + conversationSpace.id, '[data-testid="conversation-space"]')
+  await shot(page, '31-conversation-space-web-fallback', 'Conversation Space with longitudinal state')
+
+  await go(page, '#/conversation/spaces/' + conversationSpace.id + '/prepare', '[data-testid="conversation-space"]')
+  await shot(page, '32-conversation-prepare-web-fallback', 'Conversation Prepare')
+
+  await page.getByTestId('conversation-preflight-generate').click()
+  await page.getByTestId('conversation-preflight-result').waitFor({ timeout: 15000 })
+  await shot(page, '33-conversation-preflight-web-fallback', 'Conversation Preflight resolved policy/data-path evidence')
+
+  await page.getByTestId('conversation-preflight-start').click()
+  await page.getByTestId('conversation-live').waitFor({ timeout: 15000 })
+  await shot(page, '34-conversation-live-web-fallback', 'Conversation Participate with Session Pulse')
+
+  await page.getByTestId('conversation-end').click()
+  await page.getByTestId('conversation-live-summary').waitFor({ timeout: 15000 })
+  await shot(page, '35-conversation-live-continue-web-fallback', 'Conversation Continue summary')
+
+  await page.getByTestId('conversation-back-to-space').click()
+  await page.getByTestId('conversation-space').waitFor({ timeout: 15000 })
+  await page.locator('[data-testid^="conversation-continue-"]').first().click()
+  await page.getByTestId('conversation-continue-panel').waitFor({ timeout: 15000 })
+  await shot(page, '36-conversation-space-continue-web-fallback', 'Space-level Conversation Continue')
+
+  await go(page, '#/history', '[data-testid="conversation-history"]')
+  await shot(page, '37-conversation-history-web-fallback', 'Conversation-native History')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await go(page, '#/conversation/spaces/' + conversationSpace.id + '/prepare', '[data-testid="conversation-space"]')
+  await shot(page, '38-conversation-mobile-390-prepare-web-fallback', '390px Conversation Prepare')
+  const conversationOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+  if (conversationOverflow) throw new Error('390px Conversation Prepare has horizontal overflow')
+
   const manifest = {
     captured_at: new Date().toISOString(),
     evidence_type: 'PACKAGED_FRONTEND_DIST_VIA_PACKAGED_SIDECAR_HEADLESS_CHROMIUM',
@@ -385,10 +478,11 @@ try {
     frontend_dist: FRONTEND_DIST,
     goal_id: goal.id,
     practice_id: practice.practice_id,
+    conversation_space_id: conversationSpace.id,
     entries,
   }
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  if (entries.length < 29) throw new Error('expected at least 29 packaged fallback captures, got ' + entries.length)
+  if (entries.length < 38) throw new Error('expected at least 38 packaged fallback captures including Conversation Beta, got ' + entries.length)
   console.log('packaged web fallback evidence complete captures=' + entries.length)
 } catch (error) {
   console.error(error)

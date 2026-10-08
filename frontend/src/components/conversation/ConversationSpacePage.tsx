@@ -289,9 +289,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const removeSession = async (id: string) => {
     if (!window.confirm('删除这场会话？如果其中有已确认事项，会先保存 provenance tombstone；该事项将不再参与后续 Recall。')) return
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
+    const target = space.sessions.find((item) => item.id === id)
     try {
       const result = await conversationApi.deleteSession(id, 'TOMBSTONE')
-      setLifecycleMessage(`已删除会话；保留 ${result.provenance_tombstones} 条 provenance tombstone，并移除 ${result.removed_open_thread_projections ?? 0} 条派生 Open Thread projection。`)
+      let privacyNote = ''
+      if (target?.status === 'ACTIVE' && target.policy?.share_privacy === 'PRIVATE_OVERLAY') {
+        try { await restoreConversationSharePrivacy(id) }
+        catch { privacyNote = '；但无法确认 Share Privacy 已恢复，请在设置/托盘检查' }
+      }
+      setLifecycleMessage(`已删除会话；保留 ${result.provenance_tombstones} 条 provenance tombstone，并移除 ${result.removed_open_thread_projections ?? 0} 条派生 Open Thread projection${privacyNote}。`)
       setContinueData(null)
       await detail.reload(); await prepare.reload(); await retention.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
@@ -334,7 +340,16 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const deleteSpace = async () => {
     if (!window.confirm('彻底删除这个对话空间？这是 complete erase：Session、confirmed/candidate items、Session Packs、Guidance、Drafts 与 provenance tombstones 都会一起删除，无法再用于 Recall。若只是暂时不用，请选择“归档”。Interview 数据不受影响。')) return
     setSessionBusy(true); setSessionError('')
-    try { await conversationApi.deleteSpace(spaceId, true); navigate(paths.conversationSpaces()) }
+    const privateActiveIds = space.sessions
+      .filter((item) => item.status === 'ACTIVE' && item.policy?.share_privacy === 'PRIVATE_OVERLAY')
+      .map((item) => item.id)
+    try {
+      await conversationApi.deleteSpace(spaceId, true)
+      for (const id of privateActiveIds) {
+        try { await restoreConversationSharePrivacy(id) } catch { /* fail safer: protection may remain enabled */ }
+      }
+      navigate(paths.conversationSpaces())
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)); setSessionBusy(false) }
   }
 

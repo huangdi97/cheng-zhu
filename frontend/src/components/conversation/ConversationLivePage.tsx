@@ -50,7 +50,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [screenBusy, setScreenBusy] = useState(false)
   const [screenObservations, setScreenObservations] = useState<ConversationScreenContext[]>([])
   const [screenAuto, setScreenAuto] = useState<ConversationScreenAutoStatus | null>(null)
-  const [screenAutoStatusError, setScreenAutoStatusError] = useState(false)
+  const [screenAutoStatusError, setScreenAutoStatusError] = useState(true)
   const [screenAutoInterval, setScreenAutoInterval] = useState('30')
   const capturePollGate = useRef(createLivePollGate()).current
 

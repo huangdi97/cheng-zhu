@@ -638,3 +638,116 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - CI 全绿。
 
 这之后的下一阶段是 **Conversation Beta productization / dogfood / real-user evidence**，不是继续靠文档把成熟度写高。
+
+---
+
+# 19. Conversation Beta Productization Evidence
+
+主线对象/runtime 闭环完成后，productization 证据必须继续分层。
+
+## 19.1 Deterministic engineering evidence
+
+脚本：
+
+```bash
+python scripts/v2_conversation_evidence.py --out-dir artifacts/v2-conversation-validation
+```
+
+输出：
+- `v2-conversation-engineering-evidence.json`
+- `V2_CONVERSATION_ENGINEERING_EVIDENCE.md`
+
+它证明：
+- Preflight policy / privacy boundary；
+- Session Pack digest 与 frozen material version；
+- Manual Ask 只读 frozen source；
+- Proposal/AI candidate 不自动成为 truth；
+- reviewed Decision / Open Thread continuity；
+- SILENT / Direct Question priority；
+- Continue / reviewed local write-back；
+- Conversation-native History；
+- diagnostics 不偷换 human-label metrics；
+- unwired Screen/Human/Overlay/connector fail-closed。
+
+证据类型固定：
+
+```text
+SYNTHETIC_ENGINEERING_EVIDENCE
+```
+
+不得升级为真实用户证据。
+
+## 19.2 Windows packaged Conversation proof
+
+`scripts/packaged_smoke.py` 不再只证明 Interview sidecar。Windows CI/release packaged smoke 同时执行真实 Conversation API：
+
+```text
+Space
+→ Session
+→ Preflight
+→ Start / frozen Pack
+→ candidate truth
+→ user review
+→ SILENT
+→ Continue
+→ review-only DraftAction
+→ History
+→ diagnostics
+```
+
+并验证 `product.db` migration version。
+
+这可以支持：
+
+```text
+V2_CONVERSATION_PACKAGED_RUNTIME_PROVEN
+```
+
+但仍不自动支持：
+
+```text
+V2_PRODUCTIZED_RELEASE
+```
+
+后者必须是一次明确的 v2 stable release，完整经过 installer / portable / clean-install / SHA256 / download-back / source-tag provenance。
+
+## 19.3 Human-label evaluation
+
+本地 dogfood 后先生成未标注 review queue：
+
+```bash
+python scripts/v2_conversation_label_seed.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --out labels.seed.jsonl
+```
+
+人工填写后：
+
+```bash
+python scripts/v2_conversation_human_eval.py labels.jsonl \
+  --out report.json \
+  --markdown-out report.md
+```
+
+协议：
+- `docs/evals/V2_CONVERSATION_HUMAN_LABEL_PROTOCOL.md`
+- `docs/evals/v2_conversation_human_labels.template.jsonl`
+
+规则：
+- seed 的 reviewer / useful / actual state / silence correctness 等字段全部为空；
+- 没有 human label → `INSUFFICIENT_EVIDENCE`；
+- 每个指标同时报告 value + n；
+- n=0 → value=null；
+- human-label report 不自动证明 PMF。
+
+因此 productization 证据链冻结为：
+
+```text
+runtime object closure
+→ deterministic engineering evidence
+→ packaged Windows Conversation proof
+→ local dogfood seed
+→ human labeling
+→ small real-user pilot
+→ only then consider stable v2 productization / profile-specific validation
+```

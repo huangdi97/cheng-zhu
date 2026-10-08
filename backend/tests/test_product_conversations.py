@@ -444,17 +444,18 @@ def test_session_policy_is_normalized_frozen_and_enforced(product_env):
         conversations.followup_draft(session["id"])
 
 
-def test_preflight_blocks_unwired_conversation_screen_and_human_runtime(product_env):
+def test_preflight_blocks_unwired_auto_screen_and_human_runtime(product_env):
     space = conversations.create_space("Truthful Preflight", "PROJECT_SYNC")
     session = conversations.create_session(
         space["id"],
         consent_ack=True,
-        policy={"screen_context": "MANUAL", "human_assistance": "HUMAN_ALLOWED"},
+        policy={"screen_context": "AUTO", "human_assistance": "HUMAN_ALLOWED"},
     )
     check = conversations.preflight(session["id"])
     keys = {item["key"] for item in check["blockers"]}
     assert {"screen_context_runtime", "human_assistance_runtime"} <= keys
-    with pytest.raises(ValueError, match="Screen Context runtime"):
+    assert check["screen_runtime"]["mode"] == "AUTO"
+    with pytest.raises(ValueError, match="AUTO"):
         conversations.start_session(session["id"])
 
 
@@ -2565,7 +2566,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 6
+    assert diag["schema_version"] == 7
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1
@@ -2606,7 +2607,7 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert "opportunity_precision" in diag["evaluation"]["requires_human_labels"]
     assert "interruption_regret" in diag["evaluation"]["requires_human_labels"]
     assert "not precision/quality/PMF" in diag["evaluation"]["interpretation"]
-    assert diag["health"]["conversation_screen_context"] == "BLOCKED_NOT_WIRED"
+    assert diag["health"]["conversation_screen_context"] == "MANUAL_AVAILABLE_AUTO_BLOCKED"
     assert diag["health"]["conversation_human_coach"] == "BLOCKED_NOT_WIRED"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"

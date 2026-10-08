@@ -455,7 +455,7 @@ def test_preflight_blocks_unwired_auto_screen_and_human_runtime(product_env):
     keys = {item["key"] for item in check["blockers"]}
     assert {"screen_context_runtime", "human_assistance_runtime"} <= keys
     assert check["screen_runtime"]["mode"] == "AUTO"
-    with pytest.raises(ValueError, match="自动 Screen Context")
+    with pytest.raises(ValueError, match="自动 Screen Context"):
         conversations.start_session(session["id"])
 
 

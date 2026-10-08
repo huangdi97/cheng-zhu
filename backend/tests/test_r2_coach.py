@@ -180,6 +180,74 @@ def test_api_flow_permissions_and_revoke(client):
     assert client.post("/coach/api/cue", json={"text": "x"}, headers={"X-Coach-Token": token}).status_code == 401
 
 
+def test_conversation_helper_state_is_session_scoped_and_never_exposes_interview_resume_jd(client, monkeypatch):
+    import api.coach.router as router
+    from services.product import conversation_capture, conversations
+
+    target = "conv-helper-boundary"
+    seen = []
+    monkeypatch.setattr(
+        router,
+        "_human_policy_for",
+        lambda kind, session_id="": "HUMAN_ALLOWED"
+        if kind == "conversation" and session_id == target
+        else "HUMAN_FORBIDDEN",
+    )
+    monkeypatch.setattr(
+        conversations,
+        "require_session",
+        lambda session_id: (
+            seen.append(("session", session_id))
+            or {"id": session_id, "status": "ACTIVE", "state": {"current_topic": "rollback owner"}}
+        ),
+    )
+    monkeypatch.setattr(
+        conversation_capture,
+        "transcript",
+        lambda session_id: seen.append(("transcript", session_id)) or [{"session_id": session_id, "text": "private transcript"}],
+    )
+    monkeypatch.setattr(
+        conversations,
+        "guidance_history",
+        lambda session_id, limit: seen.append(("guidance", session_id)) or [{"id": "g-1", "kind": "RECALL", "text": "private cue"}],
+    )
+    monkeypatch.setattr(
+        conversations,
+        "session_context",
+        lambda session_id: seen.append(("context", session_id)) or {
+            "space": {"id": "space-1", "title": "Design Review"},
+            "brief": {"goal": "decide rollback owner"},
+            "sources": [{"title": "Frozen source"}],
+            "participants": [{"display_name": "Alex", "role": "CTO"}],
+            "profile_playbook": {"closing_objective": "leave with an owner"},
+        },
+    )
+
+    _session, token = coach.registry.create(
+        human_policy="HUMAN_ALLOWED",
+        session_kind="conversation",
+        live_session_id=target,
+        permissions={
+            "session_context": True,
+            "resume_jd": True,  # Must still be ignored for Conversation.
+            "transcript": False,
+            "ai_cue": False,
+        },
+    )
+    state = client.get("/coach/api/state", headers={"X-Coach-Token": token}).json()
+
+    assert state["session"]["kind"] == "conversation"
+    assert state["session"]["target_session_id"] == target
+    assert state["current_question"] == "rollback owner"
+    assert state["conversation_context"]["space"]["id"] == "space-1"
+    assert "resume_jd" not in state
+    assert "transcript" not in state
+    assert "ai_cue" not in state
+    assert ("context", target) in seen
+    assert not any(kind in {"transcript", "guidance"} for kind, _session_id in seen)
+    assert all(session_id == target for _kind, session_id in seen)
+
+
 def test_policy_tightened_mid_session_blocks_cues(client, monkeypatch):
     body = client.post("/api/coach/sessions", json={"session_kind": "practice"}).json()
     token = body["urls"]["local"].split("#t=")[1]

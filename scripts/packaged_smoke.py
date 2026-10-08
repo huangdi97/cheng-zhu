@@ -13,6 +13,8 @@ Checks:
   6. InterviewPack freeze persists across a sidecar restart
   7. nothing is written next to the executable (install dir stays clean)
   8. LICENSE / THIRD_PARTY_NOTICES bundled
+  9. Conversation Beta real packaged routes + product.db schema
+ 10. Conversation frozen Pack / reviewed Decision / Continue survive restart
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -219,6 +221,15 @@ def main() -> int:
         checks["intelligence_schema_expected"] = expected_schema
         ok &= expected_schema is not None and user_version == expected_schema
 
+        product_db = home / "data" / "product.db"
+        product_version = sqlite3.connect(product_db).execute("PRAGMA user_version").fetchone()[0] if product_db.exists() else None
+        checks["product_schema_version"] = product_version
+        product_migrations_source = (Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "product_migrations.py").read_text(encoding="utf-8")
+        product_version_match = re.search(r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)", product_migrations_source, re.MULTILINE)
+        expected_product_schema = int(product_version_match.group(1)) if product_version_match else None
+        checks["product_schema_expected"] = expected_product_schema
+        ok &= expected_product_schema is not None and product_version == expected_product_schema
+
         if args.frontend_dist:
             with urllib.request.urlopen(f"{base}/", timeout=10) as resp:
                 html = resp.read().decode("utf-8", "replace")
@@ -234,6 +245,72 @@ def main() -> int:
         checks["answer_done_latency"] = done.get("latency")
         ok &= cue_ok and bool(done)
 
+        # Conversation Beta packaged-runtime proof: real product.db, routes,
+        # frozen Session Pack, reviewed truth and restart persistence.
+        conv_space = http_json(f"{base}/api/product/conversation/spaces", "POST", {
+            "title": "Packaged Project Sync",
+            "profile": "PROJECT_SYNC",
+            "default_goal": "确认 rollout owner 与风险",
+        })
+        conv_session = http_json(
+            f"{base}/api/product/conversation/spaces/{conv_space['id']}/sessions",
+            "POST",
+            {
+                "title": "Packaged Conversation",
+                "capture_mode": "NOTES_ONLY",
+                "processing_mode": "LOCAL",
+                "assistance_mode": "BALANCED",
+                "consent_ack": True,
+                "policy": {
+                    "ai_assistance": "AI_ALLOWED",
+                    "human_assistance": "HUMAN_PRACTICE_ONLY",
+                    "screen_context": "OFF",
+                    "share_privacy": "OFF",
+                    "external_writeback": "REVIEW_REQUIRED",
+                    "participant_consent_status": "NOT_APPLICABLE",
+                    "participant_transparency_plan": "NOT_APPLICABLE",
+                },
+            },
+        )
+        conv_preflight = http_json(f"{base}/api/product/conversation/sessions/{conv_session['id']}/preflight")
+        checks["conversation_preflight_blockers"] = conv_preflight.get("blockers")
+        checks["conversation_pack_preview_profile"] = (conv_preflight.get("space") or {}).get("profile")
+        ok &= conv_preflight.get("blockers") == [] and checks["conversation_pack_preview_profile"] == "PROJECT_SYNC"
+
+        conv_started = http_json(f"{base}/api/product/conversation/sessions/{conv_session['id']}/start", "POST", {})
+        conv_context = http_json(f"{base}/api/product/conversation/sessions/{conv_session['id']}/context")
+        checks["conversation_started_status"] = (conv_started.get("session") or {}).get("status")
+        checks["conversation_pack_digest"] = conv_context.get("pack_digest")
+        checks["conversation_context_goal"] = (conv_context.get("brief") or {}).get("goal")
+        ok &= (
+            checks["conversation_started_status"] == "ACTIVE"
+            and bool(checks["conversation_pack_digest"])
+            and checks["conversation_context_goal"] == "确认 rollout owner 与风险"
+        )
+
+        conv_item = http_json(
+            f"{base}/api/product/conversation/sessions/{conv_session['id']}/items",
+            "POST",
+            {
+                "item_type": "Decision",
+                "title": "先完成 rollback drill 再扩大 rollout",
+                "source_refs": [{"kind": "USER_NOTE", "excerpt": "packaged smoke explicit decision", "visibility": "PRIVATE"}],
+                "epistemic_status": "OBSERVED",
+            },
+        )
+        conv_reviewed = http_json(
+            f"{base}/api/product/conversation/items/{conv_item['id']}/review",
+            "POST",
+            {"action": "CONFIRM", "patch": {}},
+        )
+        checks["conversation_reviewed_decision_state"] = conv_reviewed.get("state")
+        ok &= conv_reviewed.get("state") == "AGREED"
+
+        conv_continue = http_json(f"{base}/api/product/conversation/sessions/{conv_session['id']}/end", "POST", {})
+        checks["conversation_continue_decisions"] = len(conv_continue.get("decisions") or [])
+        checks["conversation_continue_review_required"] = conv_continue.get("review_required")
+        ok &= checks["conversation_continue_decisions"] >= 1
+
         pack = http_json(f"{base}/api/intelligence/pack/freeze", "POST", {"share_privacy_policy": "OFF"})
         checks["pack_frozen_id"] = pack.get("id")
         stop(proc)
@@ -243,6 +320,22 @@ def main() -> int:
         after = http_json(f"{base}/api/intelligence/pack")
         checks["pack_persisted_after_restart"] = bool(after.get("frozen")) and after["pack"]["id"] == pack.get("id")
         ok &= bool(checks["pack_persisted_after_restart"])
+
+        conv_after = http_json(f"{base}/api/product/conversation/spaces/{conv_space['id']}")
+        conv_history = http_json(f"{base}/api/product/conversation/history?limit=20")
+        history_ids = [item.get("id") for item in (conv_history.get("items") or [])]
+        checks["conversation_space_persisted_after_restart"] = conv_after.get("id") == conv_space["id"]
+        checks["conversation_history_persisted_after_restart"] = conv_session["id"] in history_ids
+        checks["conversation_decision_persisted_after_restart"] = any(
+            item.get("title") == "先完成 rollback drill 再扩大 rollout"
+            and item.get("state") == "AGREED"
+            for item in (conv_after.get("decisions") or [])
+        )
+        ok &= (
+            bool(checks["conversation_space_persisted_after_restart"])
+            and bool(checks["conversation_history_persisted_after_restart"])
+            and bool(checks["conversation_decision_persisted_after_restart"])
+        )
     except Exception as exc:  # noqa: BLE001
         checks["error"] = f"{type(exc).__name__}: {exc}"
         ok = False

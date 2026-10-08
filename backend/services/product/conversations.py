@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
-from services.product import materials
+from services.product import conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -829,6 +829,7 @@ def _preflight_context_fingerprint(
     pack_inputs: dict[str, Any],
     policy: dict[str, Any],
     processing_runtime: dict[str, Any],
+    screen_runtime: dict[str, Any],
 ) -> str:
     """Hash every mutable input that can materially change the eventual Pack.
 
@@ -904,6 +905,7 @@ def _preflight_context_fingerprint(
             "contribution_candidates": list(prepared.get("contribution_candidates") or []),
         },
         "processing_runtime": processing_runtime,
+        "screen_runtime": screen_runtime,
     }
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -929,6 +931,14 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
+    screen_runtime = conversation_screen.vision_runtime_status(session)
+    for message in screen_runtime["blockers"]:
+        blockers.append({
+            "key": "screen_context_runtime",
+            "label": "屏幕上下文",
+            "message": message,
+        })
+
     connector_ok = not bool(policy.get("connector_permissions"))
     if not connector_ok:
         blockers.append({
@@ -945,13 +955,10 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": "现有 Private Overlay 仍属于 Interview Live 路径；Conversation 还没有独立 runtime 证明，因此当前必须保持 OFF。",
         })
 
-    screen_ok = policy["screen_context"] == "OFF"
-    if not screen_ok:
-        blockers.append({
-            "key": "screen_context_runtime",
-            "label": "屏幕上下文",
-            "message": "Conversation 的 Screen Context runtime 尚未接线；当前必须保持 OFF，不能把 policy 选择伪装成已生效功能。",
-        })
+    screen_ok = (
+        policy["screen_context"] == "OFF"
+        or (policy["screen_context"] == "MANUAL" and not screen_runtime["blockers"])
+    )
 
     human_ok = policy["human_assistance"] != "HUMAN_ALLOWED"
     if not human_ok:
@@ -988,7 +995,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         })
 
     context_fingerprint = _preflight_context_fingerprint(
-        session, space, pack_inputs, policy, processing_runtime
+        session, space, pack_inputs, policy, processing_runtime, screen_runtime
     )
     if record_fingerprint and session["status"] == "UPCOMING":
         state = dict(session.get("state") or {})
@@ -1031,7 +1038,11 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
-        {"key": "screen", "label": "屏幕上下文", "value": policy["screen_context"], "ok": screen_ok},
+        {"key": "screen", "label": "屏幕上下文", "value": (
+            f"{policy['screen_context']} · {screen_runtime['route']}"
+            if policy["screen_context"] == "MANUAL"
+            else policy["screen_context"]
+        ), "ok": screen_ok},
         {"key": "ai", "label": "AI Assistance", "value": policy["ai_assistance"], "ok": ai_ok},
         {"key": "ai_behavior", "label": "AI 自动行为", "value": (
             "AUTO_GUIDANCE_AND_EXTRACTION" if ai_behavior["automatic_transcript_guidance"]
@@ -1052,6 +1063,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         "policy": policy,
         "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
+        "screen_runtime": screen_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
@@ -1082,6 +1094,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "expression_profile": _expression_profile(),
             "resolved_ai_behavior": ai_behavior,
             "processing_runtime": processing_runtime,
+            "screen_runtime": screen_runtime,
             "policy": {
                 **policy,
                 "capture_mode": session["capture_mode"],
@@ -1157,6 +1170,7 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "expression_profile": _expression_profile(),
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
+        "screen_runtime": conversation_screen.vision_runtime_status(session),
         "policy": {
             **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],
@@ -1342,6 +1356,7 @@ def session_context(session_id: str) -> dict[str, Any]:
         "expression_profile": payload.get("expression_profile") or {},
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
+        "screen_runtime": payload.get("screen_runtime") or {},
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
         "pack_digest": str((pack_row or {}).get("digest") or ""),
     }
@@ -1484,7 +1499,32 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) The current-session transcript supports catch-up, but remains observation.
+    # 4) Manual screen observations are source-aware but never confirmed truth.
+    for observation in conversation_screen.list_context(session_id, limit=40):
+        lexical = _text_match_score(question, str(observation.get("text") or ""))
+        if lexical:
+            ranked.append((lexical + 2, float(observation.get("created_at") or 0), {
+                "id": observation.get("id") or "",
+                "kind": "SCREEN_CONTEXT",
+                "authority": "OBSERVED_NOT_CONFIRMED",
+                "title": "本场屏幕观察",
+                "excerpt": str(observation.get("text") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "SCREEN_CONTEXT",
+                    "id": observation.get("id") or "",
+                    "session_id": session_id,
+                    "timestamp": observation.get("created_at"),
+                    "image_hash": observation.get("image_hash") or "",
+                    "vision_model": observation.get("vision_model") or "",
+                    "vision_route": observation.get("vision_route") or "",
+                    "visibility": "PRIVATE",
+                }],
+            }))
+
+    # 5) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",
@@ -1517,7 +1557,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     matches = [match for _, _, match in ranked[:6]]
     if not matches:
         return {
-            "answer": "没有在本场冻结来源、已确认历史或当前转写中找到足够直接的可追溯内容。",
+            "answer": "没有在本场冻结来源、已确认历史、屏幕观察或当前转写中找到足够直接的可追溯内容。",
             "matches": [],
             "grounded": False,
             "truth_confirmed": False,
@@ -2737,6 +2777,12 @@ def export_session(session_id: str) -> dict[str, Any]:
         params=(session_id,),
         order="created_at ASC",
     )
+    screen_context = store.select(
+        "conversation_screen_context",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
     items = store.select(
         "conversation_item",
         where="session_id = ?",
@@ -2793,7 +2839,7 @@ def export_session(session_id: str) -> dict[str, Any]:
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
-                "session", "transcript", "quick_notes", "confirmed_items",
+                "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
                 "unconfirmed_candidates", "guidance", "draft_actions",
                 "source_manifest", "session_packs",
             ],
@@ -2807,6 +2853,7 @@ def export_session(session_id: str) -> dict[str, Any]:
         },
         "session": session,
         "transcript": transcript,
+        "screen_context_observations": screen_context,
         "quick_notes": quick_notes,
         "confirmed_items": confirmed,
         "unconfirmed_candidates": candidates,
@@ -2950,6 +2997,10 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
         "SELECT COUNT(*) FROM conversation_draft_action WHERE space_id = ? AND created_at <= ?",
         (space_id, _retention_cutoff(draft_days, now_value)),
     ) or 0)
+    screen_count = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_screen_context WHERE space_id = ? AND created_at <= ?",
+        (space_id, _retention_cutoff(transcript_days, now_value)),
+    ) or 0)
     return {
         "space_id": space_id,
         "policy": policy,
@@ -2957,13 +3008,14 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
             "transcript_segments": transcript_count,
             "guidance_events": guidance_count,
             "draft_actions": draft_count,
+            "screen_context_observations": screen_count,
         },
         "kept": {
             "confirmed_items": "KEEP",
             "session_packs": "KEEP",
             "provenance_tombstones": "KEEP",
         },
-        "destructive": any((transcript_count, guidance_count, draft_count)),
+        "destructive": any((transcript_count, guidance_count, draft_count, screen_count)),
     }
 
 
@@ -2973,7 +3025,7 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
         raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
     policy = preview["policy"]
     now_value = store.now()
-    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0}
+    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0, "screen_context_observations": 0}
 
     transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
     for row in store.select(
@@ -2982,6 +3034,13 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
         params=(space_id, transcript_cutoff),
     ):
         deleted["transcript_segments"] += int(store.delete("conversation_transcript_segment", row["id"]))
+
+    for row in store.select(
+        "conversation_screen_context",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    ):
+        deleted["screen_context_observations"] += int(store.delete("conversation_screen_context", row["id"]))
 
     guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
     guidance_rows = store.rows(
@@ -3268,6 +3327,7 @@ def diagnostics() -> dict[str, Any]:
     active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
     ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
     transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
+    screen_observations = int(store.scalar("SELECT COUNT(*) FROM conversation_screen_context") or 0)
     confirmed_items = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
     ) or 0)
@@ -3311,6 +3371,7 @@ def diagnostics() -> dict[str, Any]:
             "active_sessions": active_sessions,
             "ended_sessions": ended_sessions,
             "transcript_segments": transcripts,
+            "screen_context_observations": screen_observations,
             "confirmed_items": confirmed_items,
             "pending_review_items": pending_items,
             "guidance_shown": shown,
@@ -3360,7 +3421,7 @@ def diagnostics() -> dict[str, Any]:
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": "NOT_CONFIGURED",
-            "conversation_screen_context": "BLOCKED_NOT_WIRED",
+            "conversation_screen_context": "MANUAL_AVAILABLE_AUTO_BLOCKED",
             "conversation_human_coach": "BLOCKED_NOT_WIRED",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
@@ -3375,6 +3436,7 @@ def diagnostics() -> dict[str, Any]:
             "speaker_biometric_identity": "OFF",
             "emotion_sentiment_profiling": "OFF",
             "hidden_intent_claims": "OFF",
+            "screen_raw_image_persistence": "OFF",
         },
     }
 
@@ -3384,6 +3446,9 @@ def export_space(space_id: str) -> dict[str, Any]:
     items = store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at ASC")
     transcript = store.select(
         "conversation_transcript_segment", where="space_id = ?", params=(space_id,), order="created_at ASC"
+    )
+    screen_context = store.select(
+        "conversation_screen_context", where="space_id = ?", params=(space_id,), order="created_at ASC"
     )
     guidance = store.rows(
         "SELECT g.* FROM conversation_guidance_event g JOIN conversation_session s ON s.id = g.session_id "
@@ -3426,7 +3491,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
-                "transcript", "notes", "confirmed_items", "unconfirmed_candidates",
+                "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
                 "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
@@ -3437,6 +3502,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "sessions": detail["sessions"],
         "participants": detail["participants"],
         "transcript": transcript,
+        "screen_context_observations": screen_context,
         "notes": notes,
         "confirmed_items": confirmed,
         "unconfirmed_candidates": candidates,

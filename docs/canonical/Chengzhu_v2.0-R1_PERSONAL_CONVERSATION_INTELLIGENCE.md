@@ -675,42 +675,32 @@ COMMIT_NEXT_STEP
 
 ### 12.1 Runtime truth：Expression Plan 是 Guidance 的派生展示层
 
-Expression Plan **不是第二套长期事实对象，也不单独成为 truth authority**。
-
-当前 runtime 的等价结构是：
+Expression Plan **不是第二套持久化 truth**。当前 runtime 在 service boundary 为每个 Guidance event 派生同一份可审计 Plan：
 
 ```text
-Conversation State
-+ frozen Expression Profile
-+ explicit Counterparty / audience context
-+ policy / Profile lane
-+ selected provenance
-        ↓
-Guidance Arbiter
-        ↓
-Guidance {
-  kind,
-  expression_action,
-  text,
-  source_refs,
-  reason,
-  score,
-  user_action
-}
+action
+guidance_kind
+target_participant_id
+text
+source_refs
+warnings
+max_length
+render_as
+suppression_reasons
 ```
 
-其中：
+规则：
 
-- `expression_action` 对应 SILENT / ANSWER / RECALL / ADD_TALKING_POINT / ASK_QUESTION / FLAG_RISK / CLARIFY 等表达动作；
-- DELIVERY lane 会读取共享“我的表达”、Assistance Mode 与 explicit audience context 生成表达结构建议；
-- Guidance 的 `source_refs / reason / user_action` 才是需要审计的长期事件；
-- 不另建一个可与 Guidance 冲突的持久化 ExpressionPlan 表；
-- 如果未来需要更丰富的 render metadata，应作为 Guidance 的派生/版本化展示元数据，而不是复制事实文本与 provenance。
+- SHOWN Guidance → `render_as = PRIMARY_CARD`；
+- SUPPRESSED / SILENT → `render_as = SILENCE`，并保留 suppression reason；
+- target participant 只能来自用户对 Frozen Session Pack participant 的显式选择；
+- 用户清空当前受众时必须清除旧 target，禁止跨 turn 残留；
+- 不使用 speaker biometric / hidden identity inference 补全 target；
+- 数据库仍只持久化 Guidance event；Expression Plan 是派生 read model，不新增可写真值；
+- Guidance History / action review / Live polling 必须得到同一 Plan 解释；
+- DELIVERY 读取 frozen/shared Expression Profile 与 explicit audience context，只改变表达结构，不改变事实。
 
-底线：
-
-> **调整表达，不改写事实；派生展示不制造第二套 truth。**
-
+长期审计仍以 Guidance event + frozen Session Pack 为事实边界。
 ---
 
 # 13. Counterparty State

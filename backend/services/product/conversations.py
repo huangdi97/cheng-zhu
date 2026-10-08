@@ -3791,7 +3791,7 @@ def diagnostics() -> dict[str, Any]:
             "external_connectors": "NOT_CONFIGURED",
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
-            "conversation_human_coach": "BLOCKED_NOT_WIRED",
+            "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
             "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
         },
         "evidence": {
@@ -3809,6 +3809,9 @@ def diagnostics() -> dict[str, Any]:
             "share_privacy_default": "OFF",
             "share_privacy_runtime": "ELECTRON_CONTENT_PROTECTION_BEST_EFFORT",
             "share_privacy_undetectability_claim": "NEVER",
+            "human_coach_default": "OFF_EXPLICIT_START_ONLY",
+            "human_coach_truth_authority": "ADVICE_ONLY_NOT_EVIDENCE",
+            "human_coach_public_relay": "BLOCKED_UNLESS_CONFIGURED",
         },
     }
 

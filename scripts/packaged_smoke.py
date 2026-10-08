@@ -11,8 +11,12 @@ Checks:
   5. Fast Cue E2E with the fake provider: guidance_fast before the first
      answer_chunk, answer_done carries latency
   6. InterviewPack freeze persists across a sidecar restart
-  7. nothing is written next to the executable (install dir stays clean)
-  8. LICENSE / THIRD_PARTY_NOTICES bundled
+  7. Conversation Beta API runs from the packaged sidecar: Space → Session →
+     Preflight → frozen Session Pack → reviewed truth/Open Thread → Continue
+  8. product.db is migrated to the latest product schema and Conversation
+     state/history persist across a sidecar restart
+  9. nothing is written next to the executable (install dir stays clean)
+ 10. LICENSE / THIRD_PARTY_NOTICES bundled
 
 Usage:
   python scripts/packaged_smoke.py --exe build/sidecar/chengzhu-backend/chengzhu-backend.exe \
@@ -148,6 +152,133 @@ def ws_collect(port: int, ask_text: str, timeout: float = 40) -> list[dict]:
     return events
 
 
+def conversation_smoke(base: str) -> dict:
+    """Exercise the real packaged Conversation domain without audio hardware.
+
+    NOTES_ONLY is deliberate: packaged CI runners do not provide a trustworthy
+    meeting audio device. Audio transport remains covered by backend tests;
+    this gate proves the packaged sidecar contains the v2 product schema,
+    routes, frozen pack, provenance/review model and continuity read models.
+    """
+    prefix = f"{base}/api/product/conversation"
+    space = http_json(f"{prefix}/spaces", "POST", {
+        "title": "Packaged Conversation Smoke",
+        "profile": "PROJECT_SYNC",
+        "description": "packaged-runtime evidence",
+        "default_goal": "prove packaged Conversation continuity",
+    })
+    space_id = str(space.get("id") or "")
+    if not space_id:
+        raise RuntimeError(f"Conversation Space creation failed: {space}")
+
+    participant = http_json(f"{prefix}/spaces/{space_id}/participants", "POST", {
+        "display_name": "Alex",
+        "role": "Reviewer",
+        "explicit_priority": "rollback safety",
+        "explicit_concern": "migration risk",
+        "source_refs": [{"kind": "USER_INPUT", "excerpt": "packaged smoke fixture", "visibility": "PRIVATE"}],
+    })
+    if not participant.get("id"):
+        raise RuntimeError(f"Conversation participant creation failed: {participant}")
+
+    session = http_json(f"{prefix}/spaces/{space_id}/sessions", "POST", {
+        "title": "Packaged Review",
+        "capture_mode": "NOTES_ONLY",
+        "processing_mode": "LOCAL",
+        "assistance_mode": "BALANCED",
+        "consent_ack": True,
+        "policy": {
+            "ai_assistance": "AI_ALLOWED",
+            "human_assistance": "HUMAN_PRACTICE_ONLY",
+            "screen_context": "OFF",
+            "share_privacy": "OFF",
+            "external_writeback": "REVIEW_REQUIRED",
+            "participant_consent_status": "NOT_APPLICABLE",
+            "participant_transparency_plan": "NOT_APPLICABLE",
+        },
+    })
+    session_id = str(session.get("id") or "")
+    if not session_id:
+        raise RuntimeError(f"Conversation Session creation failed: {session}")
+
+    preflight = http_json(f"{prefix}/sessions/{session_id}/preflight")
+    if preflight.get("blockers"):
+        raise RuntimeError(f"Conversation packaged Preflight unexpectedly blocked: {preflight['blockers']}")
+    if preflight.get("processing_runtime", {}).get("mode") != "LOCAL":
+        raise RuntimeError(f"Conversation packaged processing runtime mismatch: {preflight}")
+
+    started = http_json(f"{prefix}/sessions/{session_id}/start", "POST")
+    pack = started.get("pack") or {}
+    payload = pack.get("payload") or {}
+    if not pack.get("digest") or payload.get("space", {}).get("id") != space_id:
+        raise RuntimeError(f"Conversation Session Pack did not freeze correctly: {started}")
+    if payload.get("policy", {}).get("participant_transparency_plan") != "NOT_APPLICABLE":
+        raise RuntimeError(f"Conversation policy was not frozen into Session Pack: {payload.get('policy')}")
+
+    decision = http_json(f"{prefix}/sessions/{session_id}/items", "POST", {
+        "item_type": "Decision",
+        "title": "Use staged rollout",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "reviewed in packaged smoke", "visibility": "PRIVATE"}],
+        "source_excerpt": "reviewed in packaged smoke",
+        "epistemic_status": "OBSERVED",
+    })
+    decision_id = str(decision.get("id") or "")
+    if not decision_id:
+        raise RuntimeError(f"Conversation Decision creation failed: {decision}")
+    confirmed = http_json(f"{prefix}/items/{decision_id}/review", "POST", {"action": "CONFIRM", "patch": {}})
+    if confirmed.get("state") != "AGREED" or confirmed.get("review_status") != "USER_CONFIRMED":
+        raise RuntimeError(f"Conversation Decision review invariant failed: {confirmed}")
+
+    question = http_json(f"{prefix}/sessions/{session_id}/items", "POST", {
+        "item_type": "OpenQuestion",
+        "title": "Who owns rollback?",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "owner unresolved", "visibility": "PRIVATE"}],
+        "source_excerpt": "owner unresolved",
+        "epistemic_status": "OBSERVED",
+    })
+    question_id = str(question.get("id") or "")
+    if not question_id:
+        raise RuntimeError(f"Conversation OpenQuestion creation failed: {question}")
+    reviewed_question = http_json(
+        f"{prefix}/items/{question_id}/review",
+        "POST",
+        {"action": "CONFIRM", "patch": {}},
+    )
+    if reviewed_question.get("review_status") != "USER_CONFIRMED":
+        raise RuntimeError(f"Conversation OpenQuestion review failed: {reviewed_question}")
+
+    detail = http_json(f"{prefix}/spaces/{space_id}")
+    threads = detail.get("threads") or []
+    if not any(t.get("text") == "Who owns rollback?" and t.get("status") == "OPEN" for t in threads):
+        raise RuntimeError(f"Reviewed OpenQuestion did not project to Open Thread: {threads}")
+
+    ended = http_json(f"{prefix}/sessions/{session_id}/end", "POST")
+    if ended.get("session", {}).get("status") != "ENDED":
+        raise RuntimeError(f"Conversation Continue did not close session: {ended}")
+
+    history = http_json(f"{prefix}/history?limit=20")
+    if not any(item.get("id") == session_id for item in history.get("items") or []):
+        raise RuntimeError(f"Conversation History missing ended session: {history}")
+
+    diagnostics = http_json(f"{prefix}/diagnostics")
+    if diagnostics.get("evidence", {}).get("real_user_status") != "PENDING":
+        raise RuntimeError(f"Conversation diagnostics overclaimed real-user evidence: {diagnostics.get('evidence')}")
+    if diagnostics.get("health", {}).get("external_writeback_execution") != "DRAFT_ONLY_NO_CONNECTOR_EXECUTION":
+        raise RuntimeError(f"Conversation diagnostics write-back truth mismatch: {diagnostics.get('health')}")
+
+    return {
+        "space_id": space_id,
+        "session_id": session_id,
+        "pack_id": pack.get("id"),
+        "pack_digest": pack.get("digest"),
+        "decision_id": decision_id,
+        "open_thread_id": next((t.get("id") for t in threads if t.get("text") == "Who owns rollback?"), ""),
+        "history_count": len(history.get("items") or []),
+        "schema_reported": diagnostics.get("schema_version"),
+        "real_user_status": diagnostics.get("evidence", {}).get("real_user_status"),
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
@@ -219,6 +350,21 @@ def main() -> int:
         checks["intelligence_schema_expected"] = expected_schema
         ok &= expected_schema is not None and user_version == expected_schema
 
+        conversation = conversation_smoke(base)
+        checks["conversation_packaged_runtime"] = conversation
+
+        product_db = home / "data" / "product.db"
+        product_version = sqlite3.connect(product_db).execute("PRAGMA user_version").fetchone()[0] if product_db.exists() else None
+        checks["product_schema_version"] = product_version
+        product_migrations_source = (
+            Path(__file__).resolve().parents[1] / "backend" / "services" / "storage" / "product_migrations.py"
+        ).read_text(encoding="utf-8")
+        product_match = re.search(r"^LATEST_SCHEMA_VERSION\s*=\s*(\d+)", product_migrations_source, re.MULTILINE)
+        expected_product_schema = int(product_match.group(1)) if product_match else None
+        checks["product_schema_expected"] = expected_product_schema
+        ok &= expected_product_schema is not None and product_version == expected_product_schema
+        ok &= conversation.get("schema_reported") == expected_product_schema
+
         if args.frontend_dist:
             with urllib.request.urlopen(f"{base}/", timeout=10) as resp:
                 html = resp.read().decode("utf-8", "replace")
@@ -243,6 +389,19 @@ def main() -> int:
         after = http_json(f"{base}/api/intelligence/pack")
         checks["pack_persisted_after_restart"] = bool(after.get("frozen")) and after["pack"]["id"] == pack.get("id")
         ok &= bool(checks["pack_persisted_after_restart"])
+
+        conversation_after = http_json(f"{base}/api/product/conversation/history?limit=20")
+        persisted = next(
+            (item for item in conversation_after.get("items") or [] if item.get("id") == conversation.get("session_id")),
+            None,
+        )
+        checks["conversation_persisted_after_restart"] = bool(
+            persisted
+            and persisted.get("status") == "ENDED"
+            and int(persisted.get("decisions_count") or 0) >= 1
+            and int(persisted.get("open_questions_count") or 0) >= 1
+        )
+        ok &= bool(checks["conversation_persisted_after_restart"])
     except Exception as exc:  # noqa: BLE001
         checks["error"] = f"{type(exc).__name__}: {exc}"
         ok = False

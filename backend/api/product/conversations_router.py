@@ -418,10 +418,17 @@ def preflight(session_id: str):
         return conversations.preflight(session_id)
 
 
+class SessionStart(BaseModel):
+    share_privacy_runtime_proof: str = Field(default="", max_length=120)
+
+
 @router.post("/sessions/{session_id}/start")
-def start_session(session_id: str):
+def start_session(session_id: str, body: Optional[SessionStart] = None):
     with domain_errors():
-        return conversations.start_session(session_id)
+        return conversations.start_session(
+            session_id,
+            share_privacy_runtime_proof=(body.share_privacy_runtime_proof if body else ""),
+        )
 
 
 @router.post("/sessions/{session_id}/end")

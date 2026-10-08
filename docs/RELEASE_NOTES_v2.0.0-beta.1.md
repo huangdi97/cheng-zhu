@@ -57,6 +57,39 @@ Conversation Home
 
 模板能运行不等于其专属行为已经完成真实用户验证。
 
+### Profile-specific Playbook
+
+六个 Conversation Profile 已经不只是 label / default mode / Guidance allowlist 不同。每个 Profile 都有自己的 frozen Playbook：
+
+- success conditions；
+- priority truth types；
+- Prepare prompts；
+- closing objective；
+- explicit boundaries。
+
+Playbook 会贯穿：
+
+```text
+Template Picker
+→ Prepare
+→ Frozen Session Pack
+→ Live Session Pulse
+→ Continue Reviewed Outcome Evidence
+```
+
+Session 开始后，即使模板定义以后更新，也不会静默改写本场或会后的 Continue 语义。
+
+Continue 只统计经过 review 的 priority truth outputs；**不提供 meeting-quality score / success percentage / pseudo-readiness**。
+
+这代表 profile-specific runtime specialization 已存在，但仍然：
+
+```text
+runtime specialization exists
+!= specialized behavior real-user validated
+!= stable v2
+!= PMF
+```
+
 ---
 
 ## Conversation Beta 已有能力

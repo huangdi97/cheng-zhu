@@ -112,6 +112,13 @@ Ctrl+K 在 Conversation Profile：
 
 Search result 必须带 source/time/space，不做无来源“AI answer”。
 
+Runtime closure（2026-10-08）：
+
+- Ctrl+K 已接入 Find Decision / Commitment / Open Question；
+- 结果显示 Space / Session / time / review state / source kind；
+- Export current session 导出分类化 local JSON；
+- 不把 search 结果或 export 动作解释成外部同步。
+
 # 7. Notifications after meeting
 
 默认仅本机：
@@ -150,6 +157,14 @@ Commitment/Deadline 解析必须保存：
 - ambiguity。
 
 例如“下周五”如果 timezone/context 不明确，必须进入 review。
+
+Runtime closure：
+
+- product schema v6 为 `conversation_item` 增加 additive `time_semantics_json`；
+- transcript 抽出的相对 Deadline 保留原话并默认 `AMBIGUOUS`；
+- Deadline 在 normalized datetime + timezone 明确前不能从 review queue 升级为长期确认状态；
+- 带时间的 Commitment / Task 同样不能把 unresolved temporal metadata 静默写成 COMMITTED；
+- `due_at` 保留兼容字段，但 canonical temporal provenance 以 time semantics envelope 为准。
 
 # 10. Offline
 

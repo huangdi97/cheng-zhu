@@ -27,9 +27,11 @@ export async function updateConfigAndRefresh(data: Record<string, unknown>): Pro
     // but must not silently drop protection mid-session.
     const runtimeTarget: 'OFF' | 'PRIVATE_OVERLAY' = sessionOverrideActive ? 'PRIVATE_OVERLAY' : shareMode
     await electron.setSharePrivacy(runtimeTarget)
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
     const verified = await electron.getSharePrivacy()
     const shouldProtect = runtimeTarget === 'PRIVATE_OVERLAY'
-    if (verified.mode !== runtimeTarget || Boolean(verified.protected) !== shouldProtect) {
+    const runtimeVerified = verified.runtime_verified ?? (verified.mode === runtimeTarget && Boolean(verified.protected) === shouldProtect)
+    if (verified.mode !== runtimeTarget || Boolean(verified.protected) !== shouldProtect || !runtimeVerified) {
       try { await electron.setSharePrivacy(previousSharePrivacy) } catch { /* fail safer: current protection may remain */ }
       throw new Error('共享隐私设置未被桌面窗口确认；配置未保存。')
     }

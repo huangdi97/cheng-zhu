@@ -5,12 +5,12 @@ import threading
 
 import pytest
 
-from services.product import conversation_capture, conversations, materials
+from services.product import conversation_capture, conversation_screen, conversations, materials
 from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 6
+    assert store.schema_version() == 7
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -27,6 +27,7 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_draft_action",
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
+        "conversation_screen_context",
     } <= tables
     conn = sqlite3.connect(store.DB_PATH)
     try:
@@ -40,6 +41,180 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
     assert "time_semantics_json" in item_cols
 
 
+
+
+
+
+def test_manual_screen_context_local_processing_requires_local_vision_route(product_env, monkeypatch):
+    from types import SimpleNamespace
+
+    remote = SimpleNamespace(
+        name="remote-vision",
+        model="vision-remote",
+        api_base_url="https://vision.example.com/v1",
+        api_key="test-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [remote])
+
+    space = conversations.create_space("Screen Privacy", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="NOTES_ONLY",
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={"screen_context": "MANUAL"},
+    )
+    check = conversations.preflight(session["id"])
+    assert check["screen_runtime"]["route"] == "REMOTE"
+    assert check["screen_runtime"]["available"] is False
+    assert any(x["key"] == "screen_context_runtime" for x in check["blockers"])
+    with pytest.raises(ValueError, match="本地视觉模型"):
+        conversations.start_session(session["id"])
+
+
+def test_manual_screen_context_persists_only_text_hash_and_model_provenance(product_env, monkeypatch):
+    from types import SimpleNamespace
+    from services.capture import screen_capture
+
+    local = SimpleNamespace(
+        name="local-vision",
+        model="vision-local",
+        api_base_url="http://127.0.0.1:8080/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [local])
+
+    class Cfg:
+        screen_capture_region = "left_half"
+        screen_capture_max_long_edge = 1600
+
+    monkeypatch.setattr(conversation_screen, "get_config", lambda: Cfg())
+    fake_image = "data:image/png;base64,QUJDREVGRw=="
+    monkeypatch.setattr(screen_capture, "capture_primary_region_data_url", lambda region, max_long_edge=1600: fake_image)
+    monkeypatch.setattr(
+        conversation_screen,
+        "_analyze_image",
+        lambda image, model: "截图可见：rollback owner = Alex；版本 v2；风险窗口 Friday.",
+    )
+
+    space = conversations.create_space("Manual Screen", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="NOTES_ONLY",
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={"screen_context": "MANUAL"},
+    )
+    preflight = conversations.preflight(session["id"])
+    assert preflight["blockers"] == []
+    assert preflight["screen_runtime"]["route"] == "LOCAL"
+    assert preflight["screen_runtime"]["raw_image_persisted"] is False
+
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["screen_runtime"]
+    assert frozen["fingerprint"] == preflight["screen_runtime"]["fingerprint"]
+
+    saved = conversations.capture_screen_context(session["id"], region="left_half")
+    assert saved["text"].startswith("截图可见")
+    assert saved["vision_route"] == "LOCAL"
+    assert saved["image_hash"]
+    assert saved["vision_fingerprint"] == frozen["fingerprint"]
+    assert "data:image" not in repr(saved)
+    assert "QUJDREVGRw" not in repr(saved)
+
+    row = store.get("conversation_screen_context", saved["id"])
+    assert row is not None
+    assert "data:image" not in repr(row)
+    assert "QUJDREVGRw" not in repr(row)
+
+    asked = conversations.ask(session["id"], "rollback owner Alex")
+    assert asked["grounded"] is True
+    match = next(x for x in asked["matches"] if x["kind"] == "SCREEN_CONTEXT")
+    assert match["authority"] == "OBSERVED_NOT_CONFIRMED"
+    assert match["source_refs"][0]["image_hash"] == saved["image_hash"]
+
+    session_export = conversations.export_session(session["id"])
+    assert session_export["screen_context_observations"][0]["id"] == saved["id"]
+    space_export = conversations.export_space(space["id"])
+    assert space_export["screen_context_observations"][0]["id"] == saved["id"]
+    assert "data:image" not in repr(space_export["screen_context_observations"])
+
+
+def test_manual_screen_context_rejects_vision_route_change_after_session_start(product_env, monkeypatch):
+    from types import SimpleNamespace
+
+    current = {
+        "model": SimpleNamespace(
+            name="local-a",
+            model="vision-a",
+            api_base_url="http://127.0.0.1:8080/v1",
+            api_key="local-key",
+            enabled=True,
+            supports_vision=True,
+        )
+    }
+    monkeypatch.setattr(conversation_screen, "_enabled_vision_models", lambda: [current["model"]])
+
+    class Cfg:
+        screen_capture_region = "left_half"
+        screen_capture_max_long_edge = 1600
+
+    monkeypatch.setattr(conversation_screen, "get_config", lambda: Cfg())
+
+    space = conversations.create_space("Frozen Vision", "DESIGN_REVIEW")
+    session = conversations.create_session(
+        space["id"],
+        capture_mode="NOTES_ONLY",
+        processing_mode="LOCAL",
+        consent_ack=True,
+        policy={"screen_context": "MANUAL"},
+    )
+    started = conversations.start_session(session["id"])
+    old_fp = started["pack"]["payload"]["screen_runtime"]["fingerprint"]
+
+    current["model"] = SimpleNamespace(
+        name="local-b",
+        model="vision-b",
+        api_base_url="http://127.0.0.1:9090/v1",
+        api_key="local-key",
+        enabled=True,
+        supports_vision=True,
+    )
+    assert conversation_screen.vision_runtime_status(conversations.require_session(session["id"]))["fingerprint"] != old_fp
+    with pytest.raises(ValueError, match="视觉模型/数据路径已在本场开始后变化"):
+        conversations.capture_screen_context(session["id"])
+
+
+def test_screen_context_retention_uses_transcript_window(product_env, monkeypatch):
+    space = conversations.create_space("Screen Retention", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    base = store.now()
+    store.insert("conversation_screen_context", {
+        "id": "csc-old",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "capture_mode": "MANUAL",
+        "region": "left_half",
+        "text": "old screen observation",
+        "image_hash": "hash",
+        "vision_model": "vision",
+        "vision_route": "LOCAL",
+        "vision_fingerprint": "fp",
+        "source": "TEST",
+        "created_at": base,
+    })
+    future = base + 31 * 24 * 60 * 60
+    preview = conversations.retention_preview(space["id"], now=future)
+    assert preview["would_delete"]["screen_context_observations"] == 1
+
+    monkeypatch.setattr(store, "now", lambda: future)
+    applied = conversations.apply_retention(space["id"], confirm=True)
+    assert applied["deleted"]["screen_context_observations"] == 1
+    assert store.get("conversation_screen_context", "csc-old") is None
 
 
 def test_active_conversation_goals_default_into_new_session_and_old_pack_stays_frozen(product_env):

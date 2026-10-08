@@ -153,6 +153,15 @@ jobs:
         working-directory: frontend
         run: node scripts/capture-v20-conversation-packaged-evidence.mjs
 
+      - name: Upload failed Conversation visual diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chengzhu-conversation-blocked-visual
+          path: artifacts/release-evidence/v*/conversation-beta/*-BLOCKED.png
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4
         with:

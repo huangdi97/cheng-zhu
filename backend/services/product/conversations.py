@@ -250,6 +250,49 @@ def _normalize_session_policy(raw: Optional[dict[str, Any]], base: Optional[dict
     return source
 
 
+SHARE_PRIVACY_RUNTIME_PROOF = "ELECTRON_CONTENT_PROTECTION_ACTIVE"
+
+
+def share_privacy_runtime_status(
+    session: dict[str, Any],
+    runtime_proof: str = "",
+) -> dict[str, Any]:
+    """Resolve the desktop runtime needed by the Session Share Privacy policy.
+
+    PRIVATE_OVERLAY is Electron's best-effort setContentProtection on the
+    Chengzhu windows.  It reduces accidental exposure on supported capture
+    paths; it is not a security / stealth / undetectability guarantee.
+    """
+    policy = _normalize_session_policy(session.get("policy"))
+    requested = str(policy.get("share_privacy") or "OFF")
+    if requested == "OFF":
+        return {
+            "requested": "OFF",
+            "available": True,
+            "requires_desktop": False,
+            "proof_required": False,
+            "verified": True,
+            "runtime": "OFF",
+            "proof_kind": "",
+            "note": "本场未请求 Share Privacy。",
+        }
+
+    verified = str(runtime_proof or "") == SHARE_PRIVACY_RUNTIME_PROOF
+    return {
+        "requested": "PRIVATE_OVERLAY",
+        "available": True,
+        "requires_desktop": True,
+        "proof_required": True,
+        "verified": verified,
+        "runtime": "ELECTRON_SET_CONTENT_PROTECTION",
+        "proof_kind": SHARE_PRIVACY_RUNTIME_PROOF,
+        "note": (
+            "Electron content protection 只用于降低成竹窗口在受支持屏幕共享/录制路径中的意外暴露；"
+            "不同 OS / 捕获方式行为不同，这不是安全或“不可检测”保证。"
+        ),
+    }
+
+
 def resolved_ai_behavior(policy: dict[str, Any]) -> dict[str, Any]:
     level = str(policy.get("ai_assistance") or "AI_ALLOWED")
     automatic = level in {"AI_ALLOWED", "AI_EXPECTED"}
@@ -1065,12 +1108,16 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
         })
 
-    share_ok = policy["share_privacy"] == "OFF"
-    if not share_ok:
-        blockers.append({
-            "key": "share_privacy_runtime",
+    share_privacy_runtime = share_privacy_runtime_status(session)
+    share_ok = True
+    if policy["share_privacy"] == "PRIVATE_OVERLAY":
+        warnings.append({
+            "key": "share_privacy_verify_at_start",
             "label": "屏幕共享保护",
-            "message": "现有 Private Overlay 仍属于 Interview Live 路径；Conversation 还没有独立 runtime 证明，因此当前必须保持 OFF。",
+            "message": (
+                "本场将在桌面端点击“开始会话”时临时启用并验证 Electron content protection；"
+                "Web fallback 没有该 bridge 时会 fail-closed。此能力只降低受支持捕获路径中的意外暴露，不提供“隐身/不可检测”保证。"
+            ),
         })
 
     screen_ok = (
@@ -1168,7 +1215,9 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             else "DISABLED"
         ), "ok": True},
         {"key": "human", "label": "Human Assistance", "value": policy["human_assistance"], "ok": human_ok},
-        {"key": "share", "label": "屏幕共享保护", "value": policy["share_privacy"], "ok": share_ok},
+        {"key": "share", "label": "屏幕共享保护", "value": (
+            "PRIVATE_OVERLAY · VERIFY_AT_START" if policy["share_privacy"] == "PRIVATE_OVERLAY" else "OFF"
+        ), "ok": share_ok},
         {"key": "writeback", "label": "外部写回", "value": policy["external_writeback"], "ok": True},
     ]
     return {
@@ -1182,6 +1231,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
+        "share_privacy_runtime": share_privacy_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
@@ -1213,6 +1263,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "resolved_ai_behavior": ai_behavior,
             "processing_runtime": processing_runtime,
             "screen_runtime": screen_runtime,
+            "share_privacy_runtime": share_privacy_runtime,
             "policy": {
                 **policy,
                 "capture_mode": session["capture_mode"],
@@ -1234,7 +1285,11 @@ def _confirmed_context_items(space_id: str) -> list[dict[str, Any]]:
     )
 
 
-def freeze_pack(session_id: str) -> dict[str, Any]:
+def freeze_pack(
+    session_id: str,
+    *,
+    share_privacy_runtime: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     session = require_session(session_id)
     space = require_space(session["space_id"])
     existing = store.select("conversation_session_pack", where="session_id = ?", params=(session_id,), limit=1)
@@ -1290,6 +1345,11 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
         "screen_runtime": conversation_screen.vision_runtime_status(session),
+        "share_privacy_runtime": (
+            dict(share_privacy_runtime)
+            if isinstance(share_privacy_runtime, dict)
+            else share_privacy_runtime_status(session)
+        ),
         "policy": {
             **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],
@@ -1313,7 +1373,11 @@ def freeze_pack(session_id: str) -> dict[str, Any]:
     return store.get("conversation_session_pack", row["id"]) or row
 
 
-def start_session(session_id: str) -> dict[str, Any]:
+def start_session(
+    session_id: str,
+    *,
+    share_privacy_runtime_proof: str = "",
+) -> dict[str, Any]:
     before = require_session(session_id)
     expected_fingerprint = str((before.get("state") or {}).get("preflight_context_fingerprint") or "")
     check = preflight(session_id, record_fingerprint=False)
@@ -1324,7 +1388,12 @@ def start_session(session_id: str) -> dict[str, Any]:
     session = check["session"]
     if session["status"] == "ENDED":
         raise ValueError("已结束的会话不能重新开始")
-    pack = freeze_pack(session_id)
+    share_runtime = share_privacy_runtime_status(session, share_privacy_runtime_proof)
+    if share_runtime["requested"] == "PRIVATE_OVERLAY" and not share_runtime["verified"]:
+        raise ValueError(
+            "PRIVATE_OVERLAY 需要桌面端在开始前确认 Electron content protection 已启用；当前 runtime proof 缺失或无效。"
+        )
+    pack = freeze_pack(session_id, share_privacy_runtime=share_runtime)
     ts = store.now()
     state = dict(session.get("state") or {})
     frozen_brief = ((pack.get("payload") or {}).get("session_brief") or {})
@@ -1477,6 +1546,7 @@ def session_context(session_id: str) -> dict[str, Any]:
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
         "screen_runtime": payload.get("screen_runtime") or {},
+        "share_privacy_runtime": payload.get("share_privacy_runtime") or share_privacy_runtime_status(session),
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
         "pack_digest": str((pack_row or {}).get("digest") or ""),
     }

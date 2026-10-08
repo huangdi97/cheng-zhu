@@ -18,6 +18,7 @@ on:
       - "scripts/packaged_smoke.py"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
+      - "frontend/scripts/capture-v20-conversation-packaged-evidence.mjs"
       - "backend/requirements.txt"
   workflow_dispatch:
     inputs:
@@ -147,6 +148,10 @@ jobs:
             throw "expected >= 9 Conversation packaged UI captures, got $($conversationEntries.Count)"
           }
           Write-Host "Conversation Beta packaged UI evidence OK: $($conversationEntries.Count) captures"
+
+      - name: Capture independent Conversation packaged evidence
+        working-directory: frontend
+        run: node scripts/capture-v20-conversation-packaged-evidence.mjs
 
       - name: Upload packaged runtime UI evidence
         uses: actions/upload-artifact@v4

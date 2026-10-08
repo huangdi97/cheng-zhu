@@ -202,6 +202,18 @@ export function buildCommands(goalId: string | null, route: Route = currentRoute
       },
     },
     {
+      id: 'conversation-export-session', label: '导出当前 Session', contexts: ['conversation-live'],
+      keywords: 'export current session 导出 当前 会话',
+      run: async () => {
+        const sessionId = route.name === 'conversation-live' ? route.params.sessionId : ''
+        if (!sessionId) { toast('当前不在 Conversation Live'); return }
+        const payload = await conversationApi.exportSession(sessionId)
+        const safeTitle = String(payload.session.title || 'conversation-session').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80)
+        downloadJson(`${safeTitle}-${sessionId.slice(0, 8)}.json`, payload)
+        toast('已导出当前 Session JSON')
+      },
+    },
+    {
       id: 'conversation-find-decision', label: '找 Decision', contexts: ['conversation-home', 'conversation-space', 'conversation-live'],
       keywords: 'find search decision 查找 决策',
       run: () => navigate(paths.conversationSpaces(undefined, { find: 'Decision' })),
@@ -215,18 +227,6 @@ export function buildCommands(goalId: string | null, route: Route = currentRoute
       id: 'conversation-find-open-question', label: '找 Open Question', contexts: ['conversation-home', 'conversation-space', 'conversation-live'],
       keywords: 'find search open question 查找 开放问题',
       run: () => navigate(paths.conversationSpaces(undefined, { find: 'OpenQuestion' })),
-    },
-    {
-      id: 'conversation-export-session', label: '导出当前 Session', contexts: ['conversation-live'],
-      keywords: 'export current session 导出 当前 会话',
-      run: async () => {
-        const sessionId = route.name === 'conversation-live' ? route.params.sessionId : ''
-        if (!sessionId) { toast('当前不在 Conversation Live'); return }
-        const payload = await conversationApi.exportSession(sessionId)
-        const safeTitle = String(payload.session.title || 'conversation-session').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80)
-        downloadJson(`${safeTitle}-${sessionId.slice(0, 8)}.json`, payload)
-        toast('已导出当前 Session JSON')
-      },
     },
     // --- Me ---
     { id: 'confirm-facts', label: '确认事实（待确认）', contexts: ['me', 'home'], keywords: 'fact inbox 事实 确认', run: () => navigate(paths.me('inbox')) },

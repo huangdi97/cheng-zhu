@@ -40,6 +40,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   const [askText, setAskText] = useState('')
   const [askResult, setAskResult] = useState<ConversationAskResult | null>(null)
   const [capture, setCapture] = useState<ConversationCaptureStatus | null>(null)
+  const [captureStatusError, setCaptureStatusError] = useState(false)
   const [segments, setSegments] = useState<ConversationTranscriptSegment[]>([])
   const [primaryDevice, setPrimaryDevice] = useState('')
   const [selfMic, setSelfMic] = useState('')
@@ -92,20 +93,22 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   useEffect(() => {
     let alive = true
     const poll = async () => {
-      try {
-        const [nextCapture, transcript, history] = await Promise.all([
-          conversationApi.captureStatus(sessionId),
-          conversationApi.transcript(sessionId, 80),
-          conversationApi.guidanceHistory(sessionId, 12),
-        ])
-        if (!alive) return
-        setCapture(nextCapture)
-        setSegments(transcript.items)
-        const latest = latestVisibleGuidance(history.items)
+      const [captureResult, transcriptResult, guidanceResult] = await Promise.allSettled([
+        conversationApi.captureStatus(sessionId),
+        conversationApi.transcript(sessionId, 80),
+        conversationApi.guidanceHistory(sessionId, 12),
+      ])
+      if (!alive) return
+      // Capture ownership is a privacy claim. An unreachable endpoint must
+      // never leave the UI's last known CAPTURING state advertised as current.
+      setCaptureStatusError(captureResult.status !== 'fulfilled')
+      if (captureResult.status === 'fulfilled') setCapture(captureResult.value)
+      if (transcriptResult.status === 'fulfilled') setSegments(transcriptResult.value.items)
+      if (guidanceResult.status === 'fulfilled') {
+        const latest = latestVisibleGuidance(guidanceResult.value.items)
         setGuidance((current) => current?.id === latest?.id ? current : latest)
-      } catch {
-        // Capture/timeline polling is additive. Manual Conversation Live stays usable
-        // even if an older backend does not expose the v2 endpoints yet.
+      } else {
+        setGuidance(null)
       }
     }
     void poll()
@@ -116,7 +119,9 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
   if (session.loading) return <Page><Loading /></Page>
   if (session.error || !session.data) return <Page><ErrorState message={session.error ?? '会话不存在'} onRetry={session.reload} /></Page>
   const s = session.data
-  const captureView = captureViewState(s, capture)
+  const captureView = captureStatusError && s.status === 'ACTIVE' && s.capture_mode === 'TRANSCRIPT'
+    ? { label: '音频状态不可确认', listening: false }
+    : captureViewState(s, capture)
 
   const startCapture = async () => {
     if (!primaryDevice) {
@@ -131,6 +136,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
         selfMic ? Number(selfMic) : null,
       )
       setCapture(next)
+      setCaptureStatusError(false)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setCaptureBusy(false) }
   }
@@ -261,11 +267,12 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <div className="mt-4 rounded-xl border border-bg-tertiary bg-bg-primary/55 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-accent-blue" /><span className="text-xs font-semibold text-text-primary">真实转写</span>{capture?.owns_requested_session ? <StatusBadge tone="ok">{capture.paused ? 'PAUSED' : 'CAPTURING'}</StatusBadge> : <StatusBadge tone="muted">OFF</StatusBadge>}</div>
+                    <div className="flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-accent-blue" /><span className="text-xs font-semibold text-text-primary">真实转写</span>{captureStatusError ? <StatusBadge tone="warn">UNKNOWN</StatusBadge> : capture?.owns_requested_session ? <StatusBadge tone={capture.paused ? 'warn' : 'ok'}>{capture.paused ? 'PAUSED' : 'CAPTURING'}</StatusBadge> : <StatusBadge tone="muted">OFF</StatusBadge>}</div>
                     <p className="mt-1 text-[11px] text-text-muted">只复用 Audio/VAD/STT；不会启动 Interview 自动答题、Fast Cue 或 Interview Review。</p>
                   </div>
-                  {capture?.owns_requested_session ? <div className="flex gap-2"><SecondaryButton disabled={captureBusy} onClick={toggleCapturePause} icon={capture.paused ? <Play className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}>{capture.paused ? '继续' : '暂停'}</SecondaryButton><SecondaryButton disabled={captureBusy} onClick={stopCapture}>停止转写</SecondaryButton></div> : <PrimaryButton disabled={captureBusy || !primaryDevice} onClick={startCapture} icon={<Mic className="h-3.5 w-3.5" />}>{captureBusy ? '启动中…' : '开始转写'}</PrimaryButton>}
+                  {capture?.owns_requested_session ? <div className="flex gap-2"><SecondaryButton disabled={captureBusy || captureStatusError} onClick={toggleCapturePause} icon={capture.paused ? <Play className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}>{capture.paused ? '继续' : '暂停'}</SecondaryButton><SecondaryButton disabled={captureBusy} onClick={stopCapture}>停止转写</SecondaryButton></div> : <PrimaryButton disabled={captureBusy || !primaryDevice || captureStatusError} onClick={startCapture} icon={<Mic className="h-3.5 w-3.5" />}>{captureBusy ? '启动中…' : '开始转写'}</PrimaryButton>}
                 </div>
+                {captureStatusError ? <p role="alert" className="mt-2 text-[11px] text-status-risk">无法确认后端的当前采集状态。不要把断开连接视为录音已停止；请恢复连接并确认后再启动另一场。</p> : null}
                 {!capture?.owns_requested_session ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Field label="主音频（优先系统/会议音频）"><select className={inputCls} value={primaryDevice} onChange={(e) => setPrimaryDevice(e.target.value)}><option value="">请选择</option>{(devices.data?.devices ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}{d.is_loopback ? ' · loopback' : ''}</option>)}</select></Field>
                   <Field label="我的麦克风（可选）"><select className={inputCls} value={selfMic} onChange={(e) => setSelfMic(e.target.value)}><option value="">不单独采集</option>{(devices.data?.devices ?? []).filter((d) => String(d.id) !== primaryDevice).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>

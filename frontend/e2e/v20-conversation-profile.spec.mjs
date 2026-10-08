@@ -1041,6 +1041,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(panel.getByLabel('冻结 Session Context')).toBeChecked()
     await expect(panel.getByLabel('本场转写')).not.toBeChecked()
     await expect(panel.getByLabel('当前 AI Guidance')).not.toBeChecked()
+    await expect(panel.getByLabel('局域网链接')).not.toBeChecked()
 
     await panel.getByRole('button', { name: '生成教练链接' }).click()
     await expect(panel.getByText('链接只显示这一次（含一次性令牌）：')).toBeVisible()
@@ -1052,6 +1053,7 @@ test.describe('v2.0 Conversation Profile', () => {
         ai_cue: false,
         session_context: true,
       },
+      lan: false,
     })
   })
 

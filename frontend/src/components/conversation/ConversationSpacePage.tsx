@@ -150,6 +150,14 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   if (detail.loading) return <Page><Loading /></Page>
   if (detail.error || !detail.data) return <Page><ErrorState message={detail.error ?? '对话空间不存在'} onRetry={detail.reload} /></Page>
   const space = detail.data
+  const executionScope = draft?.kind === 'FOLLOWUP_EMAIL_DRAFT' ? 'mail.send'
+    : draft?.kind === 'CREATE_TASK_DRAFT' ? 'tasks.write'
+      : draft?.kind === 'CREATE_ISSUE_DRAFT' ? 'issues.write'
+        : draft?.kind === 'UPDATE_DECISION_LOG_DRAFT' ? 'action.execute'
+          : ''
+  const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
+    (row) => row.status === 'CONNECTED' && row.adapter_available && (!executionScope || row.granted_scopes.includes(executionScope)),
+  )
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -708,11 +716,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               {draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}
               {draft.status === 'APPROVED' ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/30 p-3">
                 <div className="text-xs font-semibold text-text-secondary">External Execution · 二次显式确认</div>
-                {integrationConnections.data?.items.filter((row) => row.status === 'CONNECTED' && row.adapter_available).length ? <>
+                {compatibleExecutionConnections.length ? <>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <select aria-label="执行连接" className={inputCls} value={executionConnectionId} onChange={(e) => { setExecutionConnectionId(e.target.value); setExecution(null) }}>
                       <option value="">选择已连接 provider</option>
-                      {integrationConnections.data.items.filter((row) => row.status === 'CONNECTED' && row.adapter_available).map((row) => <option key={row.id} value={row.id}>{row.display_name || row.provider} · {row.provider}</option>)}
+                      {compatibleExecutionConnections.map((row) => <option key={row.id} value={row.id}>{row.display_name || row.provider} · {row.provider}</option>)}
                     </select>
                     <input aria-label="外部目标" className={inputCls} value={executionTarget} onChange={(e) => setExecutionTarget(e.target.value)} placeholder="目标地址 / repo / list（provider-specific，可选）" />
                   </div>
@@ -720,7 +728,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     <SecondaryButton disabled={sessionBusy || !executionConnectionId} onClick={requestExternalExecution}>创建执行请求</SecondaryButton>
                     {execution?.status === 'PENDING' ? <PrimaryButton disabled={sessionBusy} onClick={executeExternalRequest}>执行到外部系统</PrimaryButton> : null}
                   </div>
-                </> : <p className="mt-2 text-[11px] text-text-muted">没有“已连接 + adapter available”的 provider。草稿仍只保留本地；这里不会显示假的发送/同步按钮。</p>}
+                </> : <p className="mt-2 text-[11px] text-text-muted">没有满足 ${executionScope || "required write scope"} 的“已连接 + adapter available” provider。草稿仍只保留本地；这里不会显示假的发送/同步按钮。</p>}
                 {execution ? <div className="mt-3 rounded-lg bg-bg-primary/60 p-2 text-[11px]">
                   <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : execution.status === 'FAILED' || execution.status === 'BLOCKED' ? 'risk' : 'warn'}>{execution.status}</StatusBadge><span className="text-text-muted">{execution.operation} · idempotency {execution.idempotency_key.slice(0, 10)}</span></div>
                   {execution.error ? <div className="mt-1 text-status-risk">{execution.error}</div> : null}

@@ -1140,7 +1140,9 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
-    connector_runtime = conversation_connectors.resolve_read_permissions(policy.get("connector_permissions") or [])
+    connector_runtime = conversation_integrations.resolve_session_permissions(
+        list(policy.get("connector_permissions") or [])
+    )
     connector_ok = bool(connector_runtime["ok"])
     if not connector_ok:
         blocked_names = ", ".join(
@@ -1150,8 +1152,8 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "key": "connector_runtime",
             "label": "连接器权限",
             "message": (
-                "本场请求的 connector capability 没有真实可用 provider；"
-                f"{blocked_names or 'NO_AVAILABLE_PROVIDER'}。不会用 placeholder 放行。"
+                "本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；"
+                f"{blocked_names or 'NO_CONNECTED_ACCOUNT'}。不会用 provider catalog 或 placeholder 放行。"
             ),
         })
 
@@ -1204,6 +1206,12 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "label": "Quick Note",
             "message": f"Quick Note {note_id} 已不存在，本场不会冻结它。",
         })
+    for snapshot_id in pack_inputs["missing_connector_snapshot_ids"]:
+        warnings.append({
+            "key": "connector_snapshot_missing",
+            "label": "Connector Snapshot",
+            "message": f"Connector Snapshot {snapshot_id} 已不存在或不属于当前 Space，本场不会冻结它。",
+        })
     if session["capture_mode"] == "TRANSCRIPT" and policy["participant_consent_status"] == "NOT_RECORDED":
         warnings.append({
             "key": "participant_consent_not_recorded",
@@ -1233,6 +1241,8 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
     ready_source_count = len(pack_inputs["sources"])
     selected_note_count = len(space.get("selected_quick_note_ids") or [])
     ready_note_count = len(pack_inputs["quick_notes"])
+    selected_connector_count = len(space.get("selected_connector_snapshot_ids") or [])
+    ready_connector_count = len(pack_inputs["connector_snapshots"])
     participant_consent_ok = (
         session["capture_mode"] != "TRANSCRIPT"
         or policy["participant_consent_status"] != "NOT_RECORDED"
@@ -1258,7 +1268,11 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": f"{ready_source_count}/{selected_source_count} Ready", "ok": ready_source_count == selected_source_count},
         {"key": "quick_notes", "label": "Quick Notes", "value": f"{ready_note_count}/{selected_note_count} available", "ok": ready_note_count == selected_note_count},
-        {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
+        {"key": "connector_snapshots", "label": "外部来源快照", "value": f"{ready_connector_count}/{selected_connector_count} frozen", "ok": ready_connector_count == selected_connector_count},
+        {"key": "connectors", "label": "连接器权限", "value": (
+            "0" if not policy.get("connector_permissions")
+            else f"{len(connector_runtime.get('grants') or [])}/{len(policy.get('connector_permissions') or [])} connected"
+        ), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
         {"key": "screen", "label": "屏幕上下文", "value": (
@@ -1298,6 +1312,21 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "selected_connector_snapshot_ids": list(space.get("selected_connector_snapshot_ids") or []),
+            "connector_snapshots": [
+                {
+                    "id": s.get("id") or "",
+                    "connection_id": s.get("connection_id") or "",
+                    "capability": s.get("capability") or "",
+                    "external_kind": s.get("external_kind") or "",
+                    "external_id": s.get("external_id") or "",
+                    "title": s.get("title") or "",
+                    "content_hash": s.get("content_hash") or "",
+                    "visibility": s.get("visibility") or "PRIVATE",
+                }
+                for s in pack_inputs["connector_snapshots"]
+            ],
+            "missing_connector_snapshot_ids": list(pack_inputs["missing_connector_snapshot_ids"]),
             "sources": [
                 {
                     "material_id": source.get("material_id") or "",

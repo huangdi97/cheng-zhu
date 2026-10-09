@@ -59,3 +59,17 @@ def test_download_back_evidence_is_uploaded_only_after_public_tag_verification()
     publish_i = text.index("- name: Publish verified GitHub Release")
     upload_i = text.index("- name: Upload download-back verification")
     assert publish_i < upload_i
+
+
+def test_publish_step_uses_safe_powershell_variable_boundaries() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    publish = _section(
+        text,
+        "- name: Publish verified GitHub Release",
+        "- name: Upload download-back verification",
+    )
+
+    # In PowerShell, "$tag:" is parsed as a scoped variable reference and
+    # fails before publication.  Delimit the variable whenever a colon follows.
+    assert 'release channel mismatch for $tag:' not in publish
+    assert 'release channel mismatch for ${tag}: expected prerelease=$isPrerelease' in publish

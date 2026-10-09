@@ -1,0 +1,18 @@
+{
+  "scenario_a_project_sync": {
+    "s1_ambiguous_deadline_blocked": true,
+    "s2_recall_open_thread_in_prepare": true,
+    "s2_continue_has_next_focus": true,
+    "s2_commitment_owner": true,
+    "s2_thread_found_open_before_resolve": true,
+    "s3_thread_stays_closed": true
+  },
+  "scenario_b_design_review": {
+    "s2_supersede_old_kept": true,
+    "s2_decision_b_agreed": true,
+    "s3_rollback_task_committed": true,
+    "s3_decision_log_draft": true,
+    "s3_draft_not_external": true,
+    "s3_continue_has_review_required": true
+  }
+}

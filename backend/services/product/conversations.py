@@ -1589,6 +1589,18 @@ def session_context(session_id: str) -> dict[str, Any]:
                 "unknown": list(counterparty.get("unknown") or []),
             },
         })
+    connector_context = [
+        {
+            "connector_id": item.get("connector_id") or "",
+            "provider": item.get("provider") or "",
+            "capability": item.get("capability") or "",
+            "external_id": item.get("external_id") or "",
+            "title": item.get("title") or "",
+            "content_hash": item.get("content_hash") or "",
+            "visibility": item.get("visibility") or "PRIVATE",
+        }
+        for item in payload.get("connector_context") or []
+    ]
     return {
         "session_id": session_id,
         "conversation_state": conversation_state(session_id),
@@ -1598,6 +1610,8 @@ def session_context(session_id: str) -> dict[str, Any]:
         "sources": sources,
         "quick_notes": notes,
         "participants": participants,
+        "connector_context": connector_context,
+        "connector_runtime": payload.get("connector_runtime") or {"requested": [], "resolved": {}, "missing": [], "ok": True},
         "expression_profile": payload.get("expression_profile") or {},
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
@@ -1781,7 +1795,37 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 3) User-authored frozen notes are usable context, but explicitly not evidence.
+    # 3) External read-only context was fetched through a real connector and
+    # frozen into this Session Pack. It is reference context, never confirmed
+    # Conversation truth merely because a provider returned it.
+    for external in pack.get("connector_context") or []:
+        haystack = " ".join([
+            str(external.get("title") or ""),
+            str(external.get("excerpt") or ""),
+        ])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            ranked.append((lexical + 4, 0.0, {
+                "id": str(external.get("external_id") or external.get("content_hash") or ""),
+                "kind": "CONNECTOR_CONTEXT",
+                "authority": "EXTERNAL_REFERENCE",
+                "title": str(external.get("title") or external.get("provider") or "External context")[:300],
+                "excerpt": str(external.get("excerpt") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "CONNECTOR_CONTEXT",
+                    "id": str(external.get("external_id") or ""),
+                    "provider": str(external.get("provider") or ""),
+                    "connector_id": str(external.get("connector_id") or ""),
+                    "capability": str(external.get("capability") or ""),
+                    "content_hash": str(external.get("content_hash") or ""),
+                    "visibility": str(external.get("visibility") or "PRIVATE"),
+                }],
+            }))
+
+    # 4) User-authored frozen notes are usable context, but explicitly not evidence.
     for note in pack.get("quick_notes") or []:
         haystack = " ".join([str(note.get("title") or ""), str(note.get("content") or "")])
         lexical = _text_match_score(question, haystack)
@@ -1798,7 +1842,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) Manual screen observations are source-aware but never confirmed truth.
+    # 5) Manual screen observations are source-aware but never confirmed truth.
     for observation in conversation_screen.list_context(session_id, limit=40):
         lexical = _text_match_score(question, str(observation.get("text") or ""))
         if lexical:
@@ -1823,7 +1867,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 5) The current-session transcript supports catch-up, but remains observation.
+    # 6) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",
@@ -1867,6 +1911,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
         "CONFIRMED_TRUTH": "已确认历史",
         "PERSONAL_EVIDENCE": "本场个人证据",
         "REFERENCE_SOURCE": "本场参考来源",
+        "EXTERNAL_REFERENCE": "本场外部参考",
         "USER_NOTE_NOT_EVIDENCE": "本场 Quick Note",
         "OBSERVED_NOT_CONFIRMED": "本场转写观察",
     }.get(top["authority"], "可追溯来源")
@@ -2879,6 +2924,7 @@ def guidance_from_transcript(
                 "CONFIRMED_TRUTH": "已确认历史",
                 "PERSONAL_EVIDENCE": "本场个人证据",
                 "REFERENCE_SOURCE": "本场参考来源",
+                "EXTERNAL_REFERENCE": "本场外部参考",
                 "USER_NOTE_NOT_EVIDENCE": "本场 Quick Note（非证据）",
             }.get(str(useful.get("authority") or ""), "可追溯来源")
             cue = f"{answer_text}：{useful.get('title') or ''}"
@@ -2920,7 +2966,7 @@ def guidance_from_transcript(
     useful = next(
         (
             match for match in result.get("matches") or []
-            if match.get("authority") in {"CONFIRMED_TRUTH", "PERSONAL_EVIDENCE", "REFERENCE_SOURCE"}
+            if match.get("authority") in {"CONFIRMED_TRUTH", "PERSONAL_EVIDENCE", "REFERENCE_SOURCE", "EXTERNAL_REFERENCE"}
         ),
         None,
     )

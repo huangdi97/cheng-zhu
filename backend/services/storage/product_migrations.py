@@ -698,6 +698,15 @@ _V8_INDEXES: tuple[str, ...] = (
 )
 
 
+def _apply_v8(conn: sqlite3.Connection) -> None:
+    _apply_statements(conn, _V8_TABLES + _V8_INDEXES)
+    space_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_space)").fetchall()}
+    if "selected_connector_snapshot_ids_json" not in space_cols:
+        conn.execute(
+            "ALTER TABLE conversation_space ADD COLUMN selected_connector_snapshot_ids_json TEXT NOT NULL DEFAULT '[]'"
+        )
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -711,7 +720,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     5: (_apply_v5, "v2.0 explicit session policy and counterparty state"),
     6: (_apply_v6, "v2.0 temporal provenance for conversation items"),
     7: (lambda conn: _apply_statements(conn, _V7_TABLES + _V7_INDEXES), "v2.0 manual Conversation screen context observations"),
-    8: (lambda conn: _apply_statements(conn, _V8_TABLES + _V8_INDEXES), "v2.0 external integration provenance and execution audit boundary"),
+    8: (_apply_v8, "v2.0 external integration provenance and execution audit boundary"),
 }
 
 

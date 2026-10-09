@@ -490,7 +490,7 @@ export interface ConversationConnectorConnection {
   display_name: string
   status: 'DISCONNECTED' | 'CONNECTED' | 'ERROR' | 'REVOKED'
   auth_mode: string
-  credential_ref: string
+  credential_ref_present: boolean
   granted_scopes: string[]
   capabilities: { read?: string[]; write?: string[]; external_kinds?: string[] }
   account_hint: string

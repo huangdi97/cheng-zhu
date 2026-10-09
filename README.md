@@ -135,8 +135,8 @@ Conversation Home
 - Conversation `PRIVATE_OVERLAY` 已有桌面 runtime：Start 时验证 Electron content protection，Live 可见，End 恢复会话前默认；Web fallback fail-closed；best-effort only，不承诺“不可检测”；
 - Conversation Human Coach 已有真实 runtime：仅在 frozen policy = `HUMAN_ALLOWED` 且记录 transparency plan 时允许；Live 中显式生成一次性、session-scoped 教练链接，逐项授权 transcript / AI Guidance / frozen Session Context；helper 不读取 Interview Resume/JD；建议标记为 `HUMAN_COACH` 且 `is_evidence=false`，Session 结束/删除自动 revoke；runtime 可用且已进入 beta.2 public prerelease，仍不等于 stable v2 或真实用户验证；
 - beta.2 public prerelease 已包含 frozen Profile Playbooks、auditable Expression Plan、explicit-start AUTO Screen Context、verified desktop Share Privacy 与 Conversation Human Coach；release tag 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`，且 Stable Latest 仍为 v1.4.2；
-- Calendar / Docs / Mail / project tracker connector runtime；
-- actual external email/task/issue write-back；
+- provider-agnostic Connector Runtime 已存在：capability/scopes/health、read-only context freeze、reviewed execution audit、幂等成功语义均已进入 runtime；但当前**没有内置 Gmail / Outlook / Google Calendar / Jira / Linear 等真实 provider adapter，也不代表用户已连接任何账户**；
+- actual external email/task/issue/decision-log execution 只有在未来真实 provider adapter + 用户授权 + capability-matched connector 可用时才可能返回 SUCCEEDED；没有 provider 时保持本地 Draft；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 

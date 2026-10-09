@@ -356,6 +356,35 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const verifyConnector = async (connectionId: string) => {
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      await conversationApi.verifyIntegrationConnection(connectionId)
+      await integrationConnections.reload()
+      setLifecycleMessage('Connector adapter + opaque credential reference 已通过 health check，连接状态为 CONNECTED。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const disconnectConnector = async (connectionId: string) => {
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      await conversationApi.disconnectIntegrationConnection(connectionId)
+      await integrationConnections.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const revokeConnector = async (connectionId: string) => {
+    if (!window.confirm('撤销这个 connector connection？会清除本地 opaque credential reference；已经冻结进 Session Pack 的 snapshot provenance 不会被改写。')) return
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      await conversationApi.revokeIntegrationConnection(connectionId)
+      await integrationConnections.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const exportSpace = async () => {
     setSessionBusy(true); setSessionError('')
     try {

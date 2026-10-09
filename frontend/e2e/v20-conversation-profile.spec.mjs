@@ -13,7 +13,8 @@ const SPACE = {
   default_mode: 'BALANCED',
   selected_source_ids: ['benchmark-note'],
   selected_quick_note_ids: [],
-  retention_policy: { preset: 'STANDARD' },
+  selected_connector_snapshot_ids: [],
+  retention_policy: { preset: 'STANDARD', connector_snapshot_days: 30 },
   created_at: 1,
   updated_at: 2,
 }
@@ -172,6 +173,14 @@ function mocks() {
     resolved_at: null,
   }
   return async (pathname, method, request) => {
+    if (pathname === '/api/product/conversation/integrations/catalog') return {
+      items: [
+        { provider_id: 'GOOGLE_CALENDAR', label: 'Google Calendar', capabilities: ['calendar.read'], read_capabilities: ['calendar.read'], write_capabilities: [], external_kinds: ['CALENDAR_EVENT'], provider_scopes: { 'calendar.read': 'https://www.googleapis.com/auth/calendar.readonly' }, sync: 'INCREMENTAL_CURSOR', adapter_available: false },
+        { provider_id: 'MCP', label: 'Model Context Protocol', capabilities: ['calendar.read', 'email.send', 'decision_log.write'], read_capabilities: ['calendar.read'], write_capabilities: ['email.send', 'decision_log.write'], external_kinds: ['CALENDAR_EVENT'], provider_scopes: { 'calendar.read': 'server-defined', 'email.send': 'server-defined', 'decision_log.write': 'server-defined' }, sync: 'SERVER_DEFINED', adapter_available: false },
+      ],
+    }
+    if (pathname === '/api/product/conversation/integrations/connections') return { items: [] }
+    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
     if (pathname === '/api/product/conversation/demo') return {
       evidence: 'SYNTHETIC_DEMO',
       scenario: 'DESIGN_REVIEW',
@@ -274,9 +283,9 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
-      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30 },
-      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0 },
-      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP' },
+      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30, connector_snapshot_days: 30 },
+      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0, connector_snapshots: 0 },
+      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP', selected_connector_snapshots: 'KEEP', external_execution_audit: 'KEEP', drafts_with_external_execution_audit: 'KEEP' },
       destructive: false,
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/sessions` && method === 'POST') return { ...SESSION, status: 'UPCOMING', started_at: null, pack_id: '' }
@@ -339,6 +348,9 @@ function mocks() {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
         selected_quick_note_ids: [],
+        selected_connector_snapshot_ids: [],
+        connector_snapshots: [],
+        missing_connector_snapshot_ids: [],
         sources: [{
           material_id: 'benchmark-note',
           version_id: 'mv-benchmark-v1',
@@ -449,6 +461,7 @@ function mocks() {
         is_personal_evidence: true,
       }],
       quick_notes: [],
+      connector_snapshots: [],
       participants: [{
         id: 'cp-1',
         display_name: 'Alex',

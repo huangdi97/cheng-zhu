@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 7
+LATEST_SCHEMA_VERSION = 8
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -630,6 +630,48 @@ _V7_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_screen_space ON conversation_screen_context(space_id, created_at)",
 )
 
+# --- v2.0 integration runtime: connector metadata + audited execution ---
+# Secrets/tokens deliberately do NOT live in product.db. Provider adapters own
+# credentials through their native secure stores/configuration.
+_V8_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_connector (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'DISCONNECTED',
+        capabilities_json TEXT NOT NULL DEFAULT '[]',
+        scopes_json TEXT NOT NULL DEFAULT '[]',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        last_error TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_external_execution (
+        id TEXT PRIMARY KEY,
+        connector_id TEXT NOT NULL REFERENCES conversation_connector(id) ON DELETE RESTRICT,
+        draft_action_id TEXT NOT NULL REFERENCES conversation_draft_action(id) ON DELETE CASCADE,
+        operation TEXT NOT NULL,
+        target TEXT NOT NULL DEFAULT '',
+        request_json TEXT NOT NULL DEFAULT '{}',
+        result_json TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        external_ref TEXT NOT NULL DEFAULT '',
+        error TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        completed_at REAL
+    )
+    """,
+)
+
+_V8_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_connector_provider ON conversation_connector(provider, status, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_execution_draft ON conversation_external_execution(draft_action_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_execution_connector ON conversation_external_execution(connector_id, status, created_at)",
+)
+
 
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
@@ -644,6 +686,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     5: (_apply_v5, "v2.0 explicit session policy and counterparty state"),
     6: (_apply_v6, "v2.0 temporal provenance for conversation items"),
     7: (lambda conn: _apply_statements(conn, _V7_TABLES + _V7_INDEXES), "v2.0 manual Conversation screen context observations"),
+    8: (lambda conn: _apply_statements(conn, _V8_TABLES + _V8_INDEXES), "v2.0 connector metadata and audited external execution"),
 }
 
 

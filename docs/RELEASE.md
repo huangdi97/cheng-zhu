@@ -33,6 +33,21 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
+Current beta.2 checkpoint:
+
+```text
+PRODUCT_SOURCE_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+DRAFT_RELEASE = v2.0.0-beta.2
+DRAFT_TARGET_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+DRAFT_ASSETS = UPLOADED
+DOWNLOAD_BACK_SHA256 = PASS
+DOWNLOADED_INSTALLER_REPLAY = PASS
+DOWNLOADED_PACKAGED_SMOKE = PASS
+PUBLICATION = PENDING
+```
+
+The first publish attempt failed only in the final PowerShell publish step after download-back verification. PR #54 fixed that release-engineering parser defect and merged as `cac605edf413ec248babf02ea9f73da708d156f8`. The next correct action is to run the fixed workflow with `publish=true` and `source_sha=b0c9e9bd7e46070dd9777fc3951ff993855790a8`; do **not** retarget beta.2 binaries to `cac605...` merely because the workflow implementation changed.
+
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 
 
@@ -132,7 +147,16 @@ installer / portable source SHA
 public tag SHA
 ```
 
-For automated publishing, the `workflow_run.head_sha` that just passed main CI is passed to `release.yml` as `source_sha`. The Release workflow checks out that SHA, exports it as `CHENGZHU_RELEASE_SOURCE_SHA`, creates the tag using an explicit `--target`, and checks the tag again before download-back and before final publish.
+For automated publishing, the exact CI-proven product commit is passed to `release.yml` as `source_sha`. The Release workflow checks out that SHA, exports it as `CHENGZHU_RELEASE_SOURCE_SHA`, creates the tag using an explicit `--target`, and checks the tag again before download-back and before final publish.
+
+**Workflow-definition SHA and product-source SHA are not always the same thing.** If a release-engineering-only fix lands after a product candidate was already proven, it is valid to dispatch the **new workflow definition from latest main** while still setting `source_sha` to the earlier immutable product candidate. In that case:
+
+```text
+workflow definition = latest main with release fix
+checkout / binaries / tag = exact product source_sha
+```
+
+The public tag must match the **product source SHA**, not the later workflow-fix commit. Never rebuild or retag from a moving `main` just to absorb release-script changes unless product source is intentionally being revved and re-proven.
 
 Do not create a release tag from a moving `main` branch after a long package build. A release where the tag points to newer source than the binary build is not a valid reproducible release, even if both commits individually pass CI.
 
@@ -154,12 +178,14 @@ Required:
 
 Required:
 
-- main CI green;
-- auto-publisher uses the exact green main CI `head_sha`, not a later moving `main`;
+- the chosen product source SHA has green CI / release evidence;
+- the workflow definition used to publish is itself from a reviewed/green release-engineering revision;
+- publisher receives the immutable product `source_sha`, not an implicit moving `main`;
 - public tag resolves to the exact SHA used to build the release binaries;
 - GitHub Release exists;
 - expected assets exist;
-- release download-back verification succeeds.
+- release download-back verification succeeds;
+- prerelease/stable channel flags are rechecked after publish.
 
 Only after this may a **stable-channel** version become Current Stable. A prerelease that passes the same gate becomes a verified public Beta, remains `prerelease=true`, and must not become GitHub Latest.
 

@@ -186,11 +186,11 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
     product_store.init_db()
     goal_id = goals.create_goal("MindRank", "AIDD Agent Engineer")["id"]
     assert goal_id
-    assert product_store.schema_version() == 7
+    assert product_store.schema_version() == 8
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 8)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 9)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -224,22 +224,57 @@ def test_v7_screen_context_migration_preserves_v6_temporal_provenance():
         assert "time_semantics_json" in item_cols_before
         assert "conversation_screen_context" not in tables_before
 
-        before = product_migrations.ensure_schema(conn)
-        assert before == 6
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        apply_v7, _name = product_migrations._MIGRATIONS[7]
+        apply_v7(conn)
+        conn.execute("PRAGMA user_version = 7")
+        conn.commit()
 
         item_cols_after = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         tables_after = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "time_semantics_json" in item_cols_after
         assert "conversation_screen_context" in tables_after
-
         indexes = {row[1] for row in conn.execute("PRAGMA index_list(conversation_screen_context)")}
         assert "idx_conversation_screen_session" in indexes
         assert "idx_conversation_screen_space" in indexes
+    finally:
+        conn.close()
 
-        # Idempotent at v7: no duplicate schema work and no regression of v6.
-        assert product_migrations.ensure_schema(conn) == 7
+
+def test_v8_integration_migration_is_additive_over_v7_screen_context():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 8):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        before_tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        before_item_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
+        before_screen_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
+        assert "conversation_screen_context" in before_tables
+        assert "time_semantics_json" in before_item_cols
+        assert "text" in before_screen_cols
+        assert "conversation_connector_connection" not in before_tables
+
+        before = product_migrations.ensure_schema(conn)
+        assert before == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
+
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert {
+            "conversation_connector_connection",
+            "conversation_connector_snapshot",
+            "conversation_connector_execution",
+        } <= tables
+        space_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_space)")}
+        assert "selected_connector_snapshot_ids_json" in space_cols
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
+        assert "text" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
+
+        assert product_migrations.ensure_schema(conn) == 8
     finally:
         conn.close()
 
@@ -250,7 +285,7 @@ def test_deleting_product_db_is_a_complete_rollback(v122_env):
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 7
+    assert product_store.schema_version() == 8
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

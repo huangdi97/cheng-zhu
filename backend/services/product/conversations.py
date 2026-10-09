@@ -3369,18 +3369,19 @@ def export_session(session_id: str) -> dict[str, Any]:
                 "content": note.get("content") or "",
                 "kind": "USER_NOTE",
             })
-
+    integration = _session_integration_export(packs, drafts)
     return {
         "kind": "CONVERSATION_SESSION",
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
                 "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
-                "unconfirmed_candidates", "guidance", "draft_actions",
-                "source_manifest", "session_packs",
+                "unconfirmed_candidates", "guidance", "draft_actions", "source_manifest",
+                "connector_snapshots", "connector_connections", "external_execution_audit", "session_packs",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
+            "credential_refs_exported": False,
         },
         "space": {
             "id": space["id"],
@@ -3396,9 +3397,11 @@ def export_session(session_id: str) -> dict[str, Any]:
         "guidance": guidance,
         "draft_actions": drafts,
         "source_manifest": source_manifest,
+        "connector_snapshots": integration["connector_snapshots"],
+        "connector_connections": integration["connections"],
+        "external_execution_audit": integration["external_execution_audit"],
         "session_packs": packs,
     }
-
 
 def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
     rows = store.rows(

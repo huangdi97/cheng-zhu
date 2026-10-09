@@ -869,7 +869,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. **完成 beta.2 public prerelease publish**。产品候选源码锁定为 `b0c9e9bd7e46070dd9777fc3951ff993855790a8`：该 exact SHA 已完成 Windows build、draft Release、asset download-back、SHA256、downloaded-installer replay 与 packaged smoke。随后发现的发布脚本 PowerShell 解析问题仅属于 release engineering；PR #54 已在 `cac605edf413ec248babf02ea9f73da708d156f8` 合并并通过完整 Windows Release preflight。正确发布动作是用**最新 main 上修复后的 workflow**重新执行 `workflow_dispatch`，但 `source_sha` 仍传 `b0c9e9bd...`、`publish=true`，最终要求 `v2.0.0-beta.2` 为 public GitHub **Prerelease** 且 Stable Latest 仍为 v1.4.2；
+1. **完成 beta.2 public prerelease publish**。第一次 beta.2 draft/download-back 验证来自 `b0c9e9bd7e46070dd9777fc3951ff993855790a8`，它已证明 installer / assets / SHA256 / downloaded replay 可用；随后 PR #54 修复最终 publish 的 PowerShell 解析问题并合入 main。合并后 `cac605edf413ec248babf02ea9f73da708d156f8` 的 main CI 已全绿，generic publisher 已自动以 **cac605... 作为新的 exact source_sha** 触发 Release run `37871601889`。因此最终 beta.2 若该 run 通过，产品 binary / public tag provenance 应锁 `cac605...`；旧 `b0c9...` 只保留为第一次 verified-draft 历史证据。最终仍要求 `v2.0.0-beta.2` 为 public GitHub **Prerelease** 且 Stable Latest 仍为 v1.4.2；
 2. 用该公开可下载安装包进行 local dogfood；
 3. 真实 Project Sync / Design Review 小规模使用；
 4. 收集 human-labeled Guidance / missed-moment / continuity evidence；

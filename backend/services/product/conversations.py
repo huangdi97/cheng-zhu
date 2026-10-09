@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
-from services.product import conversation_connectors, conversation_screen, materials
+from services.product import conversation_connectors, conversation_integrations, conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -548,6 +548,7 @@ def create_space(
     relationship_key: str = "",
     selected_source_ids: Optional[list[str]] = None,
     selected_quick_note_ids: Optional[list[str]] = None,
+    selected_connector_snapshot_ids: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     title = str(title or "").strip()
     if not title:
@@ -570,7 +571,11 @@ def create_space(
         "default_mode": mode,
         "selected_source_ids": list(selected_source_ids or []),
         "selected_quick_note_ids": list(selected_quick_note_ids or []),
-        "retention_policy": dict(RETENTION_PRESETS["STANDARD"]),
+        "selected_connector_snapshot_ids": list(selected_connector_snapshot_ids or []),
+        "retention_policy": {
+            **dict(RETENTION_PRESETS["STANDARD"]),
+            "connector_snapshot_days": 30,
+        },
         "created_at": ts,
         "updated_at": ts,
     }
@@ -635,7 +640,8 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     requested_default_goal = patch.get("default_goal") if "default_goal" in patch else None
     allowed = {
         "title", "description", "status", "project_id", "relationship_key",
-        "default_mode", "selected_source_ids", "selected_quick_note_ids", "retention_policy",
+        "default_mode", "selected_source_ids", "selected_quick_note_ids",
+        "selected_connector_snapshot_ids", "retention_policy",
     }
     clean = {k: v for k, v in patch.items() if k in allowed}
     if "title" in clean:
@@ -664,6 +670,7 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
                 "transcript_days": _days("transcript_days", 30),
                 "guidance_days": _days("guidance_days", 30),
                 "draft_days": _days("draft_days", 30),
+                "connector_snapshot_days": _days("connector_snapshot_days", 30),
                 "confirmed_items": "KEEP",
                 "audio_retention": "OFF",
             }

@@ -3810,7 +3810,7 @@ def diagnostics() -> dict[str, Any]:
     Counts describe this device only. They are deliberately not interpreted
     as product-market fit or real-user validation.
     """
-    from services.product import conversation_capture
+    from services.product import conversation_capture, conversation_integrations
     from services.storage.product_migrations import LATEST_SCHEMA_VERSION
 
     spaces = int(store.scalar("SELECT COUNT(*) FROM conversation_space") or 0)
@@ -3851,6 +3851,12 @@ def diagnostics() -> dict[str, Any]:
         "AND reason IN ('POLICY_AI_FORBIDDEN','SOURCE_VISIBILITY_BLOCKED','SOCIAL_RISK','STALE_CONTEXT','SUGGESTION_BUDGET')"
     ) or 0)
     capture = conversation_capture.status()
+    integrations = conversation_integrations.diagnostics()
+    connector_snapshots = int(store.scalar("SELECT COUNT(*) FROM conversation_connector_snapshot") or 0)
+    connector_executions = int(store.scalar("SELECT COUNT(*) FROM conversation_connector_execution") or 0)
+    successful_executions = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_connector_execution WHERE status = 'SUCCEEDED'"
+    ) or 0)
     return {
         "contract": "v2.0-R1",
         "schema_version": store.schema_version(),
@@ -3874,7 +3880,11 @@ def diagnostics() -> dict[str, Any]:
             "guidance_dismissed": dismissed_guidance,
             "duplicate_suppressed": duplicate_suppressed,
             "policy_suppressed": policy_suppressed,
+            "connector_snapshots": connector_snapshots,
+            "connector_execution_requests": connector_executions,
+            "connector_execution_succeeded": successful_executions,
         },
+        "integrations": integrations,
         "evaluation": {
             "observed_proxies": {
                 "source_attribution_coverage": (sourced_shown / shown) if shown else None,
@@ -3911,11 +3921,14 @@ def diagnostics() -> dict[str, Any]:
             "export_delete_integrity": "AVAILABLE",
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
-            "external_connectors": "NOT_CONFIGURED",
+            "external_connectors": (
+                "CONNECTED" if integrations["connected"] > 0
+                else "BOUNDARY_AVAILABLE_PROVIDER_ADAPTERS_NOT_CONNECTED"
+            ),
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
             "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
-            "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
+            "external_writeback_execution": "REVIEWED_EXPLICIT_EXECUTION_BOUNDARY_AVAILABLE",
         },
         "evidence": {
             "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
@@ -3925,6 +3938,10 @@ def diagnostics() -> dict[str, Any]:
         "privacy": {
             "remote_telemetry": "OFF",
             "auto_external_writeback": "OFF",
+            "connector_secret_storage": "OPAQUE_REFERENCE_ONLY",
+            "connector_snapshot_selection": "EXPLICIT_ONLY",
+            "external_execution_requires_approved_draft": "ON",
+            "external_execution_requires_second_explicit_action": "ON",
             "speaker_biometric_identity": "OFF",
             "emotion_sentiment_profiling": "OFF",
             "hidden_intent_claims": "OFF",

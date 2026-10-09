@@ -621,17 +621,16 @@ Calendar / mail / project tracker read path 未接线时，非空 connector perm
 - synthetic/runtime validation。
 
 ## Phase B — Read-only connectors
-仅在 connector 真实存在时进入：
-- Calendar；
-- Docs；
-- Mail；
-- project tracker。
+
+Provider-agnostic runtime 已落地；只有运行时注册了真实 adapter、health=ok、账户已连接且 capability 被用户显式选入 Session Policy 时，Calendar / Docs / Mail / project tracker 才可进入本场。
 
 规则：
-- connector 只是 source；
-- 不提升 truth authority；
-- permission 要进入 Session Pack；
-- source visibility 可阻止 Guidance。
+- product.db 只保存 non-secret connector metadata，不保存 OAuth token / API key；
+- connector 只是 source，不提升 truth authority；
+- capability permission 进入 Session Policy；
+- read context 在 Session start 时冻结进 Pack，后续外部变化不静默改写本场；
+- 没有真实 adapter / capability / health 时 Preflight fail-closed；
+- 默认仓库不捆绑或伪造任何 Gmail / Outlook / Calendar / Jira / Linear provider。
 
 ## Phase C — Reviewed write-back
 支持：
@@ -650,6 +649,14 @@ Draft
 → connector result / failure
 → audit trail
 ```
+
+Runtime state machine 已落地：
+- `APPROVED` 只表示本地草稿审核通过；
+- 只有 capability-matched real connector 才出现 execute；
+- execution 独立记录 `PENDING / SUCCEEDED / FAILED`；
+- 只有 `SUCCEEDED` 可声明 provider 接受了动作；
+- 同一 draft + connector + operation 的成功执行幂等；
+- provider 失败不会反写 Conversation truth 或把 DraftAction 改成“失败事实”。
 
 ## Phase D — Organization
 只有个人 v2 真实验证后再设计：
@@ -848,7 +855,7 @@ PMF_PROVEN = TRUE
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime 并进入 beta.2；Calendar / Docs / Mail / project-tracker connectors 与真实 external execution 仍明确 unavailable；
+- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime并进入 beta.2；provider-agnostic Connector Runtime 与 reviewed external execution state machine 已进入仓库，但真实 Calendar / Docs / Mail / project-tracker provider adapter、账户授权与 provider execution evidence 仍属于 external dependency；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；
@@ -878,8 +885,8 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；
 5. 根据真实使用再决定六类 Profile 的专属行为优化优先级；
 6. 外部依赖按独立能力推进：
-   - Calendar / Docs / Mail / project-tracker read connectors；
-   - actual external email/task/issue/decision-log execution；
+   - provider-specific Calendar / Docs / Mail / project-tracker adapters 与账户授权；
+   - real-provider email/task/issue/decision-log execution evidence；
    - participant automatic chat notice / watermark；
    - Organization / shared team truth registry；
    - code signing、macOS signing/notarization 等发布治理。

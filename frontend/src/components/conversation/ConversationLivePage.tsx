@@ -530,6 +530,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
             </div>
             <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] text-text-muted">
               <span>Sources {liveContext.data.sources.length}</span>
+              <span>External refs {liveContext.data.connector_context?.length ?? 0}</span>
               <span>Quick Notes {liveContext.data.quick_notes.length}</span>
               <span>Participants {liveContext.data.participants.length}</span>
               <span>Open {liveContext.data.brief.unresolved_count ?? 0}</span>

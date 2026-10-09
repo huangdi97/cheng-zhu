@@ -589,20 +589,47 @@ MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。M
 ## Conversation Private Overlay / Share Privacy
 已实现桌面 runtime：Conversation Session Policy 可请求 `PRIVATE_OVERLAY`；Preflight 只声明“Start 时验证”，点击开始前前端通过 Electron bridge 临时启用 `setContentProtection` 并再次读取状态，随后把 runtime proof 交给 backend。proof 缺失/无效时 Start fail-closed。verified state 冻结进 Session Pack，Live 显示保护状态；会话正常结束后恢复开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不得开始该 policy。该能力只降低受支持捕获路径中的意外暴露，不是安全、隐身或“不可检测”保证。
 
-## External connectors
-Calendar / mail / project tracker read path 未接线时，非空 connector permission 必须阻断或保持 unavailable。
+## Integration Boundary
+schema v8 已完成纯仓库 integration boundary：
 
-## Actual external write-back
-当前：
-- local draft；
-- review；
-- approve local draft。
+- provider capability catalog；
+- least-privilege read/write scopes；
+- opaque credential refs only；
+- CONNECTED 状态必须有真实 adapter + credential ref；
+- external data 先形成 immutable Connector Snapshot；
+- snapshot 只有经 Space 显式选择才进入下一场 Pack；
+- Connector Snapshot = source，不是 Conversation truth；
+- requested connector permission 必须由真实 connected adapter/scope 覆盖，否则 Preflight fail-closed。
 
-不等于：
+当前默认没有 Google / Microsoft / GitHub / MCP concrete adapter 与 OAuth provisioning，因此：
+
+```text
+INTEGRATION_BOUNDARY_AVAILABLE = TRUE
+PROVIDER_ADAPTERS_CONFIGURED = FALSE
+```
+
+## Reviewed external execution boundary
+当前 pure-repo 流程：
+
+```text
+local Draft
+→ user review
+→ APPROVED
+→ explicit Execution Request
+→ connection/scope/adapter recheck
+→ second explicit Execute
+→ provider result/failure audit
+```
+
+只有 `SUCCEEDED + provider response` 才代表真实外部成功。
+
+仍不能默认声称：
 - email 已发送；
 - task 已创建；
 - issue 已写入；
 - decision log 已同步。
+
+因为 concrete provider adapter / OAuth credential provisioning 仍是 external gate。
 
 ---
 
@@ -848,7 +875,7 @@ PMF_PROVEN = TRUE
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime 并进入 beta.2；Calendar / Docs / Mail / project-tracker connectors 与真实 external execution 仍明确 unavailable；
+- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime 并进入 beta.2；schema v8 Integration Boundary 与 reviewed execution boundary 已有 pure-repo runtime，但 concrete provider adapters/OAuth 与真实 provider success evidence 仍明确 external-gated；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；
@@ -878,8 +905,8 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；
 5. 根据真实使用再决定六类 Profile 的专属行为优化优先级；
 6. 外部依赖按独立能力推进：
-   - Calendar / Docs / Mail / project-tracker read connectors；
-   - actual external email/task/issue/decision-log execution；
+   - Google / Microsoft / GitHub / MCP concrete provider adapters 与 OAuth provisioning；
+   - actual external email/task/issue/decision-log provider execution evidence；
    - participant automatic chat notice / watermark；
    - Organization / shared team truth registry；
    - code signing、macOS signing/notarization 等发布治理。

@@ -994,7 +994,10 @@ def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
     for snapshot_id in space.get("selected_connector_snapshot_ids") or []:
         snapshot = store.get("conversation_connector_snapshot", str(snapshot_id))
         if snapshot and snapshot.get("space_id") == space["id"]:
-            selected_connector_snapshots.append(snapshot)
+            frozen_snapshot = dict(snapshot)
+            connection = store.get("conversation_connector_connection", str(snapshot.get("connection_id") or ""))
+            frozen_snapshot["provider_id"] = str((connection or {}).get("provider_id") or "")
+            selected_connector_snapshots.append(frozen_snapshot)
         else:
             missing_connector_snapshot_ids.append(str(snapshot_id))
 
@@ -1776,8 +1779,8 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     """Deterministic, source-aware Manual Ask over this session's frozen context.
 
     Ranking intentionally distinguishes authority:
-    confirmed cross-session state > frozen Ready sources > frozen Quick Notes >
-    current-session transcript.  Source-backed context is not automatically
+    confirmed cross-session state > frozen Ready sources > explicitly selected
+    connector snapshots > frozen Quick Notes > screen/transcript observations.  Source-backed context is not automatically
     upgraded into confirmed truth.
     """
     session = require_session(session_id)
@@ -1840,7 +1843,40 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 3) User-authored frozen notes are usable context, but explicitly not evidence.
+    # 3) Explicitly selected external connector snapshots are frozen references.
+    # They remain REFERENCE_SOURCE regardless of provider; external systems do
+    # not bypass Conversation review/truth promotion.
+    for snapshot in pack.get("connector_snapshots") or []:
+        haystack = " ".join([
+            str(snapshot.get("title") or ""),
+            str(snapshot.get("excerpt") or ""),
+        ])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            ranked.append((lexical + 4, float(snapshot.get("occurred_at") or snapshot.get("created_at") or 0), {
+                "id": str(snapshot.get("id") or ""),
+                "kind": "CONNECTOR_SNAPSHOT",
+                "authority": "REFERENCE_SOURCE",
+                "title": str(snapshot.get("title") or "External Context")[:300],
+                "excerpt": str(snapshot.get("excerpt") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "CONNECTOR_SNAPSHOT",
+                    "id": str(snapshot.get("id") or ""),
+                    "provider_id": str(snapshot.get("provider_id") or ""),
+                    "connection_id": str(snapshot.get("connection_id") or ""),
+                    "capability": str(snapshot.get("capability") or ""),
+                    "external_kind": str(snapshot.get("external_kind") or ""),
+                    "external_id": str(snapshot.get("external_id") or ""),
+                    "content_hash": str(snapshot.get("content_hash") or ""),
+                    "occurred_at": snapshot.get("occurred_at"),
+                    "visibility": str(snapshot.get("visibility") or "PRIVATE"),
+                }],
+            }))
+
+    # 4) User-authored frozen notes are usable context, but explicitly not evidence.
     for note in pack.get("quick_notes") or []:
         haystack = " ".join([str(note.get("title") or ""), str(note.get("content") or "")])
         lexical = _text_match_score(question, haystack)
@@ -1857,7 +1893,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) Manual screen observations are source-aware but never confirmed truth.
+    # 5) Manual screen observations are source-aware but never confirmed truth.
     for observation in conversation_screen.list_context(session_id, limit=40):
         lexical = _text_match_score(question, str(observation.get("text") or ""))
         if lexical:
@@ -1882,7 +1918,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 5) The current-session transcript supports catch-up, but remains observation.
+    # 6) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",
@@ -1915,7 +1951,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     matches = [match for _, _, match in ranked[:6]]
     if not matches:
         return {
-            "answer": "没有在本场冻结来源、已确认历史、屏幕观察或当前转写中找到足够直接的可追溯内容。",
+            "answer": "没有在本场冻结来源、外部快照、已确认历史、屏幕观察或当前转写中找到足够直接的可追溯内容。",
             "matches": [],
             "grounded": False,
             "truth_confirmed": False,

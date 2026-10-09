@@ -937,9 +937,18 @@ Private Overlay 已满足 Conversation desktop runtime：Preflight 只声明“S
 
 ## Phase 2 — Read-only Context Connectors
 
-Calendar / docs / mail / project tracker 仅作为 Prepare/Continue source。
+Provider-agnostic connector runtime 负责：
+- adapter registry；
+- non-secret account metadata；
+- capability / scopes / health；
+- Preflight permission resolution；
+- read-only context ingestion；
+- Session Pack freeze；
+- diagnostics / export audit。
 
-连接器不成为 truth authority。
+Calendar / docs / mail / project tracker 仍只作为 Prepare/Continue source；连接器不成为 truth authority。
+
+**Runtime framework available ≠ bundled provider available ≠ user account connected。** 当前仓库不因框架存在就声称 Gmail / Outlook / Google Calendar / Jira / Linear 等 provider 已可用。
 
 ## Phase 3 — Reviewed Write-back
 
@@ -951,6 +960,18 @@ Calendar / docs / mail / project tracker 仅作为 Prepare/Continue source。
 - decision log draft。
 
 默认必须用户确认，不允许“模型自己认为同意了”就写入组织系统。
+
+审核后执行仍是独立状态机：
+
+```text
+DRAFT
+→ APPROVED
+→ explicit connector target
+→ PENDING
+→ SUCCEEDED / FAILED
+```
+
+只有 `SUCCEEDED + external_ref` 能支持“provider 已接受外部动作”；`APPROVED` 永远不等于已发送/已创建。成功执行按 draft + connector + operation 幂等，失败保留审计且不改写 Conversation truth。
 
 ## Phase 4 — Organization（Future）
 

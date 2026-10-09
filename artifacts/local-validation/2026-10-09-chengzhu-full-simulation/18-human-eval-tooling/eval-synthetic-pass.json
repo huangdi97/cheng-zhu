@@ -1,0 +1,65 @@
+{
+  "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
+  "rows": 187,
+  "rows_by_kind": {
+    "continue": 22,
+    "direct_question": 24,
+    "guidance": 57,
+    "session_outcome": 20,
+    "silence": 32,
+    "truth_item": 32
+  },
+  "metrics": {
+    "opportunity_precision": {
+      "value": 1.0,
+      "n": 35
+    },
+    "interruption_regret": {
+      "value": 0.0,
+      "n": 35
+    },
+    "source_attribution_accuracy": {
+      "value": 1.0,
+      "n": 35
+    },
+    "recall_precision": {
+      "value": 1.0,
+      "n": 22
+    },
+    "useful_silence_rate": {
+      "value": 1.0,
+      "n": 32
+    },
+    "direct_question_precision": {
+      "value": 1.0,
+      "n": 24
+    },
+    "direct_question_recall": {
+      "value": 1.0,
+      "n": 24
+    },
+    "decision_commitment_state_precision": {
+      "value": 1.0,
+      "n": 32
+    },
+    "continue_writeback_accuracy": {
+      "value": 1.0,
+      "n": 22
+    },
+    "mean_cognitive_load_delta": {
+      "value": -0.38,
+      "n": 20
+    },
+    "space_reuse_intent_rate": {
+      "value": 0.8,
+      "n": 20
+    }
+  },
+  "status": "HAS_HUMAN_LABELS",
+  "claims": {
+    "REAL_CONVERSATION_USER_EVIDENCE_AVAILABLE": false,
+    "HUMAN_LABELS_AVAILABLE": true,
+    "PMF_PROVEN": false
+  },
+  "interpretation": "Human label aggregates do not verify that respondents were real external users. No threshold in this script upgrades PMF or release status."
+}

@@ -1,0 +1,58 @@
+{
+  "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
+  "rows": 0,
+  "rows_by_kind": {},
+  "metrics": {
+    "opportunity_precision": {
+      "value": null,
+      "n": 0
+    },
+    "interruption_regret": {
+      "value": null,
+      "n": 0
+    },
+    "source_attribution_accuracy": {
+      "value": null,
+      "n": 0
+    },
+    "recall_precision": {
+      "value": null,
+      "n": 0
+    },
+    "useful_silence_rate": {
+      "value": null,
+      "n": 0
+    },
+    "direct_question_precision": {
+      "value": null,
+      "n": 0
+    },
+    "direct_question_recall": {
+      "value": null,
+      "n": 0
+    },
+    "decision_commitment_state_precision": {
+      "value": null,
+      "n": 0
+    },
+    "continue_writeback_accuracy": {
+      "value": null,
+      "n": 0
+    },
+    "mean_cognitive_load_delta": {
+      "value": null,
+      "n": 0
+    },
+    "space_reuse_intent_rate": {
+      "value": null,
+      "n": 0
+    }
+  },
+  "status": "INSUFFICIENT_EVIDENCE",
+  "claims": {
+    "REAL_CONVERSATION_USER_EVIDENCE_AVAILABLE": false,
+    "HUMAN_LABELS_AVAILABLE": false,
+    "PMF_PROVEN": false
+  },
+  "interpretation": "Human label aggregates do not verify that respondents were real external users. No threshold in this script upgrades PMF or release status."
+}

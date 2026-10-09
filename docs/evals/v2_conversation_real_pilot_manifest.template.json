@@ -1,0 +1,28 @@
+{
+  "evidence_type": "AUTHORIZED_REAL_CONVERSATION_PILOT",
+  "period": {
+    "started_at": "",
+    "ended_at": ""
+  },
+  "profiles": {
+    "PROJECT_SYNC": {
+      "distinct_users": 0,
+      "sessions": 0,
+      "cross_session_spaces": 0
+    },
+    "DESIGN_REVIEW": {
+      "distinct_users": 0,
+      "sessions": 0,
+      "cross_session_spaces": 0
+    }
+  },
+  "critical_incidents": 0,
+  "attestations": [
+    "AUTHORIZED_REAL_USE",
+    "NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
+    "RAW_LABELS_KEPT_LOCAL",
+    "NO_CRITICAL_PRIVACY_INCIDENT",
+    "NO_KNOWN_DATA_LOSS"
+  ],
+  "notes": "Fill with real pilot counts only. Do not use synthetic or CI sessions."
+}

@@ -404,6 +404,13 @@ export interface ConversationPreflight {
   processing_runtime: ConversationProcessingRuntime
   screen_runtime: ConversationScreenRuntime
   share_privacy_runtime: ConversationSharePrivacyRuntime
+  connector_runtime: {
+    requested: string[]
+    resolved: Record<string, string>
+    missing: string[]
+    ok: boolean
+    error?: string
+  }
   pack_preview: {
     goal_ids: string[]
     selected_source_ids: string[]
@@ -427,6 +434,13 @@ export interface ConversationPreflight {
     processing_runtime: ConversationProcessingRuntime
     screen_runtime: ConversationScreenRuntime
     share_privacy_runtime: ConversationSharePrivacyRuntime
+    connector_runtime: {
+      requested: string[]
+      resolved: Record<string, string>
+      missing: string[]
+      ok: boolean
+      error?: string
+    }
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
   privacy_note: string
@@ -618,6 +632,7 @@ export interface ConversationSessionExport {
   unconfirmed_candidates: ConversationItem[]
   guidance: ConversationGuidance[]
   draft_actions: ConversationDraftAction[]
+  external_executions: ConversationExternalExecution[]
   source_manifest: Array<Record<string, unknown>>
   session_packs: Array<Record<string, unknown>>
 }

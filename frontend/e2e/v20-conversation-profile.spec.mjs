@@ -657,6 +657,49 @@ function mocks() {
   }
 }
 
+function mocksWithConnector() {
+  const base = mocks()
+  return async (pathname, method, request) => {
+    if (pathname === '/api/product/conversation/connectors') return {
+      items: [{
+        id: 'ccn-work',
+        provider: 'fake-work',
+        label: 'Work Connector',
+        status: 'CONNECTED',
+        capabilities: ['calendar.read', 'decision_log.write'],
+        scopes: ['calendar.readonly', 'decision.write'],
+        metadata: { account_hint: 'work@example.invalid' },
+        last_error: '',
+        runtime_registered: true,
+        runtime_health: { ok: true },
+        available: true,
+        created_at: 1,
+        updated_at: 2,
+      }],
+      providers: [{
+        provider: 'fake-work',
+        capabilities: ['calendar.read', 'decision_log.write'],
+        health: { ok: true },
+      }],
+    }
+    if (pathname === '/api/product/conversation/draft-actions/cda-derived/execute' && method === 'POST') return {
+      id: 'cex-1',
+      connector_id: request.postDataJSON().connector_id,
+      draft_action_id: 'cda-derived',
+      operation: 'decision_log.write',
+      target: '',
+      request: { draft_action_id: 'cda-derived', capability: 'decision_log.write' },
+      result: { ok: true },
+      status: 'SUCCEEDED',
+      external_ref: 'fake:decision:1',
+      error: '',
+      created_at: 5,
+      completed_at: 6,
+    }
+    return base(pathname, method, request)
+  }
+}
+
 test.describe('v2.0 Conversation Profile', () => {
   test('first opt-in runs an explicitly synthetic dry run before Conversation Home', async ({ context, page }) => {
     await installMocks(context, {
@@ -1499,6 +1542,24 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('NOT STARTED', { exact: true })).toBeVisible()
     await expect(page.getByText(/raw image NOT STORED/)).toBeVisible()
     await expect(page.locator('body')).not.toContainText('data:image/')
+  })
+
+
+  test('approved DraftAction executes only through an available capability-matched connector', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocksWithConnector(),
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await expect(page.getByText('APPROVED')).toBeVisible()
+    await expect(page.getByRole('button', { name: '执行到 Work Connector' })).toBeVisible()
+    await page.getByRole('button', { name: '执行到 Work Connector' }).click()
+    await expect(page.getByText(/Execution · SUCCEEDED/)).toBeVisible()
+    await expect(page.getByText(/ref fake:decision:1/)).toBeVisible()
   })
 
 

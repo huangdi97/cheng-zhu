@@ -520,8 +520,8 @@ export interface ConversationTranscriptSegment {
 
 export interface ConversationAskMatch {
   id: string
-  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
-  authority: 'CONFIRMED_TRUTH' | 'PERSONAL_EVIDENCE' | 'REFERENCE_SOURCE' | 'USER_NOTE_NOT_EVIDENCE' | 'OBSERVED_NOT_CONFIRMED'
+  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'CONNECTOR_CONTEXT' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
+  authority: 'CONFIRMED_TRUTH' | 'PERSONAL_EVIDENCE' | 'REFERENCE_SOURCE' | 'EXTERNAL_REFERENCE' | 'USER_NOTE_NOT_EVIDENCE' | 'OBSERVED_NOT_CONFIRMED'
   title: string
   excerpt: string
   item_type: string
@@ -588,6 +588,21 @@ export interface ConversationSessionContext {
     organization: string
     counterparty_state: CounterpartyState
   }>
+  connector_context: Array<{
+    connector_id: string
+    provider: string
+    capability: string
+    external_id: string
+    title: string
+    content_hash: string
+    visibility: string
+  }>
+  connector_runtime: {
+    requested: string[]
+    resolved: Record<string, string>
+    missing: string[]
+    ok: boolean
+  }
   expression_profile: Record<string, unknown>
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: Partial<ConversationProcessingRuntime>

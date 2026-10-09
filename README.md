@@ -122,6 +122,7 @@ Conversation Home
 - Participant consent status + transparency plan（均为用户报告，不声称系统自动通知）；
 - Session Pack 冻结来源、Quick Notes、confirmed items、Goals、participants、我的表达、policy 与 resolved processing data path；
 - Conversation-owned TRANSCRIPT capture；
+- opt-in 本地桌面提醒：只读取成竹内已排期 Session，默认提前 10 分钟，通知不显示会话标题，不等于 Calendar connector；
 - grounded global Decision / Commitment / Open Question search + Ctrl+K entry；
 - categorized current Session / Space local export；
 - schema v6 temporal provenance：original text / normalized datetime / timezone / ambiguity；

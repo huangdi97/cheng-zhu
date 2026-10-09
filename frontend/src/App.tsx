@@ -16,6 +16,7 @@ import { useInterviewWS } from '@/hooks/useInterviewWS'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useOverlayWindowSync } from '@/hooks/useOverlayWindowSync'
 import { updateConfigAndRefresh } from '@/lib/configSync'
+import { conversationApi } from '@/lib/conversationApi'
 import { hasExplicitRoute, legacyModeForRoute, navigate, paths, routeForLegacyMode, startRouterListener, useRouter, type RouteName, type ConversationTab } from '@/lib/router'
 import { useT, useUiLanguage, type StringKey } from '@/lib/i18n'
 import WorkbenchPopover from '@/components/WorkbenchPopover'
@@ -231,6 +232,56 @@ export default function App() {
       .then((shortcuts) => useShortcutsStore.getState().setShortcuts(shortcuts))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const api = window.electronAPI
+    if (!api?.onConversationReminderOpen) return
+    return api.onConversationReminderOpen(({ spaceId }) => {
+      setProductProfile('conversation')
+      try { window.localStorage.setItem('chengzhu-product-profile', 'conversation') } catch { /* storage unavailable */ }
+      navigate(paths.conversationSpace(spaceId, 'prepare'))
+    })
+  }, [])
+
+  useEffect(() => {
+    const api = window.electronAPI
+    if (!api?.syncConversationReminders) return
+
+    let disposed = false
+    const sync = async () => {
+      let enabled = false
+      try { enabled = window.localStorage.getItem('chengzhu-conversation-reminders') === '1' } catch { /* storage unavailable */ }
+      if (!enabled) {
+        await api.syncConversationReminders?.({ enabled: false, items: [] }).catch(() => {})
+        return
+      }
+      try {
+        const result = await conversationApi.reminders(30, 100)
+        if (disposed) return
+        await api.syncConversationReminders?.({
+          enabled: true,
+          leadMinutes: 10,
+          items: result.items.map((item) => ({
+            session_id: item.session_id,
+            space_id: item.space_id,
+            scheduled_at: item.scheduled_at,
+          })),
+        })
+      } catch {
+        // Reminder discovery is optional product surface; never block the shell.
+      }
+    }
+
+    void sync()
+    const onChanged = () => { void sync() }
+    window.addEventListener('chengzhu-conversation-reminders-changed', onChanged)
+    const timer = window.setInterval(() => { void sync() }, 5 * 60 * 1000)
+    return () => {
+      disposed = true
+      window.removeEventListener('chengzhu-conversation-reminders-changed', onChanged)
+      window.clearInterval(timer)
+    }
+  }, [route.path])
 
   const hasGuided = useRef(false)
   useEffect(() => {

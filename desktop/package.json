@@ -35,6 +35,7 @@
       "windowOptions.js",
       "multiScreenBatch.js",
       "sharePrivacy.js",
+      "conversationReminders.js",
       "backendLauncher.js",
       "app-title.json",
       "icon.png",

@@ -97,6 +97,7 @@ PR #18 已建立真实 Conversation runtime：
 - Contribution Opportunity；
 - deterministic SILENT / suppression；
 - Conversation-owned TRANSCRIPT capture；
+- opt-in local scheduled Conversation reminder（desktop only，privacy-safe，非 Calendar discovery）；
 - additive persistence；
 - export / retention / delete provenance；
 - local DraftActions；

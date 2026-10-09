@@ -953,6 +953,40 @@ def list_sessions(space_id: str) -> list[dict[str, Any]]:
     )
 
 
+def upcoming_reminders(*, horizon_days: int = 30, limit: int = 100, now: Optional[float] = None) -> list[dict[str, Any]]:
+    """Local schedule discovery for opt-in desktop reminders.
+
+    This deliberately reads only sessions already scheduled inside Chengzhu.
+    It is not a Calendar connector, does not discover external meetings, and
+    does not imply that the app will join/capture anything automatically.
+    """
+    current = float(store.now() if now is None else now)
+    horizon = current + max(1, min(365, int(horizon_days))) * 86400
+    rows = store.rows(
+        "SELECT s.id, s.space_id, s.title, s.scheduled_at, s.assistance_mode, "
+        "sp.title AS space_title, sp.profile AS space_profile "
+        "FROM conversation_session s "
+        "JOIN conversation_space sp ON sp.id = s.space_id "
+        "WHERE s.status = 'UPCOMING' AND s.scheduled_at IS NOT NULL "
+        "AND s.scheduled_at > ? AND s.scheduled_at <= ? "
+        "AND sp.status = 'ACTIVE' "
+        "ORDER BY s.scheduled_at ASC LIMIT ?",
+        (current, horizon, max(1, min(500, int(limit)))),
+    )
+    return [
+        {
+            "session_id": row["id"],
+            "space_id": row["space_id"],
+            "title": row.get("title") or row.get("space_title") or "Conversation",
+            "space_title": row.get("space_title") or "",
+            "space_profile": row.get("space_profile") or "",
+            "scheduled_at": float(row["scheduled_at"]),
+            "assistance_mode": row.get("assistance_mode") or "",
+        }
+        for row in rows
+    ]
+
+
 def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
     """Resolve the exact Ready sources and existing Quick Notes a new pack would freeze."""
     selected_sources: list[dict[str, Any]] = []

@@ -13,6 +13,7 @@ const SPACE = {
   default_mode: 'BALANCED',
   selected_source_ids: ['benchmark-note'],
   selected_quick_note_ids: [],
+  selected_connector_snapshot_ids: [],
   retention_policy: { preset: 'STANDARD' },
   created_at: 1,
   updated_at: 2,
@@ -196,6 +197,14 @@ function mocks() {
         { key: 'NEGOTIATION', label: '谈判', default_mode: 'QUIET', guidance: ['RECALL', 'TALKING_POINT', 'QUESTION', 'RISK'], runtime_available: true, launch_wedge: false, specialized_behavior_validated: false, stable_release: false, real_user_validated: false, maturity: 'SHARED_RUNTIME_TEMPLATE' },
       ],
     }
+    if (pathname === '/api/product/conversation/integrations/catalog') return {
+      items: [
+        { provider: 'GOOGLE_CALENDAR', label: 'Google Calendar', read_scopes: ['calendar.read'], write_scopes: [], external_kinds: ['CALENDAR_EVENT'], provider_scopes: { 'calendar.read': 'calendar.readonly' }, sync: 'INCREMENTAL_CURSOR', adapter_available: false },
+        { provider: 'GOOGLE_MAIL', label: 'Gmail', read_scopes: ['mail.read'], write_scopes: ['mail.send'], external_kinds: ['MAIL_THREAD'], provider_scopes: { 'mail.read': 'gmail.readonly', 'mail.send': 'gmail.send' }, sync: 'PROVIDER_CURSOR', adapter_available: false },
+      ],
+    }
+    if (pathname === '/api/product/conversation/integrations/connections') return { items: [] }
+    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
     if (pathname === '/api/product/conversation/history') return {
       items: [{
         ...SESSION, title: 'Review #1', status: 'ENDED', ended_at: 3,
@@ -274,9 +283,9 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
-      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30 },
-      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0 },
-      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP' },
+      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30, connector_snapshot_days: 30 },
+      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0, connector_snapshots: 0 },
+      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP', external_execution_audit: 'KEEP', selected_connector_snapshots: 'KEEP' },
       destructive: false,
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/sessions` && method === 'POST') return { ...SESSION, status: 'UPCOMING', started_at: null, pack_id: '' }
@@ -331,6 +340,9 @@ function mocks() {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
         selected_quick_note_ids: [],
+        selected_connector_snapshot_ids: [],
+        connector_snapshots: [],
+        missing_connector_snapshot_ids: [],
         sources: [{
           material_id: 'benchmark-note',
           version_id: 'mv-benchmark-v1',
@@ -1284,6 +1296,58 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(`supersedes ${DECISION.id}`)).toBeVisible()
     await expect(page.getByText('SUPERSEDED', { exact: true })).toBeVisible()
     await expect(page.getByText('AGREED', { exact: true })).toBeVisible()
+  })
+
+
+  test('approved draft needs explicit connector request and second execute before external success', async ({ context, page }) => {
+    const base = mocks()
+    let execution = null
+    const connected = async (pathname, method, request) => {
+      if (pathname === '/api/product/conversation/integrations/catalog') return {
+        items: [{ provider: 'GOOGLE_MAIL', label: 'Gmail', read_scopes: ['mail.read'], write_scopes: ['mail.send'], external_kinds: ['MAIL_THREAD'], provider_scopes: { 'mail.send': 'gmail.send' }, sync: 'PROVIDER_CURSOR', adapter_available: true }],
+      }
+      if (pathname === '/api/product/conversation/integrations/connections') return {
+        items: [{
+          id: 'ccn-mail', provider: 'GOOGLE_MAIL', display_name: 'Work Gmail', status: 'CONNECTED',
+          auth_mode: 'OPAQUE_REFERENCE', credential_ref: 'keyring:redacted', granted_scopes: ['mail.send'],
+          capabilities: { read: ['mail.read'], write: ['mail.send'], external_kinds: ['MAIL_THREAD'] },
+          account_hint: 'u…@example.com', sync_cursor: '', last_sync_at: null, last_error: '',
+          adapter_available: true, created_at: 1, updated_at: 1,
+        }],
+      }
+      if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+        execution = {
+          id: 'cce-1', draft_action_id: 'cda-derived', connection_id: request.postDataJSON().connection_id,
+          operation: 'UPDATE_DECISION_LOG', target: request.postDataJSON().target || '',
+          idempotency_key: '1234567890abcdef', status: 'PENDING', request: {}, response: {}, error: '',
+          created_at: 5, updated_at: 5, executed_at: null,
+        }
+        return execution
+      }
+      if (pathname === '/api/product/conversation/integrations/executions/cce-1/execute' && method === 'POST') {
+        execution = { ...execution, status: 'SUCCEEDED', response: { external_id: 'decision-42' }, updated_at: 6, executed_at: 6 }
+        return execution
+      }
+      return base(pathname, method, request)
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: connected,
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await expect(page.getByText('External Execution · 二次显式确认')).toBeVisible()
+    await page.getByLabel('执行连接').selectOption('ccn-mail')
+    await page.getByLabel('外部目标').fill('decision-log')
+    await page.getByRole('button', { name: '创建执行请求' }).click()
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByRole('button', { name: '执行到外部系统' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/只有 SUCCEEDED \+ provider response/)).toBeVisible()
   })
 
 

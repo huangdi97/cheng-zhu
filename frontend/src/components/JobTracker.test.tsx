@@ -274,15 +274,15 @@ describe('JobTracker', () => {
 
     fireEvent.keyDown(row as HTMLElement, { key: 'Enter' })
 
-    const updatedRow = screen
-      .getAllByText('MiniMax')
-      .map((node) => node.closest('article'))
-      .find((candidate): candidate is HTMLElement =>
-        candidate instanceof HTMLElement &&
-        within(candidate).queryByRole('button', { name: /查看 MiniMax 的 2 场关联复盘/ }) != null,
-      )
-    expect(updatedRow).not.toBeNull()
     await waitFor(() => {
+      const updatedRow = screen
+        .getAllByText('MiniMax')
+        .map((node) => node.closest('article'))
+        .find((candidate): candidate is HTMLElement =>
+          candidate instanceof HTMLElement &&
+          within(candidate).queryByRole('button', { name: /查看 MiniMax 的 2 场关联复盘/ }) != null,
+        )
+      expect(updatedRow).not.toBeNull()
       expect(within(updatedRow as HTMLElement).getByText('已定位')).toBeInTheDocument()
     })
   })

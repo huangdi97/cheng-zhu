@@ -213,6 +213,7 @@ function mocks() {
         session_ended_at: null,
       }],
     }
+    if (pathname === '/api/product/conversation/connectors') return { items: [], providers: [] }
     if (pathname === '/api/product/conversation/home') return {
       state: 'ACTIVE',
       spaces: [SPACE],
@@ -1302,6 +1303,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(/不代表已发送邮件、创建 task \/ issue 或写入 decision log/)).toBeVisible()
     await page.getByRole('button', { name: '确认草稿' }).click()
     await expect(page.getByText('APPROVED')).toBeVisible()
+    await expect(page.getByText(/没有已连接且获得该 capability 的 provider/)).toBeVisible()
+    await expect(page.getByRole('button', { name: /^执行到 / })).toHaveCount(0)
   })
 
 

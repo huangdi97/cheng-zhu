@@ -137,6 +137,7 @@ RETENTION_PRESETS: dict[str, dict[str, Any]] = {
         "transcript_days": 0,
         "guidance_days": 7,
         "draft_days": 7,
+        "connector_snapshot_days": 7,
         "confirmed_items": "KEEP",
         "audio_retention": "OFF",
     },
@@ -145,6 +146,7 @@ RETENTION_PRESETS: dict[str, dict[str, Any]] = {
         "transcript_days": 30,
         "guidance_days": 30,
         "draft_days": 30,
+        "connector_snapshot_days": 30,
         "confirmed_items": "KEEP",
         "audio_retention": "OFF",
     },
@@ -667,6 +669,7 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
                 "transcript_days": _days("transcript_days", 30),
                 "guidance_days": _days("guidance_days", 30),
                 "draft_days": _days("draft_days", 30),
+                "connector_snapshot_days": _days("connector_snapshot_days", 30),
                 "confirmed_items": "KEEP",
                 "audio_retention": "OFF",
             }
@@ -3253,6 +3256,17 @@ def export_session(session_id: str) -> dict[str, Any]:
                 "content_hash": source.get("content_hash") or "",
                 "is_personal_evidence": bool(source.get("is_personal_evidence")),
             })
+        for snapshot in payload.get("connector_snapshots") or []:
+            source_manifest.append({
+                "connector_snapshot_id": snapshot.get("id") or "",
+                "connection_id": snapshot.get("connection_id") or "",
+                "external_kind": snapshot.get("external_kind") or "",
+                "external_id": snapshot.get("external_id") or "",
+                "title": snapshot.get("title") or "",
+                "content_hash": snapshot.get("content_hash") or "",
+                "occurred_at": snapshot.get("occurred_at"),
+                "visibility": snapshot.get("visibility") or "PRIVATE",
+            })
         for note in payload.get("quick_notes") or []:
             quick_notes.append({
                 "id": note.get("id") or "",
@@ -3268,7 +3282,7 @@ def export_session(session_id: str) -> dict[str, Any]:
             "categories": [
                 "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
                 "unconfirmed_candidates", "guidance", "draft_actions",
-                "source_manifest", "session_packs",
+                "source_manifest", "external_execution_audit", "session_packs",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -3286,6 +3300,10 @@ def export_session(session_id: str) -> dict[str, Any]:
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
         "draft_actions": drafts,
+        "external_execution_audit": [
+            row for row in store.select("conversation_connector_execution", order="created_at ASC")
+            if row["draft_action_id"] in {draft["id"] for draft in drafts}
+        ],
         "source_manifest": source_manifest,
         "session_packs": packs,
     }
@@ -3410,6 +3428,7 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
     transcript_days = int(policy.get("transcript_days", 30) or 0)
     guidance_days = int(policy.get("guidance_days", 30) or 0)
     draft_days = int(policy.get("draft_days", 30) or 0)
+    connector_snapshot_days = int(policy.get("connector_snapshot_days", 30) or 0)
     transcript_count = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_transcript_segment WHERE space_id = ? AND created_at <= ?",
         (space_id, _retention_cutoff(transcript_days, now_value)),
@@ -3421,9 +3440,20 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
         (space_id, _retention_cutoff(guidance_days, now_value)),
     ) or 0)
     draft_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_draft_action WHERE space_id = ? AND created_at <= ?",
+        "SELECT COUNT(*) FROM conversation_draft_action d "
+        "WHERE d.space_id = ? AND d.created_at <= ? "
+        "AND NOT EXISTS (SELECT 1 FROM conversation_connector_execution e WHERE e.draft_action_id = d.id)",
         (space_id, _retention_cutoff(draft_days, now_value)),
     ) or 0)
+    selected_snapshot_ids = set(space.get("selected_connector_snapshot_ids") or [])
+    connector_snapshot_count = sum(
+        1 for row in store.select(
+            "conversation_connector_snapshot",
+            where="space_id = ? AND created_at <= ?",
+            params=(space_id, _retention_cutoff(connector_snapshot_days, now_value)),
+        )
+        if row["id"] not in selected_snapshot_ids
+    )
     screen_count = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_screen_context WHERE space_id = ? AND created_at <= ?",
         (space_id, _retention_cutoff(transcript_days, now_value)),
@@ -3436,13 +3466,16 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
             "guidance_events": guidance_count,
             "draft_actions": draft_count,
             "screen_context_observations": screen_count,
+            "connector_snapshots": connector_snapshot_count,
         },
         "kept": {
             "confirmed_items": "KEEP",
             "session_packs": "KEEP",
             "provenance_tombstones": "KEEP",
+            "external_execution_audit": "KEEP",
+            "selected_connector_snapshots": "KEEP",
         },
-        "destructive": any((transcript_count, guidance_count, draft_count, screen_count)),
+        "destructive": any((transcript_count, guidance_count, draft_count, screen_count, connector_snapshot_count)),
     }
 
 
@@ -3452,7 +3485,7 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
         raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
     policy = preview["policy"]
     now_value = store.now()
-    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0, "screen_context_observations": 0}
+    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0, "screen_context_observations": 0, "connector_snapshots": 0}
 
     transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
     for row in store.select(
@@ -3485,7 +3518,23 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
         where="space_id = ? AND created_at <= ?",
         params=(space_id, draft_cutoff),
     ):
+        if store.scalar(
+            "SELECT COUNT(*) FROM conversation_connector_execution WHERE draft_action_id = ?",
+            (row["id"],),
+        ):
+            continue
         deleted["draft_actions"] += int(store.delete("conversation_draft_action", row["id"]))
+
+    connector_cutoff = _retention_cutoff(int(policy.get("connector_snapshot_days", 30) or 0), now_value)
+    selected_snapshot_ids = set(require_space(space_id).get("selected_connector_snapshot_ids") or [])
+    for row in store.select(
+        "conversation_connector_snapshot",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, connector_cutoff),
+    ):
+        if row["id"] in selected_snapshot_ids:
+            continue
+        deleted["connector_snapshots"] += int(store.delete("conversation_connector_snapshot", row["id"]))
     return {"space_id": space_id, "deleted": deleted, "policy": policy}
 
 
@@ -3933,6 +3982,17 @@ def export_space(space_id: str) -> dict[str, Any]:
         params=(space_id,),
         order="deleted_at ASC",
     )
+    connector_snapshots = store.select(
+        "conversation_connector_snapshot",
+        where="space_id = ?",
+        params=(space_id,),
+        order="created_at ASC",
+    )
+    draft_ids = {row["id"] for row in list_draft_actions(space_id)}
+    connector_executions = [
+        row for row in store.select("conversation_connector_execution", order="created_at ASC")
+        if row["draft_action_id"] in draft_ids
+    ]
     # Explicit categories are primary. Legacy aggregate keys stay for tooling
     # compatibility but point to the same local data, not a second truth store.
     return {
@@ -3941,7 +4001,8 @@ def export_space(space_id: str) -> dict[str, Any]:
         "export_manifest": {
             "categories": [
                 "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
-                "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
+                "guidance", "source_manifest", "connector_snapshots", "external_execution_audit",
+                "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -3957,6 +4018,8 @@ def export_space(space_id: str) -> dict[str, Any]:
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
         "source_manifest": source_manifest,
+        "connector_snapshots": connector_snapshots,
+        "external_execution_audit": connector_executions,
         "draft_actions": list_draft_actions(space_id),
         "provenance_tombstones": tombstones,
         "items": items,

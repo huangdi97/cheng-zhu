@@ -989,11 +989,22 @@ def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
             })
         else:
             missing_note_ids.append(str(note_id))
+    selected_connector_snapshots: list[dict[str, Any]] = []
+    missing_connector_snapshot_ids: list[str] = []
+    for snapshot_id in space.get("selected_connector_snapshot_ids") or []:
+        snapshot = store.get("conversation_connector_snapshot", str(snapshot_id))
+        if snapshot and snapshot.get("space_id") == space["id"]:
+            selected_connector_snapshots.append(snapshot)
+        else:
+            missing_connector_snapshot_ids.append(str(snapshot_id))
+
     return {
         "sources": selected_sources,
         "skipped_sources": skipped_sources,
         "quick_notes": selected_notes,
         "missing_quick_note_ids": missing_note_ids,
+        "connector_snapshots": selected_connector_snapshots,
+        "missing_connector_snapshot_ids": missing_connector_snapshot_ids,
     }
 
 
@@ -1045,6 +1056,7 @@ def _preflight_context_fingerprint(
             "title": space.get("title"),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "selected_connector_snapshot_ids": list(space.get("selected_connector_snapshot_ids") or []),
             "retention_policy": dict(space.get("retention_policy") or {}),
         },
         "goals": [
@@ -1070,6 +1082,19 @@ def _preflight_context_fingerprint(
         "skipped_sources": list(pack_inputs.get("skipped_sources") or []),
         "quick_notes": list(pack_inputs.get("quick_notes") or []),
         "missing_quick_note_ids": list(pack_inputs.get("missing_quick_note_ids") or []),
+        "connector_snapshots": [
+            {
+                "id": s.get("id"),
+                "connection_id": s.get("connection_id"),
+                "capability": s.get("capability"),
+                "external_kind": s.get("external_kind"),
+                "external_id": s.get("external_id"),
+                "content_hash": s.get("content_hash"),
+                "visibility": s.get("visibility"),
+            }
+            for s in pack_inputs.get("connector_snapshots") or []
+        ],
+        "missing_connector_snapshot_ids": list(pack_inputs.get("missing_connector_snapshot_ids") or []),
         "participants": participants,
         "confirmed_items": confirmed,
         "open_threads": threads,

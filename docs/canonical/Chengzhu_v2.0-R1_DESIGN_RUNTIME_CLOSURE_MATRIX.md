@@ -701,7 +701,7 @@ PR #19 之后，main 已继续补齐：
 ```text
 V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
 V2_BETA_PRERELEASE_CANDIDATE = TRUE
-V2_BETA_PRERELEASE_PUBLISHED = FALSE
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
@@ -720,12 +720,12 @@ DOWNLOADED_PACKAGED_SMOKE = PASS
 
 RELEASE_WORKFLOW_FIX_MAIN_SHA = cac605edf413ec248babf02ea9f73da708d156f8
 FINAL_PUBLISH_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
-PUBLIC_PRERELEASE_PUBLISHED = FALSE
+PUBLIC_PRERELEASE_PUBLISHED = TRUE
 ```
 
-第一次 exact-SHA publish 已经跨过 draft/download-back/installer replay，最后只在 `Publish verified GitHub Release` 的 PowerShell `$tag:` 解析处失败。PR #54 已修复并在完整 Windows Release preflight 中通过。main `cac605...` 已在修复后重新跑过全量 CI，generic publisher 也已经自动从该 exact green SHA 触发新的 Release；因此这次最终 beta.2 会重新 build / download-back / publish 自 `cac605...`，不再沿用旧 draft 的 `b0c9...` 作为最终 tag source。
+第一次 exact-SHA publish 已经跨过 draft/download-back/installer replay，最后只在 `Publish verified GitHub Release` 的 PowerShell `$tag:` 解析处失败。PR #54 已修复并在完整 Windows Release preflight 中通过。main `cac605...` 在修复后重新跑过全量 CI，generic publisher 从该 exact green SHA 触发 Release run `37871601889`。该 run 完成了重新 build、packaged evidence、clean install、draft download-back、SHA256、downloaded installer replay，并成功执行 public publish；最终 tag/source = `cac605...`。run 随后只在给本地 verification JSON 增补新字段时失败，因此 GitHub public release truth 已成立，而 post-publish verification-artifact enrichment 作为独立 release-engineering defect 后续修复。
 
-`v2.0.0-beta.2` 最终仍必须以 GitHub `prerelease=true, latest=false` 发布，且 Stable Latest 保持 v1.4.2。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
+`v2.0.0-beta.2` 已以 GitHub `prerelease=true, latest=false` 发布，Stable Latest 保持 v1.4.2；tag `v2.0.0-beta.2` 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`。因此 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 与真实用户验证仍保留独立门禁。
 
 ---
 

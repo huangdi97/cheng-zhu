@@ -1363,7 +1363,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: 'Decision Log Draft' }).click()
     await expect(page.getByText('Architecture Review · Decision Log Draft')).toBeVisible()
     await expect(page.getByText('- offline migration 采用 v2 · state=AGREED')).toBeVisible()
-    await expect(page.getByText(/不代表已发送邮件、创建 task \/ issue 或写入 decision log/)).toBeVisible()
+    await expect(page.getByText(/APPROVED 只代表你审核了本地草稿；不等于外部执行成功/)).toBeVisible()
     await page.getByRole('button', { name: '确认草稿' }).click()
     await expect(page.getByText('APPROVED')).toBeVisible()
   })

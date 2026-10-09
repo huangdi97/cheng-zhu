@@ -140,7 +140,7 @@ Write-back locality
 
 ---
 
-## 5. Zoom AI Companion：in-meeting Q&A / catch-up 已经是基础能力
+## 5. Zoom AI：in-meeting Q&A / catch-up 已经是基础能力
 
 官方页面：
 
@@ -196,7 +196,7 @@ Transcript / summary 是第二层。
 
 ## 7. 竞争矩阵
 
-| 能力 | Otter Live Assist | Teams Facilitator | Granola | Zoom AI Companion | Chengzhu v2 目标 |
+| 能力 | Otter Live Assist | Teams Facilitator | Granola | Zoom AI | Chengzhu v2 目标 |
 |---|---|---|---|---|---|
 | Transcript / notes | 强 | 强 | 强 | 强 | 基础能力 |
 | In-meeting Q&A | 有 | 有 | 有 | 有 | Manual Ask，必须 source-aware |
@@ -309,6 +309,28 @@ Preflight 需要记录用户报告的 transparency plan：
 - real cognitive load。
 
 ---
+
+## 8.6 2026-10-09 复核：竞争面没有改变 v2 核心差异
+
+本轮对官方当前页面再次核验：
+
+- Otter Live Assist 已把“会中 glanceable coaching”正式产品化，并可用 Agent Builder grounding 在 playbook / SOP / past meetings / key resources 上；
+- Microsoft Teams Facilitator 已覆盖实时 notes、key decisions/open questions、agenda tracking、topic timer 与 task/document execution；
+- Granola 继续强调 botless/local-device capture，同时把 verbal heads-up、meeting chat notice、watermark 做成独立 transparency product surface；
+- Zoom 仍提供 meeting summary / in-meeting questions / third-party-meeting assistant 等能力；自 2026-06-22 起官方已退休 “AI Companion” 品牌名，后续应使用 Zoom AI 或具体 feature 名称，避免旧品牌造成产品研究漂移。
+
+因此没有理由把 Chengzhu 扩成另一个 generic meeting copilot。冻结差异保持：
+
+```text
+personal continuity
++ provenance-aware truth
++ stakeholder-aware expression
++ right-moment arbitration
++ explicit SILENT
++ private cross-platform sidecar
+```
+
+本轮研究只支持设计方向继续成立，不支持“Chengzhu 已优于竞品”或任何真实用户效果声明。
 
 ## 9. 当前证据边界
 

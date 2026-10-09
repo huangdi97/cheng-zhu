@@ -1,0 +1,88 @@
+{
+  "spaces": 3,
+  "sessions_created": 30,
+  "sessions_survived_restart": 30,
+  "guidance_events_total": 120,
+  "transcript_segments_total": 90,
+  "reminder_counts": [
+    3,
+    3,
+    3,
+    3,
+    3
+  ],
+  "unhandled_errors": [],
+  "screen_flags": {
+    "manual_capture_available": true,
+    "auto_status_api": true,
+    "auto_stop_noop_safe": true
+  },
+  "open_threads_final": 0,
+  "rss_start_mb": 36.3,
+  "rss_end_mb": 36.8,
+  "db_start_bytes": 548864,
+  "db_end_bytes": 696320,
+  "wall_seconds": 13.8,
+  "samples": [
+    {
+      "tag": "phase1_session_10",
+      "elapsed_sec": 4.1,
+      "rss_mb": 36.3,
+      "db_bytes": 548864,
+      "sessions": 10,
+      "items": 0,
+      "guidance": 40,
+      "segments": 30
+    },
+    {
+      "tag": "phase1_session_20",
+      "elapsed_sec": 9.0,
+      "rss_mb": 36.7,
+      "db_bytes": 618496,
+      "sessions": 20,
+      "items": 0,
+      "guidance": 80,
+      "segments": 60
+    },
+    {
+      "tag": "phase1_session_30",
+      "elapsed_sec": 13.6,
+      "rss_mb": 36.8,
+      "db_bytes": 692224,
+      "sessions": 30,
+      "items": 0,
+      "guidance": 120,
+      "segments": 90
+    },
+    {
+      "tag": "phase2_reminders",
+      "elapsed_sec": 13.7,
+      "rss_mb": 36.8,
+      "db_bytes": 696320,
+      "sessions": 30,
+      "items": 0,
+      "guidance": 120,
+      "segments": 90
+    },
+    {
+      "tag": "phase3_screen_flags",
+      "elapsed_sec": 13.7,
+      "rss_mb": 36.8,
+      "db_bytes": 696320,
+      "sessions": 30,
+      "items": 0,
+      "guidance": 120,
+      "segments": 90
+    },
+    {
+      "tag": "phase4_restart",
+      "elapsed_sec": 13.8,
+      "rss_mb": 36.8,
+      "db_bytes": 696320,
+      "sessions": 30,
+      "items": 0,
+      "guidance": 120,
+      "segments": 90
+    }
+  ]
+}

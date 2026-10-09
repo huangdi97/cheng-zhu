@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.product.common import domain_errors
-from services.product import conversation_capture, conversation_screen, conversations
+from services.product import conversation_capture, conversation_integrations, conversation_screen, conversations
 
 router = APIRouter(prefix="/conversation", tags=["product-conversation"])
 
@@ -61,6 +61,7 @@ class SpaceCreate(BaseModel):
     relationship_key: str = Field(default="", max_length=200)
     selected_source_ids: list[str] = Field(default_factory=list)
     selected_quick_note_ids: list[str] = Field(default_factory=list)
+    selected_connector_snapshot_ids: list[str] = Field(default_factory=list)
 
 
 class SpacePatch(BaseModel):
@@ -73,6 +74,7 @@ class SpacePatch(BaseModel):
     relationship_key: Optional[str] = Field(default=None, max_length=200)
     selected_source_ids: Optional[list[str]] = None
     selected_quick_note_ids: Optional[list[str]] = None
+    selected_connector_snapshot_ids: Optional[list[str]] = None
     retention_policy: Optional[dict[str, Any]] = None
 
 
@@ -101,6 +103,112 @@ def search(query: str = "", item_type: str = "", limit: int = 50):
 @router.get("/diagnostics")
 def diagnostics():
     return conversations.diagnostics()
+
+
+class IntegrationConnectionCreate(BaseModel):
+    provider_id: str = Field(max_length=100)
+    display_name: str = Field(default="", max_length=200)
+    granted_capabilities: list[str] = Field(default_factory=list)
+    provider_scopes: list[str] = Field(default_factory=list)
+    credential_ref: str = Field(default="", max_length=300)
+    account_hint: str = Field(default="", max_length=300)
+
+
+class IntegrationSync(BaseModel):
+    space_id: str = Field(max_length=200)
+    capabilities: list[str] = Field(default_factory=list)
+    query: dict[str, Any] = Field(default_factory=dict)
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+class IntegrationExecutionRequest(BaseModel):
+    connection_id: str = Field(max_length=200)
+    target: str = Field(default="", max_length=1000)
+
+
+@router.get("/integrations/catalog")
+def integration_catalog():
+    return {"items": conversation_integrations.catalog()}
+
+
+@router.get("/integrations/connections")
+def integration_connections():
+    return {"items": conversation_integrations.list_connections()}
+
+
+@router.post("/integrations/connections")
+def create_integration_connection(body: IntegrationConnectionCreate):
+    with domain_errors():
+        return conversation_integrations.create_connection(**body.model_dump())
+
+
+@router.post("/integrations/connections/{connection_id}/verify")
+def verify_integration_connection(connection_id: str):
+    with domain_errors():
+        return conversation_integrations.verify_and_connect(connection_id)
+
+
+@router.post("/integrations/connections/{connection_id}/disconnect")
+def disconnect_integration_connection(connection_id: str):
+    with domain_errors():
+        return conversation_integrations.disconnect(connection_id)
+
+
+@router.post("/integrations/connections/{connection_id}/revoke")
+def revoke_integration_connection(connection_id: str):
+    with domain_errors():
+        return conversation_integrations.revoke(connection_id)
+
+
+@router.post("/integrations/connections/{connection_id}/sync")
+def sync_integration_connection(connection_id: str, body: IntegrationSync):
+    with domain_errors():
+        return conversation_integrations.sync_connection(
+            connection_id,
+            body.space_id,
+            capabilities=body.capabilities,
+            query=body.query,
+            limit=body.limit,
+        )
+
+
+@router.get("/spaces/{space_id}/connector-snapshots")
+def connector_snapshots(space_id: str, connection_id: str = "", limit: int = 200):
+    with domain_errors():
+        return {
+            "items": conversation_integrations.list_snapshots(
+                space_id,
+                connection_id=connection_id,
+                limit=limit,
+            )
+        }
+
+
+@router.post("/draft-actions/{action_id}/execution")
+def request_external_execution(action_id: str, body: IntegrationExecutionRequest):
+    with domain_errors():
+        return conversation_integrations.request_execution(
+            action_id,
+            body.connection_id,
+            target=body.target,
+        )
+
+
+@router.get("/integrations/executions")
+def integration_executions(draft_action_id: str = "", limit: int = 200):
+    with domain_errors():
+        return {
+            "items": conversation_integrations.list_executions(
+                draft_action_id=draft_action_id,
+                limit=limit,
+            )
+        }
+
+
+@router.post("/integrations/executions/{execution_id}/execute")
+def execute_integration_request(execution_id: str):
+    with domain_errors():
+        return conversation_integrations.execute_request(execution_id)
 
 
 @router.get("/demo")

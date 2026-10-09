@@ -74,7 +74,23 @@ cognitive_load_delta 建议使用 -2 到 +2：-2 明显降低，-1 略有降低�
 
 ## 11. 状态升级边界
 
-human-label report 可以支持 REAL_CONVERSATION_USER_EVIDENCE_AVAILABLE = TRUE，但不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。稳定发布仍由 packaged/release gate 决定；PMF 需要持续使用、留存、价值与愿付费等更长期证据。
+human-label report 本身只证明存在人工标签；它不能验证 reviewer 是否是真实外部用户，也不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。
+
+当有授权真实 pilot manifest 后，使用：
+
+```bash
+python scripts/v2_conversation_stable_readiness.py \
+  human-report.json \
+  real-pilot.json
+```
+
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。即使全部通过，也只允许：
+
+```text
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE
+```
+
+stable 发布仍要走独立 packaged/release/security/public-truth review；PMF 仍需要持续使用、留存、价值与愿付费等更长期证据。
 
 ## 证据来源核验边界
 

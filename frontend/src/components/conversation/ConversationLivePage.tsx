@@ -548,6 +548,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
               <div className="mt-1 grid gap-1">
                 <span>Capture · {liveContext.data.processing_runtime.data_path?.capture ?? '—'}</span>
                 <span>STT · {liveContext.data.processing_runtime.data_path?.stt ?? '—'} / {liveContext.data.processing_runtime.configured_stt_provider ?? '—'}</span>
+                <span>Connectors · {liveContext.data.connector_runtime.grants?.length ?? 0}/{liveContext.data.connector_runtime.requested?.length ?? 0} granted</span>
                 <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
                 <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
                 <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>

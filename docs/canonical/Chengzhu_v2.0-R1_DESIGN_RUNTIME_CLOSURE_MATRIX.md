@@ -533,8 +533,9 @@ reviewed output evidence
 | Conversation AUTO Screen Context | RUNTIME_AVAILABLE | policy 允许 ≠ 自动启动；Live 二次显式 start；ACTIVE/OFF THE RECORD 可见；consent/transparency user-report gate；同帧去重/限频/连续错误 fail-stop；raw image 不持久化；frozen vision route；Session/Space lifecycle 强制 stop |
 | Conversation Human Coach | RUNTIME_AVAILABLE | Conversation-specific session kind/target + frozen HUMAN_ALLOWED policy + transparency gate + per-field permissions + helper-side session scoping + Interview Resume/JD isolation + advice-only audit + lifecycle revoke；beta.2 public prerelease / real-session evidence 仍是独立发布/用户证据门禁 |
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
-| Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |
-| External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts |
+| Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；Session read permissions 只有真实 provider 精确注册后才放行，并冻结 grant/provider；write capability 不允许由 Session permission 夹带 |
+| Calendar / Mail / Docs / project tracker provider | NOT WIRED | external dependency；registry contract 已完成，但没有真实 provider/auth/runtime evidence 就不能宣称可用 |
+| External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts；未来必须 Draft → review → explicit provider/target → capability re-check → execute → audit |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
 
@@ -732,6 +733,36 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；
 - real-user validation。
+
+# 17.8 Post-beta.2 Stable Promotion Gate
+
+beta.2 之后不再用 synthetic/packaged evidence 单独推动 stable 状态。
+
+新增机器可执行产品证据门禁：
+
+- `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
+- `scripts/v2_conversation_stable_readiness.py`
+- `docs/evals/v2_conversation_real_pilot_manifest.template.json`
+- `docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md`
+
+它要求 Project Sync / Design Review 的真实 pilot floor、human-label metric sample floor 与质量阈值、授权/隐私/数据丢失 attestations。
+
+PASS 只允许：
+
+```text
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE
+```
+
+明确不允许自动升级：
+
+```text
+V2_STABLE_RELEASE = TRUE
+PMF_PROVEN = TRUE
+```
+
+stable packaged/release/security/public-truth review 仍是独立门禁。
+
+---
 
 # 18. 本 PR 的闭环定义
 

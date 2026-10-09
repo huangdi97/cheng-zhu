@@ -382,6 +382,15 @@ export interface ConversationResolvedAiBehavior {
   engine: string
 }
 
+export interface ConversationConnectorRuntime {
+  requested: string[]
+  grants: Array<{ capability: string; provider_id: string; account_label: string }>
+  blocked: Array<{ capability: string; reason: string }>
+  ok: boolean
+  providers: Array<{ provider_id: string; capabilities: string[]; health: string; account_label: string }>
+  write_execution_allowed: boolean
+}
+
 export interface ConversationSharePrivacyRuntime {
   requested: 'OFF' | 'PRIVATE_OVERLAY'
   available: boolean
@@ -403,6 +412,7 @@ export interface ConversationPreflight {
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: ConversationProcessingRuntime
   screen_runtime: ConversationScreenRuntime
+  connector_runtime: ConversationConnectorRuntime
   share_privacy_runtime: ConversationSharePrivacyRuntime
   pack_preview: {
     goal_ids: string[]
@@ -426,6 +436,7 @@ export interface ConversationPreflight {
     resolved_ai_behavior: ConversationResolvedAiBehavior
     processing_runtime: ConversationProcessingRuntime
     screen_runtime: ConversationScreenRuntime
+    connector_runtime: ConversationConnectorRuntime
     share_privacy_runtime: ConversationSharePrivacyRuntime
     policy: ConversationSessionPolicy & { capture_mode: CaptureMode; processing_mode: ProcessingMode; assistance_mode: AssistanceMode }
   }
@@ -546,6 +557,7 @@ export interface ConversationSessionContext {
   resolved_ai_behavior: ConversationResolvedAiBehavior
   processing_runtime: Partial<ConversationProcessingRuntime>
   screen_runtime: Partial<ConversationScreenRuntime>
+  connector_runtime: Partial<ConversationConnectorRuntime>
   share_privacy_runtime: Partial<ConversationSharePrivacyRuntime>
   policy: ConversationSessionPolicy
   pack_digest: string

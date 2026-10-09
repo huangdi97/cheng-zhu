@@ -146,6 +146,8 @@ Conversation Home
 - [v2 Competitive Research · 2026-10-06](docs/research/Chengzhu_v2.0_Conversation_Competitive_Research_2026-10-06.md)
 - [v2 Implementation & Rollout Master Goal](docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md)
 - [v2.0.0-beta.2 Public Prerelease Provenance](docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md)
+- [v2 Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)
+- [v2 Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)
 
 ### 当前 Live 层级
 
@@ -310,7 +312,18 @@ python scripts/v2_conversation_label_seed.py --db /path/to/product.db --out ./lo
 python scripts/v2_conversation_human_eval.py ./reviewed-labels.jsonl --out ./local-eval.json
 ```
 
-模板与说明见 [Conversation Human-label Evaluation Protocol](docs/evals/V2_CONVERSATION_HUMAN_LABEL_PROTOCOL.md)。原始标签可能含私人会议事实，请勿上传到公开仓库或 CI。缺少标签的指标保持 N/A；有人工标签也**不自动代表**真实外部用户验证、稳定发布或 PMF。
+模板与说明见 [Conversation Human-label Evaluation Protocol](docs/evals/V2_CONVERSATION_HUMAN_LABEL_PROTOCOL.md)。
+
+当 Project Sync / Design Review 已有授权真实 pilot 后，可进一步运行 stable-review evidence gate：
+
+```bash
+python scripts/v2_conversation_stable_readiness.py \
+  human-report.json \
+  real-pilot.json \
+  --out stable-readiness.json
+```
+
+该脚本 PASS 只表示 **PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW**，不会自动发布 stable，也不会把 PMF 置为 true。阈值见 [Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)。原始标签可能含私人会议事实，请勿上传到公开仓库或 CI。缺少标签的指标保持 N/A；有人工标签也**不自动代表**真实外部用户验证、稳定发布或 PMF。
 
 ## 文档
 

@@ -1,0 +1,88 @@
+{
+  "J1_session_pack_immutability": {
+    "digest_before": "14ce01d67e34d84805734f1526c8c54374ca1f2a2818a5ad008e8dcb224cf63e",
+    "digest_after": "14ce01d67e34d84805734f1526c8c54374ca1f2a2818a5ad008e8dcb224cf63e",
+    "immutable": true,
+    "frozen_goal_still": true,
+    "frozen_expression_still": true,
+    "frozen_playbook_profile": true,
+    "frozen_processing_mode": true,
+    "frozen_participants_still_1": true
+  },
+  "J2_truth_provenance_negatives": {
+    "ai_extracted_not_agreed": true,
+    "commitment_requires_owner_source_review": true,
+    "deadline_requires_source": true,
+    "ambiguous_deadlines_blocked": [
+      {
+        "original_text": "周五前完成",
+        "blocked_from_reviewed_truth": true
+      },
+      {
+        "original_text": "下周给结论",
+        "blocked_from_reviewed_truth": true
+      },
+      {
+        "original_text": "月底前上线",
+        "blocked_from_reviewed_truth": true
+      },
+      {
+        "original_text": "明天答复",
+        "blocked_from_reviewed_truth": true
+      }
+    ],
+    "supersession_keeps_old_as_superseded": true,
+    "quick_note_authority": true,
+    "transcript_observation_not_truth": true
+  },
+  "J3_open_thread_lifecycle": {
+    "ai_extracted_not_persistent": true,
+    "confirm_opens_thread": true,
+    "resolve_closes_thread": true,
+    "objection_opens_thread": true,
+    "reject_closes_thread": true,
+    "bulk_520_confirmed": true,
+    "open_thread_projection_not_truncated": true,
+    "prepare_still_lists_all_open": true,
+    "delete_session_no_phantom_thread": true,
+    "delete_tombstoned": true,
+    "open_threads_before_delete": 520,
+    "open_threads_after_delete": 0
+  },
+  "J4_conversation_state_derived_only": {
+    "state_has_phase": true,
+    "state_has_topic_speaking_audience": true,
+    "derived_views_create_no_truth": true,
+    "continue_summary_sections": [
+      "candidates",
+      "commitments",
+      "decisions",
+      "next_focus",
+      "open_questions",
+      "pins",
+      "profile_outcome",
+      "review_required",
+      "session",
+      "what_changed"
+    ]
+  },
+  "K1_manual_ask_frozen_retrieval": {
+    "authority_order": [
+      "CONFIRMED_TRUTH"
+    ],
+    "confirmed_truth_ranks_first": true,
+    "ask_10x_hits_frozen_v1": true,
+    "ask_50x_not_falsely_grounded_in_v1": true,
+    "ask_50x_results": [],
+    "token_v2_not_v3": true,
+    "token_10x_not_50x": true,
+    "token_q4_not_q3": true,
+    "token_date_exact": true
+  },
+  "P1_expression_profile_freeze": {
+    "frozen_expression_kept": true,
+    "cue_uses_frozen_style": true,
+    "cue_changes_structure_only": true,
+    "cue_text": "先给结论；用 2–3 个要点展开；控制在约 30 秒；先主张，再给一条最强证据，最后回到下一步或 Q&A；本次表达重点：conclusion first"
+  }
+}

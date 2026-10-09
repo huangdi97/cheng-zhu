@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.product.common import domain_errors
-from services.product import conversation_capture, conversation_screen, conversations
+from services.product import conversation_capture, conversation_connectors, conversation_screen, conversations
 
 router = APIRouter(prefix="/conversation", tags=["product-conversation"])
 
@@ -101,6 +101,38 @@ def search(query: str = "", item_type: str = "", limit: int = 50):
 @router.get("/diagnostics")
 def diagnostics():
     return conversations.diagnostics()
+
+
+class ConnectorConnect(BaseModel):
+    provider: str = Field(max_length=100)
+    label: str = Field(default="", max_length=200)
+    capabilities: list[str] = Field(default_factory=list)
+    scopes: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorExecute(BaseModel):
+    connector_id: str = Field(max_length=200)
+
+
+@router.get("/connectors")
+def connectors():
+    return {
+        "items": conversation_connectors.list_connectors(),
+        "providers": conversation_connectors.registered_providers(),
+    }
+
+
+@router.post("/connectors/connect")
+def connect_connector(body: ConnectorConnect):
+    with domain_errors():
+        return conversation_connectors.connect(**body.model_dump())
+
+
+@router.post("/connectors/{connector_id}/disconnect")
+def disconnect_connector(connector_id: str):
+    with domain_errors():
+        return conversation_connectors.disconnect(connector_id)
 
 
 @router.get("/demo")
@@ -529,6 +561,18 @@ class DraftActionReview(BaseModel):
 def review_draft_action(action_id: str, body: DraftActionReview):
     with domain_errors():
         return conversations.review_draft_action(action_id, body.action)
+
+
+@router.get("/draft-actions/{action_id}/executions")
+def draft_executions(action_id: str):
+    with domain_errors():
+        return {"items": conversation_connectors.list_executions(action_id)}
+
+
+@router.post("/draft-actions/{action_id}/execute")
+def execute_draft_action(action_id: str, body: ConnectorExecute):
+    with domain_errors():
+        return conversation_connectors.execute_draft_action(action_id, body.connector_id)
 
 
 class GuidanceBody(BaseModel):

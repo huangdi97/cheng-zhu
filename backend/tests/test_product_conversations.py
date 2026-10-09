@@ -3656,17 +3656,18 @@ def test_connector_retention_keeps_selected_snapshot_and_execution_audit(product
         "retention_policy": {"preset": "MINIMUM"},
     })
 
-    started = conversations.create_adhoc(title="Execution audit", profile="CLIENT_CALL")
+    session = conversations.create_session(space["id"], title="Execution audit", consent_ack=True)
+    conversations.start_session(session["id"])
     decision = conversations.add_item(
-        started["session"]["id"],
+        session["id"],
         item_type="Decision",
         title="send reviewed follow-up",
         source_refs=[{"kind": "USER_NOTE", "excerpt": "explicit"}],
         epistemic_status="OBSERVED",
     )
     conversations.review_item(decision["id"], "CONFIRM")
-    conversations.end_session(started["session"]["id"])
-    draft = conversations.followup_draft(started["session"]["id"])
+    conversations.end_session(session["id"])
+    draft = conversations.followup_draft(session["id"])
     approved = conversations.review_draft_action(draft["id"], "APPROVE")
     request = conversation_integrations.request_execution(
         approved["id"], connection["id"], target="client@example.test",
@@ -3683,8 +3684,8 @@ def test_connector_retention_keeps_selected_snapshot_and_execution_audit(product
     assert result["deleted"]["connector_snapshots"] == 1
     assert store.get("conversation_connector_snapshot", first["id"]) is not None
     assert store.get("conversation_connector_snapshot", second["id"]) is None
-    # Execution audit belongs to a different Space's draft and remains intact;
-    # ordinary retention never treats it as disposable draft telemetry.
+    # The same Space retention pass keeps the reviewed DraftAction because it
+    # has an external execution audit, and keeps that audit itself.
     assert store.get("conversation_connector_execution", request["id"]) is not None
     assert store.get("conversation_draft_action", approved["id"]) is not None
 

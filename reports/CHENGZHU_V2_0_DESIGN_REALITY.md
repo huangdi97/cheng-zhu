@@ -1,8 +1,8 @@
 # Chengzhu v2.0-R1 — Design / Runtime Reality Report
 
-> **Updated:** 2026-10-08
+> **Updated:** 2026-10-09
 >
-> **Status:** DESIGN_COMPLETE / CONTRACT_COMPLETE / CONVERSATION_BETA_RUNTIME_AVAILABLE
+> **Status:** DESIGN_COMPLETE / CONTRACT_COMPLETE / CONVERSATION_BETA_RUNTIME_AVAILABLE / BETA_2_PRERELEASE_PUBLISHED
 >
 > **Stable v2 packaged release:** NOT CLAIMED
 >
@@ -15,6 +15,9 @@ This report supersedes the original PR #17 design-stage wording that said Conver
 ```text
 stable public release:
 v1.4.2 Interview
+
+public Conversation prerelease:
+v2.0.0-beta.2 @ cac605edf413ec248babf02ea9f73da708d156f8
 
 Conversation runtime:
 merged PR #18
@@ -92,7 +95,7 @@ Current capability / fail-closed boundaries:
 - Conversation Manual Screen Context = AVAILABLE when the frozen vision route satisfies processing policy;
 - Conversation AUTO Screen Context = AVAILABLE with Live explicit-start / off-the-record / fail-stop semantics;
 - Conversation Share Privacy / PRIVATE_OVERLAY = DESKTOP RUNTIME AVAILABLE, verify-at-start with Electron content-protection proof, Live-visible, session-scoped restoration, best-effort only;
-- Conversation Human Coach = BLOCKED;
+- Conversation Human Coach = RUNTIME AVAILABLE in the beta.2 source line; session-scoped, policy/transparency gated, advice-only and non-evidence; real-session value is still unvalidated;
 - Calendar / Mail / Docs / project-tracker connectors;
 - actual external email/task/issue/decision-log execution;
 - automatic participant chat notice / watermark;
@@ -121,6 +124,9 @@ The final audit closes canonical items that were still implementable without ext
 V2_DESIGN_COMPLETE = TRUE
 V2_CONTRACT_COMPLETE = TRUE
 V2_RUNTIME_AVAILABLE = TRUE
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
+BETA_TAG = v2.0.0-beta.2
+BETA_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
 PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
 INTERVIEW_STABLE_RELEASE_BASELINE = v1.4.2
 ```

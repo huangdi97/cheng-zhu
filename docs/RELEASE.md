@@ -23,15 +23,19 @@ Rules:
 - a Beta uses the same exact-SHA, clean-install, SHA256, download-back and provenance gates as stable;
 - a public Beta proves productization engineering, not real-user value or PMF.
 
-Current channel truth for this candidate:
+Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Candidate = v2.0.0-beta.2
+Conversation Beta Published = v2.0.0-beta.2
+Beta tag/source SHA = cac605edf413ec248babf02ea9f73da708d156f8
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+Published beta.2 provenance is recorded in `docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md`.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

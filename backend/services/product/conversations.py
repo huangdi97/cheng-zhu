@@ -1397,10 +1397,13 @@ def freeze_pack(
         "space": {"id": space["id"], "profile": space["profile"], "title": space["title"]},
         "goal_ids": session.get("goal_ids") or [],
         "selected_source_ids": space.get("selected_source_ids") or [],
+        "selected_connector_snapshot_ids": space.get("selected_connector_snapshot_ids") or [],
         "sources": pack_inputs["sources"],
         "skipped_sources": pack_inputs["skipped_sources"],
         "quick_notes": pack_inputs["quick_notes"],
         "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
+        "connector_snapshots": pack_inputs["connector_snapshots"],
+        "missing_connector_snapshot_ids": pack_inputs["missing_connector_snapshot_ids"],
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
         "profile_playbook": profile_playbook(space["profile"]),
@@ -1437,8 +1440,8 @@ def freeze_pack(
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
         "screen_runtime": conversation_screen.vision_runtime_status(session),
-        "connector_runtime": conversation_connectors.resolve_read_permissions(
-            _normalize_session_policy(session.get("policy")).get("connector_permissions") or []
+        "connector_runtime": conversation_integrations.resolve_session_permissions(
+            list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
         ),
         "share_privacy_runtime": (
             dict(share_privacy_runtime)
@@ -1610,6 +1613,19 @@ def session_context(session_id: str) -> dict[str, Any]:
         {"id": note.get("id") or "", "title": note.get("title") or ""}
         for note in payload.get("quick_notes") or []
     ]
+    connector_snapshots = [
+        {
+            "id": snapshot.get("id") or "",
+            "connection_id": snapshot.get("connection_id") or "",
+            "capability": snapshot.get("capability") or "",
+            "external_kind": snapshot.get("external_kind") or "",
+            "external_id": snapshot.get("external_id") or "",
+            "title": snapshot.get("title") or "",
+            "content_hash": snapshot.get("content_hash") or "",
+            "visibility": snapshot.get("visibility") or "PRIVATE",
+        }
+        for snapshot in payload.get("connector_snapshots") or []
+    ]
     participants = []
     for p in payload.get("participants") or []:
         counterparty = p.get("counterparty_state") or {}
@@ -1636,13 +1652,14 @@ def session_context(session_id: str) -> dict[str, Any]:
         "profile_playbook": payload.get("profile_playbook") or profile_playbook((payload.get("space") or {}).get("profile") or ""),
         "sources": sources,
         "quick_notes": notes,
+        "connector_snapshots": connector_snapshots,
         "participants": participants,
         "expression_profile": payload.get("expression_profile") or {},
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
         "screen_runtime": payload.get("screen_runtime") or {},
-        "connector_runtime": payload.get("connector_runtime") or conversation_connectors.resolve_read_permissions(
-            _normalize_session_policy(session.get("policy")).get("connector_permissions") or []
+        "connector_runtime": payload.get("connector_runtime") or conversation_integrations.resolve_session_permissions(
+            list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
         ),
         "share_privacy_runtime": payload.get("share_privacy_runtime") or share_privacy_runtime_status(session),
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),

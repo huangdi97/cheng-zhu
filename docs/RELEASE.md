@@ -27,7 +27,7 @@ Current channel truth for this candidate:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Candidate = v2.0.0-beta.2
+Conversation Public Beta = v2.0.0-beta.2
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
@@ -44,7 +44,7 @@ DRAFT_ASSETS = UPLOADED
 DOWNLOAD_BACK_SHA256 = PASS
 DOWNLOADED_INSTALLER_REPLAY = PASS
 DOWNLOADED_PACKAGED_SMOKE = PASS
-PUBLICATION = PENDING
+PUBLICATION = PUBLISHED_PRERELEASE
 ```
 
 The first publish attempt failed only in the final PowerShell publish step after download-back verification. PR #54 fixed that release-engineering parser defect and merged as `cac605edf413ec248babf02ea9f73da708d156f8`. After PR #54 merged, `cac605...` itself completed the full main CI gate, and the generic publisher automatically dispatched Release run `37871601889` with `source_sha=cac605...`. That run is now the authoritative final beta.2 publish attempt; if it succeeds, tag and binaries must both resolve to `cac605...`. The earlier `b0c9...` draft remains historical verification evidence only.
@@ -223,3 +223,22 @@ Not required for unsigned Windows engineering release:
 - real multi-hour human sessions.
 
 Unsigned Windows releases must state the SmartScreen limitation.
+
+
+## v2.0.0-beta.2 published checkpoint
+
+Public release verification on 2026-10-09:
+
+```text
+tag = v2.0.0-beta.2
+source/tag SHA = cac605edf413ec248babf02ea9f73da708d156f8
+draft = false
+prerelease = true
+Stable Latest = v1.4.2
+assets = 6 uploaded
+download-back SHA256 = PASS
+downloaded installer replay = PASS
+downloaded packaged smoke = PASS
+```
+
+Release run `37871601889` successfully published the prerelease and verified channel/tag provenance, then failed only while enriching the local `download-back-verification.json` with two new PSCustomObject properties. That post-publish artifact-write defect does not negate the already-public GitHub release, but the workflow must be fixed so future successful publications also end with a green job.

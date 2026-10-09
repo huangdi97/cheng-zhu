@@ -709,18 +709,20 @@ PMF_PROVEN = FALSE
 beta.2 当前精确 provenance：
 
 ```text
-PRODUCT_SOURCE_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
-DRAFT_RELEASE_TARGET = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+INITIAL_VERIFIED_DRAFT_SOURCE_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+FINAL_PUBLISH_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
+CURRENT_RELEASE_RUN = 37871601889
 DRAFT_ASSETS_UPLOADED = TRUE
 DRAFT_DOWNLOAD_BACK_SHA256 = PASS
 DOWNLOADED_INSTALLER_REPLAY = PASS
 DOWNLOADED_PACKAGED_SMOKE = PASS
 
 RELEASE_WORKFLOW_FIX_MAIN_SHA = cac605edf413ec248babf02ea9f73da708d156f8
+FINAL_PUBLISH_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
 PUBLIC_PRERELEASE_PUBLISHED = FALSE
 ```
 
-第一次 exact-SHA publish 已经跨过 draft/download-back/installer replay，最后只在 `Publish verified GitHub Release` 的 PowerShell `$tag:` 解析处失败。PR #54 已修复并在完整 Windows Release preflight 中通过。下一次发布必须使用**最新 main 上的修复后 workflow**，但 checkout/build/tag 的 `source_sha` 仍锁 `b0c9e9bd...`；release-engineering-only commit 不得偷换产品二进制 provenance。
+第一次 exact-SHA publish 已经跨过 draft/download-back/installer replay，最后只在 `Publish verified GitHub Release` 的 PowerShell `$tag:` 解析处失败。PR #54 已修复并在完整 Windows Release preflight 中通过。main `cac605...` 已在修复后重新跑过全量 CI，generic publisher 也已经自动从该 exact green SHA 触发新的 Release；因此这次最终 beta.2 会重新 build / download-back / publish 自 `cac605...`，不再沿用旧 draft 的 `b0c9...` 作为最终 tag source。
 
 `v2.0.0-beta.2` 最终仍必须以 GitHub `prerelease=true, latest=false` 发布，且 Stable Latest 保持 v1.4.2。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
 

@@ -708,6 +708,8 @@ PMF_PROVEN = FALSE
 
 `v2.0.0-beta.2` 已通过 public prerelease 发布门禁并以 GitHub `prerelease=true` 发布；tag/source SHA 精确等于 `cac605edf413ec248babf02ea9f73da708d156f8`，Stable Latest 仍为 v1.4.2。允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
 
+Public prerelease provenance：`docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md`。
+
 ---
 
 # 17.5 Final Pure-repo Audit

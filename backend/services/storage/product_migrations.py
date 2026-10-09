@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 7
+LATEST_SCHEMA_VERSION = 8
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -630,6 +630,84 @@ _V7_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_conversation_screen_space ON conversation_screen_context(space_id, created_at)",
 )
 
+# --- v2.0 integration boundary: external snapshots + explicit execution audit ---
+# Credentials/tokens are deliberately not stored here. credential_ref is only
+# an opaque handle resolved by a provider adapter / OS secure store.
+_V8_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_connector_connection (
+        id TEXT PRIMARY KEY,
+        provider_id TEXT NOT NULL,
+        display_name TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'DISCONNECTED',
+        auth_mode TEXT NOT NULL DEFAULT 'NONE',
+        credential_ref TEXT NOT NULL DEFAULT '',
+        granted_capabilities_json TEXT NOT NULL DEFAULT '[]',
+        provider_scopes_json TEXT NOT NULL DEFAULT '[]',
+        account_hint TEXT NOT NULL DEFAULT '',
+        sync_cursor TEXT NOT NULL DEFAULT '',
+        last_sync_at REAL,
+        last_error TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_connector_snapshot (
+        id TEXT PRIMARY KEY,
+        connection_id TEXT NOT NULL REFERENCES conversation_connector_connection(id) ON DELETE CASCADE,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        capability TEXT NOT NULL,
+        external_kind TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        excerpt TEXT NOT NULL DEFAULT '',
+        content_hash TEXT NOT NULL,
+        source_url TEXT NOT NULL DEFAULT '',
+        occurred_at REAL,
+        visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at REAL NOT NULL,
+        UNIQUE(connection_id, capability, external_kind, external_id, content_hash)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS conversation_connector_execution (
+        id TEXT PRIMARY KEY,
+        draft_action_id TEXT NOT NULL REFERENCES conversation_draft_action(id) ON DELETE CASCADE,
+        connection_id TEXT NOT NULL REFERENCES conversation_connector_connection(id) ON DELETE RESTRICT,
+        capability TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        target TEXT NOT NULL DEFAULT '',
+        idempotency_key TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        request_json TEXT NOT NULL DEFAULT '{}',
+        response_json TEXT NOT NULL DEFAULT '{}',
+        error TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL,
+        executed_at REAL
+    )
+    """,
+)
+
+_V8_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_connector_provider ON conversation_connector_connection(provider_id, status, updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_connector_snapshot_space ON conversation_connector_snapshot(space_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_connector_snapshot_connection ON conversation_connector_snapshot(connection_id, occurred_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_connector_execution_draft ON conversation_connector_execution(draft_action_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_connector_execution_status ON conversation_connector_execution(status, updated_at)",
+)
+
+
+def _apply_v8(conn: sqlite3.Connection) -> None:
+    _apply_statements(conn, _V8_TABLES + _V8_INDEXES)
+    space_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_space)").fetchall()}
+    if "selected_connector_snapshot_ids_json" not in space_cols:
+        conn.execute(
+            "ALTER TABLE conversation_space ADD COLUMN selected_connector_snapshot_ids_json TEXT NOT NULL DEFAULT '[]'"
+        )
+
 
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
@@ -644,6 +722,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     5: (_apply_v5, "v2.0 explicit session policy and counterparty state"),
     6: (_apply_v6, "v2.0 temporal provenance for conversation items"),
     7: (lambda conn: _apply_statements(conn, _V7_TABLES + _V7_INDEXES), "v2.0 manual Conversation screen context observations"),
+    8: (_apply_v8, "v2.0 external connector snapshots and reviewed execution audit"),
 }
 
 

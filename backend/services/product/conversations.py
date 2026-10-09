@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
-from services.product import conversation_screen, materials
+from services.product import conversation_connectors, conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -1106,12 +1106,27 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
-    connector_ok = not bool(policy.get("connector_permissions"))
+    connector_permissions = list(policy.get("connector_permissions") or [])
+    try:
+        connector_runtime = conversation_connectors.capability_status(connector_permissions)
+    except ValueError as exc:
+        connector_runtime = {
+            "requested": connector_permissions,
+            "resolved": {},
+            "missing": connector_permissions,
+            "ok": False,
+            "error": str(exc),
+        }
+    connector_ok = bool(connector_runtime.get("ok", False))
     if not connector_ok:
         blockers.append({
             "key": "connector_runtime",
             "label": "连接器权限",
-            "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
+            "message": (
+                str(connector_runtime.get("error") or "")
+                or "以下 connector capability 尚无真实已连接 runtime："
+                + ", ".join(connector_runtime.get("missing") or [])
+            ),
         })
 
     share_privacy_runtime = share_privacy_runtime_status(session)
@@ -1217,7 +1232,11 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": f"{ready_source_count}/{selected_source_count} Ready", "ok": ready_source_count == selected_source_count},
         {"key": "quick_notes", "label": "Quick Notes", "value": f"{ready_note_count}/{selected_note_count} available", "ok": ready_note_count == selected_note_count},
-        {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
+        {"key": "connectors", "label": "连接器权限", "value": (
+            "0"
+            if not connector_permissions
+            else f"{len(connector_runtime.get('resolved') or {})}/{len(connector_permissions)} available"
+        ), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
         {"key": "screen", "label": "屏幕上下文", "value": (
@@ -1252,6 +1271,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
         "share_privacy_runtime": share_privacy_runtime,
+        "connector_runtime": connector_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
@@ -1284,6 +1304,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "processing_runtime": processing_runtime,
             "screen_runtime": screen_runtime,
             "share_privacy_runtime": share_privacy_runtime,
+            "connector_runtime": connector_runtime,
             "policy": {
                 **policy,
                 "capture_mode": session["capture_mode"],
@@ -1319,6 +1340,19 @@ def freeze_pack(
     participants = store.select("conversation_participant", where="space_id = ?", params=(space["id"],), order="created_at ASC")
     prepared = prepare_space(space["id"])
     frozen_goals = _goals_for_session(session)
+    policy = _normalize_session_policy(session.get("policy"))
+    connector_permissions = list(policy.get("connector_permissions") or [])
+    connector_context = conversation_connectors.collect_read_context(
+        connector_permissions,
+        query={
+            "space_id": space["id"],
+            "space_title": space.get("title") or "",
+            "profile": space.get("profile") or "",
+            "session_id": session_id,
+            "session_title": session.get("title") or "",
+            "goal": frozen_goals[0]["title"] if frozen_goals else "",
+        },
+    ) if any(cap in conversation_connectors.READ_CAPABILITIES for cap in connector_permissions) else []
 
     payload = {
         "contract": "v2.0-R1",
@@ -1362,7 +1396,9 @@ def freeze_pack(
             "contribution_candidates": list(prepared.get("contribution_candidates") or []),
         },
         "expression_profile": _expression_profile(),
-        "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
+        "connector_context": connector_context,
+        "connector_runtime": conversation_connectors.capability_status(connector_permissions),
+        "resolved_ai_behavior": resolved_ai_behavior(policy),
         "processing_runtime": processing_runtime_status(session),
         "screen_runtime": conversation_screen.vision_runtime_status(session),
         "share_privacy_runtime": (
@@ -1371,7 +1407,7 @@ def freeze_pack(
             else share_privacy_runtime_status(session)
         ),
         "policy": {
-            **_normalize_session_policy(session.get("policy")),
+            **policy,
             "capture_mode": session["capture_mode"],
             "processing_mode": session["processing_mode"],
             "assistance_mode": session["assistance_mode"],

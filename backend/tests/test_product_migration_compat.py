@@ -186,11 +186,11 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
     product_store.init_db()
     goal_id = goals.create_goal("MindRank", "AIDD Agent Engineer")["id"]
     assert goal_id
-    assert product_store.schema_version() == 7
+    assert product_store.schema_version() == 8
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 8)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 9)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -208,7 +208,7 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
 
 
 
-def test_v7_screen_context_migration_preserves_v6_temporal_provenance():
+def test_v8_integration_migration_preserves_v6_and_v7_runtime_schema():
     from services.storage import product_migrations
 
     conn = sqlite3.connect(":memory:")
@@ -226,19 +226,24 @@ def test_v7_screen_context_migration_preserves_v6_temporal_provenance():
 
         before = product_migrations.ensure_schema(conn)
         assert before == 6
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
 
         item_cols_after = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         tables_after = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "time_semantics_json" in item_cols_after
         assert "conversation_screen_context" in tables_after
+        assert "conversation_connector_connection" in tables_after
+        assert "conversation_connector_snapshot" in tables_after
+        assert "conversation_connector_execution" in tables_after
+        space_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_space)")}
+        assert "selected_connector_snapshot_ids_json" in space_cols
 
         indexes = {row[1] for row in conn.execute("PRAGMA index_list(conversation_screen_context)")}
         assert "idx_conversation_screen_session" in indexes
         assert "idx_conversation_screen_space" in indexes
 
-        # Idempotent at v7: no duplicate schema work and no regression of v6.
-        assert product_migrations.ensure_schema(conn) == 7
+        # Idempotent at v8: no duplicate schema work and no regression of v6/v7.
+        assert product_migrations.ensure_schema(conn) == 8
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
     finally:
         conn.close()
@@ -250,7 +255,7 @@ def test_deleting_product_db_is_a_complete_rollback(v122_env):
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 7
+    assert product_store.schema_version() == 8
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

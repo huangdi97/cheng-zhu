@@ -573,7 +573,7 @@ def list_executions(*, draft_action_id: str = "", limit: int = 200) -> list[dict
     return store.select(
         "conversation_connector_execution",
         order="created_at DESC",
-        limit=max(1, min(int(limit), 1000),
+        limit=max(1, min(int(limit), 1000)),
     )
 
 

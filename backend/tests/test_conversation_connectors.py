@@ -172,6 +172,45 @@ def test_connector_resolution_change_after_preflight_requires_recheck(product_en
         conversations.start_session(session["id"])
 
 
+
+
+def test_session_and_space_exports_only_include_referenced_connector_metadata(product_env):
+    fake = FakeAdapter()
+    conversation_connectors.register_adapter(fake)
+    referenced = conversation_connectors.connect(
+        fake.provider,
+        label="Referenced",
+        capabilities=["calendar.read"],
+        connector_id="ccn-referenced",
+        metadata={"account_hint": "referenced@example.invalid"},
+    )
+
+    space = conversations.create_space("Scoped Export", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"connector_permissions": ["calendar.read"]},
+    )
+    conversations.start_session(session["id"])
+
+    # Created after Pack freeze; this account belongs to the same device but
+    # was never referenced by this Session/Space.
+    conversation_connectors.connect(
+        fake.provider,
+        label="Unrelated",
+        capabilities=["calendar.read"],
+        connector_id="ccn-unrelated",
+        metadata={"account_hint": "unrelated@example.invalid"},
+    )
+
+    session_export = conversations.export_session(session["id"])
+    assert [row["id"] for row in session_export["connector_metadata"]] == [referenced["id"]]
+
+    space_export = conversations.export_space(space["id"])
+    assert [row["id"] for row in space_export["connector_metadata"]] == [referenced["id"]]
+    assert "unrelated@example.invalid" not in repr(space_export)
+
+
 def test_preflight_fails_closed_for_missing_or_unsupported_connector_capability(product_env):
     fake = FakeAdapter()
     conversation_connectors.register_adapter(fake)

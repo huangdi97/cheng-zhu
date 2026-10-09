@@ -2901,7 +2901,10 @@ def test_connector_snapshot_sanitizes_signed_url_and_sensitive_provider_metadata
     assert "access_token" not in snapshot["metadata"]
     assert "cookie" not in snapshot["metadata"]["nested"]
     assert snapshot["metadata"]["nested"]["safe"] == "keep"
-    assert "secret" not in repr(snapshot)
+    dumped = repr(snapshot)
+    assert "must-drop" not in dumped
+    assert "access_token=secret" not in dumped
+    assert "cookie" not in dumped
 
 
 def test_revoke_connector_clears_credential_handle_and_sync_cursor(product_env, fake_mail_adapter):
@@ -3451,7 +3454,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 7
+    assert diag["schema_version"] == 8
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

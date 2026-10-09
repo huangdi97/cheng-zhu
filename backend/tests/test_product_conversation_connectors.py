@@ -74,3 +74,15 @@ def test_connector_diagnostics_never_contains_secrets():
     assert diag["providers"][0]["account_label"] == "Personal Calendar"
     assert "token" not in str(diag).lower()
     assert "secret" not in str(diag).lower()
+
+
+def test_connector_resolution_deduplicates_permissions_and_ignores_unrelated_providers():
+    conversation_connectors.register_provider("calendar", ["calendar.read"])
+    conversation_connectors.register_provider("docs", ["docs.read"])
+    resolved = conversation_connectors.resolve_read_permissions([
+        "calendar.read",
+        "calendar.read",
+    ])
+    assert resolved["requested"] == ["calendar.read"]
+    assert [x["provider_id"] for x in resolved["grants"]] == ["calendar"]
+    assert [x["provider_id"] for x in resolved["providers"]] == ["calendar"]

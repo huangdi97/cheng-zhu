@@ -106,6 +106,8 @@ Session 开始时冻结的不是“一个 prompt”，而是可审计输入快�
 - retention policy；
 - resolved processing runtime / data path；
 - Prepare session brief；
+- selected immutable connector snapshots（用户显式选入时）；
+- exact connector grants / provider / connection ids（Session 请求 read capability 时）；
 - digest。
 
 已证明的时间一致性：
@@ -217,6 +219,7 @@ Manual Ask 的来源排序：
 ```text
 confirmed cross-session state
 > frozen Ready source version
+> frozen connector snapshot（REFERENCE_SOURCE）
 > frozen Quick Note
 > current-session transcript
 ```
@@ -458,7 +461,18 @@ APPROVED
 != decision log written
 ```
 
-真正 connector execution 尚未接线，不能伪装完成。
+PR #61 引入 reviewed two-step external execution boundary：
+
+```text
+APPROVED DraftAction
+→ 选择 exact CONNECTED account
+→ 创建 Execution Request
+→ 第二次显式 Execute
+→ provider result
+→ SUCCEEDED / FAILED / BLOCKED audit
+```
+
+这只表示**执行边界已实现**。默认仍无真实 provider/account；没有 adapter + credential + exact capability 时无法产生 SUCCEEDED。
 
 ---
 
@@ -533,9 +547,11 @@ reviewed output evidence
 | Conversation AUTO Screen Context | RUNTIME_AVAILABLE | policy 允许 ≠ 自动启动；Live 二次显式 start；ACTIVE/OFF THE RECORD 可见；consent/transparency user-report gate；同帧去重/限频/连续错误 fail-stop；raw image 不持久化；frozen vision route；Session/Space lifecycle 强制 stop |
 | Conversation Human Coach | RUNTIME_AVAILABLE | Conversation-specific session kind/target + frozen HUMAN_ALLOWED policy + transparency gate + per-field permissions + helper-side session scoping + Interview Resume/JD isolation + advice-only audit + lifecycle revoke；beta.2 public prerelease / real-session evidence 仍是独立发布/用户证据门禁 |
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
-| Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；Session read permissions 只有真实 provider 精确注册后才放行，并冻结 grant/provider；write capability 不允许由 Session permission 夹带 |
-| Calendar / Mail / Docs / project tracker provider | NOT WIRED | external dependency；registry contract 已完成，但没有真实 provider/auth/runtime evidence 就不能宣称可用 |
-| External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts；未来必须 Draft → review → explicit provider/target → capability re-check → execute → audit |
+| Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；只回答 capability truth |
+| External Integration Boundary | PR #61 CANDIDATE | schema v8：opaque credential ref、CONNECTED account、immutable snapshot、exact grant、retention/export、Execution Request / audit；默认无 adapter |
+| Calendar / Mail / Docs / project tracker provider | NOT CONFIGURED | external dependency；catalog/contract 已定义，但没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
+| External task/email/issue write-back execution boundary | PR #61 CANDIDATE | reviewed Draft → exact account → Execution Request → second Execute → provider result；没有真实 adapter/account 时保持 fail-closed |
+| Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
 
@@ -577,6 +593,8 @@ derived state view
 - draft approval；
 - latency / recovery；
 - export/delete integrity；
+- connector snapshot immutability / Pack freeze；
+- execution idempotency / failure audit / secret-safe export；
 - Pack immutability；
 - provenance/tombstone integrity。
 
@@ -726,10 +744,10 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- Calendar / Mail / Docs / project tracker connector；
+- real Google / Microsoft / GitHub / MCP adapter + account authorization；
 - OS notification/discovery；
 - Human Coach real-session evidence；
-- actual external write-back execution；
+- real external action evidence（边界/runtime 可在 repo 内实现；provider success 必须来自真实 adapter/account）；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；
 - real-user validation。

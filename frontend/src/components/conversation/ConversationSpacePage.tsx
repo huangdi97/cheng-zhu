@@ -574,8 +574,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3 sm:col-span-2">
                 <div className="text-xs font-semibold text-text-secondary">Connector permissions</div>
                 <p className="mt-1 text-[11px] text-text-muted">这里只能选择后端真实注册且已连接的 capability。勾选会冻结进本场；没有真实 adapter 时不会显示“可连接”的假选项。</p>
-                {connectors.loading ? <div className="mt-2"><Loading /></div> : connectors.data?.items.some((item) => item.available) ? <div className="mt-2 flex flex-wrap gap-2">
-                  {Array.from(new Set(connectors.data.items.filter((item) => item.available).flatMap((item) => item.capabilities))).map((cap) => {
+                {connectors.loading ? <div className="mt-2"><Loading /></div> : connectors.data?.items?.some((item) => item.available) ? <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from(new Set((connectors.data.items ?? []).filter((item) => item.available).flatMap((item) => item.capabilities))).map((cap) => {
                     const checked = connectorPermissions.includes(cap)
                     return <label key={cap} className="inline-flex items-center gap-1.5 rounded-lg border border-bg-tertiary px-2.5 py-1.5 text-[11px] text-text-secondary">
                       <input type="checkbox" checked={checked} onChange={() => setConnectorPermissions((current) => checked ? current.filter((x) => x !== cap) : [...current, cap])} />
@@ -691,7 +691,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               {draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}
               {draft.status === 'APPROVED' ? (() => {
                 const capability = draft.kind === 'FOLLOWUP_EMAIL_DRAFT' ? 'mail.send' : draft.kind === 'CREATE_TASK_DRAFT' ? 'task.create' : draft.kind === 'CREATE_ISSUE_DRAFT' ? 'issue.create' : 'decision_log.write'
-                const targets = connectors.data?.items.filter((item) => item.available && item.capabilities.includes(capability)) ?? []
+                const targets = connectors.data?.items?.filter((item) => item.available && item.capabilities.includes(capability)) ?? []
                 return <div className="mt-3">
                   <div className="text-[11px] font-semibold text-text-secondary">External execution · {capability}</div>
                   {targets.length ? <div className="mt-2 flex flex-wrap gap-2">{targets.map((item) => <SecondaryButton key={item.id} disabled={sessionBusy} onClick={() => executeDraft(item.id)}>执行到 {item.label || item.provider}</SecondaryButton>)}</div> : <p className="mt-1 text-[11px] text-text-muted">没有已连接且获得该 capability 的 provider；草稿会继续保留在本地。</p>}

@@ -135,8 +135,8 @@ Conversation Home
 - Conversation `PRIVATE_OVERLAY` 已有桌面 runtime：Start 时验证 Electron content protection，Live 可见，End 恢复会话前默认；Web fallback fail-closed；best-effort only，不承诺“不可检测”；
 - Conversation Human Coach 已有真实 runtime：仅在 frozen policy = `HUMAN_ALLOWED` 且记录 transparency plan 时允许；Live 中显式生成一次性、session-scoped 教练链接，逐项授权 transcript / AI Guidance / frozen Session Context；helper 不读取 Interview Resume/JD；建议标记为 `HUMAN_COACH` 且 `is_evidence=false`，Session 结束/删除自动 revoke；runtime 可用且已进入 beta.2 public prerelease，仍不等于 stable v2 或真实用户验证；
 - beta.2 public prerelease 已包含 frozen Profile Playbooks、auditable Expression Plan、explicit-start AUTO Screen Context、verified desktop Share Privacy 与 Conversation Human Coach；release tag 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`，且 Stable Latest 仍为 v1.4.2；
-- Calendar / Docs / Mail / project tracker connector runtime；
-- actual external email/task/issue write-back；
+- schema v8 Integration Boundary 已实现：provider catalog、least-privilege scope、opaque credential ref、connector snapshot provenance、显式 Pack selection、reviewed execution request、idempotency / failure audit；但默认不携带 Google / Microsoft / GitHub / MCP concrete adapter 或 OAuth provisioning；
+- actual external email/task/issue/decision-log provider success 仍取决于未来真实 adapter；`APPROVED` 本地草稿或 `PENDING/BLOCKED` execution request 都不等于外部动作成功；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 
@@ -146,6 +146,7 @@ Conversation Home
 - [v2 Competitive Research · 2026-10-06](docs/research/Chengzhu_v2.0_Conversation_Competitive_Research_2026-10-06.md)
 - [v2 Implementation & Rollout Master Goal](docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md)
 - [v2.0.0-beta.2 Public Prerelease Provenance](docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md)
+- [Conversation Integration Boundary](docs/architecture/CONVERSATION_INTEGRATION_BOUNDARY.md)
 
 ### 当前 Live 层级
 

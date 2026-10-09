@@ -145,6 +145,7 @@ Conversation Home
 研究与完整边界：
 - [v2 Competitive Research · 2026-10-06](docs/research/Chengzhu_v2.0_Conversation_Competitive_Research_2026-10-06.md)
 - [v2 Implementation & Rollout Master Goal](docs/canonical/Chengzhu_v2.0-R1_IMPLEMENTATION_MASTER_GOAL.md)
+- [v2.0.0-beta.2 Public Prerelease Provenance](docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md)
 
 ### 当前 Live 层级
 

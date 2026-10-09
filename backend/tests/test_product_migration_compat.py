@@ -190,7 +190,7 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 8)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 9)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -224,9 +224,10 @@ def test_v7_screen_context_migration_preserves_v6_temporal_provenance():
         assert "time_semantics_json" in item_cols_before
         assert "conversation_screen_context" not in tables_before
 
-        before = product_migrations.ensure_schema(conn)
-        assert before == 6
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        apply_v7, _name = product_migrations._MIGRATIONS[7]
+        apply_v7(conn)
+        conn.execute("PRAGMA user_version = 7")
+        conn.commit()
 
         item_cols_after = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         tables_after = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -237,9 +238,39 @@ def test_v7_screen_context_migration_preserves_v6_temporal_provenance():
         assert "idx_conversation_screen_session" in indexes
         assert "idx_conversation_screen_space" in indexes
 
-        # Idempotent at v7: no duplicate schema work and no regression of v6.
-        assert product_migrations.ensure_schema(conn) == 8
+        before = product_migrations.ensure_schema(conn)
+        assert before == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
+    finally:
+        conn.close()
+
+
+def test_v8_connector_migration_preserves_v7_screen_context():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 8):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        before_tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "conversation_screen_context" in before_tables
+        assert "conversation_connector" not in before_tables
+        assert "conversation_external_execution" not in before_tables
+
+        before = product_migrations.ensure_schema(conn)
+        assert before == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
+
+        after_tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "conversation_screen_context" in after_tables
+        assert "conversation_connector" in after_tables
+        assert "conversation_external_execution" in after_tables
+        assert product_migrations.ensure_schema(conn) == 8
     finally:
         conn.close()
 

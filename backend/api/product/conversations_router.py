@@ -92,6 +92,12 @@ def history(limit: int = 100):
         return {"items": conversations.conversation_history(limit)}
 
 
+@router.get("/reminders")
+def reminders(horizon_days: int = 30, limit: int = 100):
+    with domain_errors():
+        return {"items": conversations.upcoming_reminders(horizon_days=horizon_days, limit=limit)}
+
+
 @router.get("/search")
 def search(query: str = "", item_type: str = "", limit: int = 50):
     with domain_errors():

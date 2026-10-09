@@ -162,6 +162,37 @@ def _capabilities(values: list[str] | tuple[str, ...] | set[str]) -> list[str]:
     return result
 
 
+def _expected_provider_scopes(provider: str, granted: set[str]) -> list[str]:
+    scope_map = dict(PROVIDER_CATALOG[provider].get("provider_scopes") or {})
+    expected = {
+        str(scope_map.get(capability) or "").strip()
+        for capability in granted
+        if str(scope_map.get(capability) or "").strip()
+    }
+    return sorted(expected)
+
+
+def _validated_provider_scopes(
+    provider: str,
+    granted: set[str],
+    supplied: Optional[list[str]],
+) -> list[str]:
+    expected = _expected_provider_scopes(provider, granted)
+    actual = sorted({str(value or "").strip() for value in (supplied or []) if str(value or "").strip()})
+    if not actual:
+        return expected
+    if provider == "MCP" and expected == ["server-defined"]:
+        if actual != ["server-defined"]:
+            raise ValueError("MCP provider scope 由 server 定义；Chengzhu 只记录 server-defined，不接受伪造 scope")
+        return actual
+    if actual != expected:
+        raise ValueError(
+            "provider_scopes 必须与 granted capabilities 的最小权限集合完全一致；"
+            f" expected={expected}, got={actual}"
+        )
+    return actual
+
+
 def _validate_credential_ref(value: str) -> str:
     value = str(value or "").strip()
     if not value:
@@ -291,6 +322,7 @@ def create_connection(
             "Provider 不支持 capability: " + ", ".join(sorted(granted - supported))
         )
     credential_ref = _validate_credential_ref(credential_ref)
+    validated_scopes = _validated_provider_scopes(provider, granted, provider_scopes)
     ts = store.now()
     row = {
         "id": store.new_id("ccn_"),
@@ -300,7 +332,7 @@ def create_connection(
         "auth_mode": "OPAQUE_REFERENCE" if credential_ref else "NONE",
         "credential_ref": credential_ref,
         "granted_capabilities": sorted(granted),
-        "provider_scopes": sorted({str(x).strip() for x in (provider_scopes or []) if str(x).strip()}),
+        "provider_scopes": validated_scopes,
         "account_hint": str(account_hint or "")[:300],
         "sync_cursor": "",
         "last_sync_at": None,
@@ -338,8 +370,12 @@ def verify_and_connect(connection_id: str) -> dict[str, Any]:
         raise ValueError("Connector adapter 未接线，不能标记 CONNECTED")
     if not row.get("credential_ref"):
         raise ValueError("缺少 opaque credential_ref，不能标记 CONNECTED")
-    if not set(row.get("granted_capabilities") or []) <= set(getattr(adapter, "capabilities", set()) or set()):
+    granted = set(row.get("granted_capabilities") or [])
+    if not granted <= set(getattr(adapter, "capabilities", set()) or set()):
         raise ValueError("Adapter 不满足 connection 已授权 capability")
+    expected_scopes = _expected_provider_scopes(provider, granted)
+    if sorted(row.get("provider_scopes") or []) != expected_scopes:
+        raise ValueError("Connection provider scope 与最小 capability grant 不一致，拒绝 CONNECTED")
     health = _sanitize(dict(adapter.health(row) or {}))
     if not bool(health.get("ok", False)):
         store.update("conversation_connector_connection", connection_id, {

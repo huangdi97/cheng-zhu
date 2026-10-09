@@ -157,6 +157,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   if (detail.loading) return <Page><Loading /></Page>
   if (detail.error || !detail.data) return <Page><ErrorState message={detail.error ?? '对话空间不存在'} onRetry={detail.reload} /></Page>
   const space = detail.data
+  const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
+  const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
+    (connection) => connection.status === 'CONNECTED'
+      && connection.adapter_available
+      && connection.granted_capabilities.includes(draftCapability),
+  )
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -418,14 +424,20 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
 
   const makeFollowupDraft = async (targetSessionId: string) => {
     setSessionBusy(true); setSessionError('')
-    try { setDraft(await conversationApi.followupDraft(targetSessionId)) }
+    try {
+      const nextDraft = await conversationApi.followupDraft(targetSessionId)
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId('')
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
 
   const makeDerivedDraft = async (targetSessionId: string, kind: 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT') => {
     setSessionBusy(true); setSessionError('')
-    try { setDraft(await conversationApi.derivedDraft(targetSessionId, kind)) }
+    try {
+      const nextDraft = await conversationApi.derivedDraft(targetSessionId, kind)
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId('')
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
@@ -433,7 +445,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const reviewDraft = async (action: 'APPROVE' | 'DISMISS') => {
     if (!draft) return
     setSessionBusy(true); setSessionError('')
-    try { setDraft(await conversationApi.reviewDraftAction(draft.id, action)) }
+    try {
+      setDraft(await conversationApi.reviewDraftAction(draft.id, action))
+      setExecution(null); setExecutionConnectionId('')
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
@@ -796,7 +811,28 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.decisions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'UPDATE_DECISION_LOG_DRAFT')}>Decision Log Draft</SecondaryButton>
             </div>
             {continueData.session.policy?.external_writeback === 'OFF' ? <p className="mt-2 text-[11px] text-text-muted">本场 External Write-back = OFF，因此不会生成 follow-up / task / issue 草稿。</p> : null}
-            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件、创建 task / issue 或写入 decision log。真正的 connector execution 尚未接线。</p></div> : null}
+            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3" data-testid="conversation-draft-action">
+              <div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span><span className="text-[10px] text-text-muted">{DRAFT_EXECUTION_CAPABILITY[draft.kind]}</span></div>
+              <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>
+              {draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}
+              {draft.status === 'APPROVED' ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/30 p-3">
+                <div className="text-xs font-semibold text-text-secondary">External Execution · 第二次显式动作</div>
+                <p className="mt-1 text-[11px] text-text-muted">APPROVED 只代表本地草稿已审核。下面先创建 Execution Request；只有随后再次点击执行且 provider 返回成功，才可显示 SUCCEEDED。</p>
+                {compatibleExecutionConnections.length ? <>
+                  <select className={inputCls + ' mt-2'} aria-label="外部执行连接" value={executionConnectionId} onChange={(e) => { setExecutionConnectionId(e.target.value); setExecution(null) }}>
+                    <option value="">选择兼容的真实连接</option>
+                    {compatibleExecutionConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.display_name} · {connection.provider_id} · {connection.account_hint || connection.id.slice(0, 8)}</option>)}
+                  </select>
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : execution.status === 'FAILED' || execution.status === 'BLOCKED' ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
+                    {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
+                    {['PENDING', 'FAILED'].includes(execution.status) ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>执行外部动作</PrimaryButton></div> : null}
+                    {execution.status === 'SUCCEEDED' ? <div className="mt-2"><div className="text-[11px] font-semibold text-status-direct">Provider 已返回成功；这条 execution audit 会保留。</div>{Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}</div> : null}
+                  </div>}
+                </> : <p className="mt-2 text-[11px] text-status-inferred">当前没有同时满足 adapter available + CONNECTED + {draftCapability} grant 的账户。本地 APPROVED 草稿会保留，但不会伪装成已发送/已创建。</p>}
+              </div> : null}
+              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。只有第二次 Execute 后 provider 明确返回成功才是 SUCCEEDED。</p>
+            </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

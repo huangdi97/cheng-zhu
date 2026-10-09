@@ -3260,10 +3260,17 @@ def export_session(session_id: str) -> dict[str, Any]:
         if item["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
     ]
     candidates = [item for item in items if item["review_status"] == "AI_EXTRACTED"]
+    connector_ids = {str(row.get("connector_id") or "") for row in executions if row.get("connector_id")}
     source_manifest: list[dict[str, Any]] = []
     quick_notes: list[dict[str, Any]] = []
     for pack in packs:
         payload = dict(pack.get("payload") or {})
+        connector_ids.update(str(x) for x in (payload.get("connector_runtime") or {}).get("resolved", {}).values() if str(x))
+        connector_ids.update(
+            str(item.get("connector_id") or "")
+            for item in payload.get("connector_context") or []
+            if item.get("connector_id")
+        )
         for source in payload.get("sources") or []:
             source_manifest.append({
                 "material_id": source.get("material_id") or "",
@@ -3289,7 +3296,7 @@ def export_session(session_id: str) -> dict[str, Any]:
             "categories": [
                 "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
                 "unconfirmed_candidates", "guidance", "draft_actions", "external_executions",
-                "source_manifest", "session_packs",
+                "connector_metadata", "source_manifest", "session_packs",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -3308,6 +3315,10 @@ def export_session(session_id: str) -> dict[str, Any]:
         "guidance": guidance,
         "draft_actions": drafts,
         "external_executions": executions,
+        "connector_metadata": [
+            row for connector_id in sorted(connector_ids)
+            if (row := store.get("conversation_connector", connector_id)) is not None
+        ],
         "source_manifest": source_manifest,
         "session_packs": packs,
     }
@@ -3972,6 +3983,28 @@ def export_space(space_id: str) -> dict[str, Any]:
         params=(space_id,),
         order="deleted_at ASC",
     )
+    space_packs = store.select(
+        "conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"
+    )
+    space_executions = store.rows(
+        "SELECT e.* FROM conversation_external_execution e "
+        "JOIN conversation_draft_action d ON d.id = e.draft_action_id "
+        "WHERE d.space_id = ? ORDER BY e.created_at ASC",
+        (space_id,),
+    )
+    space_connector_ids = {
+        str(row.get("connector_id") or "") for row in space_executions if row.get("connector_id")
+    }
+    for pack in space_packs:
+        payload = dict(pack.get("payload") or {})
+        space_connector_ids.update(
+            str(x) for x in (payload.get("connector_runtime") or {}).get("resolved", {}).values() if str(x)
+        )
+        space_connector_ids.update(
+            str(item.get("connector_id") or "")
+            for item in payload.get("connector_context") or []
+            if item.get("connector_id")
+        )
     # Explicit categories are primary. Legacy aggregate keys stay for tooling
     # compatibility but point to the same local data, not a second truth store.
     return {
@@ -3998,17 +4031,15 @@ def export_space(space_id: str) -> dict[str, Any]:
         "guidance": guidance,
         "source_manifest": source_manifest,
         "draft_actions": list_draft_actions(space_id),
-        "external_executions": store.rows(
-            "SELECT e.* FROM conversation_external_execution e "
-            "JOIN conversation_draft_action d ON d.id = e.draft_action_id "
-            "WHERE d.space_id = ? ORDER BY e.created_at ASC",
-            (space_id,),
-        ),
-        "connector_metadata": conversation_connectors.list_connectors(),
+        "external_executions": space_executions,
+        "connector_metadata": [
+            row for connector_id in sorted(space_connector_ids)
+            if (row := store.get("conversation_connector", connector_id)) is not None
+        ],
         "provenance_tombstones": tombstones,
         "items": items,
         "open_threads": detail["threads"],
         "threads": detail["threads"],  # compatibility alias
-        "session_packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
-        "packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
+        "session_packs": space_packs,
+        "packs": space_packs,
     }

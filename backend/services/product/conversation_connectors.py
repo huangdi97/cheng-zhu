@@ -98,7 +98,9 @@ def resolve_permissions(
     *,
     allow_write: bool = False,
 ) -> dict:
-    requested_caps = [str(x or "").strip() for x in requested if str(x or "").strip()]
+    requested_caps = list(dict.fromkeys(
+        str(x or "").strip() for x in requested if str(x or "").strip()
+    ))
     unknown = sorted({cap for cap in requested_caps if cap not in KNOWN_CAPABILITIES})
     write_requested = sorted({cap for cap in requested_caps if cap in WRITE_CAPABILITIES})
     blocked_write = write_requested if not allow_write else []
@@ -126,12 +128,21 @@ def resolve_permissions(
             "account_label": provider.account_label,
         })
 
+    relevant_provider_ids = {
+        provider.provider_id
+        for provider in _registry.values()
+        if any(cap in provider.capabilities for cap in requested_caps)
+    }
+    provider_rows = [
+        row for row in providers()
+        if row["provider_id"] in relevant_provider_ids
+    ]
     return {
         "requested": requested_caps,
         "grants": grants,
         "blocked": blocked,
         "ok": not blocked,
-        "providers": providers(),
+        "providers": provider_rows,
         "write_execution_allowed": bool(allow_write),
     }
 

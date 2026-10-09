@@ -3252,6 +3252,58 @@ def search_items(
     return rows
 
 
+def _public_connections_for_ids(connection_ids: set[str]) -> list[dict[str, Any]]:
+    return [
+        row for row in conversation_integrations.list_connections()
+        if row["id"] in connection_ids
+    ]
+
+
+def _space_integration_export(space_id: str) -> dict[str, Any]:
+    snapshots = conversation_integrations.list_snapshots(space_id, limit=1000)
+    drafts = list_draft_actions(space_id)
+    draft_ids = {row["id"] for row in drafts}
+    executions = [
+        row for row in conversation_integrations.list_executions(limit=1000)
+        if row.get("draft_action_id") in draft_ids
+    ]
+    connection_ids = {
+        str(row.get("connection_id") or "")
+        for row in [*snapshots, *executions]
+        if row.get("connection_id")
+    }
+    return {
+        "connections": _public_connections_for_ids(connection_ids),
+        "connector_snapshots": snapshots,
+        "external_execution_audit": executions,
+    }
+
+
+def _session_integration_export(
+    packs: list[dict[str, Any]],
+    drafts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    frozen_snapshots: list[dict[str, Any]] = []
+    for pack in packs:
+        payload = dict(pack.get("payload") or {})
+        frozen_snapshots.extend(list(payload.get("connector_snapshots") or []))
+    draft_ids = {row["id"] for row in drafts}
+    executions = [
+        row for row in conversation_integrations.list_executions(limit=1000)
+        if row.get("draft_action_id") in draft_ids
+    ]
+    connection_ids = {
+        str(row.get("connection_id") or "")
+        for row in [*frozen_snapshots, *executions]
+        if row.get("connection_id")
+    }
+    return {
+        "connections": _public_connections_for_ids(connection_ids),
+        "connector_snapshots": frozen_snapshots,
+        "external_execution_audit": executions,
+    }
+
+
 def export_session(session_id: str) -> dict[str, Any]:
     session = require_session(session_id)
     space = require_space(session["space_id"])

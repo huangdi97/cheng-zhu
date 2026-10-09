@@ -533,8 +533,10 @@ reviewed output evidence
 | Conversation AUTO Screen Context | RUNTIME_AVAILABLE | policy 允许 ≠ 自动启动；Live 二次显式 start；ACTIVE/OFF THE RECORD 可见；consent/transparency user-report gate；同帧去重/限频/连续错误 fail-stop；raw image 不持久化；frozen vision route；Session/Space lifecycle 强制 stop |
 | Conversation Human Coach | RUNTIME_AVAILABLE | Conversation-specific session kind/target + frozen HUMAN_ALLOWED policy + transparency gate + per-field permissions + helper-side session scoping + Interview Resume/JD isolation + advice-only audit + lifecycle revoke；beta.2 public prerelease / real-session evidence 仍是独立发布/用户证据门禁 |
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
-| Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |
-| External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts |
+| Provider-agnostic Connector Runtime | RUNTIME_AVAILABLE | schema v8；non-secret connector metadata、adapter registry、capability/scopes/health、Preflight fail-closed、read context freeze、Diagnostics/export audit；默认无 bundled provider |
+| Calendar / Mail / Docs / project tracker provider adapters | EXTERNAL_PROVIDER_NOT_BUNDLED | 只有真实 adapter + 用户账户授权后才能成为 available；当前不声称 Gmail / Outlook / Google Calendar / Jira / Linear 已连接 |
+| External task/email/issue/decision-log execution framework | RUNTIME_AVAILABLE | APPROVED Draft 与 execution 分离；capability-matched provider 才可执行；PENDING/SUCCEEDED/FAILED + external_ref/error 审计；成功幂等 |
+| Real provider external execution | EXTERNAL_PROVIDER_NOT_BUNDLED | 没有真实 provider adapter 时无执行按钮/Preflight capability，不能用 fake provider 冒充 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
 
@@ -725,10 +727,10 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- Calendar / Mail / Docs / project tracker connector；
+- provider-specific Calendar / Mail / Docs / project tracker adapters 与真实账户授权；
 - OS notification/discovery；
 - Human Coach real-session evidence；
-- actual external write-back execution；
+- real-provider external write-back execution evidence；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；
 - real-user validation。

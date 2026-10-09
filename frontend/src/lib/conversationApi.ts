@@ -8,6 +8,7 @@ import type {
   ConversationDraftAction,
   ConversationGuidance,
   ConversationHistoryItem,
+  ConversationReminder,
   ConversationHome,
   ConversationItem,
   ConversationItemType,
@@ -41,6 +42,8 @@ export const conversationApi = {
   templates: () => request<unknown>(`${B}/templates`).then((p) => list<ConversationTemplate>(p)),
   home: () => request<ConversationHome>(`${B}/home`),
   history: (limit = 100) => request<{ items: ConversationHistoryItem[] }>(`${B}/history?limit=${limit}`),
+  reminders: (horizonDays = 30, limit = 100) =>
+    request<{ items: ConversationReminder[] }>(`${B}/reminders?horizon_days=${horizonDays}&limit=${limit}`),
   searchItems: (query = '', itemType = '', limit = 50) => request<{ items: ConversationSearchItem[] }>(
     `${B}/search?query=${encodeURIComponent(query)}&item_type=${encodeURIComponent(itemType)}&limit=${limit}`,
   ),

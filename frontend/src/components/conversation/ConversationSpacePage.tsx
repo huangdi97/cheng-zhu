@@ -3,7 +3,7 @@ import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash
 import { conversationApi } from '@/lib/conversationApi'
 import { activateConversationSharePrivacy, restoreConversationSharePrivacy } from '@/lib/conversationSharePrivacy'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationExternalExecution, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -80,11 +80,21 @@ function ItemRow({ item, onChanged, supersedeOptions = [] }: { item: Conversatio
   )
 }
 
+const DRAFT_EXECUTION_CAPABILITY: Record<ConversationDraftAction['kind'], string> = {
+  FOLLOWUP_EMAIL_DRAFT: 'email.send',
+  CREATE_TASK_DRAFT: 'task.create',
+  CREATE_ISSUE_DRAFT: 'issue.create',
+  UPDATE_DECISION_LOG_DRAFT: 'decision_log.write',
+}
+
 export default function ConversationSpacePage({ spaceId, tab }: { spaceId: string; tab: ConversationTab }) {
   const detail = useAsync(() => conversationApi.space(spaceId), [spaceId])
   const prepare = useAsync(() => conversationApi.prepare(spaceId), [spaceId])
   const materials = useAsync(() => productApi.materials(), [])
   const quickNotes = useAsync(() => productApi.quickNotes(), [])
+  const integrationCatalog = useAsync(() => conversationApi.integrationCatalog(), [])
+  const integrationConnections = useAsync(() => conversationApi.integrationConnections(), [])
+  const connectorSnapshots = useAsync(() => conversationApi.connectorSnapshots(spaceId), [spaceId])
   const retention = useAsync(() => conversationApi.retentionPreview(spaceId), [spaceId])
   const [sessionTitle, setSessionTitle] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
@@ -118,6 +128,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [editingGoalId, setEditingGoalId] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
+  const [integrationBusy, setIntegrationBusy] = useState(false)
+  const [executionConnectionId, setExecutionConnectionId] = useState('')
+  const [execution, setExecution] = useState<ConversationExternalExecution | null>(null)
   const [lifecycleMessage, setLifecycleMessage] = useState('')
 
   const resolveThread = async (threadId: string) => {
@@ -322,6 +335,27 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSourceSaving(false) }
   }
 
+  const toggleConnectorSnapshot = async (id: string) => {
+    const selected = new Set(space.selected_connector_snapshot_ids ?? [])
+    if (selected.has(id)) selected.delete(id); else selected.add(id)
+    setSourceSaving(true); setSessionError('')
+    try {
+      await conversationApi.patchSpace(spaceId, { selected_connector_snapshot_ids: Array.from(selected) })
+      await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSourceSaving(false) }
+  }
+
+  const syncConnector = async (connectionId: string) => {
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.syncIntegrationConnection(connectionId, { space_id: spaceId })
+      setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
+      await connectorSnapshots.reload(); await integrationConnections.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const exportSpace = async () => {
     setSessionBusy(true); setSessionError('')
     try {
@@ -373,6 +407,23 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     try { setDraft(await conversationApi.reviewDraftAction(draft.id, action)) }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
+  }
+
+  const requestExecution = async () => {
+    if (!draft || draft.status !== 'APPROVED' || !executionConnectionId) return
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      setExecution(await conversationApi.requestExternalExecution(draft.id, executionConnectionId, draft.target || ''))
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const executeExternal = async () => {
+    if (!execution || !['PENDING', 'FAILED'].includes(execution.status)) return
+    setIntegrationBusy(true); setSessionError('')
+    try { setExecution(await conversationApi.executeExternalRequest(execution.id)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
   }
 
   const start = async () => {

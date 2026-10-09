@@ -1,0 +1,3791 @@
+{
+  "profiles": {
+    "PROJECT_SYNC": {
+      "space": "cs_e6221a1a85c143c4",
+      "sessions": [
+        {
+          "session_id": "cv_5e27787dbed843dc",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_967e8a3d5b7e4b6a",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_5e27787dbed843dc",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "本周已完成 V2 路由迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：本周已完成 V2 路由迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542380.316463,
+              "updated_at": 1791542380.3341339,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_83081d5257744f0e",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_5e27787dbed843dc",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "migration window 太短",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：migration window 太短"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542380.3547597,
+              "updated_at": 1791542380.411523,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_24fe08dcd8664653",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_5e27787dbed843dc",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "回滚 drill 谁来负责？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚 drill 谁来负责？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542380.5476675,
+              "updated_at": 1791542380.675818,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_dada51d3736a44de",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_5e27787dbed843dc",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "周五前完成 rollout plan",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：周五前完成 rollout plan"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542380.8507657,
+              "updated_at": 1791542380.913513,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_277481990ebd49d1",
+              "title": "月底前完成压测",
+              "type": "Deadline",
+              "review_blocked": "Deadline 时间仍有歧义；确认前请补 normalized datetime 与 timezone"
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_b1d204d49c654799",
+                "session_id": "cv_5e27787dbed843dc",
+                "candidate_id": "gc_3a5d7c2874e54513",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "回滚 drill 还未安排负责人",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542381.0800202,
+                "created_at": 1791542381.0800202,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "回滚 drill 还未安排负责人",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "USER_SPEAKING",
+              "event": {
+                "id": "ge_dd62b4e47be340ab",
+                "session_id": "cv_5e27787dbed843dc",
+                "candidate_id": "gc_52cad0f98a864ecd",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [],
+                "status": "SUPPRESSED",
+                "reason": "USER_SPEAKING",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542381.3298793,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [],
+                  "warnings": [
+                    "Suppressed: USER_SPEAKING"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "USER_SPEAKING"
+                  ]
+                }
+              }
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_41a8c751056d403b",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_81469b1d66ce46ae",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_41a8c751056d403b",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "本周已完成 V2 路由迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：本周已完成 V2 路由迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542382.5818596,
+              "updated_at": 1791542382.616128,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_e625dadf131c4c71",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_41a8c751056d403b",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "migration window 太短",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：migration window 太短"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542382.6856153,
+              "updated_at": 1791542382.7324233,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_113e855fd55448cd",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_41a8c751056d403b",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "回滚 drill 谁来负责？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚 drill 谁来负责？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542382.8518527,
+              "updated_at": 1791542382.9011712,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_a47a6823f985429b",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_41a8c751056d403b",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "周五前完成 rollout plan",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：周五前完成 rollout plan"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542383.02079,
+              "updated_at": 1791542383.0653493,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_b392967ab0d341e1",
+              "title": "月底前完成压测",
+              "type": "Deadline",
+              "review_blocked": "Deadline 时间仍有歧义；确认前请补 normalized datetime 与 timezone"
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_cbde3bb1440441e7",
+                "session_id": "cv_41a8c751056d403b",
+                "candidate_id": "gc_81e69980d27346c2",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "回滚 drill 还未安排负责人",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542383.1380086,
+                "created_at": 1791542383.1380086,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "回滚 drill 还未安排负责人",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "USER_SPEAKING",
+              "event": {
+                "id": "ge_7872027e0d62479a",
+                "session_id": "cv_41a8c751056d403b",
+                "candidate_id": "gc_dc7599e5848f4138",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [],
+                "status": "SUPPRESSED",
+                "reason": "USER_SPEAKING",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542383.176952,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [],
+                  "warnings": [
+                    "Suppressed: USER_SPEAKING"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "USER_SPEAKING"
+                  ]
+                }
+              }
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_17c873e3d6664ba2",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_a637427bcaf747c8",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_17c873e3d6664ba2",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "本周已完成 V2 路由迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：本周已完成 V2 路由迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542384.0532863,
+              "updated_at": 1791542384.0771258,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_b1c4eead1f0f40a8",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_17c873e3d6664ba2",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "migration window 太短",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：migration window 太短"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542384.1193485,
+              "updated_at": 1791542384.1596677,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_e429063846fe496b",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_17c873e3d6664ba2",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "回滚 drill 谁来负责？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚 drill 谁来负责？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542384.2175663,
+              "updated_at": 1791542384.2678354,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_85d1ba934ada4063",
+              "space_id": "cs_e6221a1a85c143c4",
+              "session_id": "cv_17c873e3d6664ba2",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "周五前完成 rollout plan",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：周五前完成 rollout plan"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542384.3979886,
+              "updated_at": 1791542384.5199537,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_af767a60a51c4eee",
+              "title": "月底前完成压测",
+              "type": "Deadline",
+              "review_blocked": "Deadline 时间仍有歧义；确认前请补 normalized datetime 与 timezone"
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_2e2965fdfaec472c",
+                "session_id": "cv_17c873e3d6664ba2",
+                "candidate_id": "gc_cf8fce092daf4695",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "回滚 drill 还未安排负责人",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542384.6578267,
+                "created_at": 1791542384.6578267,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "回滚 drill 还未安排负责人",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "USER_SPEAKING",
+              "event": {
+                "id": "ge_44586826ef4c4f6f",
+                "session_id": "cv_17c873e3d6664ba2",
+                "candidate_id": "gc_5cbe7a7ed3444bf2",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [],
+                "status": "SUPPRESSED",
+                "reason": "USER_SPEAKING",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542384.800795,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [],
+                  "warnings": [
+                    "Suppressed: USER_SPEAKING"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "USER_SPEAKING"
+                  ]
+                }
+              }
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        }
+      ],
+      "continuity": {
+        "session1_thread_projects_to_next_prepare": true,
+        "resolved_status": "RESOLVED",
+        "resolved_thread_closed_for_next_prepare": true,
+        "thread_text_probed": "migration window 太短"
+      },
+      "no_infer": {
+        "check": "PROJECT_SYNC: no emotion/personality/hidden-intent",
+        "pass": true,
+        "inferred_keys_found": []
+      },
+      "lane_checks": {
+        "profile": "PROJECT_SYNC",
+        "allowed_lanes": [
+          "CONTRIBUTION_OPPORTUNITY",
+          "QUESTION",
+          "RECALL",
+          "RISK"
+        ],
+        "suppressed_events": [
+          {
+            "kind": "CONTRIBUTION_OPPORTUNITY",
+            "reason": "USER_SPEAKING"
+          },
+          {
+            "kind": "CONTRIBUTION_OPPORTUNITY",
+            "reason": "USER_SPEAKING"
+          },
+          {
+            "kind": "CONTRIBUTION_OPPORTUNITY",
+            "reason": "USER_SPEAKING"
+          }
+        ],
+        "shown_kinds": [
+          "CONTRIBUTION_OPPORTUNITY"
+        ]
+      }
+    },
+    "DESIGN_REVIEW": {
+      "space": "cs_2d6edd7863304aee",
+      "sessions": [
+        {
+          "session_id": "cv_a44a8cd355e446bc",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_162a6010ba4145cd",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a44a8cd355e446bc",
+              "type": "Proposal",
+              "state": "PROPOSED",
+              "title": "方案 A：全量迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：方案 A：全量迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542386.2069232,
+              "updated_at": 1791542386.2922752,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_d3f65bf7ad414744",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a44a8cd355e446bc",
+              "type": "Objection",
+              "state": "PROPOSED",
+              "title": "回滚窗口不足",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚窗口不足"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542386.342349,
+              "updated_at": 1791542386.3794386,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_0ee2e50656b44c97",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a44a8cd355e446bc",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "数据一致性问题",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：数据一致性问题"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542386.4820786,
+              "updated_at": 1791542386.5122502,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_6f233fe608cd4a77",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a44a8cd355e446bc",
+              "type": "Assumption",
+              "state": "PROPOSED",
+              "title": "下游已支持新协议",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：下游已支持新协议"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542386.596061,
+              "updated_at": 1791542386.668861,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_acf67e936d224a4c",
+                "session_id": "cv_a44a8cd355e446bc",
+                "candidate_id": "gc_99f526c0106d44c7",
+                "kind": "TALKING_POINT",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "把证据与 trade-off 放同一屏",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "MANUAL_TALKING_POINT",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542386.701333,
+                "created_at": 1791542386.701333,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "把证据与 trade-off 放同一屏",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_895e967c433f489f",
+                "session_id": "cv_a44a8cd355e446bc",
+                "candidate_id": "gc_1ba5fa736a084798",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "回滚 drill 还未安排负责人",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542386.7936366,
+                "created_at": 1791542386.7936366,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "回滚 drill 还未安排负责人",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_a775c9eb55834d29",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_393ddb7f7456454e",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a775c9eb55834d29",
+              "type": "Proposal",
+              "state": "PROPOSED",
+              "title": "方案 A：全量迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：方案 A：全量迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542387.4905758,
+              "updated_at": 1791542387.5114942,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_b7d6c2eb7b5a404c",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a775c9eb55834d29",
+              "type": "Objection",
+              "state": "PROPOSED",
+              "title": "回滚窗口不足",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚窗口不足"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542387.5566223,
+              "updated_at": 1791542387.5822272,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_cd06650e9ca64085",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a775c9eb55834d29",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "数据一致性问题",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：数据一致性问题"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542387.6558254,
+              "updated_at": 1791542387.6804109,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_728a22b668c049a7",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_a775c9eb55834d29",
+              "type": "Assumption",
+              "state": "PROPOSED",
+              "title": "下游已支持新协议",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：下游已支持新协议"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542387.8037806,
+              "updated_at": 1791542387.8483765,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_714611a4322e4695",
+                "session_id": "cv_a775c9eb55834d29",
+                "candidate_id": "gc_8d1dcf63492f4254",
+                "kind": "TALKING_POINT",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "把证据与 trade-off 放同一屏",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "MANUAL_TALKING_POINT",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542387.8729258,
+                "created_at": 1791542387.8729258,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "把证据与 trade-off 放同一屏",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_65a06bef2f564a3d",
+                "session_id": "cv_a775c9eb55834d29",
+                "candidate_id": "gc_4984c46754224c3b",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "回滚 drill 还未安排负责人",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542387.961664,
+                "created_at": 1791542387.961664,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "回滚 drill 还未安排负责人",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_c20ac408d10141dd",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_79e6aa8c5aaa467d",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_c20ac408d10141dd",
+              "type": "Proposal",
+              "state": "PROPOSED",
+              "title": "方案 A：全量迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：方案 A：全量迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542388.9922788,
+              "updated_at": 1791542389.0403538,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_a70de0fff4c840ad",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_c20ac408d10141dd",
+              "type": "Objection",
+              "state": "PROPOSED",
+              "title": "回滚窗口不足",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚窗口不足"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542389.116565,
+              "updated_at": 1791542389.1543624,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_b3680f558bbc402c",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_c20ac408d10141dd",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "数据一致性问题",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：数据一致性问题"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542389.2689056,
+              "updated_at": 1791542389.367812,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_bb960fdc64cf4984",
+              "space_id": "cs_2d6edd7863304aee",
+              "session_id": "cv_c20ac408d10141dd",
+              "type": "Assumption",
+              "state": "PROPOSED",
+              "title": "下游已支持新协议",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：下游已支持新协议"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542389.4619594,
+              "updated_at": 1791542389.483088,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_bd4c6a74383b45cc",
+                "session_id": "cv_c20ac408d10141dd",
+                "candidate_id": "gc_c74047ba7dad45ca",
+                "kind": "TALKING_POINT",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "把证据与 trade-off 放同一屏",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "MANUAL_TALKING_POINT",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542389.5157542,
+                "created_at": 1791542389.5157542,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "把证据与 trade-off 放同一屏",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_7c37b36ae2a543d5",
+                "session_id": "cv_c20ac408d10141dd",
+                "candidate_id": "gc_53189366a77b4492",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "回滚 drill 还未安排负责人",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542389.6191862,
+                "created_at": 1791542389.6191862,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "回滚 drill 还未安排负责人",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        }
+      ],
+      "continuity": {
+        "session1_thread_projects_to_next_prepare": true,
+        "resolved_status": "RESOLVED",
+        "resolved_thread_closed_for_next_prepare": true,
+        "thread_text_probed": "回滚窗口不足"
+      },
+      "no_infer": {
+        "check": "DESIGN_REVIEW: no emotion/personality/hidden-intent",
+        "pass": true,
+        "inferred_keys_found": []
+      },
+      "lane_checks": {
+        "profile": "DESIGN_REVIEW",
+        "allowed_lanes": [
+          "CONTRIBUTION_OPPORTUNITY",
+          "QUESTION",
+          "RECALL",
+          "RISK",
+          "TALKING_POINT"
+        ],
+        "suppressed_events": [],
+        "shown_kinds": [
+          "CONTRIBUTION_OPPORTUNITY",
+          "TALKING_POINT"
+        ]
+      }
+    },
+    "PRESENTATION_QA": {
+      "space": "cs_c66848547c3849f0",
+      "sessions": [
+        {
+          "session_id": "cv_8ed0b5699871451e",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_15c050b885e248d2",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8ed0b5699871451e",
+              "type": "Metric",
+              "state": "PROPOSED",
+              "title": "Q4 延迟降低 40%",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：Q4 延迟降低 40%"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542391.2581093,
+              "updated_at": 1791542391.3730528,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_efd6d2e8b373460d",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8ed0b5699871451e",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "已灰度 30% 流量",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：已灰度 30% 流量"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542391.4115224,
+              "updated_at": 1791542391.4478376,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_ffe1c07956bc43d4",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8ed0b5699871451e",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "回滚触发条件是什么？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚触发条件是什么？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542391.5192885,
+              "updated_at": 1791542391.6839867,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_bb31cddbc60b4c24",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8ed0b5699871451e",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "会后提供压测报告",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：会后提供压测报告"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542391.8696077,
+              "updated_at": 1791542391.9091413,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_71c88d3dc3f44fb2",
+                "session_id": "cv_8ed0b5699871451e",
+                "candidate_id": "gc_9b69c2deab124ad1",
+                "kind": "ANSWER_CUE",
+                "expression_action": "ANSWER",
+                "text": "先给结论再补证据。",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "DIRECT_QUESTION",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542391.9971275,
+                "created_at": 1791542391.9971275,
+                "expression_plan": {
+                  "action": "ANSWER",
+                  "guidance_kind": "ANSWER_CUE",
+                  "target_participant_id": "",
+                  "text": "先给结论再补证据。",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_b32a91a9c6d4406a",
+                "session_id": "cv_8ed0b5699871451e",
+                "candidate_id": "gc_28a1b6097ff64792",
+                "kind": "DELIVERY",
+                "expression_action": "CLARIFY",
+                "text": "先主张，再给一条最强证据，最后回到下一步或 Q&A；面向 CTO 只保留与其明确职责相关的内容；优先回应对方明确优先级：migration stability；显式处理对方已表达 concern：rollback risk；本次表达重点：conclusion first",
+                "source_refs": [],
+                "status": "SHOWN",
+                "reason": "EXPRESSION_PLANNER",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542392.2439718,
+                "created_at": 1791542392.2439718,
+                "expression_plan": {
+                  "action": "CLARIFY",
+                  "guidance_kind": "DELIVERY",
+                  "target_participant_id": "",
+                  "text": "先主张，再给一条最强证据，最后回到下一步或 Q&A；面向 CTO 只保留与其明确职责相关的内容；优先回应对方明确优先级：migration stability；显式处理对方已表达 concern：rollback risk；本次表达重点：conclusion first",
+                  "source_refs": [],
+                  "warnings": [
+                    "Expression may prioritize the participant's explicitly stated concern; facts remain unchanged."
+                  ],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED",
+              "event": {
+                "id": "ge_9c0342b97d7f4a29",
+                "session_id": "cv_8ed0b5699871451e",
+                "candidate_id": "gc_7c645ea8241c4b1d",
+                "kind": "TALKING_POINT",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SUPPRESSED",
+                "reason": "PROFILE_GUIDANCE_NOT_ALLOWED",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542392.3886578,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [
+                    "Suppressed: PROFILE_GUIDANCE_NOT_ALLOWED",
+                    "Expression may prioritize the participant's explicitly stated concern; facts remain unchanged."
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "PROFILE_GUIDANCE_NOT_ALLOWED"
+                  ]
+                }
+              }
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_8315917617014312",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_02addc79edcd44d3",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8315917617014312",
+              "type": "Metric",
+              "state": "PROPOSED",
+              "title": "Q4 延迟降低 40%",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：Q4 延迟降低 40%"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542393.278487,
+              "updated_at": 1791542393.340093,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_525854aab948427d",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8315917617014312",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "已灰度 30% 流量",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：已灰度 30% 流量"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542393.437039,
+              "updated_at": 1791542393.5151799,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_0925915ea4da45c9",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8315917617014312",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "回滚触发条件是什么？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：回滚触发条件是什么？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542393.55833,
+              "updated_at": 1791542393.6569967,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_ed6baf21edb34d4b",
+              "space_id": "cs_c66848547c3849f0",
+              "session_id": "cv_8315917617014312",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "会后提供压测报告",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：会后提供压测报告"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542393.7760608,
+              "updated_at": 1791542393.8060334,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_52732783b03443e8",
+                "session_id": "cv_8315917617014312",
+                "candidate_id": "gc_c3a9dfa8e4204692",
+                "kind": "ANSWER_CUE",
+                "expression_action": "ANSWER",
+                "text": "先给结论再补证据。",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "DIRECT_QUESTION",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542393.9134092,
+                "created_at": 1791542393.9134092,
+                "expression_plan": {
+                  "action": "ANSWER",
+                  "guidance_kind": "ANSWER_CUE",
+                  "target_participant_id": "",
+                  "text": "先给结论再补证据。",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_58bfa41f92c9457f",
+                "session_id": "cv_8315917617014312",
+                "candidate_id": "gc_944893b5ccf24048",
+                "kind": "DELIVERY",
+                "expression_action": "CLARIFY",
+                "text": "先主张，再给一条最强证据，最后回到下一步或 Q&A；面向 CTO 只保留与其明确职责相关的内容；优先回应对方明确优先级：migration stability；显式处理对方已表达 concern：rollback risk；本次表达重点：conclusion first",
+                "source_refs": [],
+                "status": "SHOWN",
+                "reason": "EXPRESSION_PLANNER",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542394.1399446,
+                "created_at": 1791542394.1399446,
+                "expression_plan": {
+                  "action": "CLARIFY",
+                  "guidance_kind": "DELIVERY",
+                  "target_participant_id": "",
+                  "text": "先主张，再给一条最强证据，最后回到下一步或 Q&A；面向 CTO 只保留与其明确职责相关的内容；优先回应对方明确优先级：migration stability；显式处理对方已表达 concern：rollback risk；本次表达重点：conclusion first",
+                  "source_refs": [],
+                  "warnings": [
+                    "Expression may prioritize the participant's explicitly stated concern; facts remain unchanged."
+                  ],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED",
+              "event": {
+                "id": "ge_944fb689b2364ae2",
+                "session_id": "cv_8315917617014312",
+                "candidate_id": "gc_23adb084a27c44d1",
+                "kind": "TALKING_POINT",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SUPPRESSED",
+                "reason": "PROFILE_GUIDANCE_NOT_ALLOWED",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542394.2678146,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [
+                    "Suppressed: PROFILE_GUIDANCE_NOT_ALLOWED",
+                    "Expression may prioritize the participant's explicitly stated concern; facts remain unchanged."
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "PROFILE_GUIDANCE_NOT_ALLOWED"
+                  ]
+                }
+              }
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        }
+      ],
+      "continuity": {
+        "second_session_prepare_ok": true
+      },
+      "no_infer": {
+        "check": "PRESENTATION_QA: no emotion/personality/hidden-intent",
+        "pass": true,
+        "inferred_keys_found": []
+      },
+      "lane_checks": {
+        "profile": "PRESENTATION_QA",
+        "allowed_lanes": [
+          "ANSWER_CUE",
+          "DELIVERY",
+          "QUESTION",
+          "RECALL"
+        ],
+        "suppressed_events": [
+          {
+            "kind": "TALKING_POINT",
+            "reason": "PROFILE_GUIDANCE_NOT_ALLOWED"
+          },
+          {
+            "kind": "TALKING_POINT",
+            "reason": "PROFILE_GUIDANCE_NOT_ALLOWED"
+          }
+        ],
+        "shown_kinds": [
+          "ANSWER_CUE",
+          "DELIVERY"
+        ]
+      }
+    },
+    "ONE_ON_ONE": {
+      "space": "cs_90367923b13e4165",
+      "sessions": [
+        {
+          "session_id": "cv_2a01f8c0f16341b5",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_855a40b9e4e94ca0",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_2a01f8c0f16341b5",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "本周内给出评估",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：本周内给出评估"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542395.413102,
+              "updated_at": 1791542395.4563484,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_a0d501d1e8074497",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_2a01f8c0f16341b5",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "你担心的 blocker 是什么？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：你担心的 blocker 是什么？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542395.5583005,
+              "updated_at": 1791542395.6154878,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_d946319f89114f1c",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_2a01f8c0f16341b5",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "招聘流程已同步",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：招聘流程已同步"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542395.732128,
+              "updated_at": 1791542395.8179777,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_2e0ca53a3ec34a16",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_2a01f8c0f16341b5",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "依赖尚未对齐",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：依赖尚未对齐"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542395.8988886,
+              "updated_at": 1791542395.9267788,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_1b52ad5176584ed0",
+                "session_id": "cv_2a01f8c0f16341b5",
+                "candidate_id": "gc_40819d59d2fd4ef8",
+                "kind": "TALKING_POINT",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "明确对方 concern 的回应",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "MANUAL_TALKING_POINT",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542396.0715337,
+                "created_at": 1791542396.0715337,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "明确对方 concern 的回应",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED",
+              "event": {
+                "id": "ge_1d9bb0be132d481b",
+                "session_id": "cv_2a01f8c0f16341b5",
+                "candidate_id": "gc_0d809f85ee9044fa",
+                "kind": "DELIVERY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [],
+                "status": "SUPPRESSED",
+                "reason": "PROFILE_GUIDANCE_NOT_ALLOWED",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542396.1716173,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "DELIVERY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [],
+                  "warnings": [
+                    "Suppressed: PROFILE_GUIDANCE_NOT_ALLOWED"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "PROFILE_GUIDANCE_NOT_ALLOWED"
+                  ]
+                }
+              }
+            },
+            {
+              "guidance": {
+                "id": "ge_ae8f9d76aa524dbd",
+                "session_id": "cv_2a01f8c0f16341b5",
+                "candidate_id": "gc_663695565ac24451",
+                "kind": "RISK",
+                "expression_action": "FLAG_RISK",
+                "text": "对方明确告知合规风险",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "CRITICAL_RISK",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542396.2075186,
+                "created_at": 1791542396.2075186,
+                "expression_plan": {
+                  "action": "FLAG_RISK",
+                  "guidance_kind": "RISK",
+                  "target_participant_id": "",
+                  "text": "对方明确告知合规风险",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_b81c9ab5b1104218",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_1e71006c0b394bd2",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_b81c9ab5b1104218",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "本周内给出评估",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：本周内给出评估"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542397.0656621,
+              "updated_at": 1791542397.1179862,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_ff74f777208f44a0",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_b81c9ab5b1104218",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "你担心的 blocker 是什么？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：你担心的 blocker 是什么？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542397.2509263,
+              "updated_at": 1791542397.364188,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_4f32930cacf046e2",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_b81c9ab5b1104218",
+              "type": "Status",
+              "state": "PROPOSED",
+              "title": "招聘流程已同步",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：招聘流程已同步"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542397.4771335,
+              "updated_at": 1791542397.517182,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_d1e8b1367aac43f1",
+              "space_id": "cs_90367923b13e4165",
+              "session_id": "cv_b81c9ab5b1104218",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "依赖尚未对齐",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：依赖尚未对齐"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542397.6003623,
+              "updated_at": 1791542397.6596985,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_5c89e746d5ab4ea3",
+                "session_id": "cv_b81c9ab5b1104218",
+                "candidate_id": "gc_281952d71e9a4cb8",
+                "kind": "TALKING_POINT",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "明确对方 concern 的回应",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "MANUAL_TALKING_POINT",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542397.7933414,
+                "created_at": 1791542397.7933414,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "TALKING_POINT",
+                  "target_participant_id": "",
+                  "text": "明确对方 concern 的回应",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": null,
+              "suppressed": "PROFILE_GUIDANCE_NOT_ALLOWED",
+              "event": {
+                "id": "ge_bb6e216fa05e441f",
+                "session_id": "cv_b81c9ab5b1104218",
+                "candidate_id": "gc_394843cd8872443a",
+                "kind": "DELIVERY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [],
+                "status": "SUPPRESSED",
+                "reason": "PROFILE_GUIDANCE_NOT_ALLOWED",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542397.9045699,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "DELIVERY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [],
+                  "warnings": [
+                    "Suppressed: PROFILE_GUIDANCE_NOT_ALLOWED"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "PROFILE_GUIDANCE_NOT_ALLOWED"
+                  ]
+                }
+              }
+            },
+            {
+              "guidance": {
+                "id": "ge_5149f316f6ed424f",
+                "session_id": "cv_b81c9ab5b1104218",
+                "candidate_id": "gc_1a3bb7b4da134366",
+                "kind": "RISK",
+                "expression_action": "FLAG_RISK",
+                "text": "对方明确告知合规风险",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "CRITICAL_RISK",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542398.0162873,
+                "created_at": 1791542398.0162873,
+                "expression_plan": {
+                  "action": "FLAG_RISK",
+                  "guidance_kind": "RISK",
+                  "target_participant_id": "",
+                  "text": "对方明确告知合规风险",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        }
+      ],
+      "continuity": {
+        "second_session_prepare_ok": true
+      },
+      "no_infer": {
+        "check": "ONE_ON_ONE: no emotion/personality/hidden-intent",
+        "pass": true,
+        "inferred_keys_found": []
+      },
+      "lane_checks": {
+        "profile": "ONE_ON_ONE",
+        "allowed_lanes": [
+          "QUESTION",
+          "RECALL",
+          "TALKING_POINT"
+        ],
+        "suppressed_events": [
+          {
+            "kind": "DELIVERY",
+            "reason": "PROFILE_GUIDANCE_NOT_ALLOWED"
+          },
+          {
+            "kind": "DELIVERY",
+            "reason": "PROFILE_GUIDANCE_NOT_ALLOWED"
+          }
+        ],
+        "shown_kinds": [
+          "RISK",
+          "TALKING_POINT"
+        ]
+      }
+    },
+    "CLIENT_CALL": {
+      "space": "cs_77a80fd28f7f401d",
+      "sessions": [
+        {
+          "session_id": "cv_a4ea2c6e87e94f13",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_d19f80e3e8db4daf",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_a4ea2c6e87e94f13",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "客户明确问：迁移时长多久？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：客户明确问：迁移时长多久？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542398.9895768,
+              "updated_at": 1791542399.0125053,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_afde01bf3a4a4d02",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_a4ea2c6e87e94f13",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "我们承诺周五前答复",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：我们承诺周五前答复"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542399.088274,
+              "updated_at": 1791542399.1184092,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_2975a0c1e14e4add",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_a4ea2c6e87e94f13",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "客户明确提到合规风险",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：客户明确提到合规风险"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542399.1390011,
+              "updated_at": 1791542399.1732183,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_68562507d3f44fff",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_a4ea2c6e87e94f13",
+              "type": "Decision",
+              "state": "AGREED",
+              "title": "采用按库分批迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：采用按库分批迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542399.2825992,
+              "updated_at": 1791542399.357934,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_8bffceee62ad41e5",
+                "session_id": "cv_a4ea2c6e87e94f13",
+                "candidate_id": "gc_5f8bce69abaf41b5",
+                "kind": "ANSWER_CUE",
+                "expression_action": "ANSWER",
+                "text": "先回答影响范围。",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "DIRECT_QUESTION",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542399.396354,
+                "created_at": 1791542399.396354,
+                "expression_plan": {
+                  "action": "ANSWER",
+                  "guidance_kind": "ANSWER_CUE",
+                  "target_participant_id": "",
+                  "text": "先回答影响范围。",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_419f38f0f1e44809",
+                "session_id": "cv_a4ea2c6e87e94f13",
+                "candidate_id": "gc_216d5a5f9ca84740",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "主动补充一个客户未问的新事实",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542399.5793734,
+                "created_at": 1791542399.5793734,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "主动补充一个客户未问的新事实",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_609ebf5619184d46",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_d59c766e567d4f84",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_609ebf5619184d46",
+              "type": "OpenQuestion",
+              "state": "PROPOSED",
+              "title": "客户明确问：迁移时长多久？",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：客户明确问：迁移时长多久？"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542400.4371145,
+              "updated_at": 1791542400.482329,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_999eee9b4adb483e",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_609ebf5619184d46",
+              "type": "Commitment",
+              "state": "COMMITTED",
+              "title": "我们承诺周五前答复",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "王工",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：我们承诺周五前答复"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542400.6800113,
+              "updated_at": 1791542400.7073936,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_abb03c92bda54d66",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_609ebf5619184d46",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "客户明确提到合规风险",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：客户明确提到合规风险"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542400.7341962,
+              "updated_at": 1791542400.75853,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_0e57177fcec543c8",
+              "space_id": "cs_77a80fd28f7f401d",
+              "session_id": "cv_609ebf5619184d46",
+              "type": "Decision",
+              "state": "AGREED",
+              "title": "采用按库分批迁移",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：采用按库分批迁移"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542400.8759909,
+              "updated_at": 1791542400.906111,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": {
+                "id": "ge_1444969d83d546d0",
+                "session_id": "cv_609ebf5619184d46",
+                "candidate_id": "gc_be3d5b1b085843a3",
+                "kind": "ANSWER_CUE",
+                "expression_action": "ANSWER",
+                "text": "先回答影响范围。",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "DIRECT_QUESTION",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542400.9285746,
+                "created_at": 1791542400.9285746,
+                "expression_plan": {
+                  "action": "ANSWER",
+                  "guidance_kind": "ANSWER_CUE",
+                  "target_participant_id": "",
+                  "text": "先回答影响范围。",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            },
+            {
+              "guidance": {
+                "id": "ge_f276941d20fa4c4e",
+                "session_id": "cv_609ebf5619184d46",
+                "candidate_id": "gc_5fd286e11813478a",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "ADD_TALKING_POINT",
+                "text": "主动补充一个客户未问的新事实",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "HIGH_VALUE_OPPORTUNITY",
+                "score": {
+                  "value": 3.0,
+                  "relevance": 1.0,
+                  "novelty": 1.0,
+                  "provenance_strength": 1.0,
+                  "role_relevance": 0.0,
+                  "goal_relevance": 0.0,
+                  "urgency": 0.0,
+                  "decision_impact": 0.0,
+                  "interruption_cost": 0.0,
+                  "already_mentioned": 0.0,
+                  "uncertainty": 0.0,
+                  "social_risk": 0.0,
+                  "stale_context_risk": 0.0
+                },
+                "user_action": "NONE",
+                "rendered_at": 1791542400.9911199,
+                "created_at": 1791542400.9911199,
+                "expression_plan": {
+                  "action": "ADD_TALKING_POINT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "主动补充一个客户未问的新事实",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        }
+      ],
+      "continuity": {
+        "second_session_prepare_ok": true
+      },
+      "no_infer": {
+        "check": "CLIENT_CALL: no emotion/personality/hidden-intent",
+        "pass": true,
+        "inferred_keys_found": []
+      },
+      "lane_checks": {
+        "profile": "CLIENT_CALL",
+        "allowed_lanes": [
+          "ANSWER_CUE",
+          "CONTRIBUTION_OPPORTUNITY",
+          "QUESTION",
+          "RECALL",
+          "RISK"
+        ],
+        "suppressed_events": [],
+        "shown_kinds": [
+          "ANSWER_CUE",
+          "CONTRIBUTION_OPPORTUNITY"
+        ]
+      }
+    },
+    "NEGOTIATION": {
+      "space": "cs_fb6fe947a4a849d8",
+      "sessions": [
+        {
+          "session_id": "cv_22c0d493c3ba443c",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_82e014093de04b4d",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_22c0d493c3ba443c",
+              "type": "Proposal",
+              "state": "PROPOSED",
+              "title": "我方提出 3 个月授权期",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：我方提出 3 个月授权期"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542401.451509,
+              "updated_at": 1791542401.4719887,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_d6010e2693de404c",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_22c0d493c3ba443c",
+              "type": "Objection",
+              "state": "PROPOSED",
+              "title": "对方明确拒绝该期限",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：对方明确拒绝该期限"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542401.4920087,
+              "updated_at": 1791542401.5205975,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_255e69d6f8844e78",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_22c0d493c3ba443c",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "上线窗口冲突",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：上线窗口冲突"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542401.5728955,
+              "updated_at": 1791542401.6017978,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_a1bc042b02e043fc",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_22c0d493c3ba443c",
+              "type": "Decision",
+              "state": "AGREED",
+              "title": "暂不签长期协议",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：暂不签长期协议"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542401.6534984,
+              "updated_at": 1791542401.6855621,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": null,
+              "suppressed": "SOCIAL_RISK",
+              "event": {
+                "id": "ge_3b3fac4c290045b8",
+                "session_id": "cv_22c0d493c3ba443c",
+                "candidate_id": "gc_d8f8d04981584748",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SUPPRESSED",
+                "reason": "SOCIAL_RISK",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542401.7138147,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [
+                    "Suppressed: SOCIAL_RISK"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "SOCIAL_RISK"
+                  ]
+                }
+              }
+            },
+            {
+              "guidance": {
+                "id": "ge_1721011ba3134de9",
+                "session_id": "cv_22c0d493c3ba443c",
+                "candidate_id": "gc_84d6b04c1a3a4133",
+                "kind": "ANSWER_CUE",
+                "expression_action": "ANSWER",
+                "text": "先直接回答问题，再补一条有来源的事实。",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "DIRECT_QUESTION",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542401.7458115,
+                "created_at": 1791542401.7458115,
+                "expression_plan": {
+                  "action": "ANSWER",
+                  "guidance_kind": "ANSWER_CUE",
+                  "target_participant_id": "",
+                  "text": "先直接回答问题，再补一条有来源的事实。",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        },
+        {
+          "session_id": "cv_003dbada7a5c4e39",
+          "prepare_ok": true,
+          "preflight_blockers": [],
+          "pack_frozen_goal": true,
+          "pack_has_playbook": true,
+          "pack_has_expression_profile": true,
+          "policy_guarantees": {
+            "speaker_biometric_identity": "OFF",
+            "emotion_sentiment_profiling": "OFF",
+            "hidden_intent_claims": "OFF"
+          },
+          "items": [
+            {
+              "id": "ci_593b021d547f467e",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_003dbada7a5c4e39",
+              "type": "Proposal",
+              "state": "PROPOSED",
+              "title": "我方提出 3 个月授权期",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：我方提出 3 个月授权期"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542402.2728388,
+              "updated_at": 1791542402.2959232,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_aaf88e33b3534367",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_003dbada7a5c4e39",
+              "type": "Objection",
+              "state": "PROPOSED",
+              "title": "对方明确拒绝该期限",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：对方明确拒绝该期限"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542402.3151884,
+              "updated_at": 1791542402.3389091,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_368e15f17a8449c7",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_003dbada7a5c4e39",
+              "type": "Risk",
+              "state": "PROPOSED",
+              "title": "上线窗口冲突",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：上线窗口冲突"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542402.382425,
+              "updated_at": 1791542402.4067469,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            },
+            {
+              "id": "ci_f400f460e60d4174",
+              "space_id": "cs_fb6fe947a4a849d8",
+              "session_id": "cv_003dbada7a5c4e39",
+              "type": "Decision",
+              "state": "AGREED",
+              "title": "暂不签长期协议",
+              "detail": "",
+              "speaker_id": "",
+              "owner_id": "",
+              "due_at": "",
+              "source_refs": [
+                {
+                  "kind": "USER_NOTE",
+                  "excerpt": "明确说出：暂不签长期协议"
+                }
+              ],
+              "source_excerpt": "",
+              "confidence": 0.0,
+              "epistemic_status": "UNKNOWN",
+              "review_status": "USER_CONFIRMED",
+              "supersedes_id": "",
+              "visibility": "PRIVATE",
+              "created_at": 1791542402.4462154,
+              "updated_at": 1791542402.4661899,
+              "time_semantics": {
+                "original_text": "",
+                "normalized_datetime": "",
+                "timezone": "",
+                "ambiguity": "NOT_APPLICABLE"
+              }
+            }
+          ],
+          "guidance": [
+            {
+              "guidance": null,
+              "suppressed": "SOCIAL_RISK",
+              "event": {
+                "id": "ge_69216b53689e4b08",
+                "session_id": "cv_003dbada7a5c4e39",
+                "candidate_id": "gc_f2718f346efc4837",
+                "kind": "CONTRIBUTION_OPPORTUNITY",
+                "expression_action": "SILENT",
+                "text": "",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SUPPRESSED",
+                "reason": "SOCIAL_RISK",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": null,
+                "created_at": 1791542402.4882402,
+                "expression_plan": {
+                  "action": "SILENT",
+                  "guidance_kind": "CONTRIBUTION_OPPORTUNITY",
+                  "target_participant_id": "",
+                  "text": "",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [
+                    "Suppressed: SOCIAL_RISK"
+                  ],
+                  "max_length": 0,
+                  "render_as": "SILENCE",
+                  "suppression_reasons": [
+                    "SOCIAL_RISK"
+                  ]
+                }
+              }
+            },
+            {
+              "guidance": {
+                "id": "ge_4ad779150af74996",
+                "session_id": "cv_003dbada7a5c4e39",
+                "candidate_id": "gc_99a784f943cf4aef",
+                "kind": "ANSWER_CUE",
+                "expression_action": "ANSWER",
+                "text": "先直接回答问题，再补一条有来源的事实。",
+                "source_refs": [
+                  {
+                    "kind": "DECISION",
+                    "visibility": "PRIVATE"
+                  }
+                ],
+                "status": "SHOWN",
+                "reason": "DIRECT_QUESTION",
+                "score": {},
+                "user_action": "NONE",
+                "rendered_at": 1791542402.5174859,
+                "created_at": 1791542402.5174859,
+                "expression_plan": {
+                  "action": "ANSWER",
+                  "guidance_kind": "ANSWER_CUE",
+                  "target_participant_id": "",
+                  "text": "先直接回答问题，再补一条有来源的事实。",
+                  "source_refs": [
+                    {
+                      "kind": "DECISION",
+                      "visibility": "PRIVATE"
+                    }
+                  ],
+                  "warnings": [],
+                  "max_length": 1200,
+                  "render_as": "PRIMARY_CARD",
+                  "suppression_reasons": []
+                }
+              },
+              "suppressed": null
+            }
+          ],
+          "continue_sections": [
+            "candidates",
+            "commitments",
+            "decisions",
+            "next_focus",
+            "open_questions",
+            "pins",
+            "profile_outcome",
+            "review_required",
+            "session",
+            "what_changed"
+          ],
+          "ended_status": "ENDED"
+        }
+      ],
+      "continuity": {
+        "second_session_prepare_ok": true
+      },
+      "no_infer": {
+        "check": "NEGOTIATION: no emotion/personality/hidden-intent",
+        "pass": true,
+        "inferred_keys_found": []
+      },
+      "lane_checks": {
+        "profile": "NEGOTIATION",
+        "allowed_lanes": [
+          "QUESTION",
+          "RECALL",
+          "RISK",
+          "TALKING_POINT"
+        ],
+        "suppressed_events": [
+          {
+            "kind": "CONTRIBUTION_OPPORTUNITY",
+            "reason": "SOCIAL_RISK"
+          },
+          {
+            "kind": "CONTRIBUTION_OPPORTUNITY",
+            "reason": "SOCIAL_RISK"
+          }
+        ],
+        "shown_kinds": [
+          "ANSWER_CUE"
+        ]
+      }
+    }
+  },
+  "global_checks": {
+    "negotiation_social_risk_silent": true,
+    "presentation_lane_isolation": true,
+    "one_on_one_critical_risk_global_override": true,
+    "policy_guarantees_off": true,
+    "ambiguous_deadline_blocked": true,
+    "profiles_simulated": 6,
+    "sessions_total": 14
+  }
+}

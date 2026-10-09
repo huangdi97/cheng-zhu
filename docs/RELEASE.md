@@ -36,9 +36,10 @@ PMF_PROVEN = FALSE
 Current beta.2 checkpoint:
 
 ```text
-PRODUCT_SOURCE_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+INITIAL_DRAFT_SOURCE_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+FINAL_PUBLISH_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
+RELEASE_RUN = 37871601889
 DRAFT_RELEASE = v2.0.0-beta.2
-DRAFT_TARGET_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
 DRAFT_ASSETS = UPLOADED
 DOWNLOAD_BACK_SHA256 = PASS
 DOWNLOADED_INSTALLER_REPLAY = PASS
@@ -46,7 +47,7 @@ DOWNLOADED_PACKAGED_SMOKE = PASS
 PUBLICATION = PENDING
 ```
 
-The first publish attempt failed only in the final PowerShell publish step after download-back verification. PR #54 fixed that release-engineering parser defect and merged as `cac605edf413ec248babf02ea9f73da708d156f8`. The next correct action is to run the fixed workflow with `publish=true` and `source_sha=b0c9e9bd7e46070dd9777fc3951ff993855790a8`; do **not** retarget beta.2 binaries to `cac605...` merely because the workflow implementation changed.
+The first publish attempt failed only in the final PowerShell publish step after download-back verification. PR #54 fixed that release-engineering parser defect and merged as `cac605edf413ec248babf02ea9f73da708d156f8`. After PR #54 merged, `cac605...` itself completed the full main CI gate, and the generic publisher automatically dispatched Release run `37871601889` with `source_sha=cac605...`. That run is now the authoritative final beta.2 publish attempt; if it succeeds, tag and binaries must both resolve to `cac605...`. The earlier `b0c9...` draft remains historical verification evidence only.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

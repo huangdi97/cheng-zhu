@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from urllib.parse import urlsplit, urlunsplit
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol
 
@@ -218,9 +219,13 @@ def create_connection(
 
 def list_connections() -> list[dict[str, Any]]:
     rows = store.select("conversation_connector_connection", order="created_at ASC")
+    public: list[dict[str, Any]] = []
     for row in rows:
-        row["adapter_available"] = row["provider"] in _ADAPTERS
-    return rows
+        item = {k: v for k, v in row.items() if k != "credential_ref"}
+        item["credential_ref_present"] = bool(row.get("credential_ref"))
+        item["adapter_available"] = row["provider"] in _ADAPTERS
+        public.append(item)
+    return public
 
 
 def set_connection_status(connection_id: str, status: str, *, error: str = "") -> dict[str, Any]:
@@ -242,7 +247,54 @@ def set_connection_status(connection_id: str, status: str, *, error: str = "") -
 
 
 def revoke_connection(connection_id: str) -> dict[str, Any]:
-    return set_connection_status(connection_id, "REVOKED")
+    _require_connection(connection_id)
+    store.update("conversation_connector_connection", connection_id, {
+        "status": "REVOKED",
+        "auth_mode": "NONE",
+        "credential_ref": "",
+        "sync_cursor": "",
+        "last_error": "",
+        "updated_at": store.now(),
+    })
+    public = next((row for row in list_connections() if row["id"] == connection_id), None)
+    return public or {"id": connection_id, "status": "REVOKED", "credential_ref_present": False}
+
+
+_SENSITIVE_METADATA_KEY = re.compile(
+    r"(?:^|[_-])(token|secret|authorization|credential|cookie|api[_-]?key|refresh[_-]?token|access[_-]?token)(?:$|[_-])",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_metadata(value: Any, *, depth: int = 0) -> Any:
+    if depth > 5:
+        return "[TRUNCATED]"
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for key, item in list(value.items())[:100]:
+            key_text = str(key)[:200]
+            if _SENSITIVE_METADATA_KEY.search(key_text):
+                continue
+            out[key_text] = _sanitize_metadata(item, depth=depth + 1)
+        return out
+    if isinstance(value, list):
+        return [_sanitize_metadata(item, depth=depth + 1) for item in value[:100]]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value if not isinstance(value, str) else value[:4000]
+    return str(value)[:4000]
+
+
+def _safe_source_url(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parts = urlsplit(raw)
+        if parts.scheme not in {"http", "https"}:
+            return ""
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))[:2000]
+    except ValueError:
+        return ""
 
 
 def _snapshot_hash(item: dict[str, Any]) -> str:
@@ -272,7 +324,7 @@ def _store_snapshot(connection: dict[str, Any], space_id: str, item: dict[str, A
         "title": str(item.get("title") or "")[:500],
         "excerpt": str(item.get("excerpt") or "")[:20_000],
         "occurred_at": item.get("occurred_at"),
-        "metadata": dict(item.get("metadata") or {}),
+        "metadata": _sanitize_metadata(dict(item.get("metadata") or {})),
     }
     content_hash = str(item.get("content_hash") or _snapshot_hash(normalized))
     existing = store.rows(
@@ -288,7 +340,7 @@ def _store_snapshot(connection: dict[str, Any], space_id: str, item: dict[str, A
         "space_id": space_id,
         **normalized,
         "content_hash": content_hash,
-        "source_url": str(item.get("source_url") or "")[:2000],
+        "source_url": _safe_source_url(str(item.get("source_url") or "")),
         "visibility": str(item.get("visibility") or "PRIVATE").upper()[:80],
         "created_at": store.now(),
     }

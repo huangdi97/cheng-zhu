@@ -878,11 +878,12 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；
 5. 根据真实使用再决定六类 Profile 的专属行为优化优先级；
 6. 外部依赖按独立能力推进：
-   - Calendar / Docs / Mail / project-tracker read connectors；
-   - actual external email/task/issue/decision-log execution；
+   - Calendar / Docs / Mail / project-tracker read connectors：必须遵循 [Connector Capability Contract](Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)，默认空 registry / fail-closed；
+   - actual external email/task/issue/decision-log execution：必须走 reviewed DraftAction → explicit target/provider → capability re-check → execute → audit；
    - participant automatic chat notice / watermark；
    - Organization / shared team truth registry；
    - code signing、macOS signing/notarization 等发布治理。
+7. stable v2 不再使用“感觉可以了”作为升级条件：真实 pilot + human-label 指标先通过 [Stable Promotion Evidence Gate](Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)，再进入独立 release review；PASS 不等于 PMF。
 
 已经进入 beta.2 的 Human Coach、Share Privacy、Manual/AUTO Screen Context 不再列为“待实现”；它们下一步需要的是 dogfood / real-session evidence 与成熟度验证，而不是重复补一套 runtime。
 

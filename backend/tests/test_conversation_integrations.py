@@ -1,0 +1,375 @@
+"""v2.0 external integration boundary: fail-closed accounts, frozen sources and audited execution."""
+from __future__ import annotations
+
+import pytest
+
+from services.product import conversation_integrations, conversations
+from services.storage import product as store
+
+
+class FakeAdapter:
+    provider_id = "MCP"
+
+    def __init__(self, capabilities=None):
+        self.capabilities = set(capabilities or {
+            "calendar.read",
+            "docs.read",
+            "email.send",
+            "task.create",
+            "issue.create",
+            "decision_log.write",
+        })
+        self.healthy = True
+        self.fail_execute = False
+        self.execute_calls = 0
+        self.items = {
+            "calendar.read": [{
+                "external_kind": "CALENDAR_EVENT",
+                "external_id": "event-1",
+                "title": "Architecture review",
+                "excerpt": "Q4 migration benchmark validated 10x data scale; rollback owner remains open.",
+                "occurred_at": 1_800_000_000.0,
+                "source_url": "https://calendar.example/event/1?secret=query",
+                "metadata": {"organizer": "Alex", "access_token": "must-not-persist"},
+            }],
+            "docs.read": [{
+                "external_kind": "DOCUMENT",
+                "external_id": "doc-1",
+                "title": "Migration notes",
+                "excerpt": "The reviewed plan prefers offline migration v2.",
+                "source_url": "https://docs.example/doc/1#private",
+                "metadata": {"safe": "yes"},
+            }],
+        }
+
+    def health(self, connection=None):
+        return {"ok": self.healthy, "label": "Fake MCP"} if self.healthy else {"ok": False, "error": "adapter down"}
+
+    def read_context(self, *, connection, capability, query, cursor, limit):
+        return {"items": list(self.items.get(capability, []))[:limit], "next_cursor": f"{capability}:cursor-1"}
+
+    def execute(self, *, connection, capability, operation, target, payload, idempotency_key):
+        self.execute_calls += 1
+        if self.fail_execute:
+            raise RuntimeError("provider rejected request")
+        return {
+            "ok": True,
+            "external_id": f"{operation.lower()}-1",
+            "target": target,
+            "idempotency_key": idempotency_key,
+            "access_token": "must-not-leak",
+            "nested": {"authorization": "must-not-leak", "safe": "kept"},
+        }
+
+
+@pytest.fixture(autouse=True)
+def _clean_integration_registry():
+    conversation_integrations.clear_adapters_for_tests()
+    yield
+    conversation_integrations.clear_adapters_for_tests()
+
+
+def _connected(adapter: FakeAdapter, capabilities: list[str]):
+    conversation_integrations.register_adapter(adapter)
+    connection = conversation_integrations.create_connection(
+        "MCP",
+        display_name="Work MCP",
+        granted_capabilities=capabilities,
+        provider_scopes=["server-defined"],
+        credential_ref="plugin:mcp/work",
+        account_hint="work@example.test",
+    )
+    return conversation_integrations.verify_and_connect(connection["id"])
+
+
+def test_default_boundary_is_fail_closed_and_never_accepts_raw_credentials(product_env):
+    catalog = conversation_integrations.catalog()
+    assert catalog and all(item["adapter_available"] is False for item in catalog)
+
+    with pytest.raises(ValueError, match="opaque reference"):
+        conversation_integrations.create_connection(
+            "MCP",
+            granted_capabilities=["calendar.read"],
+            credential_ref="ya29.this-is-a-token",
+        )
+
+    connection = conversation_integrations.create_connection(
+        "MCP",
+        granted_capabilities=["calendar.read"],
+        credential_ref="plugin:mcp/work",
+    )
+    assert connection["status"] == "DISCONNECTED"
+    assert connection["credential_ref_present"] is True
+    assert "credential_ref" not in connection
+
+    with pytest.raises(ValueError, match="adapter 未接线"):
+        conversation_integrations.verify_and_connect(connection["id"])
+
+    resolved = conversation_integrations.resolve_session_permissions(["calendar.read"])
+    assert resolved["ok"] is False
+    assert resolved["blocked"] == [{"capability": "calendar.read", "reason": "NO_CONNECTED_ACCOUNT"}]
+
+
+def test_connected_account_requires_exact_grants_and_session_permissions_remain_read_only(product_env):
+    adapter = FakeAdapter({"calendar.read", "email.send"})
+    connection = _connected(adapter, ["calendar.read", "email.send"])
+    assert connection["status"] == "CONNECTED"
+
+    read = conversation_integrations.resolve_session_permissions(["calendar.read"])
+    assert read["ok"] is True
+    assert read["grants"][0]["connection_id"] == connection["id"]
+    assert read["grants"][0]["provider_id"] == "MCP"
+
+    write = conversation_integrations.resolve_session_permissions(["email.send"])
+    assert write["ok"] is False
+    assert write["blocked"] == [{
+        "capability": "email.send",
+        "reason": "WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW",
+    }]
+
+    missing = conversation_integrations.resolve_session_permissions(["docs.read"])
+    assert missing["ok"] is False
+    assert missing["blocked"][0]["reason"] == "NO_CONNECTED_ACCOUNT"
+
+
+def test_sync_creates_immutable_idempotent_snapshots_and_sanitizes_metadata(product_env):
+    adapter = FakeAdapter({"calendar.read"})
+    connection = _connected(adapter, ["calendar.read"])
+    space = conversations.create_space("Connector Space", "PROJECT_SYNC")
+
+    first = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])
+    assert len(first["snapshots"]) == 1
+    snapshot = first["snapshots"][0]
+    assert snapshot["source_url"] == "https://calendar.example/event/1"
+    assert "access_token" not in snapshot["metadata"]
+
+    second = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])
+    assert second["snapshots"][0]["id"] == snapshot["id"]
+    assert len(conversation_integrations.list_snapshots(space["id"])) == 1
+
+    adapter.items["calendar.read"][0] = {
+        **adapter.items["calendar.read"][0],
+        "excerpt": "Replacement says 50x data scale; this must become a new immutable snapshot.",
+    }
+    third = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])
+    assert third["snapshots"][0]["id"] != snapshot["id"]
+    assert len(conversation_integrations.list_snapshots(space["id"])) == 2
+
+
+def test_selected_snapshot_is_frozen_into_pack_and_manual_ask_keeps_reference_authority(product_env):
+    adapter = FakeAdapter({"calendar.read"})
+    connection = _connected(adapter, ["calendar.read"])
+    space = conversations.create_space("Architecture", "DESIGN_REVIEW")
+    synced = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])
+    snapshot = synced["snapshots"][0]
+    conversations.update_space(space["id"], {"selected_connector_snapshot_ids": [snapshot["id"]]})
+
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"connector_permissions": ["calendar.read"]},
+    )
+    check = conversations.preflight(session["id"])
+    assert check["blockers"] == []
+    assert check["pack_preview"]["connector_snapshots"][0]["id"] == snapshot["id"]
+    assert check["connector_runtime"]["grants"][0]["connection_id"] == connection["id"]
+
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["connector_snapshots"][0]
+    assert frozen["id"] == snapshot["id"]
+    assert frozen["provider_id"] == "MCP"
+
+    result = conversations.ask(session["id"], "10x data scale")
+    assert result["grounded"] is True
+    assert result["truth_confirmed"] is False
+    assert result["matches"][0]["kind"] == "CONNECTOR_SNAPSHOT"
+    assert result["matches"][0]["authority"] == "REFERENCE_SOURCE"
+    assert result["matches"][0]["source_refs"][0]["content_hash"] == snapshot["content_hash"]
+
+    adapter.items["calendar.read"][0] = {
+        **adapter.items["calendar.read"][0],
+        "excerpt": "New sync says 50x data scale.",
+    }
+    conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])
+    # Already-started session is pinned to the old immutable snapshot.
+    assert conversations.ask(session["id"], "10x data scale")["grounded"] is True
+    assert conversations.ask(session["id"], "50x data scale")["grounded"] is False
+
+
+def test_approved_draft_requires_request_then_second_execute_and_is_idempotent(product_env):
+    adapter = FakeAdapter({"email.send"})
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Writeback", "CLIENT_CALL")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    draft = conversations.create_draft_action(
+        session["id"],
+        kind="FOLLOWUP_EMAIL_DRAFT",
+        title="Follow-up",
+        content="Thanks — here are the reviewed next steps.",
+        target="alex@example.test",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "reviewed next steps"}],
+    )
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+    assert approved["status"] == "APPROVED"
+    assert adapter.execute_calls == 0
+
+    request = conversation_integrations.request_execution(
+        draft["id"],
+        connection["id"],
+        target="alex@example.test",
+    )
+    assert request["status"] == "PENDING"
+    assert adapter.execute_calls == 0
+
+    # Request creation is idempotent.
+    same = conversation_integrations.request_execution(
+        draft["id"],
+        connection["id"],
+        target="alex@example.test",
+    )
+    assert same["id"] == request["id"]
+
+    executed = conversation_integrations.execute_request(request["id"])
+    assert executed["status"] == "SUCCEEDED"
+    assert adapter.execute_calls == 1
+    assert executed["response"]["external_id"] == "send_email-1"
+    assert "access_token" not in executed["response"]
+    assert "authorization" not in executed["response"]["nested"]
+    assert executed["response"]["nested"]["safe"] == "kept"
+
+    replay = conversation_integrations.execute_request(request["id"])
+    assert replay["status"] == "SUCCEEDED"
+    assert adapter.execute_calls == 1
+
+
+def test_execution_without_write_grant_blocks_and_provider_failure_is_audited(product_env):
+    read_adapter = FakeAdapter({"calendar.read"})
+    read_connection = _connected(read_adapter, ["calendar.read"])
+    space = conversations.create_space("Blocked Write", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    draft = conversations.create_draft_action(
+        session["id"],
+        kind="FOLLOWUP_EMAIL_DRAFT",
+        title="Follow-up",
+        content="body",
+    )
+    conversations.review_draft_action(draft["id"], "APPROVE")
+
+    blocked = conversation_integrations.request_execution(draft["id"], read_connection["id"])
+    assert blocked["status"] == "BLOCKED"
+    with pytest.raises(ValueError, match="Connection 没有真实可用 capability"):
+        conversation_integrations.execute_request(blocked["id"])
+
+    conversation_integrations.clear_adapters_for_tests()
+    failing = FakeAdapter({"email.send"})
+    failing.fail_execute = True
+    write_connection = _connected(failing, ["email.send"])
+    failed_request = conversation_integrations.request_execution(draft["id"], write_connection["id"])
+    failed = conversation_integrations.execute_request(failed_request["id"])
+    assert failed["status"] == "FAILED"
+    assert "provider rejected request" in failed["error"]
+    assert failing.execute_calls == 1
+
+
+def test_retention_keeps_selected_snapshots_and_execution_audit(product_env):
+    adapter = FakeAdapter({"calendar.read", "email.send"})
+    connection = _connected(adapter, ["calendar.read", "email.send"])
+    space = conversations.create_space("Retention", "PROJECT_SYNC")
+    first = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])["snapshots"][0]
+    adapter.items["calendar.read"][0] = {
+        **adapter.items["calendar.read"][0],
+        "external_id": "event-2",
+        "title": "Unselected old event",
+    }
+    second = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])["snapshots"][0]
+    conversations.update_space(space["id"], {
+        "selected_connector_snapshot_ids": [first["id"]],
+        "retention_policy": {
+            "preset": "CUSTOM",
+            "transcript_days": 30,
+            "guidance_days": 30,
+            "draft_days": 0,
+            "connector_snapshot_days": 0,
+            "confirmed_items": "KEEP",
+            "audio_retention": "OFF",
+        },
+    })
+
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    audited = conversations.create_draft_action(
+        session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="audited", content="body",
+    )
+    conversations.review_draft_action(audited["id"], "APPROVE")
+    execution = conversation_integrations.request_execution(audited["id"], connection["id"])
+
+    unaudited = conversations.create_draft_action(
+        session["id"], kind="CREATE_TASK_DRAFT", title="cleanup me", content="body",
+    )
+    old = store.now() - 100
+    store.update("conversation_connector_snapshot", first["id"], {"created_at": old})
+    store.update("conversation_connector_snapshot", second["id"], {"created_at": old})
+    store.update("conversation_draft_action", audited["id"], {"created_at": old})
+    store.update("conversation_draft_action", unaudited["id"], {"created_at": old})
+
+    preview = conversations.retention_preview(space["id"], now=store.now())
+    assert preview["would_delete"]["connector_snapshots"] == 1
+    assert preview["would_delete"]["draft_actions"] == 1
+    assert preview["kept"]["external_execution_audit"] == "KEEP"
+
+    result = conversations.apply_retention(space["id"], confirm=True)
+    assert result["deleted"]["connector_snapshots"] == 1
+    assert result["deleted"]["draft_actions"] == 1
+    assert store.get("conversation_connector_snapshot", first["id"]) is not None
+    assert store.get("conversation_connector_snapshot", second["id"]) is None
+    assert store.get("conversation_draft_action", audited["id"]) is not None
+    assert store.get("conversation_draft_action", unaudited["id"]) is None
+    assert store.get("conversation_connector_execution", execution["id"]) is not None
+
+
+def test_exports_include_connector_provenance_and_audit_but_never_credential_refs(product_env):
+    adapter = FakeAdapter({"calendar.read", "email.send"})
+    connection = _connected(adapter, ["calendar.read", "email.send"])
+    space = conversations.create_space("Export", "PROJECT_SYNC")
+    snapshot = conversation_integrations.sync_connection(
+        connection["id"], space["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+    conversations.update_space(space["id"], {"selected_connector_snapshot_ids": [snapshot["id"]]})
+
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    draft = conversations.create_draft_action(
+        session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="Follow-up", content="body",
+    )
+    conversations.review_draft_action(draft["id"], "APPROVE")
+    request = conversation_integrations.request_execution(draft["id"], connection["id"])
+    conversation_integrations.execute_request(request["id"])
+
+    space_export = conversations.export_space(space["id"])
+    session_export = conversations.export_session(session["id"])
+    for exported in (space_export, session_export):
+        assert exported["export_manifest"]["contains_external_secrets"] is False
+        assert exported["export_manifest"]["credential_refs_exported"] is False
+        assert exported["connector_snapshots"]
+        assert exported["external_execution_audit"]
+        assert exported["connector_connections"]
+        assert "credential_ref" not in exported["connector_connections"][0]
+        assert "plugin:mcp/work" not in str(exported)
+        assert "must-not-leak" not in str(exported)
+
+
+def test_diagnostics_distinguishes_boundary_from_real_provider_availability(product_env):
+    diag = conversations.diagnostics()
+    assert diag["schema_version"] == 8
+    assert diag["health"]["external_connectors"] == "NOT_CONFIGURED"
+    assert diag["health"]["external_writeback_execution"] == "REVIEWED_SECOND_EXPLICIT_EXECUTION_BOUNDARY"
+    assert diag["integrations"]["connected_count"] == 0
+    assert diag["integrations"]["default"] == "NO_PROVIDER_ADAPTERS_CONFIGURED"
+
+    adapter = FakeAdapter({"calendar.read"})
+    _connected(adapter, ["calendar.read"])
+    connected = conversations.diagnostics()
+    assert connected["health"]["external_connectors"] == "CONNECTED"
+    assert connected["integrations"]["connected_count"] == 1

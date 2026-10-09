@@ -126,7 +126,11 @@ class ConnectorConnectionCreate(BaseModel):
 @router.post("/integrations/connections")
 def integration_create_connection(body: ConnectorConnectionCreate):
     with domain_errors():
-        return conversation_integrations.create_connection(**body.model_dump())
+        created = conversation_integrations.create_connection(**body.model_dump())
+        return next(
+            row for row in conversation_integrations.list_connections()
+            if row["id"] == created["id"]
+        )
 
 
 @router.post("/integrations/connections/{connection_id}/revoke")

@@ -534,6 +534,7 @@ reviewed output evidence
 | Conversation Human Coach | RUNTIME_AVAILABLE | Conversation-specific session kind/target + frozen HUMAN_ALLOWED policy + transparency gate + per-field permissions + helper-side session scoping + Interview Resume/JD isolation + advice-only audit + lifecycle revoke；beta.2 public prerelease / real-session evidence 仍是独立发布/用户证据门禁 |
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
 | Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；Session read permissions 只有真实 provider 精确注册后才放行，并冻结 grant/provider；write capability 不允许由 Session permission 夹带 |
+| Local scheduled Conversation reminder | RUNTIME_AVAILABLE_DESKTOP | 只读取 Chengzhu 内手工排期的 UPCOMING Session；用户显式 opt-in；默认提前 10 分钟；通知正文不泄露 Session/Space 标题；点击只打开对应 Space Prepare；持久化 registry 支持 app restart；不等于 Calendar connector |
 | Calendar / Mail / Docs / project tracker provider | NOT WIRED | external dependency；registry contract 已完成，但没有真实 provider/auth/runtime evidence 就不能宣称可用 |
 | External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts；未来必须 Draft → review → explicit provider/target → capability re-check → execute → audit |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
@@ -722,12 +723,13 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 - ad-hoc 统一为 Space-backed continuity truth，不再设计第二套 standalone truth；
 - schema v6 temporal provenance + Deadline ambiguity review gate；
 - subsystem-level Conversation Diagnostics；
+- privacy-first local scheduled Conversation reminder（非 Calendar discovery）；
 - stale Reality Report / historical Goal truth sync。
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
 - Calendar / Mail / Docs / project tracker connector；
-- OS notification/discovery；
+- external Calendar/meeting discovery；
 - Human Coach real-session evidence；
 - actual external write-back execution；
 - participant auto chat notice / watermark；

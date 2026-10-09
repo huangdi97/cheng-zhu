@@ -30,12 +30,13 @@ V2_CONTRACT_COMPLETE = TRUE
 V2_RUNTIME_AVAILABLE = TRUE
 V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
 V2_BETA_PRERELEASE_CANDIDATE = TRUE
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前主线已经进一步具备 Windows packaged Conversation Beta engineering evidence 与独立 screenshot evidence，因此允许进入 `v2.0.0-beta.2` prerelease candidate；这仍不等于 stable v2，也不等于真实用户价值已经验证。
+`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前主线已经具备 Windows packaged Conversation Beta engineering evidence 与独立 screenshot evidence，并且 `v2.0.0-beta.2` 已于 2026-10-09 公开发布为 GitHub Prerelease；tag/source SHA = `cac605edf413ec248babf02ea9f73da708d156f8`，Stable Latest 仍为 v1.4.2。这仍不等于 stable v2，也不等于真实用户价值已经验证。
 
 ---
 
@@ -705,7 +706,7 @@ REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`v2.0.0-beta.2` 必须通过与 stable 相同的 exact-SHA / installer / portable / SHA256 / download-back / provenance gate，并以 GitHub `prerelease=true, latest=false` 发布。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
+`v2.0.0-beta.2` 已通过 public prerelease 发布门禁并以 GitHub `prerelease=true` 发布；tag/source SHA 精确等于 `cac605edf413ec248babf02ea9f73da708d156f8`，Stable Latest 仍为 v1.4.2。允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
 
 ---
 

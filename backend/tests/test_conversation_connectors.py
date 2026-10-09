@@ -139,6 +139,39 @@ def test_preflight_and_pack_freeze_real_connector_read_context(product_env):
     assert same_pack["payload"]["connector_context"][0]["title"] == "Architecture Review"
 
 
+
+
+def test_connector_resolution_change_after_preflight_requires_recheck(product_env):
+    fake = FakeAdapter()
+    conversation_connectors.register_adapter(fake)
+    first = conversation_connectors.connect(
+        fake.provider,
+        label="Account A",
+        capabilities=["calendar.read"],
+        connector_id="ccn-a",
+    )
+    space = conversations.create_space("TOCTOU", "PROJECT_SYNC")
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"connector_permissions": ["calendar.read"]},
+    )
+    check = conversations.preflight(session["id"])
+    assert check["connector_runtime"]["resolved"]["calendar.read"] == first["id"]
+
+    # A newer account with the same capability changes resolution. Start must
+    # not silently freeze a different account than the one Preflight reviewed.
+    second = conversation_connectors.connect(
+        fake.provider,
+        label="Account B",
+        capabilities=["calendar.read"],
+        connector_id="ccn-b",
+    )
+    assert second["id"] != first["id"]
+    with pytest.raises(ValueError, match="自上次 Preflight 后已变化"):
+        conversations.start_session(session["id"])
+
+
 def test_preflight_fails_closed_for_missing_or_unsupported_connector_capability(product_env):
     fake = FakeAdapter()
     conversation_connectors.register_adapter(fake)

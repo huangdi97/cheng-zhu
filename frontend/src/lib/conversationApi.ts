@@ -4,6 +4,10 @@ import type {
   CaptureMode,
   ConversationAskResult,
   ConversationCaptureStatus,
+  ConversationConnectorCatalogItem,
+  ConversationConnectorConnection,
+  ConversationConnectorExecution,
+  ConversationConnectorSnapshot,
   ConversationContinue,
   ConversationDraftAction,
   ConversationGuidance,
@@ -45,6 +49,21 @@ export const conversationApi = {
     `${B}/search?query=${encodeURIComponent(query)}&item_type=${encodeURIComponent(itemType)}&limit=${limit}`,
   ),
   diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
+  integrationCatalog: () => request<unknown>(`${B}/integrations/catalog`).then((p) => list<ConversationConnectorCatalogItem>(p)),
+  integrationConnections: () => request<unknown>(`${B}/integrations/connections`).then((p) => list<ConversationConnectorConnection>(p)),
+  connectorSnapshots: (spaceId: string, connectionId = '', limit = 200) => request<unknown>(
+    `${B}/spaces/${encodeURIComponent(spaceId)}/connector-snapshots?connection_id=${encodeURIComponent(connectionId)}&limit=${limit}`,
+  ).then((p) => list<ConversationConnectorSnapshot>(p)),
+  requestExecution: (draftActionId: string, connectionId: string, target = '') =>
+    request<ConversationConnectorExecution>(
+      `${B}/draft-actions/${encodeURIComponent(draftActionId)}/execution`,
+      json('POST', { connection_id: connectionId, target }),
+    ),
+  executeIntegrationRequest: (executionId: string) =>
+    request<ConversationConnectorExecution>(`${B}/integrations/executions/${encodeURIComponent(executionId)}/execute`, json('POST')),
+  integrationExecutions: (draftActionId = '', limit = 200) => request<unknown>(
+    `${B}/integrations/executions?draft_action_id=${encodeURIComponent(draftActionId)}&limit=${limit}`,
+  ).then((p) => list<ConversationConnectorExecution>(p)),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
     scenario: string

@@ -622,7 +622,51 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 {quickNotes.loading ? <Loading /> : quickNotes.data?.items.length ? <div className="space-y-1.5">{quickNotes.data.items.map((n) => <label key={n.id} className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-xs hover:bg-bg-hover/40"><input type="checkbox" checked={(space.selected_quick_note_ids ?? []).includes(n.id)} disabled={sourceSaving} onChange={() => void toggleQuickNote(n.id)} className="mt-0.5" /><span><span className="text-text-primary">{n.title || n.content.slice(0, 50)}</span><span className="ml-1 text-text-muted">用户速记 · 非证据</span></span></label>)}</div> : <p className="text-xs text-text-muted">没有 Quick Notes。</p>}
               </div>
             </div>
-            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本与所选 Quick Notes；后续替换资料不会静默改写这场的 Pack。</p>
+            <div className="mt-4 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3" data-testid="conversation-external-context">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-text-secondary">External Context · 真实连接边界</div>
+                  <p className="mt-1 text-[11px] text-text-muted">Catalog 只描述支持方向，不代表账户已连接。只有 adapter + verified connection 才能 Sync；Sync 后还要逐条选择 snapshot 才进入本场。</p>
+                </div>
+                <StatusBadge tone={(integrationConnections.data?.items.some((item) => item.status === 'CONNECTED' && item.adapter_available)) ? 'ok' : 'muted'}>
+                  {integrationConnections.data?.items.filter((item) => item.status === 'CONNECTED' && item.adapter_available).length ?? 0} CONNECTED
+                </StatusBadge>
+              </div>
+              {integrationCatalog.loading || integrationConnections.loading || connectorSnapshots.loading ? <div className="mt-3"><Loading /></div> : <>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(integrationCatalog.data?.items ?? []).map((provider) => <StatusBadge key={provider.provider_id} tone={provider.adapter_available ? 'ok' : 'muted'}>{provider.label} · {provider.adapter_available ? 'adapter ready' : 'not configured'}</StatusBadge>)}
+                </div>
+                <div className="mt-3 space-y-2">
+                  {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
+                    <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div><span className="text-xs font-medium text-text-primary">{connection.display_name}</span><span className="ml-2 text-[10px] text-text-muted">{connection.provider_id} · {connection.account_hint || 'account hidden'}</span></div>
+                        <StatusBadge tone={connection.status === 'CONNECTED' && connection.adapter_available ? 'ok' : connection.status === 'ERROR' ? 'warn' : 'muted'}>{connection.status}</StatusBadge>
+                      </div>
+                      <div className="mt-1 text-[10px] text-text-muted">{connection.granted_capabilities.join(' · ') || 'no grants'} · credential {connection.credential_ref_present ? 'opaque ref present' : 'not configured'}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
+                        {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
+                      </div>
+                      {connection.last_error ? <div className="mt-2 text-[10px] text-status-risk">{connection.last_error}</div> : null}
+                    </div>
+                  )) : <p className="text-[11px] text-text-muted">当前没有 connector account。仓库不会因为 catalog 里有 Google / Microsoft / GitHub / MCP 就假装已连接；账户授权由真实 provider/plugin 流程创建。</p>}
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Immutable snapshots · 显式选入 Space</div>
+                  {(connectorSnapshots.data?.items ?? []).length ? <div className="space-y-1.5">{connectorSnapshots.data!.items.map((snapshot) => {
+                    const checked = (space.selected_connector_snapshot_ids ?? []).includes(snapshot.id)
+                    return <label key={snapshot.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
+                      <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
+                      <span><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
+                    </label>
+                  })}</div> : <p className="text-[11px] text-text-muted">还没有外部 snapshot。真实连接 Sync 后才会出现；本场仍可完全离线使用。</p>}
+                </div>
+              </>}
+            </div>
+            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本、所选 Quick Notes 与显式选择的 external snapshots；后续资料替换或再次 Sync 都不会静默改写这场的 Pack。</p>
           </Section>
           <Section title="Preflight">
             <div className="mb-3 grid gap-3 md:grid-cols-2">

@@ -1304,13 +1304,13 @@ test.describe('v2.0 Conversation Profile', () => {
     let execution = null
     const connected = async (pathname, method, request) => {
       if (pathname === '/api/product/conversation/integrations/catalog') return {
-        items: [{ provider: 'GOOGLE_MAIL', label: 'Gmail', read_scopes: ['mail.read'], write_scopes: ['mail.send'], external_kinds: ['MAIL_THREAD'], provider_scopes: { 'mail.send': 'gmail.send' }, sync: 'PROVIDER_CURSOR', adapter_available: true }],
+        items: [{ provider: 'MCP', label: 'Model Context Protocol', read_scopes: ['context.read'], write_scopes: ['action.execute'], external_kinds: ['DOCUMENT', 'TASK', 'ISSUE'], provider_scopes: { 'action.execute': 'server-defined action scope' }, sync: 'SERVER_DEFINED', adapter_available: true }],
       }
       if (pathname === '/api/product/conversation/integrations/connections') return {
         items: [{
-          id: 'ccn-mail', provider: 'GOOGLE_MAIL', display_name: 'Work Gmail', status: 'CONNECTED',
-          auth_mode: 'OPAQUE_REFERENCE', credential_ref: 'keyring:redacted', granted_scopes: ['mail.send'],
-          capabilities: { read: ['mail.read'], write: ['mail.send'], external_kinds: ['MAIL_THREAD'] },
+          id: 'ccn-mcp', provider: 'MCP', display_name: 'Project MCP', status: 'CONNECTED',
+          auth_mode: 'OPAQUE_REFERENCE', credential_ref: 'plugin:redacted', granted_scopes: ['action.execute'],
+          capabilities: { read: ['context.read'], write: ['action.execute'], external_kinds: ['DOCUMENT', 'TASK', 'ISSUE'] },
           account_hint: 'u…@example.com', sync_cursor: '', last_sync_at: null, last_error: '',
           adapter_available: true, created_at: 1, updated_at: 1,
         }],
@@ -1340,7 +1340,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: 'Decision Log Draft' }).click()
     await page.getByRole('button', { name: '确认草稿' }).click()
     await expect(page.getByText('External Execution · 二次显式确认')).toBeVisible()
-    await page.getByLabel('执行连接').selectOption('ccn-mail')
+    await page.getByLabel('执行连接').selectOption('ccn-mcp')
     await page.getByLabel('外部目标').fill('decision-log')
     await page.getByRole('button', { name: '创建执行请求' }).click()
     await expect(page.getByText('PENDING', { exact: true })).toBeVisible()

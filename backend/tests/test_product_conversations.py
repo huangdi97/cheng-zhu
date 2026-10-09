@@ -3282,6 +3282,38 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"
 
 
+
+
+def test_local_upcoming_reminders_only_return_active_future_scheduled_sessions(product_env):
+    now = 1_000_000.0
+    active = conversations.create_space("Active", "PROJECT_SYNC")
+    archived = conversations.create_space("Archived", "PROJECT_SYNC")
+    conversations.update_space(archived["id"], {"status": "ARCHIVED"})
+
+    due = conversations.create_session(
+        active["id"], title="Tomorrow", scheduled_at=now + 3600, consent_ack=True,
+    )
+    conversations.create_session(
+        active["id"], title="Unscheduled", scheduled_at=None, consent_ack=True,
+    )
+    past = conversations.create_session(
+        active["id"], title="Past", scheduled_at=now - 60, consent_ack=True,
+    )
+    conversations.create_session(
+        archived["id"], title="Archived Future", scheduled_at=now + 1800, consent_ack=True,
+    )
+    started = conversations.create_session(
+        active["id"], title="Already Started", scheduled_at=now + 1200, consent_ack=True,
+    )
+    conversations.start_session(started["id"])
+
+    rows = conversations.upcoming_reminders(now=now, horizon_days=2)
+    assert [row["session_id"] for row in rows] == [due["id"]]
+    assert rows[0]["space_id"] == active["id"]
+    assert rows[0]["scheduled_at"] == now + 3600
+    assert all(row["session_id"] != past["id"] for row in rows)
+
+
 def test_space_summaries_grouping_inputs_include_upcoming_and_open_counts(product_env):
     space = conversations.create_space("Roadmap", "PROJECT_SYNC")
     conversations.create_session(

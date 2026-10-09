@@ -118,6 +118,18 @@ def test_preflight_and_pack_freeze_real_connector_read_context(product_env):
     assert frozen[0]["content_hash"]
     assert "token" not in repr(frozen).lower()
 
+    asked = conversations.ask(session["id"], "rollback owner")
+    assert asked["grounded"] is True
+    assert asked["truth_confirmed"] is False
+    assert asked["matches"][0]["kind"] == "CONNECTOR_CONTEXT"
+    assert asked["matches"][0]["authority"] == "EXTERNAL_REFERENCE"
+    assert asked["matches"][0]["source_refs"][0]["connector_id"] == connector["id"]
+
+    live_context = conversations.session_context(session["id"])
+    assert live_context["connector_context"][0]["title"] == "Architecture Review"
+    assert "excerpt" not in live_context["connector_context"][0]
+    assert live_context["connector_runtime"]["resolved"]["calendar.read"] == connector["id"]
+
     fake.read_rows = [{
         "external_id": "evt-2",
         "title": "Changed after start",

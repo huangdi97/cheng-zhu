@@ -533,8 +533,10 @@ reviewed output evidence
 | Conversation AUTO Screen Context | RUNTIME_AVAILABLE | policy 允许 ≠ 自动启动；Live 二次显式 start；ACTIVE/OFF THE RECORD 可见；consent/transparency user-report gate；同帧去重/限频/连续错误 fail-stop；raw image 不持久化；frozen vision route；Session/Space lifecycle 强制 stop |
 | Conversation Human Coach | RUNTIME_AVAILABLE | Conversation-specific session kind/target + frozen HUMAN_ALLOWED policy + transparency gate + per-field permissions + helper-side session scoping + Interview Resume/JD isolation + advice-only audit + lifecycle revoke；beta.2 public prerelease / real-session evidence 仍是独立发布/用户证据门禁 |
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
-| Calendar / Mail / Docs / project tracker connector | NOT WIRED | external dependency；不能用 placeholder 伪装 |
-| External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts |
+| Integration Boundary / connector provenance | RUNTIME_AVAILABLE | schema v8；provider capability + least-privilege scope；opaque credential ref；explicit snapshot selection；Pack freeze；retention/export；无 token/secret 入 product.db |
+| Concrete Google / Microsoft / GitHub / MCP adapters + OAuth provisioning | EXTERNAL_NOT_CONFIGURED | provider dependency；默认没有真实 adapter/credential，不能用 placeholder 伪装 |
+| Reviewed external execution boundary | RUNTIME_AVAILABLE | APPROVED Draft → Execution Request → second explicit Execute → idempotency/provider result audit；缺 connection/scope/adapter 时 BLOCKED |
+| Actual task/email/issue/decision-log provider execution | EXTERNAL_NOT_CONFIGURED | 只有真实 adapter 执行并返回 SUCCEEDED 才能宣称外部动作成功 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
 
@@ -725,10 +727,10 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- Calendar / Mail / Docs / project tracker connector；
+- concrete Google / Microsoft / GitHub / MCP provider adapters 与 OAuth provisioning；
 - OS notification/discovery；
 - Human Coach real-session evidence；
-- actual external write-back execution；
+- actual external write-back provider success evidence；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；
 - real-user validation。
@@ -742,7 +744,7 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - 不存在“表存在但没有生命周期语义”的一等对象；
 - AI candidate 与 reviewed continuity 明确分层；
 - mutable Space 与 frozen Session Pack 明确分层；
-- external/unwired 能力 fail-closed；
+- external/unwired 能力 fail-closed；Integration Boundary 可用不等于 provider 已连接；
 - README 不夸大 release / validation；
 - CI 全绿。
 

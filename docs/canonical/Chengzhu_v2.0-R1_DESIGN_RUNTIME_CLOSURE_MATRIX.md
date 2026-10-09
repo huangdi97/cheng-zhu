@@ -35,7 +35,7 @@ REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前主线已经进一步具备 Windows packaged Conversation Beta engineering evidence 与独立 screenshot evidence，因此允许进入 `v2.0.0-beta.1` prerelease candidate；这仍不等于 stable v2，也不等于真实用户价值已经验证。
+`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前主线已经进一步具备 Windows packaged Conversation Beta engineering evidence 与独立 screenshot evidence，因此允许进入 `v2.0.0-beta.2` prerelease candidate；这仍不等于 stable v2，也不等于真实用户价值已经验证。
 
 ---
 
@@ -705,7 +705,7 @@ REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`v2.0.0-beta.1` 必须通过与 stable 相同的 exact-SHA / installer / portable / SHA256 / download-back / provenance gate，并以 GitHub `prerelease=true, latest=false` 发布。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
+`v2.0.0-beta.2` 必须通过与 stable 相同的 exact-SHA / installer / portable / SHA256 / download-back / provenance gate，并以 GitHub `prerelease=true, latest=false` 发布。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
 
 ---
 
@@ -725,7 +725,7 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 - Calendar / Mail / Docs / project tracker connector；
 - OS notification/discovery；
-- Human Coach public prerelease / real-session evidence；
+- Human Coach real-session evidence；
 - actual external write-back execution；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；

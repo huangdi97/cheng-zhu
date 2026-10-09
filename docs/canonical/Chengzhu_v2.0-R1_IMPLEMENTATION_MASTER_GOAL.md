@@ -744,7 +744,7 @@ PR 合并后至少要有：
 
 ## Public Conversation Beta Prerelease Gate
 
-`v2.0.0-beta.1` 只允许在以下条件同时成立时发布：
+`v2.0.0-beta.2` 只允许在以下条件同时成立时发布：
 
 - exact green main SHA；
 - Windows installer + portable；
@@ -869,11 +869,12 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 发布 `v2.0.0-beta.1` GitHub Prerelease，保持 v1.4.2 为 Stable Latest；
-2. 用该可下载安装包进行 local dogfood；
-3. 真实 Project Sync / Design Review 小规模使用；
-4. 收集 human-labeled Guidance / missed-moment / continuity evidence；
-5. 根据真实证据再决定是否继续投入：
+1. 先让 `v2.0.0-beta.2` 的 PR CI + Windows Release preflight 在 exact final head 全绿；
+2. 合并后由 exact green main SHA 发布 GitHub Prerelease，保持 v1.4.2 为 Stable Latest；
+3. 用该可下载安装包进行 local dogfood；
+4. 真实 Project Sync / Design Review 小规模使用；
+5. 收集 human-labeled Guidance / missed-moment / continuity evidence；
+6. 根据真实证据再决定是否继续投入：
    - Human Coach 的 packaged/real-session evidence；
    - Private Overlay；
    - Calendar / Docs / Mail / project-tracker connectors；

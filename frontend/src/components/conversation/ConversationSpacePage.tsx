@@ -728,7 +728,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     <SecondaryButton disabled={sessionBusy || !executionConnectionId} onClick={requestExternalExecution}>创建执行请求</SecondaryButton>
                     {execution?.status === 'PENDING' ? <PrimaryButton disabled={sessionBusy} onClick={executeExternalRequest}>执行到外部系统</PrimaryButton> : null}
                   </div>
-                </> : <p className="mt-2 text-[11px] text-text-muted">没有满足 ${executionScope || "required write scope"} 的“已连接 + adapter available” provider。草稿仍只保留本地；这里不会显示假的发送/同步按钮。</p>}
+                </> : <p className="mt-2 text-[11px] text-text-muted">没有满足 {executionScope || 'required write scope'} 的“已连接 + adapter available” provider。草稿仍只保留本地；这里不会显示假的发送/同步按钮。</p>}
                 {execution ? <div className="mt-3 rounded-lg bg-bg-primary/60 p-2 text-[11px]">
                   <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : execution.status === 'FAILED' || execution.status === 'BLOCKED' ? 'risk' : 'warn'}>{execution.status}</StatusBadge><span className="text-text-muted">{execution.operation} · idempotency {execution.idempotency_key.slice(0, 10)}</span></div>
                   {execution.error ? <div className="mt-1 text-status-risk">{execution.error}</div> : null}

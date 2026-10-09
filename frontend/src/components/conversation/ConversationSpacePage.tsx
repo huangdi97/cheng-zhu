@@ -85,6 +85,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const prepare = useAsync(() => conversationApi.prepare(spaceId), [spaceId])
   const materials = useAsync(() => productApi.materials(), [])
   const quickNotes = useAsync(() => productApi.quickNotes(), [])
+  const integrationCatalog = useAsync(() => conversationApi.integrationCatalog(), [])
+  const integrationConnections = useAsync(() => conversationApi.integrationConnections(), [])
+  const connectorSnapshots = useAsync(() => conversationApi.connectorSnapshots(spaceId), [spaceId])
   const retention = useAsync(() => conversationApi.retentionPreview(spaceId), [spaceId])
   const [sessionTitle, setSessionTitle] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
@@ -322,6 +325,17 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSourceSaving(false) }
   }
 
+  const toggleConnectorSnapshot = async (id: string) => {
+    const selected = new Set(space.selected_connector_snapshot_ids ?? [])
+    if (selected.has(id)) selected.delete(id); else selected.add(id)
+    setSourceSaving(true); setSessionError('')
+    try {
+      await conversationApi.patchSpace(spaceId, { selected_connector_snapshot_ids: Array.from(selected) })
+      await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSourceSaving(false) }
+  }
+
   const exportSpace = async () => {
     setSessionBusy(true); setSessionError('')
     try {
@@ -528,7 +542,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             <p className="mt-2 text-[11px] text-text-muted">Playbook 会随 Session Pack 冻结；它是本 Profile 的工作框架，不是“会议成功评分”。</p>
           </Section> : null}
           <Section title="本场带入来源">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-3">
               <div>
                 <div className="mb-2 text-xs font-semibold text-text-secondary">项目资料 / 知识库</div>
                 {materials.loading ? <Loading /> : materials.data?.items.length ? <div className="space-y-1.5">{materials.data.items.map((m) => {
@@ -541,8 +555,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 <div className="mb-2 text-xs font-semibold text-text-secondary">Quick Notes</div>
                 {quickNotes.loading ? <Loading /> : quickNotes.data?.items.length ? <div className="space-y-1.5">{quickNotes.data.items.map((n) => <label key={n.id} className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-xs hover:bg-bg-hover/40"><input type="checkbox" checked={(space.selected_quick_note_ids ?? []).includes(n.id)} disabled={sourceSaving} onChange={() => void toggleQuickNote(n.id)} className="mt-0.5" /><span><span className="text-text-primary">{n.title || n.content.slice(0, 50)}</span><span className="ml-1 text-text-muted">用户速记 · 非证据</span></span></label>)}</div> : <p className="text-xs text-text-muted">没有 Quick Notes。</p>}
               </div>
+              <div>
+                <div className="mb-2 text-xs font-semibold text-text-secondary">External Connector Snapshots</div>
+                {connectorSnapshots.loading ? <Loading /> : connectorSnapshots.data?.items.length ? <div className="space-y-1.5">{connectorSnapshots.data.items.map((snapshot) => <label key={snapshot.id} className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-xs hover:bg-bg-hover/40"><input type="checkbox" checked={(space.selected_connector_snapshot_ids ?? []).includes(snapshot.id)} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" /><span><span className="text-text-primary">{snapshot.title || snapshot.external_kind}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · snapshot · 非 truth</span></span></label>)}</div> : <div className="space-y-2">
+                  <p className="text-xs text-text-muted">还没有真实 connector snapshot。未连接 provider 时不会伪造 Calendar / Mail / Issue 数据。</p>
+                  {integrationCatalog.data?.items.slice(0, 6).map((provider) => <div key={provider.provider} className="rounded-lg border border-bg-tertiary/60 px-2 py-1.5 text-[11px]"><div className="flex items-center justify-between gap-2"><span className="text-text-secondary">{provider.label}</span><StatusBadge tone={provider.adapter_available ? 'ok' : 'muted'}>{provider.adapter_available ? 'adapter available' : 'not wired'}</StatusBadge></div><div className="mt-1 text-text-muted">read · {provider.read_scopes.join(' / ') || 'none'}{provider.write_scopes.length ? ` · write · ${provider.write_scopes.join(' / ')}` : ''}</div></div>)}
+                </div>}
+              </div>
             </div>
-            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本与所选 Quick Notes；后续替换资料不会静默改写这场的 Pack。</p>
+            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本、所选 Quick Notes 与显式选择的 connector snapshots；外部 snapshot 只是带 provenance 的 source，不会自动升级成 Decision / Commitment truth。</p>
           </Section>
           <Section title="Preflight">
             <div className="mb-3 grid gap-3 md:grid-cols-2">

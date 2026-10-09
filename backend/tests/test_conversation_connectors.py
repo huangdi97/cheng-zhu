@@ -33,7 +33,11 @@ class FakeAdapter:
         self.executions.append((capability, dict(payload)))
         if self.fail_execute:
             raise RuntimeError("provider rejected request")
-        return {"external_ref": f"fake:{capability}:{len(self.executions)}", "ok": True}
+        return {
+            "external_ref": f"fake:{capability}:{len(self.executions)}",
+            "ok": True,
+            "nested": {"access_token": "provider-secret", "safe": "visible"},
+        }
 
 
 @pytest.fixture(autouse=True)
@@ -70,12 +74,15 @@ def test_connector_metadata_excludes_secrets_and_reports_capability_health(produ
             "account_hint": "user@example.invalid",
             "access_token": "must-not-persist",
             "api_key": "must-not-persist",
+            "nested": {"authorization": "Bearer hidden", "safe": "ok"},
         },
     )
     assert connected["status"] == "CONNECTED"
     assert connected["metadata"]["account_hint"] == "user@example.invalid"
     assert "access_token" not in connected["metadata"]
     assert "api_key" not in connected["metadata"]
+    assert "authorization" not in connected["metadata"]["nested"]
+    assert connected["metadata"]["nested"]["safe"] == "ok"
 
     status = conversation_connectors.capability_status(["calendar.read", "mail.send"])
     assert status["ok"] is True
@@ -184,6 +191,8 @@ def test_external_execution_requires_approved_draft_permission_and_real_connecto
     execution = conversation_connectors.execute_draft_action(draft["id"], connector["id"])
     assert execution["status"] == "SUCCEEDED"
     assert execution["external_ref"].startswith("fake:mail.send:")
+    assert "access_token" not in execution["result"]["nested"]
+    assert execution["result"]["nested"]["safe"] == "visible"
     assert fake.executions[0][0] == "mail.send"
 
     replay = conversation_connectors.execute_draft_action(draft["id"], connector["id"])

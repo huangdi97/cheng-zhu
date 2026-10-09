@@ -1,0 +1,158 @@
+start=2026-10-09 19:50:38 source=3d65fa052b0d6f6cb65ef18bba9e53537645cf92
++ E:\AI\面试助手\build\sidecar-venv\Scripts\python.exe -m pip install --upgrade pip --quiet
++ E:\AI\面试助手\build\sidecar-venv\Scripts\python.exe -m pip install -r backend/requirements.txt pyinstaller>=6.10,<7 --quiet
++ E:\AI\面试助手\build\sidecar-venv\Scripts\python.exe -m PyInstaller packaging/chengzhu-backend.spec --noconfirm --distpath build/sidecar --workpath build/pyinstaller
+481 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.7
+481 INFO: Python: 3.11.15
+545 INFO: Platform: Windows-10-10.0.26200-SP0
+545 INFO: Python environment: E:\AI\面试助手\build\sidecar-venv
+2636 INFO: Module search paths (PYTHONPATH):
+['E:\\AI\\面试助手',
+ 'C:\\Users\\Kaiser\\AppData\\Roaming\\uv\\python\\cpython-3.11.15-windows-x86_64-none\\python311.zip',
+ 'C:\\Users\\Kaiser\\AppData\\Roaming\\uv\\python\\cpython-3.11.15-windows-x86_64-none\\DLLs',
+ 'C:\\Users\\Kaiser\\AppData\\Roaming\\uv\\python\\cpython-3.11.15-windows-x86_64-none\\Lib',
+ 'C:\\Users\\Kaiser\\AppData\\Roaming\\uv\\python\\cpython-3.11.15-windows-x86_64-none',
+ 'E:\\AI\\面试助手\\build\\sidecar-venv',
+ 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages',
+ 'E:\\AI\\面试助手\\backend']
+4955 INFO: Appending 'datas' from .spec
+4968 INFO: checking Analysis
+5062 INFO: Building because hiddenimports changed
+5062 INFO: Looking for Python shared library...
+5062 INFO: Using Python shared library: C:\Users\Kaiser\AppData\Roaming\uv\python\cpython-3.11.15-windows-x86_64-none\python311.dll
+5062 INFO: Running Analysis Analysis-00.toc
+5062 INFO: Target bytecode optimization level: 0
+5062 INFO: Initializing module dependency graph...
+5070 INFO: Initializing module graph hook caches...
+5201 INFO: Analyzing modules for base_library.zip ...
+7355 INFO: Processing standard module hook 'hook-encodings.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8679 INFO: Processing standard module hook 'hook-heapq.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+11235 INFO: Processing standard module hook 'hook-math.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+11421 INFO: Processing standard module hook 'hook-pickle.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+16132 INFO: Caching module dependency graph...
+16206 INFO: Analyzing E:\AI\面试助手\backend\sidecar.py
+16354 INFO: Processing standard module hook 'hook-uvicorn.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+17477 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+17816 INFO: Processing standard module hook 'hook-xml.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+18356 INFO: Processing standard module hook 'hook-_ctypes.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+19993 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+19999 INFO: SetuptoolsInfo: initializing cached setuptools info...
+26896 INFO: Processing standard module hook 'hook-platform.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+27405 INFO: Processing standard module hook 'hook-difflib.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+27697 INFO: Processing standard module hook 'hook-webbrowser.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+28628 INFO: Processing standard module hook 'hook-websockets.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+30435 INFO: Processing standard module hook 'hook-anyio.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+32548 INFO: Processing standard module hook 'hook-pydantic.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+34249 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+34313 INFO: Processing standard module hook 'hook-sysconfig.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+38030 INFO: Processing standard module hook 'hook-opentelemetry.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+39725 INFO: Processing standard module hook 'hook-docx.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+40396 INFO: Processing standard module hook 'hook-lxml.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+41850 INFO: Processing standard module hook 'hook-lxml.etree.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+44096 INFO: Processing standard module hook 'hook-pypdfium2.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+44138 INFO: Processing standard module hook 'hook-pypdfium2_raw.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+44708 INFO: Processing standard module hook 'hook-PIL.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+45010 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+46230 INFO: Processing standard module hook 'hook-numpy.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+54613 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+56255 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+57016 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+59892 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+62090 INFO: Processing standard module hook 'hook-sqlite3.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+65083 INFO: Processing standard module hook 'hook-certifi.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+79476 INFO: Processing standard module hook 'hook-sounddevice.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+85431 INFO: Processing standard module hook 'hook-urllib3.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+85888 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+85890 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+85931 INFO: Processing standard module hook 'hook-setuptools.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+86105 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+86108 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+87112 INFO: Processing standard module hook 'hook-distutils.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87180 INFO: Processing standard module hook 'hook-distutils.util.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87391 INFO: Processing standard module hook 'hook-_osx_support.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87481 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+88294 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+88296 INFO: Setuptools: 'jaraco' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.jaraco'!
+88325 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+88332 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+88362 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+88364 INFO: Setuptools: 'more_itertools' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.more_itertools'!
+89085 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+89087 INFO: Setuptools: 'importlib_metadata' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.importlib_metadata'!
+89134 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+89138 INFO: Processing pre-safe-import-module hook 'hook-zipp.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+89140 INFO: Setuptools: 'zipp' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.zipp'!
+90158 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+90161 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli'!
+91346 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+92459 INFO: Processing pre-safe-import-module hook 'hook-platformdirs.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+92461 INFO: Setuptools: 'platformdirs' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.platformdirs'!
+93237 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+93241 INFO: Setuptools: 'wheel' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.wheel'!
+95305 INFO: Processing standard module hook 'hook-opencc.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+96186 INFO: Processing standard module hook 'hook-av.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+109119 INFO: Processing standard module hook 'hook-fsspec.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+111823 INFO: Processing standard module hook 'hook-onnxruntime.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+112158 INFO: Processing pre-safe-import-module hook 'hook-tensorflow.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+112524 INFO: Processing standard module hook 'hook-soundcard.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\soundcard\\__pyinstaller'
+113056 INFO: Processing standard module hook 'hook-pycparser.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+118996 INFO: Analyzing hidden import 'uvicorn.__main__'
+119011 INFO: Analyzing hidden import 'uvicorn.lifespan'
+119012 INFO: Analyzing hidden import 'uvicorn.lifespan.off'
+119031 INFO: Analyzing hidden import 'uvicorn.lifespan.on'
+119053 INFO: Analyzing hidden import 'uvicorn.loops'
+119054 INFO: Analyzing hidden import 'uvicorn.loops.asyncio'
+119072 INFO: Analyzing hidden import 'uvicorn.loops.auto'
+119105 INFO: Analyzing hidden import 'uvicorn.loops.zuvloop'
+119122 INFO: Analyzing hidden import 'uvicorn.protocols.http.auto'
+119138 INFO: Analyzing hidden import 'uvicorn.protocols.websockets.auto'
+119151 INFO: Analyzing hidden import 'uvicorn.workers'
+119173 INFO: Analyzing hidden import 'mss'
+119392 INFO: Analyzing hidden import 'qrcode'
+119880 INFO: Processing module hooks (post-graph stage)...
+126723 INFO: Processing standard module hook 'hook-lxml.isoschematron.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+126842 WARNING: Hidden import "pycparser.lextab" not found!
+126842 WARNING: Hidden import "pycparser.yacctab" not found!
+128029 WARNING: Hidden import "tzdata" not found!
+129170 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks'
+132344 INFO: Processing standard module hook 'hook-lxml.objectify.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+132398 INFO: Performing binary vs. data reclassification (125 entries)
+134335 INFO: Looking for ctypes DLLs
+134945 INFO: Analyzing run-time hooks ...
+134969 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+134995 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+135036 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+135082 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+135178 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+135429 INFO: Creating base_library.zip...
+135469 INFO: Looking for dynamic libraries
+149162 INFO: Extra DLL search directories (AddDllDirectory): ['E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\ctranslate2', 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\ctranslate2/../_rocm_sdk_core/bin', 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\av.libs', 'E:\\AI\\面试助手\\build\\sidecar-venv\\Lib\\site-packages\\numpy.libs']
+149163 INFO: Extra DLL search directories (PATH): []
+153584 INFO: Warnings written to E:\AI\面试助手\build\pyinstaller\chengzhu-backend\warn-chengzhu-backend.txt
+154077 INFO: Graph cross-reference written to E:\AI\面试助手\build\pyinstaller\chengzhu-backend\xref-chengzhu-backend.html
+154264 INFO: checking PYZ
+154327 INFO: Building because toc changed
+154327 INFO: Building PYZ (ZlibArchive) E:\AI\面试助手\build\pyinstaller\chengzhu-backend\PYZ-00.pyz
+156578 INFO: Building PYZ (ZlibArchive) E:\AI\面试助手\build\pyinstaller\chengzhu-backend\PYZ-00.pyz completed successfully.
+156680 INFO: checking PKG
+156706 INFO: Building because E:\AI\面试助手\build\pyinstaller\chengzhu-backend\PYZ-00.pyz changed
+156707 INFO: Building PKG (CArchive) chengzhu-backend.pkg
+156832 INFO: Building PKG (CArchive) chengzhu-backend.pkg completed successfully.
+156835 INFO: Bootloader E:\AI\面试助手\build\sidecar-venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+156835 INFO: checking EXE
+156856 INFO: Rebuilding EXE-00.toc because pkg is more recent
+156856 INFO: Building EXE from EXE-00.toc
+156856 INFO: Copying bootloader EXE to E:\AI\面试助手\build\pyinstaller\chengzhu-backend\chengzhu-backend.exe
+156995 INFO: Copying icon to EXE
+157069 INFO: Copying 0 resources to EXE
+157070 INFO: Embedding manifest in EXE
+157132 INFO: Appending PKG archive to EXE
+157242 INFO: Fixing EXE headers
+157695 INFO: Building EXE from EXE-00.toc completed successfully.
+157702 INFO: checking COLLECT
+157728 INFO: Removing dir E:\AI\面试助手\build\sidecar\chengzhu-backend
+157890 INFO: Building COLLECT COLLECT-00.toc
+159577 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+159613 INFO: Build complete! The results are available in: E:\AI\面试助手\build\sidecar
+sidecar ready: E:\AI\面试助手\build\sidecar\chengzhu-backend\chengzhu-backend.exe
+exit=0 elapsed=174s

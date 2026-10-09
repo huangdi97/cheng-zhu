@@ -1,0 +1,20 @@
+start=2026-10-09 21:01:55
+
+> cheng-zhu-desktop@2.0.0-beta.2 dist:win
+> electron-builder --win --x64 --publish never
+
+  • electron-builder  version=25.1.8 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=41.10.7 arch=x64 buildFromSource=false appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=41.10.7 appOutDir=E:\AI\面试助手\dist\desktop\win-unpacked
+  • updating asar integrity executable resource  executablePath=E:\AI\面试助手\dist\desktop\win-unpacked\Chengzhu.exe
+  • building        target=zip arch=x64 file=E:\AI\面试助手\dist\desktop\Chengzhu-Portable-x64.zip
+  • building        target=nsis file=E:\AI\面试助手\dist\desktop\Chengzhu-Setup-x64.exe archs=x64 oneClick=false perMachine=false
+  • signing with signtool.exe  path=E:\AI\面试助手\dist\desktop\__uninstaller-nsis-cheng-zhu-desktop.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • signing with signtool.exe  path=E:\AI\面试助手\dist\desktop\Chengzhu-Setup-x64.exe
+  • no signing info identified, signing is skipped  signHook=false cscInfo=null
+  • building block map  blockMapFile=E:\AI\面试助手\dist\desktop\Chengzhu-Setup-x64.exe.blockmap
+exit=0 elapsed=156s

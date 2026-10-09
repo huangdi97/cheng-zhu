@@ -1,0 +1,3 @@
+
+testHome=C:\Users\Kaiser\.pi-desktop\scratch\fa318a99-bff2-42d3-a66f-64e1b46ff678\chengzhu-home-w
+launched pid=43664 at 20:13:56

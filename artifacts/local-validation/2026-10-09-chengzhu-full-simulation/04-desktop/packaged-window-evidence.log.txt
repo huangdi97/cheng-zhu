@@ -1,0 +1,37 @@
+start=2026-10-09 20:33:29 source=3d65fa052b0d6f6cb65ef18bba9e53537645cf92
+[sidecar] INFO:     Started server process [35968]
+[sidecar] INFO:     Waiting for application startup.
+[sidecar] INFO:     Application startup complete.
+[sidecar] INFO:     Uvicorn running on http://127.0.0.1:56895 (Press CTRL+C to quit)
+[app] 
+[sidecar] 2026-10-09 20:33:36 | WARNING | stt.engines | Whisper CUDA warmup failed; falling back to CPU: Library cublas64_12.dll is not found or cannot be loaded
+app stdout tail: 
+
+app stderr tail: 
+app evidence stage: {
+  "stage": "main-loaded",
+  "at": "2026-10-09T12:33:36.430Z",
+  "pid": 25760,
+  "packaged": true
+}
+Error: packaged evidence plan timed out: C:\Users\Kaiser\AppData\Local\Temp\chengzhu-runtime-evidence-BXc4M2\fresh-install-result.json
+    at waitForFile (file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-v13-packaged-window-evidence.mjs:117:9)
+    at async runPlan (file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-v13-packaged-window-evidence.mjs:157:20)
+    at async file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-v13-packaged-window-evidence.mjs:232:17
+sidecar output tail: INFO:     Started server process [35968]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:56895 (Press CTRL+C to quit)
+2026-10-09 20:33:36 | WARNING | stt.engines | Whisper CUDA warmup failed; falling back to CPU: Library cublas64_12.dll is not found or cannot be loaded
+
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+
+Error: packaged evidence plan timed out: C:\Users\Kaiser\AppData\Local\Temp\chengzhu-runtime-evidence-BXc4M2\fresh-install-result.json
+    at waitForFile (file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-v13-packaged-window-evidence.mjs:117:9)
+    at async runPlan (file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-v13-packaged-window-evidence.mjs:157:20)
+    at async file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-v13-packaged-window-evidence.mjs:232:17
+
+Node.js v22.15.0
+exit=1 elapsed=187s

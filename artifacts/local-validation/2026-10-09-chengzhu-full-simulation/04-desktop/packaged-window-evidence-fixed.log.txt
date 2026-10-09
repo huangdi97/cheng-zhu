@@ -1,0 +1,31 @@
+start=2026-10-09 21:09:31 source=870ace14e5c6118e79ee13e16aa88b16b4e29cfe
+[sidecar] INFO:     Started server process [42448]
+[sidecar] INFO:     Waiting for application startup.
+[sidecar] 2026-10-09 21:09:36 | WARNING | stt.engines | Whisper CUDA warmup failed; falling back to CPU: Library cublas64_12.dll is not found or cannot be loaded
+[sidecar] INFO:     Application startup complete.
+[sidecar] INFO:     Uvicorn running on http://127.0.0.1:62186 (Press CTRL+C to quit)
+[app] 
+[app] Using evidence sidecar on http://127.0.0.1:62186 (packaged=true)...
+[app] Evidence sidecar ready, creating window...
+[sidecar] INFO:     127.0.0.1:54999 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+[sidecar] INFO:     127.0.0.1:57465 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+[app] 
+[app] Using evidence sidecar on http://127.0.0.1:62186 (packaged=true)...
+[app] Evidence sidecar ready, creating window...
+[sidecar] INFO:     127.0.0.1:50386 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+[sidecar] INFO:     127.0.0.1:49571 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+[sidecar] INFO:     127.0.0.1:59738 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+[app] 
+[app] Using evidence sidecar on http://127.0.0.1:62186 (packaged=true)...
+[app] Evidence sidecar ready, creating window...
+[sidecar] INFO:     127.0.0.1:49287 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+[sidecar] INFO:     127.0.0.1:61493 - "WebSocket /ws" [accepted]
+[sidecar] INFO:     connection open
+done E:\AI\面试助手\artifacts\release-evidence\v2.0.0-beta.2 captures=46
+exit=0 elapsed=46s

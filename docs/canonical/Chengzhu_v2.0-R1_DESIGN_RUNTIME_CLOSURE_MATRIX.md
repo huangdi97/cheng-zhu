@@ -523,9 +523,9 @@ reviewed output evidence
 
 ---
 
-# 14. 当前明确 blocked / future-runtime 项
+# 14. Runtime / External Boundary Matrix
 
-以下不是“忘了实现”，而是当前证据边界要求不能假装已生效：
+这里同时列出“已经有真实 runtime、但成熟度仍受发布/真人证据门禁约束”的能力，以及真正 NOT WIRED / FUTURE 的外部能力。不要把两者统称为 blocked。
 
 | 能力 | 当前状态 | 为什么不伪装 |
 | --- | --- | --- |
@@ -700,12 +700,29 @@ PR #19 之后，main 已继续补齐：
 ```text
 V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
 V2_BETA_PRERELEASE_CANDIDATE = TRUE
+V2_BETA_PRERELEASE_PUBLISHED = FALSE
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`v2.0.0-beta.2` 必须通过与 stable 相同的 exact-SHA / installer / portable / SHA256 / download-back / provenance gate，并以 GitHub `prerelease=true, latest=false` 发布。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
+beta.2 当前精确 provenance：
+
+```text
+PRODUCT_SOURCE_SHA = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+DRAFT_RELEASE_TARGET = b0c9e9bd7e46070dd9777fc3951ff993855790a8
+DRAFT_ASSETS_UPLOADED = TRUE
+DRAFT_DOWNLOAD_BACK_SHA256 = PASS
+DOWNLOADED_INSTALLER_REPLAY = PASS
+DOWNLOADED_PACKAGED_SMOKE = PASS
+
+RELEASE_WORKFLOW_FIX_MAIN_SHA = cac605edf413ec248babf02ea9f73da708d156f8
+PUBLIC_PRERELEASE_PUBLISHED = FALSE
+```
+
+第一次 exact-SHA publish 已经跨过 draft/download-back/installer replay，最后只在 `Publish verified GitHub Release` 的 PowerShell `$tag:` 解析处失败。PR #54 已修复并在完整 Windows Release preflight 中通过。下一次发布必须使用**最新 main 上的修复后 workflow**，但 checkout/build/tag 的 `source_sha` 仍锁 `b0c9e9bd...`；release-engineering-only commit 不得偷换产品二进制 provenance。
+
+`v2.0.0-beta.2` 最终仍必须以 GitHub `prerelease=true, latest=false` 发布，且 Stable Latest 保持 v1.4.2。只有 public prerelease 真正完成后，才允许写 `V2_BETA_PRERELEASE_PUBLISHED = TRUE`。Stable v2 仍保留独立门禁。
 
 ---
 
@@ -721,11 +738,12 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 - subsystem-level Conversation Diagnostics；
 - stale Reality Report / historical Goal truth sync。
 
-以下仍保持 external/productization gate，不得为了“全做完”伪实现：
+以下仍保持 external / release-maturity / real-user gate，不得为了“全做完”伪实现：
 
 - Calendar / Mail / Docs / project tracker connector；
 - OS notification/discovery；
-- Human Coach real-session evidence；
+- Human Coach **real-session evidence**（runtime 已有，不是实现缺口）；
+- PRIVATE_OVERLAY **real-desktop / real-session evidence**（desktop runtime 已有，不是实现缺口）；
 - actual external write-back execution；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；

@@ -3692,3 +3692,57 @@ def test_long_lived_space_open_thread_lookup_survives_over_500_other_threads(pro
     result = conversations.delete_session(old_session["id"], confirmed_policy="TOMBSTONE")
     assert result["removed_open_thread_projections"] == 1
     assert store.get("conversation_open_thread", original["id"]) is None
+
+def test_delivery_cue_uses_frozen_expression_profile_after_global_change(product_env, monkeypatch):
+    """v2.0-R1 contract: the Expression Profile is frozen into the Session Pack at
+    start; a later global「我的表达」change must not alter Live delivery cues for
+    this already-started Session (the cue may change structure/length/delivery
+    but never source facts)."""
+    import json as _json
+
+    from core import config as core_config
+    from services.storage import intelligence as intel_store
+
+    class Cfg:
+        stt_provider = "whisper"
+        doubao_stt_api_key = ""
+        doubao_stt_access_token = ""
+        candidate_stt_provider = "whisper"
+        candidate_remote_stt_enabled = False
+
+    monkeypatch.setattr(core_config, "get_config", lambda: Cfg())
+    space = conversations.create_space("Exp Freeze", "PRESENTATION_QA")
+    session = conversations.create_session(
+        space["id"], capture_mode="NOTES_ONLY", processing_mode="LOCAL", consent_ack=True,
+    )
+    intel_store.save_voice_profile(
+        "local",
+        _json.dumps({"explicit_preferences": {
+            "conclusion_first": True, "shape": "bullet", "target_seconds": 30,
+        }}),
+        1, True,
+    )
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["expression_profile"]
+
+    # User changes the global expression profile mid-session.
+    intel_store.save_voice_profile(
+        "local",
+        _json.dumps({"explicit_preferences": {
+            "conclusion_first": False, "shape": "narrative", "target_seconds": 90,
+        }}),
+        1, True,
+    )
+    assert conversations._frozen_pack_payload(
+        conversations.require_session(session["id"])
+    )["expression_profile"] == frozen
+
+    cue = conversations.evaluate_guidance(
+        session["id"], {"delivery_focus": "conclusion first", "source_refs": []}
+    )
+    text = cue["guidance"]["text"]
+    # Frozen style, not the changed global style.
+    assert "先给结论" in text and "要点展开" in text and "30 秒" in text
+    assert "90 秒" not in text and "narrative" not in text
+    # The cue must not inject facts.
+    assert "10x" not in text and "方案" not in text

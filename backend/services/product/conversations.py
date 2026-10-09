@@ -2504,7 +2504,15 @@ def _guidance_kind_allowed(session: dict[str, Any], kind: str) -> bool:
 
 
 def _delivery_cue(session: dict[str, Any], body: dict[str, Any]) -> str:
-    expression = _expression_profile()
+    # COMPATIBILITY/CONTRACT:
+    # The v2.0-R1 runtime boundary freezes the Expression Profile into the
+    # Session Pack; Live delivery cues must keep using the frozen profile for
+    # this Session even if the user changes the global「我的表达」mid-session.
+    # Fall back to the live profile only when no pack has been frozen yet
+    # (e.g. preflight previews), so the pack remains the single authority
+    # once a Session is ACTIVE.
+    frozen = (_frozen_pack_payload(session) or {}).get("expression_profile") or {}
+    expression = frozen or _expression_profile()
     audience = {
         "role": str(body.get("audience_role") or "").strip(),
         "priority": str(body.get("audience_priority") or "").strip(),

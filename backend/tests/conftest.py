@@ -30,6 +30,19 @@ def product_env(tmp_path, monkeypatch):
     # in-memory config edits made by a test are rolled back at teardown
     monkeypatch.setattr(config_module, "_config", config_module._raw_config().model_copy(deep=True))
     monkeypatch.setattr(config_module, "_effective", None)
+    # The suite must be hermetic against the developer's own machine STT
+    # credentials: with Doubao/generic STT configured, the v2 LOCAL+TRANSCRIPT
+    # privacy preflight (intentional fail-closed) blocks start_session in tests
+    # that merely exercise transcript/item logic. CI passes because it has no
+    # config.json; forcing local-only STT here reproduces that contract locally.
+    # Tests that deliberately exercise remote-possible STT override
+    # get_config() themselves and are unaffected by this default.
+    _test_cfg = config_module._config
+    _test_cfg.stt_provider = "whisper"
+    _test_cfg.doubao_stt_api_key = ""
+    _test_cfg.doubao_stt_access_token = ""
+    _test_cfg.candidate_stt_provider = "whisper"
+    _test_cfg.candidate_remote_stt_enabled = False
     monkeypatch.setattr("services.storage.paths.exports_dir", lambda: str(tmp_path))
     monkeypatch.setattr("services.product.data_export.exports_dir", lambda: str(tmp_path))
     intel_storage.init_db()

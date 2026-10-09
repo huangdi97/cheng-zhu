@@ -997,6 +997,7 @@ def _preflight_context_fingerprint(
     policy: dict[str, Any],
     processing_runtime: dict[str, Any],
     screen_runtime: dict[str, Any],
+    connector_runtime: Optional[dict[str, Any]] = None,
 ) -> str:
     """Hash every mutable input that can materially change the eventual Pack.
 
@@ -1073,6 +1074,12 @@ def _preflight_context_fingerprint(
         },
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
+        "connector_runtime": {
+            "requested": list((connector_runtime or {}).get("requested") or []),
+            "resolved": dict((connector_runtime or {}).get("resolved") or {}),
+            "missing": list((connector_runtime or {}).get("missing") or []),
+            "ok": bool((connector_runtime or {}).get("ok", True)),
+        },
     }
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -1192,7 +1199,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         })
 
     context_fingerprint = _preflight_context_fingerprint(
-        session, space, pack_inputs, policy, processing_runtime, screen_runtime
+        session, space, pack_inputs, policy, processing_runtime, screen_runtime, connector_runtime
     )
     if record_fingerprint and session["status"] == "UPCOMING":
         state = dict(session.get("state") or {})

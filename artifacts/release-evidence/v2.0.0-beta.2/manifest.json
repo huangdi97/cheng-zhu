@@ -1,0 +1,430 @@
+{
+  "captured_at": "2026-10-09T13:10:16.569Z",
+  "evidence_type": "PACKAGED_BROWSERWINDOW_FILE_PLAN_WITH_PACKAGED_SIDECAR",
+  "executable": "E:\\AI\\面试助手\\dist\\desktop\\win-unpacked\\Chengzhu.exe",
+  "backend_executable": "E:\\AI\\面试助手\\dist\\desktop\\win-unpacked\\resources\\backend\\chengzhu-backend.exe",
+  "goal_id": "g_76da1b93256641b9",
+  "practice_id": "pr_8c4e7ad2493c4b1c",
+  "conversation_beta": {
+    "space_id": "cs_0a74e6c1b32f466d",
+    "prior_session_id": "cv_89e5b51e592e4b42",
+    "live_session_id": "cv_f4a1f59c2f944606",
+    "evidence_boundary": "PACKAGED_BETA_ENGINEERING_EVIDENCE_NOT_REAL_USER_VALIDATION"
+  },
+  "entries": [
+    {
+      "name": "01-onboarding",
+      "note": "real packaged fresh-install onboarding",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01-onboarding.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "01b-first-goal",
+      "note": "first packaged Goal during onboarding",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01b-first-goal.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "01c-guided-question",
+      "note": "real Practice 3.0 question in onboarding",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01c-guided-question.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "01d-guided-fast-cue",
+      "note": "real Fast Cue in packaged Guided First Practice",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01d-guided-fast-cue.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "01e-guided-overlay",
+      "note": "Compact Overlay opened from onboarding",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01e-guided-overlay.png",
+      "target": "overlay",
+      "width": 558,
+      "height": 185,
+      "url": "http://127.0.0.1:62186/?overlay=1"
+    },
+    {
+      "name": "01f-guided-quick-note",
+      "note": "Quick Note created inside first practice",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01f-guided-quick-note.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "01g-guided-reflection",
+      "note": "Content/Delivery feedback plus Demo Reflection closes the first-use loop",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01g-guided-reflection.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "01h-onboarding-complete",
+      "note": "canonical Goal-centered completion message",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\01h-onboarding-complete.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "02-action-home",
+      "note": "Action Home",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\02-action-home.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "03-goal-list",
+      "note": "Goal list",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\03-goal-list.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/goals"
+    },
+    {
+      "name": "04-goal-overview",
+      "note": "Goal Room overview with Next Focus and trends",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\04-goal-overview.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/goals/g_76da1b93256641b9"
+    },
+    {
+      "name": "05-goal-prepare",
+      "note": "Goal Prepare",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\05-goal-prepare.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/goals/g_76da1b93256641b9/prepare"
+    },
+    {
+      "name": "06-goal-interviews",
+      "note": "Goal interviews",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\06-goal-interviews.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/goals/g_76da1b93256641b9/interviews"
+    },
+    {
+      "name": "07-goal-offer",
+      "note": "Offer metadata without ATS-first UI",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\07-goal-offer.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/goals/g_76da1b93256641b9/offer"
+    },
+    {
+      "name": "08-me-resume",
+      "note": "Person workspace: current resume",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\08-me-resume.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/me/resume"
+    },
+    {
+      "name": "09-fact-inbox",
+      "note": "Fact Inbox",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\09-fact-inbox.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/me/inbox"
+    },
+    {
+      "name": "10-stories",
+      "note": "Stories 3.0 and competency coverage",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\10-stories.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/me/stories"
+    },
+    {
+      "name": "11-library-materials",
+      "note": "Material taxonomy/lifecycle",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\11-library-materials.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/library/materials"
+    },
+    {
+      "name": "12-quick-notes",
+      "note": "Quick Notes",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\12-quick-notes.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/library/notes"
+    },
+    {
+      "name": "13-question-banks",
+      "note": "Question Banks",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\13-question-banks.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/library/banks"
+    },
+    {
+      "name": "14-command-palette",
+      "note": "Ctrl+K contextual command palette",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\14-command-palette.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "15-practice-setup",
+      "note": "Practice 3.0 setup",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\15-practice-setup.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/practice?goal=g_76da1b93256641b9"
+    },
+    {
+      "name": "16-panel-practice",
+      "note": "Panel practice with controlled personas and split coaching",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\16-panel-practice.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/practice/pr_8c4e7ad2493c4b1c"
+    },
+    {
+      "name": "17-reflection",
+      "note": "Action-first Reflection",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\17-reflection.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/reflection/practice/pr_8c4e7ad2493c4b1c"
+    },
+    {
+      "name": "18-preflight",
+      "note": "Preflight 3.0 origins and policies",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\18-preflight.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/goals/g_76da1b93256641b9"
+    },
+    {
+      "name": "19-live-idle",
+      "note": "Live Cockpit one-status-line idle state",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\19-live-idle.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/live/default"
+    },
+    {
+      "name": "20-live-fast-cue",
+      "note": "Question → Fast Cue before Deep",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\20-live-fast-cue.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/live/default"
+    },
+    {
+      "name": "21-live-deep",
+      "note": "Deep answer as second layer",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\21-live-deep.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/live/default"
+    },
+    {
+      "name": "22-pin-moment",
+      "note": "Pin Moment",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\22-pin-moment.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/live/default"
+    },
+    {
+      "name": "23-live-quick-notes",
+      "note": "Live read-only Quick Notes drawer",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\23-live-quick-notes.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/live/default"
+    },
+    {
+      "name": "24-closing-mode",
+      "note": "Contextual Closing Mode",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\24-closing-mode.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/live/default"
+    },
+    {
+      "name": "25-settings-overlay",
+      "note": "Settings 3.0 + Overlay 3.0",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\25-settings-overlay.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/settings/live"
+    },
+    {
+      "name": "26-validation",
+      "note": "v1.4 product-loop validation UI",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\26-validation.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/settings/diagnostics"
+    },
+    {
+      "name": "27-dark-home",
+      "note": "Dark theme",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\27-dark-home.png",
+      "target": "main",
+      "width": 1503,
+      "height": 1003,
+      "url": "http://127.0.0.1:62186/#/home"
+    },
+    {
+      "name": "28-mobile-390-goal-prepare",
+      "note": "390px Goal Prepare",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\28-mobile-390-goal-prepare.png",
+      "target": "main",
+      "width": 488,
+      "height": 1058,
+      "url": "http://127.0.0.1:62186/#/goals/g_76da1b93256641b9/prepare"
+    },
+    {
+      "name": "29-history",
+      "note": "Unified History",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\29-history.png",
+      "target": "main",
+      "width": 488,
+      "height": 1058,
+      "url": "http://127.0.0.1:62186/#/history"
+    },
+    {
+      "name": "30-conversation-home",
+      "note": "Conversation Home from packaged BrowserWindow",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\30-conversation-home.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation"
+    },
+    {
+      "name": "31-conversation-spaces",
+      "note": "Conversation Spaces continuity list",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\31-conversation-spaces.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation/spaces"
+    },
+    {
+      "name": "32-conversation-overview",
+      "note": "Conversation Space overview with reviewed continuity and stakeholder state",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\32-conversation-overview.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation/spaces/cs_0a74e6c1b32f466d"
+    },
+    {
+      "name": "33-conversation-prepare",
+      "note": "Prepare with Brief, Agenda, Preflight policy and Pack context",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\33-conversation-prepare.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation/spaces/cs_0a74e6c1b32f466d/prepare"
+    },
+    {
+      "name": "34-conversation-decisions",
+      "note": "Decision timeline and reviewed truth",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\34-conversation-decisions.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation/spaces/cs_0a74e6c1b32f466d/decisions"
+    },
+    {
+      "name": "35-conversation-continue",
+      "note": "Continue with What changed, reviewed Open Questions and local DraftActions",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\35-conversation-continue.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation/spaces/cs_0a74e6c1b32f466d/sessions"
+    },
+    {
+      "name": "36-conversation-live",
+      "note": "Guidance-first Live with frozen Session Pulse and explicit stakeholder context",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\36-conversation-live.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/conversation/live/cv_f4a1f59c2f944606"
+    },
+    {
+      "name": "37-conversation-history",
+      "note": "Profile-aware Conversation History",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\37-conversation-history.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/history"
+    },
+    {
+      "name": "38-conversation-diagnostics",
+      "note": "Conversation subsystem diagnostics and evidence boundaries",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\38-conversation-diagnostics.png",
+      "target": "main",
+      "width": 1802,
+      "height": 1203,
+      "url": "http://127.0.0.1:62186/#/settings/diagnostics"
+    },
+    {
+      "name": "39-conversation-390-prepare",
+      "note": "390px Conversation Prepare",
+      "file": "E:\\AI\\面试助手\\artifacts\\release-evidence\\v2.0.0-beta.2\\39-conversation-390-prepare.png",
+      "target": "main",
+      "width": 488,
+      "height": 1058,
+      "url": "http://127.0.0.1:62186/#/conversation/spaces/cs_0a74e6c1b32f466d/prepare"
+    }
+  ]
+}

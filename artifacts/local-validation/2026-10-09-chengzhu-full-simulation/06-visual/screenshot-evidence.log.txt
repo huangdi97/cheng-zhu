@@ -1,0 +1,188 @@
+start=2026-10-09 21:29:16
+file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-local-screenshot-evidence.mjs:20
+import { spawn } from 'node:child_process'
+         ^^^^^
+
+SyntaxError: Identifier 'spawn' has already been declared
+    at compileSourceTextModule (node:internal/modules/esm/utils:344:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:105:18)
+    at #translate (node:internal/modules/esm/loader:534:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:581:27)
+    at async ModuleJob._link (node:internal/modules/esm/module_job:116:19)
+
+Node.js v22.15.0
+exit=1 elapsed=0s
+retry start=2026-10-09 21:33:09
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'E:\AI\面试助手\frontend\scripts\e2e\fixtures\setup.mjs' imported from E:\AI\面试助手\frontend\scripts\capture-local-screenshot-evidence.mjs
+Did you mean to import "../e2e/fixtures/setup.mjs"?
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:860:10)
+    at defaultResolve (node:internal/modules/esm/resolve:984:11)
+    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:780:12)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:704:25)
+    at ModuleLoader.resolve (node:internal/modules/esm/loader:687:38)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:305:38)
+    at ModuleJob._link (node:internal/modules/esm/module_job:137:49) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/e2e/fixtures/setup.mjs'
+}
+
+Node.js v22.15.0
+exit=1 elapsed=0s
+retry2 start=2026-10-09 21:34:53
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: spawn npx ENOENT
+    at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Emitted 'error' event on ChildProcess instance at:
+    at ChildProcess._handle.onexit (node:internal/child_process:291:12)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'spawn npx',
+  path: 'npx',
+  spawnargs: [
+    'vite',
+    'preview',
+    '--host',
+    '127.0.0.1',
+    '--port',
+    '4174',
+    '--strictPort'
+  ]
+}
+
+Node.js v22.15.0
+exit=1 elapsed=1s
+retry3 start=2026-10-09 21:38:37
+Error: spawn EINVAL
+    at ChildProcess.spawn (node:internal/child_process:420:11)
+    at spawn (node:child_process:753:9)
+    at run (file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-local-screenshot-evidence.mjs:102:18)
+    at file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-local-screenshot-evidence.mjs:205:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5) {
+  errno: -4071,
+  code: 'EINVAL',
+  syscall: 'spawn'
+}
+exit=1 elapsed=1s
+retry4 start=2026-10-09 21:39:15
+page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4174/#/conversation
+Call log:
+  - navigating to "http://127.0.0.1:4174/#/conversation", waiting until "networkidle"
+
+    at run (E:\AI\面试助手\frontend\scripts\capture-local-screenshot-evidence.mjs:123:18) {
+  name: 'Error'
+}
+exit=1 elapsed=8s
+retry5 start=2026-10-09 21:39:57
+page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4174/#/conversation
+Call log:
+  - navigating to "http://127.0.0.1:4174/#/conversation", waiting until "networkidle"
+
+    at run (E:\AI\面试助手\frontend\scripts\capture-local-screenshot-evidence.mjs:123:18) {
+  name: 'Error'
+}
+exit=1 elapsed=12s
+retry6 start=2026-10-09 21:43:04
+page.waitForSelector: Timeout 20000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid="conversation-home"]') to be visible
+
+    at run (E:\AI\面试助手\frontend\scripts\capture-local-screenshot-evidence.mjs:137:18) {
+  name: 'TimeoutError'
+}
+exit=1 elapsed=26s
+retry7 start=2026-10-09 21:46:42
+node:fs:442
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open 'E:\AI\面试助手\frontend\scripts\e2e\v20-conversation-profile.spec.mjs'
+    at Object.readFileSync (node:fs:442:20)
+    at file:///E:/AI/%E9%9D%A2%E8%AF%95%E5%8A%A9%E6%89%8B/frontend/scripts/capture-local-screenshot-evidence.mjs:112:20
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'E:\\AI\\面试助手\\frontend\\scripts\\e2e\\v20-conversation-profile.spec.mjs'
+}
+
+Node.js v22.15.0
+exit=1 elapsed=1s
+retry8 start=2026-10-09 21:47:41
+screenshots: 60
+  conversation-home-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\conversation-home-light-desktop.png
+  space-overview-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\space-overview-light-desktop.png
+  prepare-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\prepare-light-desktop.png
+  live-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-light-desktop.png
+  silent-state-light-desktop | unobstructed: true | 
+  manual-ask-provenance-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\manual-ask-provenance-light-desktop.png
+  transcript-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\transcript-light-desktop.png
+  live-surfaces-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-surfaces-light-desktop.png
+  continue-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\continue-light-desktop.png
+  history-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\history-light-desktop.png
+  diagnostics-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\diagnostics-light-desktop.png
+  reminder-settings-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\reminder-settings-light-desktop.png
+  pack-preview-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\pack-preview-light-desktop.png
+  interview-home-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-home-light-desktop.png
+  interview-history-light-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-history-light-desktop.png
+  conversation-home-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\conversation-home-light-390.png
+  space-overview-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\space-overview-light-390.png
+  prepare-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\prepare-light-390.png
+  live-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-light-390.png
+  silent-state-light-390 | unobstructed: true | 
+  manual-ask-provenance-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\manual-ask-provenance-light-390.png
+  transcript-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\transcript-light-390.png
+  live-surfaces-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-surfaces-light-390.png
+  continue-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\continue-light-390.png
+  history-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\history-light-390.png
+  diagnostics-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\diagnostics-light-390.png
+  reminder-settings-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\reminder-settings-light-390.png
+  pack-preview-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\pack-preview-light-390.png
+  interview-home-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-home-light-390.png
+  interview-history-light-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-history-light-390.png
+  conversation-home-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\conversation-home-dark-desktop.png
+  space-overview-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\space-overview-dark-desktop.png
+  prepare-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\prepare-dark-desktop.png
+  live-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-dark-desktop.png
+  silent-state-dark-desktop | unobstructed: true | 
+  manual-ask-provenance-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\manual-ask-provenance-dark-desktop.png
+  transcript-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\transcript-dark-desktop.png
+  live-surfaces-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-surfaces-dark-desktop.png
+  continue-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\continue-dark-desktop.png
+  history-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\history-dark-desktop.png
+  diagnostics-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\diagnostics-dark-desktop.png
+  reminder-settings-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\reminder-settings-dark-desktop.png
+  pack-preview-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\pack-preview-dark-desktop.png
+  interview-home-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-home-dark-desktop.png
+  interview-history-dark-desktop | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-history-dark-desktop.png
+  conversation-home-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\conversation-home-dark-390.png
+  space-overview-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\space-overview-dark-390.png
+  prepare-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\prepare-dark-390.png
+  live-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-dark-390.png
+  silent-state-dark-390 | unobstructed: true | 
+  manual-ask-provenance-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\manual-ask-provenance-dark-390.png
+  transcript-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\transcript-dark-390.png
+  live-surfaces-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\live-surfaces-dark-390.png
+  continue-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\continue-dark-390.png
+  history-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\history-dark-390.png
+  diagnostics-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\diagnostics-dark-390.png
+  reminder-settings-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\reminder-settings-dark-390.png
+  pack-preview-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\pack-preview-dark-390.png
+  interview-home-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-home-dark-390.png
+  interview-history-dark-390 | unobstructed: true | ..\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\screenshots\interview-history-dark-390.png
+exit=0 elapsed=146s

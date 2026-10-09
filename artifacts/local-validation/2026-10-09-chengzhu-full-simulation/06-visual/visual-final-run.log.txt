@@ -1,0 +1,10 @@
+start=2026-10-09 18:27:14 source=e609b176f49d1c03c238a716523c2c9d61ab360c
+
+Running 3 tests using 2 workers
+
+  ok 1 [chromium] › e2e\visual.spec.mjs:19:3 › @visual v1.3 main surfaces › Action Home (2.9s)
+  ok 2 [chromium] › e2e\visual.spec.mjs:27:3 › @visual v1.3 main surfaces › Goal list (2.5s)
+  ok 3 [chromium] › e2e\visual.spec.mjs:34:3 › @visual v1.3 main surfaces › Person resume workspace (2.0s)
+
+  3 passed (10.7s)
+exit=0

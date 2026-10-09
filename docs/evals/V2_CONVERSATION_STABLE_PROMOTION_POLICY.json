@@ -3,14 +3,14 @@
   "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. This policy is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
   "profiles_required": {
     "PROJECT_SYNC": {
-      "min_distinct_users": 5,
-      "min_sessions": 20,
-      "min_cross_session_spaces": 3
+      "distinct_users": 5,
+      "sessions": 20,
+      "cross_session_spaces": 3
     },
     "DESIGN_REVIEW": {
-      "min_distinct_users": 5,
-      "min_sessions": 20,
-      "min_cross_session_spaces": 3
+      "distinct_users": 5,
+      "sessions": 20,
+      "cross_session_spaces": 3
     }
   },
   "metrics": {

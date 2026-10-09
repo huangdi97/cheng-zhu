@@ -1,0 +1,483 @@
+{
+  "evidence_type": "LOCAL_FULL_SIMULATION_SCREENSHOTS",
+  "surface_visibility": "UNOBSTRUCTED_BY_MODAL",
+  "human_visual_acceptance": false,
+  "entries": [
+    {
+      "name": "conversation-home-light-desktop",
+      "note": "Conversation Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\conversation-home-light-desktop.png",
+      "sha256": "fe51a20fb30a79c2edef68833ba3b1c0c0d578ccab8e5752ec5fd7377fa4489f",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "space-overview-light-desktop",
+      "note": "Space Overview",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\space-overview-light-desktop.png",
+      "sha256": "db1b4e4b1c55ffecffddd0929c1762e7adedd854db228f9bbdbb6366f8b521fc",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "prepare-light-desktop",
+      "note": "Prepare",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\prepare-light-desktop.png",
+      "sha256": "a89228ba73f3bc078059eae59669fdf939adaad62bf71a95840e63dcd12707a1",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-light-desktop",
+      "note": "Live / Session Pulse",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-light-desktop.png",
+      "sha256": "b12b648956481e1f5d55f446e88d3178812d26e2c7b5f001c0ad400ff225a558",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "silent-state-light-desktop",
+      "note": "SILENT: no shown guidance card on idle Live",
+      "file": "",
+      "sha256": "",
+      "unobstructed": true
+    },
+    {
+      "name": "manual-ask-provenance-light-desktop",
+      "note": "Manual Ask provenance",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\manual-ask-provenance-light-desktop.png",
+      "sha256": "b0d4ccef810b4ae4b8bc98c35d318d25870f955d77849cd1541f1a562bdf782d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "transcript-light-desktop",
+      "note": "Transcript",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\transcript-light-desktop.png",
+      "sha256": "b0d4ccef810b4ae4b8bc98c35d318d25870f955d77849cd1541f1a562bdf782d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-surfaces-light-desktop",
+      "note": "Live surfaces (screen/coach/privacy chips)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-surfaces-light-desktop.png",
+      "sha256": "b0d4ccef810b4ae4b8bc98c35d318d25870f955d77849cd1541f1a562bdf782d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "continue-light-desktop",
+      "note": "Continue / Sessions",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\continue-light-desktop.png",
+      "sha256": "a89228ba73f3bc078059eae59669fdf939adaad62bf71a95840e63dcd12707a1",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "history-light-desktop",
+      "note": "Conversation History",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\history-light-desktop.png",
+      "sha256": "8a8a564204f1d57b2e9d1619c0e96bfcf923424dfcab50621805cf3ad0a34052",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "diagnostics-light-desktop",
+      "note": "Settings / Diagnostics",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\diagnostics-light-desktop.png",
+      "sha256": "71a9b41316019f69d07f91e4482a8859aae4c718b747af24c59db17de9e46e5a",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "reminder-settings-light-desktop",
+      "note": "Reminder settings",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\reminder-settings-light-desktop.png",
+      "sha256": "4f005a6af10218449350e8d3bad60a909c759960ea62af6f60c593a04f7c91c4",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "pack-preview-light-desktop",
+      "note": "Session Pack / Preflight surface",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\pack-preview-light-desktop.png",
+      "sha256": "98cab199433f7d9fcb86c12949ad67cb124fce2bc8ee38e26a39b52e4175c47a",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-home-light-desktop",
+      "note": "Interview Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-home-light-desktop.png",
+      "sha256": "1f1ddd8f6d3d6bb8d11256a9a1a2a09efb7b7317bc4c2c7a4dcc7a62bc19bea7",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-history-light-desktop",
+      "note": "Interview History (same route, Interview shell)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-history-light-desktop.png",
+      "sha256": "9079e7b0d4d846fe085305d10856d44e5a174889369d92f57170d50835b78c7b",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "conversation-home-light-390",
+      "note": "Conversation Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\conversation-home-light-390.png",
+      "sha256": "b035d4d91140545881e6349bc71bca184dba04dfe39b7ae5d5a727d9cf786bcc",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "space-overview-light-390",
+      "note": "Space Overview",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\space-overview-light-390.png",
+      "sha256": "3ebbb118ca263ac4602c9cf459bd8d267db8f6ae9ecf20eaf8d66dc22de23fe4",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "prepare-light-390",
+      "note": "Prepare",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\prepare-light-390.png",
+      "sha256": "3ebbb118ca263ac4602c9cf459bd8d267db8f6ae9ecf20eaf8d66dc22de23fe4",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-light-390",
+      "note": "Live / Session Pulse",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-light-390.png",
+      "sha256": "9ba2ef1bf82f48f384bfe1090796f79f715b2723a30dd6649d7233801173acb3",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "silent-state-light-390",
+      "note": "SILENT: no shown guidance card on idle Live",
+      "file": "",
+      "sha256": "",
+      "unobstructed": true
+    },
+    {
+      "name": "manual-ask-provenance-light-390",
+      "note": "Manual Ask provenance",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\manual-ask-provenance-light-390.png",
+      "sha256": "9ba2ef1bf82f48f384bfe1090796f79f715b2723a30dd6649d7233801173acb3",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "transcript-light-390",
+      "note": "Transcript",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\transcript-light-390.png",
+      "sha256": "9ba2ef1bf82f48f384bfe1090796f79f715b2723a30dd6649d7233801173acb3",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-surfaces-light-390",
+      "note": "Live surfaces (screen/coach/privacy chips)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-surfaces-light-390.png",
+      "sha256": "9ba2ef1bf82f48f384bfe1090796f79f715b2723a30dd6649d7233801173acb3",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "continue-light-390",
+      "note": "Continue / Sessions",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\continue-light-390.png",
+      "sha256": "3ebbb118ca263ac4602c9cf459bd8d267db8f6ae9ecf20eaf8d66dc22de23fe4",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "history-light-390",
+      "note": "Conversation History",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\history-light-390.png",
+      "sha256": "dbf738ae6a19f4ebc25764a478aca8c158fa8750461f85b6c5112f82b914e4a6",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "diagnostics-light-390",
+      "note": "Settings / Diagnostics",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\diagnostics-light-390.png",
+      "sha256": "a8e1705fe2d26bf61c8203f28b92a1b66136f1c7cddb173dd24bbc2906af390d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "reminder-settings-light-390",
+      "note": "Reminder settings",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\reminder-settings-light-390.png",
+      "sha256": "ed3b076bd4b18e7bd2986bb9b63917c5f531e85565038b40df67affdf3299c9f",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "pack-preview-light-390",
+      "note": "Session Pack / Preflight surface",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\pack-preview-light-390.png",
+      "sha256": "2a0b27b858946679ca69deb80906e4b28839434dcfc1c91f092888c61a57f8bc",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-home-light-390",
+      "note": "Interview Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-home-light-390.png",
+      "sha256": "b60270949bcd03c9e7281de37f65b49370048c54787f2b65ba1572bec43b0b47",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-history-light-390",
+      "note": "Interview History (same route, Interview shell)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-history-light-390.png",
+      "sha256": "634d3e1dcab75b93d37416253469d0d8835d692250a98e8205b3cc2cea563d70",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "conversation-home-dark-desktop",
+      "note": "Conversation Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\conversation-home-dark-desktop.png",
+      "sha256": "29c987ca7f4ea492e93394033aa1e5ba8bc5b888d3d7b0a24f2f13eb17dc1d98",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "space-overview-dark-desktop",
+      "note": "Space Overview",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\space-overview-dark-desktop.png",
+      "sha256": "946c9b528454df12503a6f5eba8efabbfe824bcbf35e9ca5b8c47565cd33c48f",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "prepare-dark-desktop",
+      "note": "Prepare",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\prepare-dark-desktop.png",
+      "sha256": "934cb06ba1c39896015cdbd4df4b9882824634dd287fa19cded00550062c339d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-dark-desktop",
+      "note": "Live / Session Pulse",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-dark-desktop.png",
+      "sha256": "2a05147d973fd538806a8ea10cf7de1f1a240c7808fc6d49be5b91751242a5b7",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "silent-state-dark-desktop",
+      "note": "SILENT: no shown guidance card on idle Live",
+      "file": "",
+      "sha256": "",
+      "unobstructed": true
+    },
+    {
+      "name": "manual-ask-provenance-dark-desktop",
+      "note": "Manual Ask provenance",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\manual-ask-provenance-dark-desktop.png",
+      "sha256": "2a05147d973fd538806a8ea10cf7de1f1a240c7808fc6d49be5b91751242a5b7",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "transcript-dark-desktop",
+      "note": "Transcript",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\transcript-dark-desktop.png",
+      "sha256": "2a05147d973fd538806a8ea10cf7de1f1a240c7808fc6d49be5b91751242a5b7",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-surfaces-dark-desktop",
+      "note": "Live surfaces (screen/coach/privacy chips)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-surfaces-dark-desktop.png",
+      "sha256": "2a05147d973fd538806a8ea10cf7de1f1a240c7808fc6d49be5b91751242a5b7",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "continue-dark-desktop",
+      "note": "Continue / Sessions",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\continue-dark-desktop.png",
+      "sha256": "934cb06ba1c39896015cdbd4df4b9882824634dd287fa19cded00550062c339d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "history-dark-desktop",
+      "note": "Conversation History",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\history-dark-desktop.png",
+      "sha256": "97b2919e4a3d1ee8e83208a771c387f1702b6518767ed28ad2fea28cfa75b4ac",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "diagnostics-dark-desktop",
+      "note": "Settings / Diagnostics",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\diagnostics-dark-desktop.png",
+      "sha256": "16df7dff1235366e7b0404827c0cadf0f146afcefbb5382783dabc31eaccb003",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "reminder-settings-dark-desktop",
+      "note": "Reminder settings",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\reminder-settings-dark-desktop.png",
+      "sha256": "ac49f8d3b8d508f7e51065b4c4373c3a901829989019d278e837f9a2f4d7633a",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "pack-preview-dark-desktop",
+      "note": "Session Pack / Preflight surface",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\pack-preview-dark-desktop.png",
+      "sha256": "0af5178b5b0bbf00f18679b8a69b6945da2cdf7f674a8a2d232a066df7528695",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-home-dark-desktop",
+      "note": "Interview Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-home-dark-desktop.png",
+      "sha256": "3ad1c61f1854bcd87f14489cea51d311b6c5f1f16921de2c69f7cb4909e280c5",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-history-dark-desktop",
+      "note": "Interview History (same route, Interview shell)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-history-dark-desktop.png",
+      "sha256": "e7262be3bb4ebceee3432e5efe972f4eb59e3f3f4d5179b13822f7531ddaa4e1",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "conversation-home-dark-390",
+      "note": "Conversation Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\conversation-home-dark-390.png",
+      "sha256": "b98e6c5bc588b3b0473ddf3ee7a46ea9f80ef32c57c517f8d67c600a66b9c0d2",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "space-overview-dark-390",
+      "note": "Space Overview",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\space-overview-dark-390.png",
+      "sha256": "88d32d90ef34e9212b9fbaa5e737132cb53b5304b33988afb9c87209e741e99b",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "prepare-dark-390",
+      "note": "Prepare",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\prepare-dark-390.png",
+      "sha256": "88d32d90ef34e9212b9fbaa5e737132cb53b5304b33988afb9c87209e741e99b",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-dark-390",
+      "note": "Live / Session Pulse",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-dark-390.png",
+      "sha256": "01514b8faa9b0461ac9b6bb50f8a3ff58218e94111a1ac2c54e41990f870897d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "silent-state-dark-390",
+      "note": "SILENT: no shown guidance card on idle Live",
+      "file": "",
+      "sha256": "",
+      "unobstructed": true
+    },
+    {
+      "name": "manual-ask-provenance-dark-390",
+      "note": "Manual Ask provenance",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\manual-ask-provenance-dark-390.png",
+      "sha256": "01514b8faa9b0461ac9b6bb50f8a3ff58218e94111a1ac2c54e41990f870897d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "transcript-dark-390",
+      "note": "Transcript",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\transcript-dark-390.png",
+      "sha256": "01514b8faa9b0461ac9b6bb50f8a3ff58218e94111a1ac2c54e41990f870897d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "live-surfaces-dark-390",
+      "note": "Live surfaces (screen/coach/privacy chips)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\live-surfaces-dark-390.png",
+      "sha256": "01514b8faa9b0461ac9b6bb50f8a3ff58218e94111a1ac2c54e41990f870897d",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "continue-dark-390",
+      "note": "Continue / Sessions",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\continue-dark-390.png",
+      "sha256": "88d32d90ef34e9212b9fbaa5e737132cb53b5304b33988afb9c87209e741e99b",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "history-dark-390",
+      "note": "Conversation History",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\history-dark-390.png",
+      "sha256": "2a60bd0ebc0405b624ccf5917ae0045b7ba58a8d2641ab3e43ed6de5f9756a0c",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "diagnostics-dark-390",
+      "note": "Settings / Diagnostics",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\diagnostics-dark-390.png",
+      "sha256": "5a58320d13fe89110988dd147744d94a9ed49a318ac5bdab15b4f8b39348acbf",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "reminder-settings-dark-390",
+      "note": "Reminder settings",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\reminder-settings-dark-390.png",
+      "sha256": "38dd6756805cd5ed17ce0a8fb8b0f2bdaf2cb2f89ac1f873518f3b7b3625db59",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "pack-preview-dark-390",
+      "note": "Session Pack / Preflight surface",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\pack-preview-dark-390.png",
+      "sha256": "46d3aaac074ad75d88fbab4ed02977d6a3c0e241bf6e25c22d4a66409323d9df",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-home-dark-390",
+      "note": "Interview Home",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-home-dark-390.png",
+      "sha256": "ab64b7a240286ae166dad4d0cdc960922e2c6c88d28931893d765d987ec3ce19",
+      "overlays_detected": 0,
+      "unobstructed": true
+    },
+    {
+      "name": "interview-history-dark-390",
+      "note": "Interview History (same route, Interview shell)",
+      "file": "..\\artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\screenshots\\interview-history-dark-390.png",
+      "sha256": "50bf77b83ddaa0013f5e83835859fec87515b4d679a76d54f0e74f08b660bb01",
+      "overlays_detected": 0,
+      "unobstructed": true
+    }
+  ]
+}

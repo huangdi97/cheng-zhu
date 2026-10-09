@@ -3159,7 +3159,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 7
+    assert diag["schema_version"] == 8
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1
@@ -3173,6 +3173,11 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
     assert diag["health"]["export_delete_integrity"] == "AVAILABLE"
     assert diag["health"]["processing_policy"] == "AVAILABLE"
     assert diag["health"]["speaker_diarization"] == "LIMITED_CHANNEL_ONLY"
+    assert diag["health"]["external_connectors"] == "NOT_CONFIGURED"
+    assert diag["health"]["external_writeback_execution"] == "DRAFT_ONLY_NO_CONNECTED_PROVIDER"
+    assert diag["runtime"]["connected_connectors"] == 0
+    assert diag["runtime"]["external_execution_succeeded"] == 0
+    assert diag["runtime"]["external_execution_failed"] == 0
 
 
 

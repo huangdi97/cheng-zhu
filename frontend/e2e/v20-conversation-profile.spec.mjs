@@ -1365,7 +1365,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('- offline migration 采用 v2 · state=AGREED')).toBeVisible()
     await expect(page.getByText(/APPROVED 只代表你审核了本地草稿；不等于外部执行成功/)).toBeVisible()
     await page.getByRole('button', { name: '确认草稿' }).click()
-    await expect(page.getByText('APPROVED')).toBeVisible()
+    await expect(page.getByText('APPROVED', { exact: true })).toBeVisible()
   })
 
 

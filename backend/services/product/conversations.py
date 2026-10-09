@@ -4074,18 +4074,21 @@ def export_space(space_id: str) -> dict[str, Any]:
         params=(space_id,),
         order="deleted_at ASC",
     )
-    # Explicit categories are primary. Legacy aggregate keys stay for tooling
-    # compatibility but point to the same local data, not a second truth store.
+    integration = _space_integration_export(space_id)
+    packs = store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC")
     return {
         "kind": "CONVERSATION_SPACE",
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
                 "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
-                "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
+                "guidance", "source_manifest", "connector_snapshots", "connector_connections",
+                "external_execution_audit", "open_threads", "draft_actions", "session_packs",
+                "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
+            "credential_refs_exported": False,
         },
         "space": {k: v for k, v in detail.items() if k not in {"goals", "sessions", "participants", "decisions", "commitments", "open_questions", "threads"}},
         "goals": detail["goals"],
@@ -4098,11 +4101,14 @@ def export_space(space_id: str) -> dict[str, Any]:
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
         "source_manifest": source_manifest,
+        "connector_snapshots": integration["connector_snapshots"],
+        "connector_connections": integration["connections"],
+        "external_execution_audit": integration["external_execution_audit"],
         "draft_actions": list_draft_actions(space_id),
         "provenance_tombstones": tombstones,
         "items": items,
         "open_threads": detail["threads"],
-        "threads": detail["threads"],  # compatibility alias
-        "session_packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
-        "packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
+        "threads": detail["threads"],
+        "session_packs": packs,
+        "packs": packs,
     }

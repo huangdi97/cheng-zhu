@@ -10,7 +10,7 @@ from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 7
+    assert store.schema_version() == 8
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -28,6 +28,8 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
         "conversation_screen_context",
+        "conversation_connector",
+        "conversation_external_execution",
     } <= tables
     conn = sqlite3.connect(store.DB_PATH)
     try:

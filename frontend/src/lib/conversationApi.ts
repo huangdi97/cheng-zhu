@@ -4,8 +4,10 @@ import type {
   CaptureMode,
   ConversationAskResult,
   ConversationCaptureStatus,
+  ConversationConnector,
   ConversationContinue,
   ConversationDraftAction,
+  ConversationExternalExecution,
   ConversationGuidance,
   ConversationHistoryItem,
   ConversationHome,
@@ -45,6 +47,7 @@ export const conversationApi = {
     `${B}/search?query=${encodeURIComponent(query)}&item_type=${encodeURIComponent(itemType)}&limit=${limit}`,
   ),
   diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
+  connectors: () => request<{ items: ConversationConnector[]; providers: Array<{ provider: string; capabilities: string[]; health: Record<string, unknown> }> }>(`${B}/connectors`),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
     scenario: string
@@ -220,4 +223,8 @@ export const conversationApi = {
     request<unknown>(`${B}/spaces/${encodeURIComponent(spaceId)}/draft-actions`).then((p) => list<ConversationDraftAction>(p)),
   reviewDraftAction: (id: string, action: 'APPROVE' | 'DISMISS' | 'RESET') =>
     request<ConversationDraftAction>(`${B}/draft-actions/${encodeURIComponent(id)}/review`, json('POST', { action })),
+  draftExecutions: (id: string) =>
+    request<unknown>(`${B}/draft-actions/${encodeURIComponent(id)}/executions`).then((p) => list<ConversationExternalExecution>(p)),
+  executeDraftAction: (id: string, connectorId: string) =>
+    request<ConversationExternalExecution>(`${B}/draft-actions/${encodeURIComponent(id)}/execute`, json('POST', { connector_id: connectorId })),
 }

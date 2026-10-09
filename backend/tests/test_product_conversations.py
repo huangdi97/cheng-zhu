@@ -2866,6 +2866,67 @@ def test_integration_schema_rejects_raw_secret_and_requires_real_adapter_for_con
         conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
 
 
+
+def test_connector_snapshot_sanitizes_signed_url_and_sensitive_provider_metadata(product_env, fake_mail_adapter):
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read"],
+        credential_ref="keyring:chengzhu/google-mail/sanitize",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    space = conversations.create_space("Sanitize", "CLIENT_CALL")
+
+    original_read = fake_mail_adapter.read_snapshots
+    fake_mail_adapter.read_snapshots = lambda **kwargs: {
+        "items": [{
+            "external_kind": "MAIL_THREAD",
+            "external_id": "thread-secret",
+            "title": "Signed source",
+            "excerpt": "safe content",
+            "source_url": "https://mail.example.test/thread/1?access_token=secret#fragment",
+            "metadata": {
+                "thread_label": "client",
+                "access_token": "must-drop",
+                "nested": {"cookie": "must-drop", "safe": "keep"},
+            },
+        }],
+        "next_cursor": "cursor-sanitize",
+    }
+    try:
+        snapshot = conversation_integrations.sync_connection(connection["id"], space["id"])["snapshots"][0]
+    finally:
+        fake_mail_adapter.read_snapshots = original_read
+
+    assert snapshot["source_url"] == "https://mail.example.test/thread/1"
+    assert "access_token" not in snapshot["metadata"]
+    assert "cookie" not in snapshot["metadata"]["nested"]
+    assert snapshot["metadata"]["nested"]["safe"] == "keep"
+    assert "secret" not in repr(snapshot)
+
+
+def test_revoke_connector_clears_credential_handle_and_sync_cursor(product_env, fake_mail_adapter):
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read"],
+        credential_ref="keyring:chengzhu/google-mail/revoke",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    space = conversations.create_space("Revoke", "CLIENT_CALL")
+    conversation_integrations.sync_connection(connection["id"], space["id"])
+    raw_before = store.get("conversation_connector_connection", connection["id"])
+    assert raw_before["credential_ref"]
+    assert raw_before["sync_cursor"]
+
+    public = conversation_integrations.revoke_connection(connection["id"])
+    assert public["status"] == "REVOKED"
+    assert public["credential_ref_present"] is False
+    assert "credential_ref" not in public
+    raw_after = store.get("conversation_connector_connection", connection["id"])
+    assert raw_after["credential_ref"] == ""
+    assert raw_after["sync_cursor"] == ""
+
+
+
 def test_connector_snapshot_sync_freezes_explicit_source_and_manual_ask_never_promotes_truth(product_env, fake_mail_adapter):
     connection = conversation_integrations.create_connection(
         "GOOGLE_MAIL",

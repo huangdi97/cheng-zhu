@@ -27,6 +27,29 @@ declare global {
         note: string
       }>
       getWindowState: () => Promise<{ alwaysOnTop: boolean; contentProtection: boolean; visible: boolean }>
+      syncConversationReminders?: (payload: {
+        enabled: boolean
+        leadMinutes?: number
+        items: Array<{ session_id: string; space_id: string; scheduled_at: number }>
+      }) => Promise<{
+        supported: boolean
+        enabled: boolean
+        scheduled_count: number
+        pending_count: number
+        next_notify_at_ms: number | null
+        privacy: string
+        source: string
+      }>
+      getConversationReminderRuntime?: () => Promise<{
+        supported: boolean
+        enabled: boolean
+        scheduled_count: number
+        pending_count: number
+        next_notify_at_ms: number | null
+        privacy: string
+        source: string
+      }>
+      onConversationReminderOpen?: (callback: (payload: { sessionId: string; spaceId: string }) => void) => (() => void)
       captureRegion?: () => Promise<{ left: number; top: number; width: number; height: number } | null>
       syncOverlayWindow?: (payload: Partial<OverlayStatePayload> & { visible?: boolean }) => Promise<{ ok: boolean; visible: boolean }>
       resizeOverlayWindow?: (payload: { width?: number; height?: number }) => Promise<{ ok: boolean; width?: number; height?: number; skipped?: boolean }>

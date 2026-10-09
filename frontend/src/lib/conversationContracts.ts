@@ -445,6 +445,38 @@ export interface ConversationContinue {
   review_required: number
 }
 
+export interface ConversationConnector {
+  id: string
+  provider: string
+  label: string
+  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | string
+  capabilities: string[]
+  scopes: string[]
+  metadata: Record<string, unknown>
+  last_error: string
+  runtime_registered: boolean
+  runtime_health: Record<string, unknown>
+  available: boolean
+  created_at: number
+  updated_at: number
+}
+
+export interface ConversationExternalExecution {
+  id: string
+  connector_id: string
+  draft_action_id: string
+  operation: string
+  target: string
+  request: Record<string, unknown>
+  result: Record<string, unknown>
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED'
+  external_ref: string
+  error: string
+  created_at: number
+  completed_at: number | null
+  idempotent_replay?: boolean
+}
+
 export interface ConversationDraftAction {
   id: string
   space_id: string

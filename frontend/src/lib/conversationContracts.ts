@@ -118,6 +118,7 @@ export interface ConversationSpace {
   default_mode: AssistanceMode
   selected_source_ids: string[]
   selected_quick_note_ids: string[]
+  selected_connector_snapshot_ids: string[]
   retention_policy: Record<string, unknown>
   created_at: number
   updated_at: number
@@ -285,7 +286,7 @@ export interface ConversationProfileOutcome {
 }
 
 export interface ConversationPrepare {
-  space: Pick<ConversationSpace, 'id' | 'profile' | 'title' | 'description' | 'default_goal' | 'default_mode' | 'selected_source_ids' | 'selected_quick_note_ids'>
+  space: Pick<ConversationSpace, 'id' | 'profile' | 'title' | 'description' | 'default_goal' | 'default_mode' | 'selected_source_ids' | 'selected_quick_note_ids' | 'selected_connector_snapshot_ids'>
   goals: ConversationGoal[]
   next_session: ConversationSession | null
   open_commitments: ConversationItem[]
@@ -404,10 +405,22 @@ export interface ConversationPreflight {
   processing_runtime: ConversationProcessingRuntime
   screen_runtime: ConversationScreenRuntime
   share_privacy_runtime: ConversationSharePrivacyRuntime
+  integration_runtime: {
+    requested_permissions: string[]
+    available_scopes: string[]
+    connected_provider_ids: string[]
+    missing_permissions: string[]
+    blockers: string[]
+    live_access: 'AVAILABLE' | 'NOT_REQUESTED' | 'BLOCKED' | string
+    snapshot_access: 'EXPLICIT_SELECTION_ONLY' | string
+  }
   pack_preview: {
     goal_ids: string[]
     selected_source_ids: string[]
     selected_quick_note_ids: string[]
+    selected_connector_snapshot_ids: string[]
+    connector_snapshots: ConversationConnectorSnapshot[]
+    missing_connector_snapshot_ids: string[]
     sources: Array<{
       material_id: string
       version_id: string
@@ -460,6 +473,67 @@ export interface ConversationDraftAction {
   updated_at: number
 }
 
+export interface ConversationConnectorCatalogItem {
+  provider: string
+  label: string
+  read_scopes: string[]
+  write_scopes: string[]
+  external_kinds: string[]
+  provider_scopes: Record<string, string>
+  sync: string
+  adapter_available: boolean
+}
+
+export interface ConversationConnectorConnection {
+  id: string
+  provider: string
+  display_name: string
+  status: 'DISCONNECTED' | 'CONNECTED' | 'ERROR' | 'REVOKED'
+  auth_mode: string
+  credential_ref: string
+  granted_scopes: string[]
+  capabilities: { read?: string[]; write?: string[]; external_kinds?: string[] }
+  account_hint: string
+  sync_cursor: string
+  last_sync_at: number | null
+  last_error: string
+  adapter_available?: boolean
+  created_at: number
+  updated_at: number
+}
+
+export interface ConversationConnectorSnapshot {
+  id: string
+  connection_id: string
+  space_id: string
+  external_kind: string
+  external_id: string
+  title: string
+  excerpt: string
+  content_hash: string
+  source_url: string
+  occurred_at: number | null
+  visibility: string
+  metadata: Record<string, unknown>
+  created_at: number
+}
+
+export interface ConversationConnectorExecution {
+  id: string
+  draft_action_id: string
+  connection_id: string
+  operation: string
+  target: string
+  idempotency_key: string
+  status: 'PENDING' | 'EXECUTING' | 'SUCCEEDED' | 'FAILED' | 'BLOCKED' | 'CANCELLED'
+  request: Record<string, unknown>
+  response: Record<string, unknown>
+  error: string
+  created_at: number
+  updated_at: number
+  executed_at: number | null
+}
+
 export interface ConversationTranscriptSegment {
   id: string
   space_id: string
@@ -474,7 +548,7 @@ export interface ConversationTranscriptSegment {
 
 export interface ConversationAskMatch {
   id: string
-  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
+  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'CONNECTOR_SNAPSHOT' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
   authority: 'CONFIRMED_TRUTH' | 'PERSONAL_EVIDENCE' | 'REFERENCE_SOURCE' | 'USER_NOTE_NOT_EVIDENCE' | 'OBSERVED_NOT_CONFIRMED'
   title: string
   excerpt: string

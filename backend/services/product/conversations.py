@@ -3879,6 +3879,7 @@ def diagnostics() -> dict[str, Any]:
         "AND reason IN ('POLICY_AI_FORBIDDEN','SOURCE_VISIBILITY_BLOCKED','SOCIAL_RISK','STALE_CONTEXT','SUGGESTION_BUDGET')"
     ) or 0)
     capture = conversation_capture.status()
+    integration = conversation_integrations.diagnostics()
     return {
         "contract": "v2.0-R1",
         "schema_version": store.schema_version(),
@@ -3940,14 +3941,16 @@ def diagnostics() -> dict[str, Any]:
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": (
-                "AVAILABLE"
-                if conversation_connectors.diagnostics()["available_capabilities"]
+                "CONNECTED"
+                if integration["connected_count"] > 0
+                else "ADAPTER_AVAILABLE_NOT_CONNECTED"
+                if integration["registered_adapters"]
                 else "NOT_CONFIGURED"
             ),
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
             "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
-            "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
+            "external_writeback_execution": "REVIEWED_SECOND_EXPLICIT_EXECUTION_BOUNDARY",
         },
         "evidence": {
             "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
@@ -3969,6 +3972,7 @@ def diagnostics() -> dict[str, Any]:
             "human_coach_public_relay": "BLOCKED_UNLESS_CONFIGURED",
         },
         "connectors": conversation_connectors.diagnostics(),
+        "integrations": integration,
     }
 
 

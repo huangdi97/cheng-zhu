@@ -1580,6 +1580,9 @@ def session_context(session_id: str) -> dict[str, Any]:
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
         "screen_runtime": payload.get("screen_runtime") or {},
+        "connector_runtime": payload.get("connector_runtime") or conversation_connectors.resolve_read_permissions(
+            _normalize_session_policy(session.get("policy")).get("connector_permissions") or []
+        ),
         "share_privacy_runtime": payload.get("share_privacy_runtime") or share_privacy_runtime_status(session),
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
         "pack_digest": str((pack_row or {}).get("digest") or ""),

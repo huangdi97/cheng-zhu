@@ -2,7 +2,7 @@
 
 ## 这是什么版本
 
-v2.0.0-beta.2 是 **Personal Conversation Intelligence** 的第二个 Windows Beta 发布候选，直接从 2026-10-08 最新 main 构建。
+v2.0.0-beta.2 是 **Personal Conversation Intelligence** 的第二个 Windows Beta，已于 2026-10-09 作为公开 GitHub Prerelease 发布。最终 exact source/tag SHA：`cac605edf413ec248babf02ea9f73da708d156f8`。
 
 它不会取代当前稳定版 v1.4.2。GitHub Release 必须保持：
 
@@ -267,11 +267,11 @@ PMF_PROVEN = FALSE
 
 ```text
 Stable Latest = v1.4.2
-Beta Candidate = v2.0.0-beta.2
+Public Beta Prerelease = v2.0.0-beta.2
 Stable v2 = NOT CLAIMED
 ```
 
-beta.2 必须发布为 GitHub **Prerelease**，不得成为 Stable Latest。
+beta.2 已按 GitHub **Prerelease** 发布，`prerelease=true`、`latest=false`；Stable Latest 仍为 v1.4.2。
 
 ## License
 

@@ -23,11 +23,13 @@ Rules:
 - a Beta uses the same exact-SHA, clean-install, SHA256, download-back and provenance gates as stable;
 - a public Beta proves productization engineering, not real-user value or PMF.
 
-Current channel truth for this candidate:
+Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Candidate = v2.0.0-beta.2
+Conversation Beta Published = v2.0.0-beta.2
+Beta tag/source SHA = cac605edf413ec248babf02ea9f73da708d156f8
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE

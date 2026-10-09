@@ -10,7 +10,7 @@ from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 7
+    assert store.schema_version() == 8
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -28,17 +28,22 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
         "conversation_screen_context",
+        "conversation_connector_connection",
+        "conversation_connector_snapshot",
+        "conversation_connector_execution",
     } <= tables
     conn = sqlite3.connect(store.DB_PATH)
     try:
         session_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_session)")}
         participant_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_participant)")}
         item_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_item)")}
+        space_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_space)")}
     finally:
         conn.close()
     assert "policy_json" in session_cols
     assert "counterparty_state_json" in participant_cols
     assert "time_semantics_json" in item_cols
+    assert "selected_connector_snapshot_ids_json" in space_cols
 
 
 
@@ -3232,7 +3237,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 7
+    assert diag["schema_version"] == 8
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

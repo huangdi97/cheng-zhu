@@ -3,7 +3,7 @@ import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash
 import { conversationApi } from '@/lib/conversationApi'
 import { activateConversationSharePrivacy, restoreConversationSharePrivacy } from '@/lib/conversationSharePrivacy'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationConnectorExecution, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -121,6 +121,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [editingGoalId, setEditingGoalId] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
+  const [execution, setExecution] = useState<ConversationConnectorExecution | null>(null)
+  const [executionConnectionId, setExecutionConnectionId] = useState('')
+  const [executionTarget, setExecutionTarget] = useState('')
   const [lifecycleMessage, setLifecycleMessage] = useState('')
 
   const resolveThread = async (threadId: string) => {
@@ -385,6 +388,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     if (!draft) return
     setSessionBusy(true); setSessionError('')
     try { setDraft(await conversationApi.reviewDraftAction(draft.id, action)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const requestExternalExecution = async () => {
+    if (!draft || draft.status !== 'APPROVED' || !executionConnectionId) return
+    setSessionBusy(true); setSessionError('')
+    try {
+      setExecution(await conversationApi.requestExecution(draft.id, executionConnectionId, executionTarget.trim()))
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
+  const executeExternalRequest = async () => {
+    if (!execution || execution.status !== 'PENDING') return
+    if (!window.confirm('确定执行到外部 provider？这一步可能真正发送邮件、创建 task / issue 或更新外部系统。')) return
+    setSessionBusy(true); setSessionError('')
+    try { setExecution(await conversationApi.executeIntegrationRequest(execution.id)) }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
@@ -681,7 +702,33 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.decisions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'UPDATE_DECISION_LOG_DRAFT')}>Decision Log Draft</SecondaryButton>
             </div>
             {continueData.session.policy?.external_writeback === 'OFF' ? <p className="mt-2 text-[11px] text-text-muted">本场 External Write-back = OFF，因此不会生成 follow-up / task / issue 草稿。</p> : null}
-            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件、创建 task / issue 或写入 decision log。真正的 connector execution 尚未接线。</p></div> : null}
+            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3">
+              <div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div>
+              <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>
+              {draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}
+              {draft.status === 'APPROVED' ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/30 p-3">
+                <div className="text-xs font-semibold text-text-secondary">External Execution · 二次显式确认</div>
+                {integrationConnections.data?.items.filter((row) => row.status === 'CONNECTED' && row.adapter_available).length ? <>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <select aria-label="执行连接" className={inputCls} value={executionConnectionId} onChange={(e) => { setExecutionConnectionId(e.target.value); setExecution(null) }}>
+                      <option value="">选择已连接 provider</option>
+                      {integrationConnections.data.items.filter((row) => row.status === 'CONNECTED' && row.adapter_available).map((row) => <option key={row.id} value={row.id}>{row.display_name || row.provider} · {row.provider}</option>)}
+                    </select>
+                    <input aria-label="外部目标" className={inputCls} value={executionTarget} onChange={(e) => setExecutionTarget(e.target.value)} placeholder="目标地址 / repo / list（provider-specific，可选）" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <SecondaryButton disabled={sessionBusy || !executionConnectionId} onClick={requestExternalExecution}>创建执行请求</SecondaryButton>
+                    {execution?.status === 'PENDING' ? <PrimaryButton disabled={sessionBusy} onClick={executeExternalRequest}>执行到外部系统</PrimaryButton> : null}
+                  </div>
+                </> : <p className="mt-2 text-[11px] text-text-muted">没有“已连接 + adapter available”的 provider。草稿仍只保留本地；这里不会显示假的发送/同步按钮。</p>}
+                {execution ? <div className="mt-3 rounded-lg bg-bg-primary/60 p-2 text-[11px]">
+                  <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : execution.status === 'FAILED' || execution.status === 'BLOCKED' ? 'risk' : 'warn'}>{execution.status}</StatusBadge><span className="text-text-muted">{execution.operation} · idempotency {execution.idempotency_key.slice(0, 10)}</span></div>
+                  {execution.error ? <div className="mt-1 text-status-risk">{execution.error}</div> : null}
+                  {execution.status === 'SUCCEEDED' ? <div className="mt-1 text-status-direct">只有 SUCCEEDED + provider response 才表示外部动作成功。</div> : null}
+                </div> : null}
+              </div> : null}
+              <p className="mt-2 text-[11px] text-text-muted">APPROVED 只代表你审核了本地草稿；不等于外部执行成功。外部动作必须再创建 execution request，并由你再次明确执行；只有 provider 返回 SUCCEEDED 才算完成。</p>
+            </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

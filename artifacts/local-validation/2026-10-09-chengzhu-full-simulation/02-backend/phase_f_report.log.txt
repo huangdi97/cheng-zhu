@@ -1,0 +1,94 @@
+start=2026-10-09 18:17:07 source=c410236daffea4a82a67bfda8e791dfdd16c9215
+=== MODE create ===
+{
+  "mode": "create",
+  "db_path": "artifacts\\local-validation\\2026-10-09-chengzhu-full-simulation\\db-snapshots\\phase-f\\product.db",
+  "schema_version": 7,
+  "entities_created": 12,
+  "reminder_count": 2,
+  "reminder_has_future": true,
+  "decision_state": "AGREED",
+  "commitment_state": "COMMITTED",
+  "resolved_status": "RESOLVED",
+  "ids": {
+    "space_id": "cs_cede02bd8f794a91",
+    "goal_id": "cg_099cfb34150e4a4c",
+    "participant_id": "cp_412e105d1eff4375",
+    "session_id": "cv_21c3730950e1414f",
+    "pack_id": "cpack_e9698c10acfe409a",
+    "decision_id": "ci_9cdc9788a7c44491",
+    "commitment_id": "ci_cae24d626b1641d6",
+    "thread_id": "ci_31bee5fceada4c04",
+    "resolved_thread_id": "cot_50fde4307f5b4270",
+    "guidance_id": "ge_0f4d72e4b28b4d13",
+    "draft_id": "cda_c094c492b35b42e0",
+    "future_session_id": "cv_705d7d584d714476"
+  }
+}
+create exit=0
+=== MODE verify (new process = restart) ===
+{
+  "mode": "verify",
+  "schema_version": 7,
+  "session_status_after_restart": "ACTIVE",
+  "space_persisted": true,
+  "decision_persisted_state": "AGREED",
+  "commitment_persisted_state": "COMMITTED",
+  "thread_persisted_state": "DONE",
+  "guidance_events_after_restart": 1,
+  "space_detail_lists_session": true,
+  "history_only_ended_sessions": true,
+  "draft_actions_after_restart": 1,
+  "reminder_after_restart": true,
+  "phase_after_restart": "PARTICIPATE"
+}
+verify exit=0
+=== MODE migrate ===
+Traceback (most recent call last):
+  File "E:\AI\面试助手\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\02-backend\phase_f_db_migration_persistence.py", line 282, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "E:\AI\面试助手\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\02-backend\phase_f_db_migration_persistence.py", line 274, in main
+    report = mode_migrate(data_dir)
+  File "E:\AI\面试助手\artifacts\local-validation\2026-10-09-chengzhu-full-simulation\02-backend\phase_f_db_migration_persistence.py", line 221, in mode_migrate
+    conn.execute(
+    ~~~~~~~~~~~~^
+        "INSERT INTO goal (id, company, role, jd, status, stage, created_at, updated_at) "
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "VALUES ('old_goal_1', 'MindRank', 'AIDD Agent Engineer', 'RAG+Agent', 'ACTIVE', 'interview', 1000, 1000)"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.IntegrityError: UNIQUE constraint failed: goal.id
+migrate exit=1
+end=2026-10-09 18:17:09
+=== MODE migrate (clean dir) ===
+{
+  "mode": "migrate",
+  "version_before": 1,
+  "version_after": 7,
+  "version_rerun": 7,
+  "legacy_goal_row_intact": [
+    "old_goal_1",
+    "MindRank",
+    "ACTIVE"
+  ],
+  "legacy_rows_seeded": 1,
+  "conversation_tables": [
+    "conversation_draft_action",
+    "conversation_goal",
+    "conversation_guidance_event",
+    "conversation_item",
+    "conversation_open_thread",
+    "conversation_participant",
+    "conversation_provenance_tombstone",
+    "conversation_screen_context",
+    "conversation_session",
+    "conversation_session_pack",
+    "conversation_space",
+    "conversation_transcript_segment"
+  ],
+  "idempotent_rerun_ok": true,
+  "latest_expected": 7
+}
+migrate exit=0

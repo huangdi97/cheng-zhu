@@ -1,0 +1,122 @@
+start=2026-10-09 18:25:00 source=5e12fdec7569c9c09d9179f1637f1d93786d013b
+
+Running 3 tests using 2 workers
+
+  x  2 [chromium] › e2e\visual.spec.mjs:27:3 › @visual v1.3 main surfaces › Goal list (3.4s)
+  x  1 [chromium] › e2e\visual.spec.mjs:19:3 › @visual v1.3 main surfaces › Action Home (3.5s)
+  x  3 [chromium] › e2e\visual.spec.mjs:34:3 › @visual v1.3 main surfaces › Person resume workspace (2.6s)
+
+
+  1) [chromium] › e2e\visual.spec.mjs:19:3 › @visual v1.3 main surfaces › Action Home ──────────────
+
+    Error: A snapshot doesn't exist at E:\AI\面试助手\frontend\e2e\__screenshots__\visual.spec.mjs\action-home-win32.png, writing actual.
+
+      22 |     await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
+      23 |     await page.waitForTimeout(500)
+    > 24 |     await expect(page).toHaveScreenshot('action-home.png', { fullPage: false, timeout: 30_000 })
+         |     ^
+      25 |   })
+      26 |
+      27 |   test('Goal list', async ({ page }) => {
+        at E:\AI\面试助手\frontend\e2e\visual.spec.mjs:24:5
+
+    attachment #1: action-home (image/png) ─────────────────────────────────────────────────────────
+    Expected: e2e\__screenshots__\visual.spec.mjs\action-home-win32.png
+    Received: test-results\visual--visual-v1-3-main-surfaces-Action-Home-chromium\action-home-actual.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Action-Home-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Action-Home-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual--visual-v1-3-main-surfaces-Action-Home-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Action-Home-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\visual--visual-v1-3-main-surfaces-Action-Home-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e\visual.spec.mjs:27:3 › @visual v1.3 main surfaces › Goal list ────────────────
+
+    Error: A snapshot doesn't exist at E:\AI\面试助手\frontend\e2e\__screenshots__\visual.spec.mjs\goals-win32.png, writing actual.
+
+      29 |     await expect(page.getByRole('heading', { name: '求职目标', exact: true })).toBeVisible()
+      30 |     await page.waitForTimeout(500)
+    > 31 |     await expect(page).toHaveScreenshot('goals.png', { fullPage: false, timeout: 30_000 })
+         |     ^
+      32 |   })
+      33 |
+      34 |   test('Person resume workspace', async ({ page }) => {
+        at E:\AI\面试助手\frontend\e2e\visual.spec.mjs:31:5
+
+    attachment #1: goals (image/png) ───────────────────────────────────────────────────────────────
+    Expected: e2e\__screenshots__\visual.spec.mjs\goals-win32.png
+    Received: test-results\visual--visual-v1-3-main-surfaces-Goal-list-chromium\goals-actual.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Goal-list-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Goal-list-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual--visual-v1-3-main-surfaces-Goal-list-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Goal-list-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\visual--visual-v1-3-main-surfaces-Goal-list-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e\visual.spec.mjs:34:3 › @visual v1.3 main surfaces › Person resume workspace ──
+
+    Error: A snapshot doesn't exist at E:\AI\面试助手\frontend\e2e\__screenshots__\visual.spec.mjs\me-resume-win32.png, writing actual.
+
+      37 |     await expect(page.getByTestId('resume-mount-panel')).toBeVisible({ timeout: 8000 })
+      38 |     await page.waitForTimeout(500)
+    > 39 |     await expect(page).toHaveScreenshot('me-resume.png', { fullPage: false, timeout: 30_000 })
+         |     ^
+      40 |   })
+      41 | })
+      42 |
+        at E:\AI\面试助手\frontend\e2e\visual.spec.mjs:39:5
+
+    attachment #1: me-resume (image/png) ───────────────────────────────────────────────────────────
+    Expected: e2e\__screenshots__\visual.spec.mjs\me-resume-win32.png
+    Received: test-results\visual--visual-v1-3-main-surfaces-Person-resume-workspace-chromium\me-resume-actual.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Person-resume-workspace-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Person-resume-workspace-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual--visual-v1-3-main-surfaces-Person-resume-workspace-chromium\error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\visual--visual-v1-3-main-surfaces-Person-resume-workspace-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\visual--visual-v1-3-main-surfaces-Person-resume-workspace-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [chromium] › e2e\visual.spec.mjs:19:3 › @visual v1.3 main surfaces › Action Home ───────────────
+    [chromium] › e2e\visual.spec.mjs:27:3 › @visual v1.3 main surfaces › Goal list ─────────────────
+    [chromium] › e2e\visual.spec.mjs:34:3 › @visual v1.3 main surfaces › Person resume workspace ───
+exit=1 elapsed=18s

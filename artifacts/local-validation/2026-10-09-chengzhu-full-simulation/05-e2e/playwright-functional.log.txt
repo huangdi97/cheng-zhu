@@ -1,0 +1,112 @@
+start=2026-10-09 18:21:42 source=5e12fdec7569c9c09d9179f1637f1d93786d013b
+
+Running 59 tests using 2 workers
+
+  ok  1 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: goals has no critical/serious violations (4.5s)
+  ok  2 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: home has no critical/serious violations (4.7s)
+  ok  3 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: me has no critical/serious violations (3.7s)
+  ok  4 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: practice has no critical/serious violations (3.7s)
+  ok  5 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: library has no critical/serious violations (3.6s)
+  ok  6 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: history has no critical/serious violations (4.0s)
+  ok  8 [chromium] › e2e\a11y.spec.mjs:44:1 › a11y: primary navigation is keyboard reachable (1.6s)
+  ok  9 [chromium] › e2e\a11y.spec.mjs:66:1 › a11y: a v1.2 appMode still lands on its v1.3 route (1.5s)
+  ok  7 [chromium] › e2e\a11y.spec.mjs:26:3 › a11y: settings has no critical/serious violations (4.3s)
+  ok 10 [chromium] › e2e\critical-paths.spec.mjs:44:3 › app shell (live) › boots and shows the brand header + STT status pill (1.6s)
+  ok 11 [chromium] › e2e\critical-paths.spec.mjs:51:3 › app shell (live) › does not log uncaught errors during initial render (2.1s)
+  ok 12 [chromium] › e2e\critical-paths.spec.mjs:76:3 › v1.3 goal-centered navigation › primary nav exposes the Goal-centered IA and retires the module tabs (1.7s)
+  ok 13 [chromium] › e2e\critical-paths.spec.mjs:94:3 › v1.3 goal-centered navigation › clicking each nav item navigates and marks the current page (3.4s)
+  ok 15 [chromium] › e2e\critical-paths.spec.mjs:132:3 › Live cue-first hierarchy › keeps previous turns collapsed so the latest question owns the first screen (1.5s)
+  ok 16 [chromium] › e2e\critical-paths.spec.mjs:193:3 › Live focus mode › collapses secondary tools while recording and restores them on demand (3.8s)
+  ok 14 [chromium] › e2e\critical-paths.spec.mjs:105:3 › v1.3 goal-centered navigation › every v1.3 route renders against a partial payload without uncaught errors (8.9s)
+  ok 17 [chromium] › e2e\critical-paths.spec.mjs:243:3 › settings › opens from the nav rail, groups by layer, and searches (2.4s)
+  ok 18 [chromium] › e2e\critical-paths.spec.mjs:270:3 › assist mode with WebSocket-driven Q/A › renders streamed transcripts and answer payload from mock WS (1.7s)
+  ok 19 [chromium] › e2e\job-review-linkage.spec.mjs:65:3 › Goal and History linkage › phone-width Goal Room keeps the linked session visible without horizontal overflow (1.5s)
+  ok 20 [chromium] › e2e\job-review-linkage.spec.mjs:87:3 › Goal and History linkage › Goal Room and History expose the same linked session and open the same Reflection (1.7s)
+  ok 22 [chromium] › e2e\job-workspace.spec.mjs:96:3 › Goal Prepare workspace › fits a phone-width viewport without horizontal overflow (1.5s)
+  ok 21 [chromium] › e2e\job-workspace.spec.mjs:86:3 › Goal Prepare workspace › shows preparation gaps, likely deep-dives, story gaps and follow-up questions (1.7s)
+  ok 24 [chromium] › e2e\r2-live-cue.spec.mjs:99:3 › R2 live cue-first › share privacy defaults OFF and human assistance defaults to practice only in settings (1.5s)
+  ok 23 [chromium] › e2e\r2-live-cue.spec.mjs:9:3 › R2 live cue-first › guidance_fast renders cue + sources before the deep answer, and session claim warning offers corrections (1.8s)
+  ok 25 [chromium] › e2e\r2-live-cue.spec.mjs:114:3 › v1.3 first-run onboarding › fresh config shows the 11-step wizard and explains a failing model check (1.4s)
+  ok 26 [chromium] › e2e\r2-live-cue.spec.mjs:155:3 › v1.3 first-run onboarding › first Goal flows into Guided First Practice before onboarding completes (2.2s)
+  ok 27 [chromium] › e2e\r2-live-cue.spec.mjs:242:3 › R2 human coach › coach cue shows as advice, not as a source (1.3s)
+  -  29 [chromium] › e2e\real-chain-smoke.spec.mjs:106:3 › real interview chain smoke › real preflight sends playback/capture/STT/LLM events over WebSocket
+  -  30 [chromium] › e2e\real-chain-smoke.spec.mjs:163:3 › real interview chain smoke › bad candidate microphone does not block real main interview answer generation
+  -  31 [chromium] › e2e\real-chain-smoke.spec.mjs:197:3 › real interview chain smoke › candidate ASR config matrix preserves start, pause, resume, and stop
+  ok 28 [chromium] › e2e\r2-live-cue.spec.mjs:258:3 › R2 human coach › practice setup offers a Human Coach panel when explicitly enabled (1.4s)
+  ok 32 [chromium] › e2e\resume-linkage.spec.mjs:16:3 › shared resume mount › switching the mounted resume in resume optimizer updates shared config (1.6s)
+  ok 33 [chromium] › e2e\v13-product-loop.spec.mjs:66:3 › v1.3 Goal-centered product loop › Goal → Preflight → Live → Pin → Reflection keeps one Goal context (2.4s)
+  ok 34 [chromium] › e2e\v13-product-loop.spec.mjs:106:3 › v1.3 Goal-centered product loop › Panel Practice separates personas and Content vs Delivery feedback (2.1s)
+  ok 35 [chromium] › e2e\v13-product-loop.spec.mjs:172:3 › v1.3 Goal-centered product loop › Goal trends stay explainable and never turn into an offer-probability score (1.6s)
+  ok 36 [chromium] › e2e\v13-product-loop.spec.mjs:203:3 › v1.3 Goal-centered product loop › v1.4 diagnostics renders six product-loop questions without claiming PMF (1.6s)
+  ok 38 [chromium] › e2e\v13-product-loop.spec.mjs:290:3 › v1.3 Goal-centered product loop › Overlay 3.0 persists Dock × Interaction × Size and stays usable at 390px (1.5s)
+  ok 37 [chromium] › e2e\v13-product-loop.spec.mjs:250:3 › v1.3 Goal-centered product loop › Fact Inbox can choose a Goal and continue directly into Practice (2.1s)
+  ok 39 [chromium] › e2e\v20-conversation-profile.spec.mjs:684:3 › v2.0 Conversation Profile › first opt-in runs an explicitly synthetic dry run before Conversation Home (1.9s)
+  ok 40 [chromium] › e2e\v20-conversation-profile.spec.mjs:706:3 › v2.0 Conversation Profile › global Start follows Conversation Profile into the create/preflight flow (1.6s)
+  ok 42 [chromium] › e2e\v20-conversation-profile.spec.mjs:752:3 › v2.0 Conversation Profile › Open Thread can be resolved from Space through reviewed provenance (1.4s)
+  ok 41 [chromium] › e2e\v20-conversation-profile.spec.mjs:725:3 › v2.0 Conversation Profile › profile switcher opens a real Conversation Home and Space (2.1s)
+  ok 43 [chromium] › e2e\v20-conversation-profile.spec.mjs:767:3 › v2.0 Conversation Profile › Goal editor controls outcome, priority and lifecycle without creating a second truth (2.5s)
+  ok 45 [chromium] › e2e\v20-conversation-profile.spec.mjs:864:3 › v2.0 Conversation Profile › Live exposes explicit Talking Point and Delivery planner lanes (1.6s)
+  ok 46 [chromium] › e2e\v20-conversation-profile.spec.mjs:882:3 › v2.0 Conversation Profile › Manual Ask is source-aware and user speaking produces SILENT (1.9s)
+  ok 47 [chromium] › e2e\v20-conversation-profile.spec.mjs:904:3 › v2.0 Conversation Profile › SILENT polling never revives an older shown Guidance card (1.1s)
+  ok 48 [chromium] › e2e\v20-conversation-profile.spec.mjs:940:3 › v2.0 Conversation Profile › Transcript mode uses Conversation-owned capture controls instead of Interview answering (2.4s)
+  ok 49 [chromium] › e2e\v20-conversation-profile.spec.mjs:1021:3 › v2.0 Conversation Profile › HUMAN_ALLOWED exposes an explicit session-scoped Human Coach link with minimum default permissions (1.0s)
+  ok 50 [chromium] › e2e\v20-conversation-profile.spec.mjs:1085:3 › v2.0 Conversation Profile › PRIVATE_OVERLAY verifies Electron protection before start and restores baseline after end (3.5s)
+  ok 51 [chromium] › e2e\v20-conversation-profile.spec.mjs:1218:3 › v2.0 Conversation Profile › Review Queue never silently assigns unknown commitment owner to me (1.4s)
+  ok 52 [chromium] › e2e\v20-conversation-profile.spec.mjs:1261:3 › v2.0 Conversation Profile › Decision supersession is explicit, directional, and preserves the old Decision (1.5s)
+  ok 53 [chromium] › e2e\v20-conversation-profile.spec.mjs:1314:3 › v2.0 Conversation Profile › Continue exposes reviewed local write-back drafts without claiming connector execution (1.7s)
+  ok 54 [chromium] › e2e\v20-conversation-profile.spec.mjs:1332:3 › v2.0 Conversation Profile › Conversation global search stays grounded in Space Session time and source (1.1s)
+  ok 55 [chromium] › e2e\v20-conversation-profile.spec.mjs:1349:3 › v2.0 Conversation Profile › MANUAL Screen Context stays in Conversation namespace and never returns raw screenshot bytes (1.3s)
+  ok 56 [chromium] › e2e\v20-conversation-profile.spec.mjs:1408:3 › v2.0 Conversation Profile › AUTO Screen Context requires explicit Live start and supports Off the record without raw image persistence (3.5s)
+  ok 57 [chromium] › e2e\v20-conversation-profile.spec.mjs:1526:3 › v2.0 Conversation Profile › Conversation History stays inside Conversation Profile and returns to the same Space (1.5s)
+  ok 58 [chromium] › e2e\v20-conversation-profile.spec.mjs:1543:3 › v2.0 Conversation Profile › Conversation surfaces remain usable at 390px (926ms)
+  ok 59 [chromium] › e2e\written-exam-flow.spec.mjs:41:3 › written exam flow › starts written exam mode and renders code question answer (6.0s)
+  x  44 [chromium] › e2e\v20-conversation-profile.spec.mjs:796:3 › v2.0 Conversation Profile › Prepare → Preflight → Live → Guidance → Continue is one real product loop (8.9s)
+  ok 60 [chromium] › e2e\v20-conversation-profile.spec.mjs:796:3 › v2.0 Conversation Profile › Prepare → Preflight → Live → Guidance → Continue is one real product loop (retry #1) (3.1s)
+
+
+  1) [chromium] › e2e\v20-conversation-profile.spec.mjs:796:3 › v2.0 Conversation Profile › Prepare → Preflight → Live → Guidance → Continue is one real product loop 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('target cp-1', { exact: true })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('target cp-1', { exact: true })[22m
+
+
+      849 |     await expect(page.getByText('CONTRIBUTION_OPPORTUNITY')).toBeVisible()
+      850 |     await expect(page.getByText('PRIMARY_CARD', { exact: true })).toBeVisible()
+    > 851 |     await expect(page.getByText('target cp-1', { exact: true })).toBeVisible()
+          |                                                                  ^
+      852 |     await expect(page.getByRole('paragraph').filter({ hasText: 'Q4 benchmark 已覆盖 10x data scale' })).toBeVisible()
+      853 |
+      854 |     await testInfo.attach('v2-live-guidance', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+        at E:\AI\面试助手\frontend\e2e\v20-conversation-profile.spec.mjs:851:66
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\v20-conversation-profile-v-0c7b2-ue-is-one-real-product-loop-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\v20-conversation-profile-v-0c7b2-ue-is-one-real-product-loop-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\v20-conversation-profile-v-0c7b2-ue-is-one-real-product-loop-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\v20-conversation-profile-v-0c7b2-ue-is-one-real-product-loop-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\v20-conversation-profile-v-0c7b2-ue-is-one-real-product-loop-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 flaky
+    [chromium] › e2e\v20-conversation-profile.spec.mjs:796:3 › v2.0 Conversation Profile › Prepare → Preflight → Live → Guidance → Continue is one real product loop 
+  3 skipped
+  55 passed (2.3m)
+exit=0 end=2026-10-09 18:24:30 elapsed=168s

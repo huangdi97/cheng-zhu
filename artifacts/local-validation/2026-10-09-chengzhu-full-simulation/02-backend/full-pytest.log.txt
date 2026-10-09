@@ -1,0 +1,193 @@
+start=2026-10-09 17:23:23 source=06877537ea6c3317a6cf403ee34dc8a1c03412cc
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+........................................................................ [ 29%]
+........................................................................ [ 35%]
+........................................................................ [ 41%]
+........................................................................ [ 47%]
+..............................................FFF................F...... [ 53%]
+..............................FFF.F.F................................... [ 58%]
+........................................................................ [ 64%]
+........................................................................ [ 70%]
+........................................................................ [ 76%]
+........................................................................ [ 82%]
+........................................................................ [ 88%]
+........................................................................ [ 94%]
+......................................................................   [100%]
+================================== FAILURES ===================================
+_ test_end_session_extracts_only_review_candidates_from_explicit_transcript_language _
+tests\test_product_conversations.py:1338: in test_end_session_extracts_only_review_candidates_from_explicit_transcript_language
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+_____ test_transcript_candidate_extraction_is_idempotent_and_policy_gated _____
+tests\test_product_conversations.py:1385: in test_transcript_candidate_extraction_is_idempotent_and_policy_gated
+    conversations.start_session(allowed["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+_____________ test_primary_audio_commitment_does_not_infer_owner ______________
+tests\test_product_conversations.py:1429: in test_primary_audio_commitment_does_not_infer_owner
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+_ test_transcript_deadline_candidate_preserves_original_time_text_as_ambiguous _
+tests\test_product_conversations.py:1902: in test_transcript_deadline_candidate_preserves_original_time_text_as_ambiguous
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+________ test_conversation_capture_isolated_transcription_only_bridge _________
+tests\test_product_conversations.py:2998: in test_conversation_capture_isolated_transcription_only_bridge
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+__________ test_conversation_capture_reports_self_mic_degraded_state __________
+tests\test_product_conversations.py:3056: in test_conversation_capture_reports_self_mic_degraded_state
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+_____ test_conversation_capture_stop_allows_final_asr_callback_to_reenter _____
+tests\test_product_conversations.py:3105: in test_conversation_capture_stop_allows_final_asr_callback_to_reenter
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+_______ test_conversation_capture_refuses_to_steal_live_interview_audio _______
+tests\test_product_conversations.py:3129: in test_conversation_capture_refuses_to_steal_live_interview_audio
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+_________ test_conversation_router_lifecycle_exit_stops_owned_capture _________
+tests\test_product_conversations.py:3154: in test_conversation_router_lifecycle_exit_stops_owned_capture
+    conversations.start_session(session["id"])
+services\product\conversations.py:1453: in start_session
+    raise ValueError(check["blockers"][0]["message"])
+E   ValueError: Local Processing Ҫ������Ƶ STT ȷ�������豸����ǰ���� STT ���ô���Զ��·��
+----------------------------- Captured log setup ------------------------------
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v1 initial intelligence core schema
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v2 r2 provenance axes, interview pack, session claims
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v3 r2 turn trace for review 2.0
+INFO     storage.intelligence_migrations:intelligence_migrations.py:386 intelligence migration applied: v4 v1.3 stories source/skill/last-used metadata
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v1 v1.3 goal-centered product layer
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v2 v2.0 personal conversation intelligence
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v3 v2.0 conversation runtime closure
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v4 v2.0 deletion provenance tombstones
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v5 v2.0 explicit session policy and counterparty state
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v6 v2.0 temporal provenance for conversation items
+INFO     storage.product_migrations:product_migrations.py:669 product migration applied: v7 v2.0 manual Conversation screen context observations
+=========================== short test summary info ===========================
+FAILED tests/test_product_conversations.py::test_end_session_extracts_only_review_candidates_from_explicit_transcript_language
+FAILED tests/test_product_conversations.py::test_transcript_candidate_extraction_is_idempotent_and_policy_gated
+FAILED tests/test_product_conversations.py::test_primary_audio_commitment_does_not_infer_owner
+FAILED tests/test_product_conversations.py::test_transcript_deadline_candidate_preserves_original_time_text_as_ambiguous
+FAILED tests/test_product_conversations.py::test_conversation_capture_isolated_transcription_only_bridge
+FAILED tests/test_product_conversations.py::test_conversation_capture_reports_self_mic_degraded_state
+FAILED tests/test_product_conversations.py::test_conversation_capture_stop_allows_final_asr_callback_to_reenter
+FAILED tests/test_product_conversations.py::test_conversation_capture_refuses_to_steal_live_interview_audio
+FAILED tests/test_product_conversations.py::test_conversation_router_lifecycle_exit_stops_owned_capture
+9 failed, 1213 passed in 447.32s (0:07:27)
+exit=1 end=2026-10-09 17:30:54 elapsed=451s

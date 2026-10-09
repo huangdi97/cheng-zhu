@@ -725,6 +725,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Goals {preflight.pack_preview.goal_ids.length}</span>
                   <span>Ready Sources {preflight.pack_preview.sources.length}/{preflight.pack_preview.selected_source_ids.length}</span>
                   <span>Quick Notes {preflight.pack_preview.quick_notes.length}/{preflight.pack_preview.selected_quick_note_ids.length}</span>
+                  <span>External Snapshots {preflight.pack_preview.connector_snapshots.length}/{preflight.pack_preview.selected_connector_snapshot_ids.length}</span>
                   <span>Participants {preflight.pack_preview.participants_count}</span>
                   <span>Confirmed items {preflight.pack_preview.confirmed_items_count}</span>
                   <span>Expression {Object.keys(preflight.pack_preview.expression_profile ?? {}).length ? '已冻结' : '默认'}</span>
@@ -739,8 +740,13 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 </div>
                 {preflight.pack_preview.connector_runtime.grants.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen connector grants</div>
-                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_runtime.grants.map((grant) => <div key={grant.capability} className="text-[11px] text-text-secondary">• {grant.capability} · {grant.provider_id}{grant.account_label ? ` · ${grant.account_label}` : ''}</div>)}</div>
-                  <p className="mt-1 text-[10px] text-text-muted">这里只是 read capability grant；不会顺带允许 email/task/issue write execution。</p>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_runtime.grants.map((grant) => <div key={`${grant.connection_id}:${grant.capability}`} className="text-[11px] text-text-secondary">• {grant.capability} · {grant.provider_id}{grant.account_hint ? ` · ${grant.account_hint}` : ''} · connection {grant.connection_id.slice(0, 8)}</div>)}</div>
+                  <p className="mt-1 text-[10px] text-text-muted">这是 exact read grant + exact connection；不会顺带允许 email/task/issue write execution。</p>
+                </div> : null}
+                {preflight.pack_preview.connector_snapshots.length ? <div className="mt-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen external snapshots · reference only</div>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_snapshots.map((snapshot) => <div key={snapshot.id} className="text-[11px] text-text-secondary">• {snapshot.title || snapshot.external_id} · {snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</div>)}</div>
+                  <p className="mt-1 text-[10px] text-text-muted">External snapshot 永远是 REFERENCE_SOURCE，不会因为来自 Google / Microsoft / GitHub 就自动升级成 Decision / Commitment truth。</p>
                 </div> : null}
                 {preflight.pack_preview.sources.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen sources</div>
@@ -751,7 +757,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <div className="mt-1 space-y-1">{preflight.pack_preview.quick_notes.map((note) => <div key={note.id} className="text-[11px] text-text-secondary">• {note.title || note.id}</div>)}</div>
                 </div> : null}
                 {preflight.pack_preview.skipped_sources.length ? <div className="mt-3 text-[11px] text-status-inferred">Skipped Sources · {preflight.pack_preview.skipped_sources.map((x) => x.title || x.id).join(' · ')}</div> : null}
-                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、我的表达与 policy 会被冻结进 Session Pack；后续资料或表达偏好变化不会静默改写本场。</p>
+                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、external snapshot、exact connector grant、我的表达与 policy 会被冻结进 Session Pack；后续资料、再次 Sync、账户状态或表达偏好变化不会静默改写本场。</p>
               </div>
               <p className="mt-3 text-[11px] text-text-muted">{preflight.privacy_note}</p>
             </div> : null}

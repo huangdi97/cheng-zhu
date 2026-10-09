@@ -3190,6 +3190,12 @@ def export_session(session_id: str) -> dict[str, Any]:
         params=(session_id,),
         order="created_at ASC",
     )
+    draft_ids = [draft["id"] for draft in drafts]
+    executions = [
+        row
+        for draft_id in draft_ids
+        for row in conversation_connectors.list_executions(draft_id)
+    ]
     packs = store.select(
         "conversation_session_pack",
         where="session_id = ?",
@@ -3229,7 +3235,7 @@ def export_session(session_id: str) -> dict[str, Any]:
         "export_manifest": {
             "categories": [
                 "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
-                "unconfirmed_candidates", "guidance", "draft_actions",
+                "unconfirmed_candidates", "guidance", "draft_actions", "external_executions",
                 "source_manifest", "session_packs",
             ],
             "privacy": "LOCAL_EXPORT",
@@ -3248,6 +3254,7 @@ def export_session(session_id: str) -> dict[str, Any]:
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
         "draft_actions": drafts,
+        "external_executions": executions,
         "source_manifest": source_manifest,
         "session_packs": packs,
     }
@@ -3763,6 +3770,19 @@ def diagnostics() -> dict[str, Any]:
         "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED' "
         "AND reason IN ('POLICY_AI_FORBIDDEN','SOURCE_VISIBILITY_BLOCKED','SOCIAL_RISK','STALE_CONTEXT','SUGGESTION_BUDGET')"
     ) or 0)
+    connector_rows = conversation_connectors.list_connectors()
+    connector_connected = sum(1 for row in connector_rows if row.get("available"))
+    connector_capabilities = sorted({
+        capability
+        for row in connector_rows if row.get("available")
+        for capability in (row.get("capabilities") or [])
+    })
+    external_succeeded = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_external_execution WHERE status = 'SUCCEEDED'"
+    ) or 0)
+    external_failed = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_external_execution WHERE status = 'FAILED'"
+    ) or 0)
     capture = conversation_capture.status()
     return {
         "contract": "v2.0-R1",
@@ -3787,6 +3807,10 @@ def diagnostics() -> dict[str, Any]:
             "guidance_dismissed": dismissed_guidance,
             "duplicate_suppressed": duplicate_suppressed,
             "policy_suppressed": policy_suppressed,
+            "connected_connectors": connector_connected,
+            "connector_capabilities": connector_capabilities,
+            "external_execution_succeeded": external_succeeded,
+            "external_execution_failed": external_failed,
         },
         "evaluation": {
             "observed_proxies": {
@@ -3824,11 +3848,11 @@ def diagnostics() -> dict[str, Any]:
             "export_delete_integrity": "AVAILABLE",
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
-            "external_connectors": "NOT_CONFIGURED",
+            "external_connectors": "AVAILABLE" if connector_connected else "NOT_CONFIGURED",
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
             "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
-            "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
+            "external_writeback_execution": "CONNECTOR_RUNTIME_AVAILABLE" if connector_connected else "DRAFT_ONLY_NO_CONNECTED_PROVIDER",
         },
         "evidence": {
             "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
@@ -3903,7 +3927,8 @@ def export_space(space_id: str) -> dict[str, Any]:
         "export_manifest": {
             "categories": [
                 "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
-                "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
+                "guidance", "source_manifest", "open_threads", "draft_actions", "external_executions", "connector_metadata",
+                "session_packs", "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -3920,6 +3945,13 @@ def export_space(space_id: str) -> dict[str, Any]:
         "guidance": guidance,
         "source_manifest": source_manifest,
         "draft_actions": list_draft_actions(space_id),
+        "external_executions": store.rows(
+            "SELECT e.* FROM conversation_external_execution e "
+            "JOIN conversation_draft_action d ON d.id = e.draft_action_id "
+            "WHERE d.space_id = ? ORDER BY e.created_at ASC",
+            (space_id,),
+        ),
+        "connector_metadata": conversation_connectors.list_connectors(),
         "provenance_tombstones": tombstones,
         "items": items,
         "open_threads": detail["threads"],

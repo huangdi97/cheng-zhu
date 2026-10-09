@@ -548,6 +548,7 @@ def create_space(
     relationship_key: str = "",
     selected_source_ids: Optional[list[str]] = None,
     selected_quick_note_ids: Optional[list[str]] = None,
+    selected_connector_snapshot_ids: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     title = str(title or "").strip()
     if not title:
@@ -570,6 +571,7 @@ def create_space(
         "default_mode": mode,
         "selected_source_ids": list(selected_source_ids or []),
         "selected_quick_note_ids": list(selected_quick_note_ids or []),
+        "selected_connector_snapshot_ids": list(selected_connector_snapshot_ids or []),
         "retention_policy": dict(RETENTION_PRESETS["STANDARD"]),
         "created_at": ts,
         "updated_at": ts,
@@ -635,7 +637,8 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     requested_default_goal = patch.get("default_goal") if "default_goal" in patch else None
     allowed = {
         "title", "description", "status", "project_id", "relationship_key",
-        "default_mode", "selected_source_ids", "selected_quick_note_ids", "retention_policy",
+        "default_mode", "selected_source_ids", "selected_quick_note_ids",
+        "selected_connector_snapshot_ids", "retention_policy",
     }
     clean = {k: v for k, v in patch.items() if k in allowed}
     if "title" in clean:
@@ -982,11 +985,21 @@ def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
             })
         else:
             missing_note_ids.append(str(note_id))
+    selected_connector_snapshots: list[dict[str, Any]] = []
+    missing_connector_snapshot_ids: list[str] = []
+    for snapshot_id in space.get("selected_connector_snapshot_ids") or []:
+        snapshot = store.get("conversation_connector_snapshot", str(snapshot_id))
+        if snapshot and snapshot.get("space_id") == space["id"]:
+            selected_connector_snapshots.append(snapshot)
+        else:
+            missing_connector_snapshot_ids.append(str(snapshot_id))
     return {
         "sources": selected_sources,
         "skipped_sources": skipped_sources,
         "quick_notes": selected_notes,
         "missing_quick_note_ids": missing_note_ids,
+        "connector_snapshots": selected_connector_snapshots,
+        "missing_connector_snapshot_ids": missing_connector_snapshot_ids,
     }
 
 
@@ -1037,6 +1050,7 @@ def _preflight_context_fingerprint(
             "title": space.get("title"),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "selected_connector_snapshot_ids": list(space.get("selected_connector_snapshot_ids") or []),
             "retention_policy": dict(space.get("retention_policy") or {}),
         },
         "goals": [
@@ -1073,6 +1087,7 @@ def _preflight_context_fingerprint(
         },
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
+        "integration_runtime": integration_runtime,
     }
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -1106,12 +1121,16 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
-    connector_ok = not bool(policy.get("connector_permissions"))
-    if not connector_ok:
+    from services.product import conversation_integrations
+    integration_runtime = conversation_integrations.runtime_status(
+        requested_permissions=list(policy.get("connector_permissions") or []),
+    )
+    connector_ok = not integration_runtime["blockers"]
+    for message in integration_runtime["blockers"]:
         blockers.append({
             "key": "connector_runtime",
             "label": "连接器权限",
-            "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
+            "message": message,
         })
 
     share_privacy_runtime = share_privacy_runtime_status(session)
@@ -1151,6 +1170,12 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             })
 
     pack_inputs = _pack_inputs(space)
+    for snapshot_id in pack_inputs["missing_connector_snapshot_ids"]:
+        warnings.append({
+            "key": "connector_snapshot_missing",
+            "label": "连接器来源",
+            "message": f"Connector snapshot {snapshot_id} 已不存在或不属于本 Space，本场不会冻结它。",
+        })
     for skipped in pack_inputs["skipped_sources"]:
         warnings.append({
             "key": "source_not_ready",
@@ -1217,6 +1242,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": f"{ready_source_count}/{selected_source_count} Ready", "ok": ready_source_count == selected_source_count},
         {"key": "quick_notes", "label": "Quick Notes", "value": f"{ready_note_count}/{selected_note_count} available", "ok": ready_note_count == selected_note_count},
+        {"key": "connector_sources", "label": "Connector Snapshots", "value": f"{len(pack_inputs['connector_snapshots'])}/{len(space.get('selected_connector_snapshot_ids') or [])} available", "ok": not pack_inputs["missing_connector_snapshot_ids"]},
         {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
@@ -1256,6 +1282,21 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "selected_connector_snapshot_ids": list(space.get("selected_connector_snapshot_ids") or []),
+            "connector_snapshots": [
+                {
+                    "id": row["id"],
+                    "connection_id": row["connection_id"],
+                    "external_kind": row["external_kind"],
+                    "external_id": row["external_id"],
+                    "title": row.get("title") or "",
+                    "content_hash": row["content_hash"],
+                    "occurred_at": row.get("occurred_at"),
+                    "visibility": row.get("visibility") or "PRIVATE",
+                }
+                for row in pack_inputs["connector_snapshots"]
+            ],
+            "missing_connector_snapshot_ids": list(pack_inputs["missing_connector_snapshot_ids"]),
             "sources": [
                 {
                     "material_id": source.get("material_id") or "",
@@ -1325,6 +1366,9 @@ def freeze_pack(
         "space": {"id": space["id"], "profile": space["profile"], "title": space["title"]},
         "goal_ids": session.get("goal_ids") or [],
         "selected_source_ids": space.get("selected_source_ids") or [],
+        "selected_connector_snapshot_ids": space.get("selected_connector_snapshot_ids") or [],
+        "connector_snapshots": pack_inputs["connector_snapshots"],
+        "missing_connector_snapshot_ids": pack_inputs["missing_connector_snapshot_ids"],
         "sources": pack_inputs["sources"],
         "skipped_sources": pack_inputs["skipped_sources"],
         "quick_notes": pack_inputs["quick_notes"],
@@ -1745,7 +1789,37 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 3) User-authored frozen notes are usable context, but explicitly not evidence.
+    # 3) Explicitly selected connector snapshots are external sources, not truth.
+    for snapshot in pack.get("connector_snapshots") or []:
+        haystack = " ".join([
+            str(snapshot.get("title") or ""),
+            str(snapshot.get("excerpt") or ""),
+        ])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            ranked.append((lexical + 4, float(snapshot.get("occurred_at") or snapshot.get("created_at") or 0), {
+                "id": str(snapshot.get("id") or ""),
+                "kind": "CONNECTOR_SNAPSHOT",
+                "authority": "REFERENCE_SOURCE",
+                "title": str(snapshot.get("title") or snapshot.get("external_kind") or "Connector source")[:300],
+                "excerpt": str(snapshot.get("excerpt") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "CONNECTOR_SNAPSHOT",
+                    "id": str(snapshot.get("id") or ""),
+                    "connection_id": str(snapshot.get("connection_id") or ""),
+                    "external_kind": str(snapshot.get("external_kind") or ""),
+                    "external_id": str(snapshot.get("external_id") or ""),
+                    "content_hash": str(snapshot.get("content_hash") or ""),
+                    "timestamp": snapshot.get("occurred_at"),
+                    "visibility": str(snapshot.get("visibility") or "PRIVATE"),
+                }],
+            }))
+
+    # 4) User-authored frozen notes are usable context, but explicitly not evidence.
+
     for note in pack.get("quick_notes") or []:
         haystack = " ".join([str(note.get("title") or ""), str(note.get("content") or "")])
         lexical = _text_match_score(question, haystack)
@@ -1762,7 +1836,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) Manual screen observations are source-aware but never confirmed truth.
+    # 5) Manual screen observations are source-aware but never confirmed truth.
     for observation in conversation_screen.list_context(session_id, limit=40):
         lexical = _text_match_score(question, str(observation.get("text") or ""))
         if lexical:
@@ -1787,7 +1861,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 5) The current-session transcript supports catch-up, but remains observation.
+    # 6) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",

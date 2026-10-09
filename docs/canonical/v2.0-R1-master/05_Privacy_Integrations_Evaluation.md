@@ -97,34 +97,142 @@ Screen Context 默认 OFF / explicit opt-in。
 
 # 8. Connectors
 
-## Read-only first
+## Integration Boundary 已进入 runtime
 
-优先：
+纯仓库层不再只有“connector placeholder”。schema v8 定义三层独立对象：
 
-- Calendar；
-- docs；
-- approved project sources；
-- approved email threads；
-- task/issue tracker。
+```text
+Connection descriptor
+→ immutable Connector Snapshot
+→ explicit Space selection
+→ Frozen Session Pack source
 
-每个 connector scope 明确。
+APPROVED DraftAction
+→ Execution Request
+→ second explicit Execute
+→ provider result / failure audit
+```
 
-## Source authority
+### 8.1 Provider capability / least privilege
 
-Connector payload 是 source，不自动变 truth。
+Provider catalog 只表达 capability 与最小 scope，不表达“已经连接”。
+
+当前 catalog：
+- Google Calendar：`calendar.read`；
+- Gmail：`mail.read` / `mail.send` 分离；
+- Google Drive / Docs：`docs.read`；
+- Microsoft Graph：calendar / mail / docs / task read 与 mail/task write 分离；
+- GitHub：issues read / write 分离；
+- MCP：context.read / action.execute 分离。
+
+规则：
+- requested permission 必须被某个真实 `CONNECTED + adapter available` connection 覆盖；
+- 不允许 silent scope escalation；
+- read scope 不自动获得 write；
+- provider adapter 未接线时 fail-closed。
+
+### 8.2 Secret boundary
+
+`product.db` **禁止保存 OAuth token / API secret**。
+
+只允许 opaque credential ref：
+
+```text
+keyring:...
+oskeychain:...
+provider:...
+plugin:...
+```
+
+真实 provider adapter 负责向 OS keychain / provider credential store 取凭据。
+
+### 8.3 Read snapshot boundary
+
+外部 Calendar / Mail / Docs / Issue 数据进入 Chengzhu 后，先变成：
+
+```text
+CONNECTOR_SNAPSHOT
++ provider / external id
++ content hash
++ occurred_at
++ visibility
++ provenance
+```
+
+Snapshot：
+- 是 source；
+- 不自动变 Conversation truth；
+- 只有用户在 Space 中显式选择后，才进入下一场 Session Pack；
+- Session 开始后 snapshot 更新不静默改写旧 Pack；
+- Manual Ask 可检索 frozen snapshot，但 authority 仍是 `REFERENCE_SOURCE`。
+
+同步 cursor / token 由 provider adapter 持久化；provider 不同可使用 sync token、delta cursor、ETag 或 MCP server-defined cursor。
+
+### 8.4 Retention / export
+
+Connector snapshot 独立 retention：
+- Minimum：7 天；
+- Standard：30 天；
+- 当前 Space 仍显式选中的 snapshot 不被普通 retention 删除；
+- 已经冻结进 Session Pack 的副本不被 snapshot retention 反向改写。
+
+Export：
+- 可导出 connector snapshot provenance；
+- 可导出 external execution audit；
+- 不导出 credential ref / token / secret。
 
 ## Write-back
 
-第一阶段只生成 DraftAction：
+DraftAction 仍必须先经过：
 
 ```text
-CREATE_TASK_DRAFT
-CREATE_ISSUE_DRAFT
-FOLLOWUP_EMAIL_DRAFT
-UPDATE_DECISION_LOG_DRAFT
+DRAFT
+→ APPROVED
 ```
 
-用户确认后才能执行。
+但 pure-repo execution boundary 已扩展为：
+
+```text
+APPROVED DraftAction
+→ explicit Execution Request
+→ scope / connection / adapter recheck
+→ second explicit Execute
+→ PENDING / EXECUTING / SUCCEEDED / FAILED / BLOCKED
+→ provider response + idempotency audit
+```
+
+硬规则：
+- APPROVED 不等于 sent / created；
+- 缺 scope → BLOCKED；
+- 未连接 → BLOCKED；
+- adapter 不存在 → BLOCKED；
+- provider error → FAILED；
+- 同一个 draft / connection / operation / target 复用 idempotency key，避免双发；
+- 只有 `SUCCEEDED + provider response` 才能宣称外部动作成功；
+- 普通 retention 不删除已有 external execution audit。
+
+## 当前 external gate
+
+当前仓库拥有 **Integration Boundary runtime**，但默认不携带真实 Google / Microsoft / GitHub / MCP adapter，也没有用户 OAuth credential provisioning。
+
+因此允许写：
+
+```text
+INTEGRATION_BOUNDARY_AVAILABLE = TRUE
+REVIEWED_EXTERNAL_EXECUTION_BOUNDARY_AVAILABLE = TRUE
+PROVIDER_ADAPTERS_CONFIGURED = FALSE
+```
+
+不能写：
+
+```text
+GOOGLE_CALENDAR_CONNECTED = TRUE
+MAIL_SENT = TRUE
+TASK_CREATED = TRUE
+ISSUE_CREATED = TRUE
+```
+
+除非未来 provider adapter 真实执行并返回成功证据。
 
 # 9. MCP
 

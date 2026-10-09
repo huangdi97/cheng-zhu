@@ -1090,7 +1090,6 @@ def _preflight_context_fingerprint(
         },
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
-        "integration_runtime": integration_runtime,
     }
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -1280,6 +1279,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
+        "integration_runtime": integration_runtime,
         "share_privacy_runtime": share_privacy_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),

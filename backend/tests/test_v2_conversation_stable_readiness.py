@@ -42,14 +42,14 @@ def _pilot():
         ],
         "profiles": {
             "PROJECT_SYNC": {
-                "min_distinct_users": 5,
-                "min_sessions": 20,
-                "min_cross_session_spaces": 3,
+                "distinct_users": 5,
+                "sessions": 20,
+                "cross_session_spaces": 3,
             },
             "DESIGN_REVIEW": {
-                "min_distinct_users": 5,
-                "min_sessions": 20,
-                "min_cross_session_spaces": 3,
+                "distinct_users": 5,
+                "sessions": 20,
+                "cross_session_spaces": 3,
             },
         },
         "critical_incidents": 0,
@@ -109,11 +109,11 @@ def test_stable_readiness_fails_when_profile_floor_is_missing():
     module = _module()
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     pilot = _pilot()
-    pilot["profiles"]["PROJECT_SYNC"]["min_sessions"] = 2
+    pilot["profiles"]["PROJECT_SYNC"]["sessions"] = 2
     report = module.evaluate(_human_report(), pilot, policy)
     assert report["status"] == "NO_GO"
     assert any(
-        item["name"] == "profile:PROJECT_SYNC:min_sessions"
+        item["name"] == "profile:PROJECT_SYNC:sessions"
         for item in report["failed_checks"]
     )
 

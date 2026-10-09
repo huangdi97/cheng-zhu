@@ -295,11 +295,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const applyRetention = async () => {
     if (!retention.data) return
     const counts = retention.data.would_delete
-    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}；已确认事项与 provenance 不删除。`)) return
+    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}、未选 external snapshot ${counts.connector_snapshots ?? 0}；已确认事项、已选 snapshot、execution audit 与 provenance 不删除。`)) return
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.applyRetention(spaceId, true)
-      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0}`)
+      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0} · external snapshot ${result.deleted.connector_snapshots ?? 0}`)
       await retention.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }

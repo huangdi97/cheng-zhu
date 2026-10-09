@@ -3622,9 +3622,113 @@ def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(p
         "guidance_events": 1,
         "draft_actions": 1,
         "screen_context_observations": 0,
+        "connector_snapshots": 0,
     }
     assert store.get("conversation_item", item["id"]) is not None
     assert store.get("conversation_draft_action", draft["id"]) is None
+
+
+
+
+def test_connector_retention_keeps_selected_snapshot_and_execution_audit(product_env, fake_mail_adapter, monkeypatch):
+    clock = [3_000_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read", "mail.send"],
+        credential_ref="keyring:chengzhu/google-mail/retention",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    space = conversations.create_space("Integration retention", "CLIENT_CALL")
+    first = conversation_integrations.sync_connection(connection["id"], space["id"])["snapshots"][0]
+
+    # Create a second old snapshot which is not selected.
+    second = conversation_integrations._store_snapshot(connection, space["id"], {
+        "external_kind": "MAIL_THREAD",
+        "external_id": "thread-2",
+        "title": "Disposable thread",
+        "excerpt": "temporary external context",
+        "occurred_at": 90.0,
+    })
+    conversations.update_space(space["id"], {
+        "selected_connector_snapshot_ids": [first["id"]],
+        "retention_policy": {"preset": "MINIMUM"},
+    })
+
+    started = conversations.create_adhoc(title="Execution audit", profile="CLIENT_CALL")
+    decision = conversations.add_item(
+        started["session"]["id"],
+        item_type="Decision",
+        title="send reviewed follow-up",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "explicit"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(started["session"]["id"])
+    draft = conversations.followup_draft(started["session"]["id"])
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+    request = conversation_integrations.request_execution(
+        approved["id"], connection["id"], target="client@example.test",
+    )
+    assert request["status"] == "PENDING"
+
+    clock[0] += 8 * 24 * 60 * 60
+    preview = conversations.retention_preview(space["id"])
+    assert preview["would_delete"]["connector_snapshots"] == 1
+    assert store.get("conversation_connector_snapshot", first["id"]) is not None
+    assert store.get("conversation_connector_snapshot", second["id"]) is not None
+
+    result = conversations.apply_retention(space["id"], confirm=True)
+    assert result["deleted"]["connector_snapshots"] == 1
+    assert store.get("conversation_connector_snapshot", first["id"]) is not None
+    assert store.get("conversation_connector_snapshot", second["id"]) is None
+    # Execution audit belongs to a different Space's draft and remains intact;
+    # ordinary retention never treats it as disposable draft telemetry.
+    assert store.get("conversation_connector_execution", request["id"]) is not None
+    assert store.get("conversation_draft_action", approved["id"]) is not None
+
+
+def test_export_includes_connector_provenance_and_execution_audit_without_credentials(product_env, fake_mail_adapter):
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read", "mail.send"],
+        credential_ref="keyring:chengzhu/google-mail/export",
+        account_hint="user@example.test",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    space = conversations.create_space("Export connectors", "CLIENT_CALL")
+    snapshot = conversation_integrations.sync_connection(connection["id"], space["id"])["snapshots"][0]
+    conversations.update_space(space["id"], {"selected_connector_snapshot_ids": [snapshot["id"]]})
+
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    decision = conversations.add_item(
+        session["id"], item_type="Decision", title="reviewed external follow-up",
+        source_refs=[conversation_integrations.snapshot_source_ref(snapshot)],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(session["id"])
+    draft = conversations.followup_draft(session["id"])
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+    execution = conversation_integrations.request_execution(
+        approved["id"], connection["id"], target="client@example.test",
+    )
+
+    exported = conversations.export_space(space["id"])
+    assert exported["connector_snapshots"][0]["id"] == snapshot["id"]
+    assert exported["external_execution_audit"][0]["id"] == execution["id"]
+    assert "connector_snapshots" in exported["export_manifest"]["categories"]
+    assert "external_execution_audit" in exported["export_manifest"]["categories"]
+    dumped = repr(exported)
+    assert "keyring:chengzhu/google-mail/export" not in dumped
+    assert "credential_ref" not in dumped
+
+    session_export = conversations.export_session(session["id"])
+    assert any(x.get("connector_snapshot_id") == snapshot["id"] for x in session_export["source_manifest"])
+    assert session_export["external_execution_audit"][0]["id"] == execution["id"]
+    assert "credential_ref" not in repr(session_export)
 
 
 def test_export_is_categorized_and_keeps_truth_classes_separate(product_env):

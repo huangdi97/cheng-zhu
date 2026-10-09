@@ -1,0 +1,14 @@
+{
+  "space_id": "cs_cede02bd8f794a91",
+  "goal_id": "cg_099cfb34150e4a4c",
+  "participant_id": "cp_412e105d1eff4375",
+  "session_id": "cv_21c3730950e1414f",
+  "pack_id": "cpack_e9698c10acfe409a",
+  "decision_id": "ci_9cdc9788a7c44491",
+  "commitment_id": "ci_cae24d626b1641d6",
+  "thread_id": "ci_31bee5fceada4c04",
+  "resolved_thread_id": "cot_50fde4307f5b4270",
+  "guidance_id": "ge_0f4d72e4b28b4d13",
+  "draft_id": "cda_c094c492b35b42e0",
+  "future_session_id": "cv_705d7d584d714476"
+}

@@ -282,11 +282,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const applyRetention = async () => {
     if (!retention.data) return
     const counts = retention.data.would_delete
-    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}；已确认事项与 provenance 不删除。`)) return
+    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}、未选中的 connector snapshot ${counts.connector_snapshots ?? 0}；已确认事项、Session Pack、external execution audit 与当前显式选择的 connector snapshot 不删除。`)) return
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.applyRetention(spaceId, true)
-      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0}`)
+      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0} · connector snapshot ${result.deleted.connector_snapshots ?? 0}`)
       await retention.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -521,8 +521,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <SecondaryButton disabled={sessionBusy} onClick={() => setRetentionPreset('STANDARD')}>Standard</SecondaryButton>
             </div>
             {retention.loading ? <div className="mt-2"><Loading /></div> : retention.data ? <div className="mt-3 rounded-xl bg-bg-secondary/40 p-3">
-              <p className="text-xs text-text-primary">当前策略若现在执行：transcript {retention.data.would_delete.transcript_segments} · guidance {retention.data.would_delete.guidance_events} · draft {retention.data.would_delete.draft_actions}</p>
-              <p className="mt-1 text-[11px] text-text-muted">已确认事项、Session Pack 与 provenance tombstone 始终保留；原始音频当前默认不长期保存。</p>
+              <p className="text-xs text-text-primary">当前策略若现在执行：transcript {retention.data.would_delete.transcript_segments} · guidance {retention.data.would_delete.guidance_events} · draft {retention.data.would_delete.draft_actions} · connector snapshot {retention.data.would_delete.connector_snapshots ?? 0}</p>
+              <p className="mt-1 text-[11px] text-text-muted">已确认事项、Session Pack、provenance tombstone、external execution audit 与当前显式选择的 connector snapshot 保留；原始音频默认不长期保存。</p>
               <div className="mt-3"><SecondaryButton disabled={sessionBusy || !retention.data.destructive} onClick={applyRetention}>预览后执行本地清理</SecondaryButton></div>
             </div> : null}
           </Section>

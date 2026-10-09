@@ -562,9 +562,9 @@ Capture start 必须二次校验，防止 Preflight 后配置改变。
 
 ---
 
-# 14. 当前明确 Blocked 的能力
+# 14. 当前 Runtime Truth 与 External Blockers
 
-以下能力在真实 runtime 未接线前必须阻止开始或标明 unavailable：
+以下按“已落地 runtime / 仍需外部依赖”分层记录。不能把已经完成的 Conversation runtime 继续标成 blocked，也不能因为本地 runtime 存在就提前升级成 public prerelease / stable / real-user truth。
 
 ## Conversation Screen Context
 MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。MANUAL 每次由用户主动抓取；AUTO 的 policy 选择不会启动捕获，必须进入 Live 后再次显式 start，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED。AUTO 要求 participant consent/allowance status 与 transparency plan（均为用户报告），支持 duplicate-frame suppression、rate limit、bounded error fail-stop，Session end/delete/Space erase 强制停止。两种模式都不落原图，只保存 observation text + image/model-route provenance；LOCAL processing 下 remote vision fail-closed，冻结 vision fingerprint 在会中变化时拒绝继续抓取。
@@ -845,7 +845,7 @@ PMF_PROVEN = TRUE
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- Manual + explicit-start AUTO Screen Context 可用；coach / private overlay / connectors 明确 blocked；
+- Manual + explicit-start AUTO Screen Context、session-scoped Conversation Human Coach、verified desktop PRIVATE_OVERLAY 均已有真实 runtime；Calendar / Docs / Mail / project-tracker connectors 与 actual external write-back 仍明确 blocked；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；
@@ -869,16 +869,14 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 先让 `v2.0.0-beta.2` 的 PR CI + Windows Release preflight 在 exact final head 全绿；
-2. 合并后由 exact green main SHA 发布 GitHub Prerelease，保持 v1.4.2 为 Stable Latest；
-3. 用该可下载安装包进行 local dogfood；
-4. 真实 Project Sync / Design Review 小规模使用；
-5. 收集 human-labeled Guidance / missed-moment / continuity evidence；
-6. 根据真实证据再决定是否继续投入：
-   - Human Coach 的 packaged/real-session evidence；
-   - Private Overlay；
+1. **完成 beta.2 public prerelease publish**。产品候选源码锁定为 `b0c9e9bd7e46070dd9777fc3951ff993855790a8`：该 exact SHA 已完成 Windows build、draft Release、asset download-back、SHA256、downloaded-installer replay 与 packaged smoke。随后发现的发布脚本 PowerShell 解析问题仅属于 release engineering；PR #54 已在 `cac605edf413ec248babf02ea9f73da708d156f8` 合并并通过完整 Windows Release preflight。正确发布动作是用**最新 main 上修复后的 workflow**重新执行 `workflow_dispatch`，但 `source_sha` 仍传 `b0c9e9bd...`、`publish=true`，最终要求 `v2.0.0-beta.2` 为 public GitHub **Prerelease** 且 Stable Latest 仍为 v1.4.2；
+2. 用该公开可下载安装包进行 local dogfood；
+3. 真实 Project Sync / Design Review 小规模使用；
+4. 收集 human-labeled Guidance / missed-moment / continuity evidence；
+5. 根据真实证据再决定是否继续投入：
    - Calendar / Docs / Mail / project-tracker connectors；
-   - actual external write-back；
-   - Presentation / 1:1 / Client Call / Negotiation 专属行为优化。
+   - actual external email/task/issue/decision-log write-back；
+   - Presentation / 1:1 / Client Call / Negotiation 的真实场景专项验证与优化；
+   - stable v2 发布门槛。
 
-后四类不是“源码里再补几个字段就能完成”的缺口，而是需要真实 runtime、外部权限或真实用户证据才能合法升级状态。
+Human Coach、PRIVATE_OVERLAY 与 explicit-start AUTO Screen Context 已经是 runtime，不再列为“待实现”；它们仍需要 public beta / real-session evidence 才能升级成熟度。剩余外部项不是“源码里再补几个字段就能完成”的缺口，而是需要外部权限、真实 runtime 或真实用户证据才能合法升级状态。

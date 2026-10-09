@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-from services.product import conversation_capture, conversation_screen, conversations, materials
+from services.product import conversation_capture, conversation_connectors, conversation_screen, conversations, materials
 from services.storage import product as store
 
 
@@ -1140,6 +1140,81 @@ def test_connector_permission_remains_a_real_preflight_blocker(product_env):
     assert "connector_runtime" in keys
     item_state = {x["key"]: x["ok"] for x in check["items"]}
     assert item_state["connectors"] is False
+
+
+
+def test_registered_read_connector_is_granted_frozen_and_visible_in_live_context(product_env):
+    conversation_connectors.clear_registry()
+    try:
+        conversation_connectors.register_provider(
+            "calendar-local",
+            ["calendar.read"],
+            account_label="Work Calendar",
+        )
+        space = conversations.create_space("Connector Grant", "PROJECT_SYNC")
+        session = conversations.create_session(
+            space["id"],
+            consent_ack=True,
+            policy={"connector_permissions": ["calendar.read"]},
+        )
+        check = conversations.preflight(session["id"])
+        assert check["blockers"] == []
+        assert check["connector_runtime"]["ok"] is True
+        assert check["connector_runtime"]["grants"] == [{
+            "capability": "calendar.read",
+            "provider_id": "calendar-local",
+            "account_label": "Work Calendar",
+        }]
+
+        started = conversations.start_session(session["id"])
+        frozen = started["pack"]["payload"]["connector_runtime"]
+        assert frozen["grants"][0]["provider_id"] == "calendar-local"
+        live = conversations.session_context(session["id"])
+        assert live["connector_runtime"]["grants"][0]["capability"] == "calendar.read"
+    finally:
+        conversation_connectors.clear_registry()
+
+
+def test_connector_registry_change_after_preflight_invalidates_context_fingerprint(product_env):
+    conversation_connectors.clear_registry()
+    try:
+        conversation_connectors.register_provider("calendar-a", ["calendar.read"])
+        space = conversations.create_space("Connector Drift", "PROJECT_SYNC")
+        session = conversations.create_session(
+            space["id"],
+            consent_ack=True,
+            policy={"connector_permissions": ["calendar.read"]},
+        )
+        first = conversations.preflight(session["id"])
+        assert first["blockers"] == []
+
+        conversation_connectors.clear_registry()
+        conversation_connectors.register_provider("calendar-b", ["calendar.read"])
+        with pytest.raises(ValueError, match="上下文自上次 Preflight 后已变化"):
+            conversations.start_session(session["id"])
+    finally:
+        conversation_connectors.clear_registry()
+
+
+def test_session_connector_permissions_cannot_grant_write_execution(product_env):
+    conversation_connectors.clear_registry()
+    try:
+        conversation_connectors.register_provider("writer", ["email.send"])
+        space = conversations.create_space("Write Guard", "CLIENT_CALL")
+        session = conversations.create_session(
+            space["id"],
+            consent_ack=True,
+            policy={"connector_permissions": ["email.send"]},
+        )
+        check = conversations.preflight(session["id"])
+        assert any(x["key"] == "connector_runtime" for x in check["blockers"])
+        assert check["connector_runtime"]["blocked"] == [{
+            "capability": "email.send",
+            "reason": "WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW",
+        }]
+    finally:
+        conversation_connectors.clear_registry()
+
 
 
 def test_share_privacy_off_does_not_require_runtime_proof(product_env):

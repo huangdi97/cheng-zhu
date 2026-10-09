@@ -1,0 +1,196 @@
+{
+  "devices": [
+    {
+      "index": 0,
+      "name": "Microsoft 声音映射器 - Input",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 1,
+      "name": "麦克风 (EDIFIER M30 Plus)",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 2,
+      "name": "麦克风 (Web Camera)",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 3,
+      "name": "Microsoft 声音映射器 - Output",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 4,
+      "name": "扬声器 (EDIFIER M30 Plus)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 5,
+      "name": "OF24Q (NVIDIA High Definition A",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 6,
+      "name": "主声音捕获驱动程序",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 7,
+      "name": "麦克风 (EDIFIER M30 Plus)",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 8,
+      "name": "麦克风 (Web Camera)",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 9,
+      "name": "主声音驱动程序",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 10,
+      "name": "扬声器 (EDIFIER M30 Plus)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 11,
+      "name": "OF24Q (NVIDIA High Definition Audio)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 12,
+      "name": "扬声器 (EDIFIER M30 Plus)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 13,
+      "name": "OF24Q (NVIDIA High Definition Audio)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 14,
+      "name": "麦克风 (EDIFIER M30 Plus)",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 15,
+      "name": "麦克风 (Web Camera)",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 16,
+      "name": "麦克风 (Realtek HD Audio Mic input)",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 17,
+      "name": "立体声混音 (Realtek HD Audio Stereo input)",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 18,
+      "name": "Speakers (Realtek HD Audio output)",
+      "max_input_channels": 0,
+      "max_output_channels": 8,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 19,
+      "name": "线路输入 (Realtek HD Audio Line input)",
+      "max_input_channels": 2,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 20,
+      "name": "扬声器 (EDIFIER M30 Plus)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 21,
+      "name": "麦克风 (EDIFIER M30 Plus)",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 22,
+      "name": "Output (NVIDIA High Definition Audio)",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 48000.0
+    },
+    {
+      "index": 23,
+      "name": "耳机 ()",
+      "max_input_channels": 0,
+      "max_output_channels": 2,
+      "default_samplerate": 44100.0
+    },
+    {
+      "index": 24,
+      "name": "耳机 (@System32\\drivers\\bthhfenum.sys,#2;%1 Hands-Free%0\r\n;(OPPO Enco X2))",
+      "max_input_channels": 0,
+      "max_output_channels": 1,
+      "default_samplerate": 8000.0
+    },
+    {
+      "index": 25,
+      "name": "耳机 (@System32\\drivers\\bthhfenum.sys,#2;%1 Hands-Free%0\r\n;(OPPO Enco X2))",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 8000.0
+    },
+    {
+      "index": 26,
+      "name": "麦克风 (Web Camera)",
+      "max_input_channels": 1,
+      "max_output_channels": 0,
+      "default_samplerate": 44100.0
+    }
+  ],
+  "default_input": 1,
+  "default_output": 4,
+  "total_devices": 27
+}

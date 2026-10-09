@@ -1,0 +1,93 @@
+{
+  "F1_mic_open_failure": {
+    "mic_open_fail_raises": true,
+    "capture_inactive_after_fail": true,
+    "overlay_restored_after_fail": true
+  },
+  "F2_self_mic_degraded": {
+    "self_mic_degraded_test_covered": true
+  },
+  "F3_database_locked": {
+    "db_locked_raises": true,
+    "db_locked_read_clean": true
+  },
+  "F4_missing_quick_note_invalid_material": {
+    "preflight_warns_skipped_source": true,
+    "pack_skipped_source_reason": [
+      "NOT_READY_OR_MISSING"
+    ],
+    "pack_missing_quick_note_ids": [
+      "ghost_note"
+    ],
+    "start_succeeds_gracefully": true
+  },
+  "F5_coach_expired_revoked": {
+    "coach_created": true,
+    "default_permissions": {
+      "transcript": false,
+      "ai_cue": false,
+      "resume_jd": false,
+      "session_context": true
+    },
+    "conversation_min_permissions_match_contract": true,
+    "coach_revoked": true
+  },
+  "F6_remote_stt_while_local_off": {
+    "local_with_remote_stt_blocked": true,
+    "off_blocks_transcript": true
+  },
+  "F7_electron_protection_unavailable": {
+    "private_overlay_without_proof_refused": true
+  },
+  "stress_long_lived_space": {
+    "sessions_created": 100,
+    "items_created": 600,
+    "threads_created": 300,
+    "transcript_segments_created": 1000,
+    "timing_create_seconds": 69.17,
+    "home_spaces": 5,
+    "ask_answer_sample": "已确认历史：item-59-9",
+    "ask_truth_confirmed": true,
+    "detail_sessions_listed": 100,
+    "open_threads_returned": 300,
+    "prepare_open_threads": 300,
+    "history_returned": 100,
+    "manual_ask_grounded": true,
+    "continue_sections": [
+      "candidates",
+      "commitments",
+      "decisions",
+      "next_focus",
+      "open_questions",
+      "pins",
+      "profile_outcome",
+      "review_required",
+      "session",
+      "what_changed"
+    ],
+    "no_phantom_continuity": true,
+    "timing_queries_seconds": 1.22,
+    "delete_tombstoned": true,
+    "retention_preview_keys": [
+      "destructive",
+      "kept",
+      "policy",
+      "space_id",
+      "would_delete"
+    ],
+    "export_manifest_categories": [
+      "transcript",
+      "screen_context_observations",
+      "notes",
+      "confirmed_items",
+      "unconfirmed_candidates",
+      "guidance",
+      "source_manifest",
+      "open_threads",
+      "draft_actions",
+      "session_packs",
+      "provenance_tombstones"
+    ],
+    "timing_delete_retention_export_seconds": 0.13
+  }
+}

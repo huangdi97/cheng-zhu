@@ -537,6 +537,7 @@ reviewed output evidence
 | External task/email/issue write-back execution | NOT WIRED | 当前只有 reviewed local drafts |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
+| Native interactive Windows BrowserWindow visual acceptance | EXTERNAL EVIDENCE GATE | hosted runner 可诚实 fallback；真实 `BrowserWindow.capturePage()` / human visual acceptance 仍需本机交互桌面 replay，见 GitHub issue #34 |
 
 ---
 
@@ -765,3 +766,5 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - CI 全绿。
 
 这之后的下一阶段已经从“是否有 packaged evidence”推进为 **Conversation Beta public prerelease / dogfood / real-user evidence**。packaged evidence 与 human-eval tooling 已进入 main；剩余成熟度只能由公开 prerelease provenance、真实 dogfood 和真实用户研究继续推进，不能继续靠文档把状态写高。
+
+Native Windows UI fidelity 另有一条独立 evidence gate：GitHub issue #34。Hosted-runner fallback 仍可支持 Beta engineering/release evidence，但不能升级 `NATIVE_ELECTRON_UI_FIDELITY_PROVEN` 或 human visual acceptance；不得通过延长 timeout 或重命名 fallback 来伪关闭该 issue。

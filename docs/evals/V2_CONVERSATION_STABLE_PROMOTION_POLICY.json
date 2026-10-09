@@ -1,0 +1,45 @@
+{
+  "policy_version": "v2.0-R1-stable-promotion-1",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. This policy is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
+  "profiles_required": {
+    "PROJECT_SYNC": {
+      "min_distinct_users": 5,
+      "min_sessions": 20,
+      "min_cross_session_spaces": 3
+    },
+    "DESIGN_REVIEW": {
+      "min_distinct_users": 5,
+      "min_sessions": 20,
+      "min_cross_session_spaces": 3
+    }
+  },
+  "metrics": {
+    "opportunity_precision": {"direction": "gte", "threshold": 0.8, "min_n": 30},
+    "interruption_regret": {"direction": "lte", "threshold": 0.15, "min_n": 30},
+    "source_attribution_accuracy": {"direction": "gte", "threshold": 0.95, "min_n": 30},
+    "recall_precision": {"direction": "gte", "threshold": 0.9, "min_n": 20},
+    "useful_silence_rate": {"direction": "gte", "threshold": 0.8, "min_n": 30},
+    "direct_question_precision": {"direction": "gte", "threshold": 0.9, "min_n": 20},
+    "direct_question_recall": {"direction": "gte", "threshold": 0.85, "min_n": 20},
+    "decision_commitment_state_precision": {"direction": "gte", "threshold": 0.9, "min_n": 30},
+    "continue_writeback_accuracy": {"direction": "gte", "threshold": 0.95, "min_n": 20},
+    "mean_cognitive_load_delta": {"direction": "lte", "threshold": -0.25, "min_n": 15},
+    "space_reuse_intent_rate": {"direction": "gte", "threshold": 0.7, "min_n": 15}
+  },
+  "required_attestations": [
+    "AUTHORIZED_REAL_USE",
+    "NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
+    "RAW_LABELS_KEPT_LOCAL",
+    "NO_CRITICAL_PRIVACY_INCIDENT",
+    "NO_KNOWN_DATA_LOSS"
+  ],
+  "claims": {
+    "on_pass": "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW",
+    "not_granted": [
+      "V2_STABLE_RELEASE",
+      "PMF_PROVEN",
+      "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
+    ]
+  },
+  "change_control": "Thresholds must be revised by an explicit design change before looking at a new pilot result; do not lower a threshold merely to make a failing pilot pass."
+}

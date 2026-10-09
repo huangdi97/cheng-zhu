@@ -1,0 +1,17 @@
+=== Sound devices (Win32_SoundDevice) ===
+  USB Audio Device | status=OK
+  NVIDIA High Definition Audio | status=OK
+  USB Audio Device | status=OK
+  Realtek High Definition Audio | status=OK
+=== Device count ===
+4
+=== Playback render devices (WMI Win32_PnPEntity filter sound) ===
+  High Definition Audio 控制器
+  扬声器 (EDIFIER M30 Plus)
+  Realtek PCIe GbE Family Controller
+  High Definition Audio 控制器
+  麦克风 (EDIFIER M30 Plus)
+  NVIDIA High Definition Audio
+  麦克风 (Web Camera)
+  Realtek High Definition Audio
+  OF24Q (NVIDIA High Definition Audio)

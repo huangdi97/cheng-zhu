@@ -1,0 +1,39 @@
+=== OS ===
+Microsoft Windows 11 专业版 build 26200 arch=64 位
+=== CPU ===
+12th Gen Intel(R) Core(TM) i5-12400F cores=6 threads=12
+=== RAM(GB) ===
+31.8
+=== GPU ===
+NVIDIA GeForce RTX 4060 Ti driver=32.0.15.9186
+=== Python ===
+Python 3.13.14
+=== pip ===
+pip 26.1.2 from D:\Code\Python\Lib\site-packages\pip (python 3.13)
+
+=== Node ===
+v22.15.0
+=== npm ===
+11.3.0
+=== Git ===
+git version 2.55.0.windows.5
+=== FFmpeg ===
+ffmpeg version 8.0-full_build-www.gyan.dev Copyright (c) 2000-2025 the FFmpeg developers
+=== Electron (desktop/node_modules) ===
+41.10.7
+=== Chromium (playwright) ===
+.links, b, chromium_headless_shell-1234, chromium_headless_shell-1243, chromium_headless_shell-1246, chromium-1234, chromium-1243, chromium-1246, daemon, ffmpeg-1011, firefox-1538, winldd-1007
+=== Project path ===
+E:\AI\面试助手
+=== Remote origin ===
+https://github.com/huangdi97/cheng-zhu.git
+=== origin/main SHA ===
+383978fa480aac35d214dce3fa4e9fa5ebb17118
+=== beta.2 tag SHA ===
+cac605edf413ec248babf02ea9f73da708d156f8
+=== v1.4.2 tag SHA ===
+ce72eb4068408fd22be8eb421503e7b1b59dc856
+=== Local branch (initial) ===
+feat/chengzhu-v1.3-goal-centered-experience
+=== Local HEAD (initial) ===
+699fafe4cb784fda3cfa1b8c98b89a4f0db528e6

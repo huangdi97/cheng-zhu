@@ -1,0 +1,11 @@
+ M frontend/e2e/fixtures/sample-data.mjs
+ M frontend/e2e/job-review-linkage.spec.mjs
+ M frontend/e2e/job-workspace.spec.mjs
+ M frontend/e2e/r2-live-cue.spec.mjs
+ M frontend/e2e/resume-linkage.spec.mjs
+ M frontend/e2e/visual.spec.mjs
+ M reports/V1_3_V1_4_EXECUTION_CHECKPOINT.md
+?? artifacts/local-validation/
+?? frontend/e2e/__screenshots__/visual.spec.mjs/assist-win32.png
+?? frontend/e2e/__screenshots__/visual.spec.mjs/knowledge-win32.png
+?? frontend/e2e/__screenshots__/visual.spec.mjs/resume-win32.png

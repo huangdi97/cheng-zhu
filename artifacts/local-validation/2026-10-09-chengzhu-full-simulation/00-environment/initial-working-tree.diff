@@ -1,0 +1,503 @@
+diff --git a/frontend/e2e/fixtures/sample-data.mjs b/frontend/e2e/fixtures/sample-data.mjs
+index c9593d7..a32440a 100644
+--- a/frontend/e2e/fixtures/sample-data.mjs
++++ b/frontend/e2e/fixtures/sample-data.mjs
+@@ -36,6 +36,166 @@ export const SAMPLE_MODELS_FULL = [
+   },
+ ]
+ 
++// ---------------------------------------------------------------------------
++// v1.3 product layer (Goal-centered). The Goal deliberately reuses the v1.2
++// job-tracker and review samples: one Goal maps to application id 1
++// (MiniMax · AI 产品工程师), so the legacy board embedded in Goal Room → 面试
++// and the History list render the same records the v1.2 journeys asserted.
++// ---------------------------------------------------------------------------
++
++const goalBase = {
++  id: 'goal-1',
++  title: 'MiniMax · AI 产品工程师',
++  company: 'MiniMax',
++  role: 'AI 产品工程师',
++  jd: '任职要求：\n熟悉 RAG 与 Agent 架构\n有高并发在线服务经验优先',
++  status: 'ACTIVE',
++  stage: 'interview2',
++  next_interview_at: daysFromNow(1),
++  interview_round: '技术二面',
++  goal_notes: '二面是系统设计，面试官偏好追问容量估算。',
++  selected_resume_id: 3,
++  selected_material_ids: ['mat-1'],
++  selected_kb_ids: [],
++  selected_quick_note_ids: ['qn-1'],
++  active_question_bank_ids: ['qb-1'],
++  next_focus_id: 'nf-1',
++  offer_state: 'NONE',
++  role_family: 'AI_ML',
++  legacy_prep_space_id: 1,
++  application_id: 1,
++  last_opened_at: daysAgo(1),
++  created_at: daysAgo(14),
++  updated_at: daysAgo(1),
++}
++
++const goalSessions = [
++  {
++    key: 'real-902', type: 'REAL', guided: false,
++    reflection_ref: { session_kind: 'REVIEW', session_ref: '902' }, review_session_id: 902,
++    goal_id: 'goal-1', goal_title: 'MiniMax · AI 产品工程师', round: 'TECHNICAL',
++    title: '二面复盘', panel: false, started_at: daysAgo(1.2), ended_at: daysAgo(1),
++    turn_count: 6, has_reflection_actions: true,
++  },
++  {
++    key: 'real-901', type: 'REAL', guided: false,
++    reflection_ref: { session_kind: 'REVIEW', session_ref: '901' }, review_session_id: 901,
++    goal_id: 'goal-1', goal_title: 'MiniMax · AI 产品工程师', round: 'TECHNICAL',
++    title: '一面复盘', panel: false, started_at: daysAgo(5.4), ended_at: daysAgo(5.1),
++    turn_count: 5, has_reflection_actions: true,
++  },
++]
++
++export const SAMPLE_GOAL = {
++  ...goalBase,
++  interviews: [
++    { id: 'gi-1', goal_id: 'goal-1', round: '技术二面', kind: 'REAL', status: 'UPCOMING', scheduled_at: daysFromNow(1), notes: '' },
++    { id: 'gi-2', goal_id: 'goal-1', round: '技术一面', kind: 'REAL', status: 'DONE', scheduled_at: daysAgo(5.4), notes: '项目背景讲清楚了。' },
++  ],
++  offer: { goal_id: 'goal-1', status: 'NONE', comp: '', deadline: null, notes: '', updated_at: null },
++  next_focus: [
++    {
++      id: 'nf-1', goal_id: 'goal-1', type: 'SYSTEM_DESIGN', title: '系统设计容量估算',
++      reason: '二面是系统设计，复盘里 trade-off 和容量估算都还被追问。',
++      source_kind: 'REFLECTION', source_ref: '902',
++      actions: [{ key: 'practice', label: '练这个问题' }, { key: 'learn', label: '学知识' }],
++      priority: 1, status: 'OPEN', origin: 'DERIVED',
++    },
++    {
++      id: 'nf-2', goal_id: 'goal-1', type: 'OWNERSHIP', title: 'Ownership 表达',
++      reason: '一面里多用「我们」，听不出你本人做了什么。',
++      source_kind: 'REFLECTION', source_ref: '901',
++      actions: [{ key: 'create_story', label: '写一个 Story' }, { key: 'practice', label: '练这个问题' }],
++      priority: 2, status: 'OPEN', origin: 'DERIVED',
++    },
++  ],
++  sessions: goalSessions,
++}
++
++export const SAMPLE_GOAL_PREPARE = {
++  goal_id: 'goal-1',
++  next_focus: SAMPLE_GOAL.next_focus,
++  gap_map: [
++    { topic: 'RAG 评估', status: 'REVIEW_WEAKNESS', source: 'review', priority: 'high', reason: '复盘中暴露的薄弱点（出现 2 次）' },
++    { topic: 'Kubernetes', status: 'KNOWLEDGE_MATCH', source: 'job_alignment', priority: 'medium', reason: '可以用通用知识回答，但没有证据时不能说做过' },
++  ],
++  attack_surface: [
++    {
++      claim_id: 'cl-a',
++      text: '订单系统：负责整体架构设计，使用 Redis 做缓存，支撑日均 3 万 QPS',
++      risks: ['指标会被追问口径与来源', '与岗位要求直接相关'],
++      probes: ['整体架构是怎么设计的？', '缓存的一致性是怎么保证的？'],
++    },
++  ],
++  question_graph: [
++    { id: 'q1', text: '谈谈你对「Kubernetes」的理解？', kind: 'KNOWLEDGE', source: 'job_alignment', parent_id: '' },
++    { id: 'q2', text: '你实际做过「Kubernetes」相关的事情吗？', kind: 'EXPERIENCE_BOUNDARY', source: 'job_alignment', parent_id: 'q1' },
++    { id: 'q3', text: '如果让你来落地「Kubernetes」，你会怎么做？', kind: 'OPEN_DESIGN', source: 'job_alignment', parent_id: 'q2' },
++  ],
++  stories: {
++    items: [],
++    prompts: [{ competency: '团队协作', hint: '从你的真实经历里找一个体现「团队协作」的事件' }],
++    coverage: {
++      categories: [{ key: 'Ownership', label: 'Ownership 担当', story_ids: ['st-1'] }],
++      missing: [{ key: 'Collaboration', label: '协作' }],
++    },
++  },
++  has_jd: true,
++  materials: {
++    included: [{ material_id: 'mat-1', version_id: 'mv-1', version: 1, title: 'WenNian 项目总结', kind: 'PROJECT', usage: 'FACTS', is_personal_evidence: true }],
++    skipped: [],
++    selected_ids: ['mat-1'],
++  },
++  pack_preview: {
++    quick_notes: [{ id: 'qn-1', title: '想问团队规模', content: '想问团队规模和排期压力' }],
++    materials: [],
++    legacy_prep_space_id: 1,
++  },
++}
++
++// Reflection for Goal goal-1 review 902 (real-902). Goal Room 最近场次 and 历史
++// both open it via /reflection/review/902; the v1.3 reflection page (canonical
++// §18) needs a full first_screen so the Next Step / findings / timeline render.
++export const SAMPLE_REFLECTION_REVIEW_902 = {
++  session_kind: 'REVIEW',
++  session_ref: '902',
++  goal_id: 'goal-1',
++  title: '二面复盘',
++  first_screen: {
++    next_step: {
++      kind: 'PRACTICE',
++      title: '系统设计容量估算',
++      reason: '复盘里 trade-off 和容量估算都还被追问。',
++      finding_id: 'nf-1',
++      goal_id: 'goal-1',
++    },
++    pinned_moments: [],
++    went_well: [
++      { dimension: 'structure', dimension_label: '问题拆解', question: '讲一个你最有代表性的项目。', actual_speech: '我先讲了项目背景、目标和自己负责的关键环节。' },
++    ],
++    to_improve: [
++      {
++        id: 'f-1',
++        kind: 'TRADE_OFF',
++        kind_label: '取舍',
++        finding: 'trade-off 解释偏短，容量估算仍需补强',
++        question: '如果再来一轮追问，你最需要补哪块？',
++        actual_speech: '我会优先补 trade-off、容量估算或者动机表达里最薄的那一环。',
++        action_hint: '练这个问题',
++      },
++    ],
++    fact_checks: [],
++    story_opportunities: [],
++  },
++  delivery: [],
++  timeline: [
++    { turn_id: '9021', seq: 1, question: '讲一个你最有代表性的项目。', actual_speech: '我先讲了项目背景、目标和自己负责的关键环节。', move: 'OPEN', persona: '', content: { signals: {}, findings: [], strengths: [] } },
++    { turn_id: '9022', seq: 2, question: '如果再来一轮追问，你最需要补哪块？', actual_speech: '我会优先补 trade-off、容量估算或者动机表达里最薄的那一环。', move: 'FOLLOW_UP', persona: '', content: { signals: {}, findings: [], strengths: [] } },
++  ],
++  actions: [],
++  ask_cue_feedback: false,
++}
++
+ export const SAMPLE_CONFIG = {
+   models: [
+     { name: 'GPT-4.1 Mini', supports_think: true, supports_vision: true, enabled: true },
+@@ -753,6 +913,27 @@ export const SAMPLE_REVIEW_SESSION_DETAILS = Object.fromEntries(
+ export function resolveApiPayload(pathname, method) {
+   if (pathname === '/api/config') return SAMPLE_CONFIG
+   if (pathname === '/api/config/models-full') return { models: SAMPLE_MODELS_FULL }
++  if (pathname === '/api/product/goals') return { items: [SAMPLE_GOAL] }
++  if (pathname === '/api/product/goals/goal-1') return SAMPLE_GOAL
++  if (pathname === '/api/product/reflection/review/902') return SAMPLE_REFLECTION_REVIEW_902
++  if (pathname === '/api/product/goals/goal-1/prepare') return SAMPLE_GOAL_PREPARE
++  if (pathname === '/api/product/goals/goal-1/next-focus')
++    return { items: SAMPLE_GOAL.next_focus, practice_defaults: { round: 'SYSTEM_DESIGN', focus: SAMPLE_GOAL.next_focus[0], demeanor: 'SKEPTICAL', difficulty: 'STANDARD', sources: ['GOAL_GRAPH'] } }
++  if (pathname === '/api/product/history') return { items: SAMPLE_GOAL.sessions }
++  if (pathname === '/api/product/quick-notes')
++    return { items: [{ id: 'qn-1', scope: 'GOAL', goal_id: 'goal-1', title: '想问团队规模', content: '想问团队规模和排期压力', pinned: true, sort_order: 0, tags: ['想问'], revision: 1, created_at: daysAgo(2), updated_at: daysAgo(2) }] }
++  if (pathname === '/api/product/stories/coverage')
++    return { stories: [], categories: SAMPLE_GOAL_PREPARE.stories.coverage.categories, missing: SAMPLE_GOAL_PREPARE.stories.coverage.missing }
++  if (pathname === '/api/product/practice/options')
++    return {
++      rounds: [{ key: 'SYSTEM_DESIGN', label: '系统设计' }, { key: 'TECHNICAL', label: '技术面' }],
++      demeanors: [{ key: 'NEUTRAL', label: '中性' }, { key: 'SKEPTICAL', label: '质疑' }],
++      difficulties: [{ key: 'STANDARD', label: '标准' }, { key: 'PRESSURE', label: '压力' }],
++      sources: [{ key: 'GOAL_GRAPH', label: 'Goal 问题图' }],
++      personas: [{ key: 'p1', label: '技术面试官', concern: '架构深度', followup_style: 'deep', demeanor: 'SKEPTICAL' }],
++    }
++  if (pathname === '/api/product/trends')
++    return { goal_id: 'goal-1', sessions: 3, dimensions: [], delivery: null, note: '样本不足' }
+   if (pathname === '/api/options') return SAMPLE_OPTIONS
+   if (pathname === '/api/devices') return SAMPLE_DEVICES
+   if (pathname === '/api/network-info') return { ip: '127.0.0.1', port: 18999 }
+diff --git a/frontend/e2e/job-review-linkage.spec.mjs b/frontend/e2e/job-review-linkage.spec.mjs
+index 8d7e4c4..4304c57 100644
+--- a/frontend/e2e/job-review-linkage.spec.mjs
++++ b/frontend/e2e/job-review-linkage.spec.mjs
+@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test'
+ 
+ import { COMMON_WS_BOOTSTRAP, installMocks } from './fixtures/setup.mjs'
+ 
+-test.describe('job tracker and review linkage', () => {
+-  test('compact job tracker keeps detail feedback clear and opens linked review timeline', async ({ context, page }) => {
++// v1.3: the legacy job-tracker ↔ review linkage now lives inside the Goal-centered IA.
++// 求职目标 (GoalsPage → Goal Room) carries the linked review timeline, and 历史 →
++// 复盘 opens the same reflection records the v1.2 board asserted.
++test.describe('goal and review linkage', () => {
++  test('goal room keeps the linked review timeline clear and opens a review', async ({ context, page }) => {
+     await installMocks(context, {
+       messages: COMMON_WS_BOOTSTRAP,
+       localStorage: {
+@@ -15,22 +18,25 @@ test.describe('job tracker and review linkage', () => {
+     await page.setViewportSize({ width: 390, height: 844 })
+     await page.goto('/')
+ 
+-    await page.getByRole('tab', { name: '投递看板' }).click()
+-    await expect(page.getByRole('heading', { name: '求职进度', exact: true })).toBeVisible()
+-    await page.getByRole('button', { name: '查看 MiniMax 详情' }).click()
++    // A v1.2 job-tracker install lands on the v1.3 Goals list.
++    await expect(page).toHaveURL(/#\/goals/)
++    await expect(page.getByTestId('goals-page')).toBeVisible()
++    await expect(page.getByRole('heading', { name: '求职目标', exact: true })).toBeVisible()
+ 
+-    await expect(page.getByRole('button', { name: '定位 MiniMax 详情' })).toBeVisible()
+-    await expect(page.getByRole('button', { name: '返回列表' })).toBeVisible()
+-    await expect(page.getByText('已聚焦 1 条 · 当前筛选 2 条')).toBeVisible()
+-    await expect(page.getByText('复盘时间线')).toBeVisible()
++    await page.getByRole('button', { name: /MiniMax · AI 产品工程师/ }).click()
++    await expect(page).toHaveURL(/#\/goals\/goal-1/)
++    await expect(page.getByTestId('goal-room')).toBeVisible()
+ 
+-    await page.getByRole('button', { name: '看复盘' }).click()
+-    await expect(page.getByRole('heading', { name: '关联复盘' })).toBeVisible()
+-    await expect(page.getByText('二面复盘')).toBeVisible()
+-    await expect(page.getByText('一面复盘')).toBeVisible()
++    // The linked review timeline: both MiniMax reviews are listed under 最近场次.
++    const reviewRows = page.locator('li').filter({ hasText: '真实面试 · 技术面' })
++    await expect(reviewRows).toHaveCount(2)
++    await reviewRows.first().getByRole('button').click()
++
++    await expect(page).toHaveURL(/#\/reflection\/review\/902/)
++    await expect(page.getByRole('heading', { name: '二面复盘', exact: true })).toBeVisible()
+   })
+ 
+-  test('review detail shows the linked application timeline and can jump back to job tracker', async ({ context, page }) => {
++  test('review detail shows the linked application timeline and can jump back to goals', async ({ context, page }) => {
+     await installMocks(context, {
+       messages: COMMON_WS_BOOTSTRAP,
+       localStorage: {
+@@ -40,17 +46,25 @@ test.describe('job tracker and review linkage', () => {
+     })
+ 
+     await page.goto('/')
++    // A v1.2 review install lands on the v1.3 History list.
++    await expect(page).toHaveURL(/#\/history/)
++    const nav = page.getByRole('navigation', { name: '主导航' })
++    await expect(nav.getByRole('button', { name: '历史' })).toHaveAttribute('aria-current', 'page')
+ 
+-    await expect(page.getByRole('tab', { name: '复盘', exact: true })).toHaveAttribute('aria-selected', 'true')
+-    const linkedReviewRow = page.locator('article').filter({ hasText: '二面复盘' }).first()
++    const linkedReviewRow = page.locator('li').filter({ hasText: '真实面试 · 技术面 · MiniMax · AI 产品工程师' }).first()
+     await expect(linkedReviewRow).toBeVisible()
+-    await linkedReviewRow.click()
++    await linkedReviewRow.getByRole('button').click()
++
++    await expect(page).toHaveURL(/#\/reflection\/review\/902/)
++    await expect(page.getByRole('heading', { name: '二面复盘', exact: true })).toBeVisible()
+ 
++    // The linked application timeline lives in the full review detail.
++    await page.getByRole('region', { name: /完整复盘/ }).getByRole('button', { name: '展开' }).click()
+     await expect(page.getByText('已绑定求职记录')).toBeVisible()
+     await expect(page.getByText(/2\s*场复盘/)).toBeVisible()
+ 
+     await page.getByRole('button', { name: '去求职看板' }).click()
+-    await expect(page.getByRole('heading', { name: '求职进度', exact: true })).toBeVisible()
+-    await expect(page.getByText('已定位到 MiniMax · AI 产品工程师')).toBeVisible()
++    await expect(page).toHaveURL(/#\/goals/)
++    await expect(page.getByRole('heading', { name: '求职目标', exact: true })).toBeVisible()
+   })
+ })
+diff --git a/frontend/e2e/job-workspace.spec.mjs b/frontend/e2e/job-workspace.spec.mjs
+index aadd93c..752e32d 100644
+--- a/frontend/e2e/job-workspace.spec.mjs
++++ b/frontend/e2e/job-workspace.spec.mjs
+@@ -2,11 +2,16 @@ import { expect, test } from '@playwright/test'
+ 
+ import { COMMON_WS_BOOTSTRAP, installMocks } from './fixtures/setup.mjs'
+ 
++// In v1.3 preparation lives inside the Goal (canonical §6): Goal Room → 准备
++// renders Next Focus, Gap Map, Attack Surface, Question Graph, Skills/Stories,
++// Materials and the InterviewPack preview. The v1.2 PrepSpace analysis is still
++// reachable there through the「技能卡与预测题」embed, so its journey stays covered.
++
+ const SPACE = {
+-  id: 7,
+-  title: '示例科技 · 高级后端',
+-  role: '高级后端开发工程师',
+-  company: '示例科技',
++  id: 1,
++  title: 'MiniMax · AI 产品工程师',
++  role: 'AI 产品工程师',
++  company: 'MiniMax',
+   jd_text: '任职要求：熟悉 Redis、Kafka；熟悉 Kubernetes',
+   resume_text: '订单系统：负责整体架构设计，使用 Redis 做缓存，支撑日均 3 万 QPS',
+   resume_history_id: null,
+@@ -24,8 +29,8 @@ const SPACE = {
+ 
+ const WORKSPACE = {
+   job_id: 'job-1',
+-  company: '示例科技',
+-  title: '高级后端开发工程师',
++  company: 'MiniMax',
++  title: 'AI 产品工程师',
+   level: 'senior',
+   technologies: ['Redis', 'Kafka', 'Kubernetes'],
+   must_have: ['熟悉 Redis、Kafka', '熟悉 Kubernetes'],
+@@ -64,44 +69,56 @@ const WORKSPACE = {
+   },
+ }
+ 
+-async function openWorkspace(context, page) {
++async function openGoalPrepare(context, page) {
+   await installMocks(context, {
+     messages: COMMON_WS_BOOTSTRAP,
+-    localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'job-tracker' },
++    localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+     apiOverrides: {
+       'GET /api/prep/spaces': { items: [SPACE] },
+-      'GET /api/prep/spaces/7': SPACE,
++      'GET /api/prep/spaces/1': SPACE,
+       'POST /api/intelligence/workspace': WORKSPACE,
+     },
+   })
+-  await page.goto('/')
+-  await page.getByText('示例科技 · 高级后端').click()
+-  await page.getByRole('button', { name: /分析岗位/ }).click()
++  await page.goto('/#/goals/goal-1/prepare')
++  await expect(page.getByTestId('goal-room')).toBeVisible()
+   await expect(page.getByLabel('Gap Map')).toBeVisible()
+ }
+ 
+-test.describe('prepare job workspace (Stage L1)', () => {
+-  test('shows gap map, attack surface, stories and the follow-up tree', async ({ context, page }) => {
+-    await openWorkspace(context, page)
++test.describe('Goal Room → 准备 (v1.3 prepare)', () => {
++  test('shows Next Focus, gap map, attack surface, stories and the question graph', async ({ context, page }) => {
++    await openGoalPrepare(context, page)
++
++    // Gap Map carries the topic, its status and the reason it was raised.
++    await expect(page.getByText('RAG 评估').first()).toBeVisible()
++    await expect(page.getByText('复盘中暴露的薄弱点（出现 2 次）').first()).toBeVisible()
+ 
+-    await expect(page.getByText('RAG 评估')).toBeVisible()
++    // Attack Surface joins the risks into one line under the claim it protects.
+     await expect(page.getByText('指标会被追问口径与来源 · 与岗位要求直接相关')).toBeVisible()
+-    await expect(page.getByText(/缺少「团队协作」故事/)).toBeVisible()
+ 
+-    const tree = page.getByRole('button', { name: /追问树（1 条主线）/ })
+-    await tree.focus()
+-    await page.keyboard.press('Enter')
+-    await expect(tree).toHaveAttribute('aria-expanded', 'true')
++    // Story gaps point at the 5-minute builder instead of inventing an event.
++    await expect(page.getByText(/还没有「协作」故事/)).toBeVisible()
++
++    // The Question Graph is a real tree: the follow-up chain is rendered.
++    const tree = page.getByRole('tree', { name: 'Question Graph' })
++    await expect(tree).toBeVisible()
+     await expect(page.getByText('如果让你来落地「Kubernetes」，你会怎么做？')).toBeVisible()
+-    await page.screenshot({ path: test.info().outputPath('job-workspace-desktop.png'), fullPage: true })
++
++    // The v1.2 PrepSpace analysis is still reachable through its embed.
++    await page.getByRole('button', { name: '技能卡与预测题' }).click()
++    await expect(page.getByRole('button', { name: /分析岗位/ })).toBeVisible()
++    await page.getByRole('button', { name: /分析岗位/ }).focus()
++    await page.keyboard.press('Enter')
++    await expect(page.getByText('RAG 评估').first()).toBeVisible()
++
++    await page.screenshot({ path: test.info().outputPath('goal-prepare-desktop.png'), fullPage: true })
+   })
+ 
+   test('fits a phone-width viewport without horizontal overflow', async ({ context, page }) => {
+     await page.setViewportSize({ width: 390, height: 844 })
+-    await openWorkspace(context, page)
+-    await page.getByRole('button', { name: /追问树/ }).click()
++    await openGoalPrepare(context, page)
++    await expect(page.getByRole('tree', { name: 'Question Graph' })).toBeVisible()
+     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+     expect(overflow).toBeLessThanOrEqual(0)
+-    await page.screenshot({ path: test.info().outputPath('job-workspace-mobile.png'), fullPage: true })
++    await page.screenshot({ path: test.info().outputPath('goal-prepare-mobile.png'), fullPage: true })
+   })
+ })
+diff --git a/frontend/e2e/r2-live-cue.spec.mjs b/frontend/e2e/r2-live-cue.spec.mjs
+index 5884a6d..ca62337 100644
+--- a/frontend/e2e/r2-live-cue.spec.mjs
++++ b/frontend/e2e/r2-live-cue.spec.mjs
+@@ -145,9 +145,13 @@ test.describe('R2 human coach', () => {
+     await expect(cues.getByText('先说边界，再讲你做过的 Redis')).toBeVisible()
+   })
+ 
+-  test('rehearse hub offers a practice coach panel', async ({ context, page }) => {
++  test('practice setup offers a practice coach panel', async ({ context, page }) => {
+     await installMocks(context, { messages: COMMON_WS_BOOTSTRAP, localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'prep' } })
+     await page.goto('/')
++    // A v1.2 prep install lands on the v1.3 Practice setup; the coach panel is
++    // part of the setup once 邀请真人教练一起练 is on.
++    await expect(page).toHaveURL(/#\/practice/)
++    await page.getByText('邀请真人教练一起练').click()
+     const panel = page.getByTestId('coach-panel')
+     await expect(panel).toBeVisible({ timeout: 8000 })
+     await expect(panel.getByText('人工教练（练习）')).toBeVisible()
+diff --git a/frontend/e2e/resume-linkage.spec.mjs b/frontend/e2e/resume-linkage.spec.mjs
+index 4aca15c..2509127 100644
+--- a/frontend/e2e/resume-linkage.spec.mjs
++++ b/frontend/e2e/resume-linkage.spec.mjs
+@@ -122,13 +122,20 @@ test.describe('shared resume mount', () => {
+     })
+ 
+     await page.goto('/')
+-    await page.getByRole('tab', { name: '我的成竹' }).click()
++    // v1.3: resume optimizer lives under 我的成竹 → 简历.
++    await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '我的成竹' }).click()
++    await expect(page).toHaveURL(/#\/me/)
++    await page.getByRole('tab', { name: '简历' }).click()
++    await expect(page).toHaveURL(/#\/me\/resume/)
++
+     await expect(page.getByText('张三_后端开发.pdf').first()).toBeVisible()
+ 
+     await page.getByRole('button', { name: '选用' }).first().click()
+-    await expect(page.getByText('李四_后端.pdf').first()).toBeVisible()
++    // The mount is shared: 选用写回 config, so the mount filename switches too.
++    await expect(page.getByTestId('resume-mount-filename')).toHaveText('李四_后端.pdf')
+ 
+-    await page.getByRole('tab', { name: '上场' }).click()
+-    await expect(page.getByRole('heading', { name: '成竹', exact: true })).toBeVisible()
++    // The global 上场 action stays reachable from the shell.
++    await page.getByTestId('go-live').click()
++    await expect(page.getByTestId('preflight')).toBeVisible()
+   })
+ })
+diff --git a/frontend/e2e/visual.spec.mjs b/frontend/e2e/visual.spec.mjs
+index 65c98da..cab05a6 100644
+--- a/frontend/e2e/visual.spec.mjs
++++ b/frontend/e2e/visual.spec.mjs
+@@ -33,19 +33,18 @@ test.describe('@visual main pages', () => {
+   })
+ 
+   test('knowledge page', async ({ page }) => {
+-    await page.goto('/')
+-    await page.getByRole('tab', { name: '复盘', exact: true }).click()
+-    await page.getByRole('tab', { name: '能力分析' }).click()
+-    await expect(page.getByText('薄弱点排名')).toBeVisible({ timeout: 8000 })
++    // v1.3: the knowledge surface is 资料库 → 知识库 (/library/knowledge).
++    await page.goto('/#/library/knowledge')
++    await expect(page.getByText(/知识库是技术参考/)).toBeVisible({ timeout: 8000 })
+     await page.waitForTimeout(500)
+     await expect(page).toHaveScreenshot('knowledge.png', { fullPage: false, timeout: 30_000 })
+   })
+ 
+   test('resume page', async ({ page }) => {
+-    await page.goto('/')
+-    await page.getByRole('tab', { name: '我的成竹' }).click()
++    await page.goto('/#/me/resume')
+     await expect(page.getByPlaceholder('将招聘 JD 粘贴到这里...')).toBeVisible({ timeout: 8000 })
+     await page.waitForTimeout(500)
+     await expect(page).toHaveScreenshot('resume.png', { fullPage: false, timeout: 30_000 })
+   })
++
+ })
+diff --git a/reports/V1_3_V1_4_EXECUTION_CHECKPOINT.md b/reports/V1_3_V1_4_EXECUTION_CHECKPOINT.md
+index aa8b6a3..2489341 100644
+--- a/reports/V1_3_V1_4_EXECUTION_CHECKPOINT.md
++++ b/reports/V1_3_V1_4_EXECUTION_CHECKPOINT.md
+@@ -258,3 +258,23 @@ frontend/src/lib/productApi.ts                typed client + payload normalisers
+ frontend/e2e/a11y.spec.mjs                    the re-pointing pattern to copy
+ backend/tests/test_product_migration_compat.py migration safety proof
+ ```
++
++---
++
++## 10. Update after push (2026-10-03)
++
++The branch was pushed and is now on GitHub; the checkpoint above describes the state *before* this.
++
++| Item | Value |
++|---|---|
++| Pushed | `feat/chengzhu-v1.3-goal-centered-experience` @ `699fafe` (verified: remote SHA == local HEAD) |
++| PR | [#5](https://github.com/huangdi97/cheng-zhu/pull/5) — opened, NOT merged (CI red by design) |
++| CI run | `37106894550` — completed, **failure** |
++| CI jobs | backend ✅ · frontend ✅ · desktop ✅ · **e2e-smoke ✅** · **packaged-smoke ✅** · e2e-playwright ❌ · e2e-visual ❌ · ci-gate ❌ |
++
++The two red jobs are the known remaining work: 6 functional specs + `visual.spec.mjs` still use the
++retired v1.2 `role=tab` navigation. `update-visual-snapshots` was triggered (run `37107571825`) and
++failed for the same reason: `visual.spec.mjs` cannot reach the screens to snapshot. The 7 specs are
++being migrated by a subagent; after they are green, re-trigger `update-visual-snapshots` with
++`base_branch=feat/chengzhu-v1.3-goal-centered-experience`, merge the generated baseline PR, then
++re-run CI. Only then tag + release per stages 63–66 of the goal document.

@@ -3,7 +3,7 @@ import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash
 import { conversationApi } from '@/lib/conversationApi'
 import { activateConversationSharePrivacy, restoreConversationSharePrivacy } from '@/lib/conversationSharePrivacy'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationExternalExecution, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -86,6 +86,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const materials = useAsync(() => productApi.materials(), [])
   const quickNotes = useAsync(() => productApi.quickNotes(), [])
   const retention = useAsync(() => conversationApi.retentionPreview(spaceId), [spaceId])
+  const connectors = useAsync(() => conversationApi.connectors(), [])
   const [sessionTitle, setSessionTitle] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [capture, setCapture] = useState<CaptureMode>('NOTES_ONLY')
@@ -98,6 +99,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [externalWriteback, setExternalWriteback] = useState<'OFF' | 'REVIEW_REQUIRED'>('REVIEW_REQUIRED')
   const [participantConsent, setParticipantConsent] = useState<'NOT_RECORDED' | 'USER_REPORTS_ALLOWED' | 'USER_REPORTS_CONSENTED' | 'NOT_APPLICABLE'>('NOT_RECORDED')
   const [participantTransparency, setParticipantTransparency] = useState<'NOT_RECORDED' | 'USER_WILL_NOTIFY_VERBALLY' | 'USER_WILL_NOTIFY_IN_CHAT' | 'USER_REPORTS_ALREADY_NOTIFIED' | 'NOT_APPLICABLE'>('NOT_RECORDED')
+  const [connectorPermissions, setConnectorPermissions] = useState<string[]>([])
   const [consent, setConsent] = useState(false)
   const [preflight, setPreflight] = useState<ConversationPreflight | null>(null)
   const [sessionId, setSessionId] = useState('')
@@ -118,6 +120,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [editingGoalId, setEditingGoalId] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
+  const [execution, setExecution] = useState<ConversationExternalExecution | null>(null)
   const [lifecycleMessage, setLifecycleMessage] = useState('')
 
   const resolveThread = async (threadId: string) => {
@@ -163,6 +166,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           external_writeback: externalWriteback,
           participant_consent_status: participantConsent,
           participant_transparency_plan: participantTransparency,
+          connector_permissions: connectorPermissions,
         },
       })
       setSessionId(session.id)
@@ -375,6 +379,14 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSessionBusy(false) }
   }
 
+  const executeDraft = async (connectorId: string) => {
+    if (!draft || draft.status !== 'APPROVED') return
+    setSessionBusy(true); setSessionError('')
+    try { setExecution(await conversationApi.executeDraftAction(draft.id, connectorId)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSessionBusy(false) }
+  }
+
   const start = async () => {
     if (!sessionId || !preflight) return
     setSessionBusy(true); setSessionError('')
@@ -559,6 +571,19 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <Field label="Human Assistance"><select className={inputCls} value={humanPolicy} onChange={(e) => setHumanPolicy(e.target.value as typeof humanPolicy)}><option value="HUMAN_FORBIDDEN">Forbidden</option><option value="HUMAN_PRACTICE_ONLY">Practice only</option><option value="HUMAN_ALLOWED">Allowed（runtime 未接线，会阻止开始）</option></select></Field>
               <Field label="屏幕共享保护"><select className={inputCls} value={sharePrivacy} onChange={(e) => setSharePrivacy(e.target.value as typeof sharePrivacy)}><option value="OFF">Off</option><option value="PRIVATE_OVERLAY">Private overlay（桌面开始时验证）</option></select></Field>
               <Field label="外部写回"><select className={inputCls} value={externalWriteback} onChange={(e) => setExternalWriteback(e.target.value as typeof externalWriteback)}><option value="REVIEW_REQUIRED">只生成草稿，必须确认</option><option value="OFF">完全关闭</option></select></Field>
+              <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3 sm:col-span-2">
+                <div className="text-xs font-semibold text-text-secondary">Connector permissions</div>
+                <p className="mt-1 text-[11px] text-text-muted">这里只能选择后端真实注册且已连接的 capability。勾选会冻结进本场；没有真实 adapter 时不会显示“可连接”的假选项。</p>
+                {connectors.loading ? <div className="mt-2"><Loading /></div> : connectors.data?.items.some((item) => item.available) ? <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from(new Set(connectors.data.items.filter((item) => item.available).flatMap((item) => item.capabilities))).map((cap) => {
+                    const checked = connectorPermissions.includes(cap)
+                    return <label key={cap} className="inline-flex items-center gap-1.5 rounded-lg border border-bg-tertiary px-2.5 py-1.5 text-[11px] text-text-secondary">
+                      <input type="checkbox" checked={checked} onChange={() => setConnectorPermissions((current) => checked ? current.filter((x) => x !== cap) : [...current, cap])} />
+                      {cap}
+                    </label>
+                  })}
+                </div> : <p className="mt-2 text-[11px] text-text-muted">当前没有可用 connector runtime；Calendar / Docs / Mail / project tracker 不会被伪装为已连接。</p>}
+              </div>
               <Field label="参与者同意状态（仅用户报告）"><select className={inputCls} value={participantConsent} onChange={(e) => setParticipantConsent(e.target.value as typeof participantConsent)}><option value="NOT_RECORDED">未记录 / 未确认</option><option value="USER_REPORTS_ALLOWED">用户报告当前场景允许</option><option value="USER_REPORTS_CONSENTED">用户报告已取得所需参与者同意</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
               <Field label="透明告知计划（仅用户报告）"><select className={inputCls} value={participantTransparency} onChange={(e) => setParticipantTransparency(e.target.value as typeof participantTransparency)}><option value="NOT_RECORDED">尚未记录</option><option value="USER_WILL_NOTIFY_VERBALLY">我会口头告知</option><option value="USER_WILL_NOTIFY_IN_CHAT">我会在会议聊天中告知</option><option value="USER_REPORTS_ALREADY_NOTIFIED">我报告已完成告知</option><option value="NOT_APPLICABLE">不适用</option></select></Field>
               <div className="rounded-xl border border-bg-tertiary/70 bg-bg-secondary/25 p-3 text-[11px] text-text-muted">Speaker biometric identity、emotion/sentiment profiling、hidden-intent claims 在 v2 中固定为 OFF，不能由会话设置放开。</div>
@@ -660,7 +685,21 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.decisions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'UPDATE_DECISION_LOG_DRAFT')}>Decision Log Draft</SecondaryButton>
             </div>
             {continueData.session.policy?.external_writeback === 'OFF' ? <p className="mt-2 text-[11px] text-text-muted">本场 External Write-back = OFF，因此不会生成 follow-up / task / issue 草稿。</p> : null}
-            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件、创建 task / issue 或写入 decision log。真正的 connector execution 尚未接线。</p></div> : null}
+            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3">
+              <div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div>
+              <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>
+              {draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}
+              {draft.status === 'APPROVED' ? (() => {
+                const capability = draft.kind === 'FOLLOWUP_EMAIL_DRAFT' ? 'mail.send' : draft.kind === 'CREATE_TASK_DRAFT' ? 'task.create' : draft.kind === 'CREATE_ISSUE_DRAFT' ? 'issue.create' : 'decision_log.write'
+                const targets = connectors.data?.items.filter((item) => item.available && item.capabilities.includes(capability)) ?? []
+                return <div className="mt-3">
+                  <div className="text-[11px] font-semibold text-text-secondary">External execution · {capability}</div>
+                  {targets.length ? <div className="mt-2 flex flex-wrap gap-2">{targets.map((item) => <SecondaryButton key={item.id} disabled={sessionBusy} onClick={() => executeDraft(item.id)}>执行到 {item.label || item.provider}</SecondaryButton>)}</div> : <p className="mt-1 text-[11px] text-text-muted">没有已连接且获得该 capability 的 provider；草稿会继续保留在本地。</p>}
+                  {execution ? <div className="mt-2 text-[11px] text-text-muted">Execution · <span className={execution.status === 'SUCCEEDED' ? 'text-status-direct' : execution.status === 'FAILED' ? 'text-status-risk' : 'text-status-inferred'}>{execution.status}</span>{execution.external_ref ? ` · ref ${execution.external_ref}` : ''}{execution.error ? ` · ${execution.error}` : ''}</div> : null}
+                </div>
+              })() : null}
+              <p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿；只有上方 External execution 明确返回 SUCCEEDED 才表示外部系统执行成功。</p>
+            </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

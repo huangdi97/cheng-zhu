@@ -5,12 +5,12 @@ import threading
 
 import pytest
 
-from services.product import conversation_capture, conversation_screen, conversations, materials
+from services.product import conversation_capture, conversation_integrations, conversation_screen, conversations, materials
 from services.storage import product as store
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 7
+    assert store.schema_version() == 8
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -28,17 +28,22 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
         "conversation_screen_context",
+        "conversation_connector_connection",
+        "conversation_connector_snapshot",
+        "conversation_connector_execution",
     } <= tables
     conn = sqlite3.connect(store.DB_PATH)
     try:
         session_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_session)")}
         participant_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_participant)")}
         item_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_item)")}
+        space_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_space)")}
     finally:
         conn.close()
     assert "policy_json" in session_cols
     assert "counterparty_state_json" in participant_cols
     assert "time_semantics_json" in item_cols
+    assert "selected_connector_snapshot_ids_json" in space_cols
 
 
 
@@ -2797,6 +2802,234 @@ def test_session_pack_freezes_ready_material_version_and_user_notes(product_env)
     assert pack["payload"]["quick_notes"][0].get("is_evidence") is None
 
 
+
+
+
+
+class _FakeConnectorAdapter:
+    provider = "GOOGLE_MAIL"
+
+    def __init__(self):
+        self.read_calls = []
+        self.execute_calls = []
+        self.fail_execute = False
+
+    def read_snapshots(self, *, connection, space_id, cursor, limit):
+        self.read_calls.append((connection["id"], space_id, cursor, limit))
+        return {
+            "items": [{
+                "external_kind": "MAIL_THREAD",
+                "external_id": "thread-1",
+                "title": "Client follow-up",
+                "excerpt": "The client explicitly asked for rollback evidence before Friday.",
+                "source_url": "https://mail.google.test/thread-1",
+                "occurred_at": 100.0,
+                "visibility": "PRIVATE",
+                "metadata": {"participants": ["client@example.test"]},
+            }],
+            "next_cursor": "cursor-2",
+        }
+
+    def execute(self, *, connection, operation, target, payload, idempotency_key):
+        self.execute_calls.append((connection["id"], operation, target, payload, idempotency_key))
+        if self.fail_execute:
+            raise RuntimeError("provider unavailable")
+        return {"provider_message_id": "msg-1", "operation": operation, "target": target}
+
+
+@pytest.fixture
+def fake_mail_adapter():
+    adapter = _FakeConnectorAdapter()
+    conversation_integrations.register_adapter(adapter)
+    try:
+        yield adapter
+    finally:
+        conversation_integrations.unregister_adapter("GOOGLE_MAIL")
+
+
+def test_integration_schema_rejects_raw_secret_and_requires_real_adapter_for_connected_state(product_env):
+    with pytest.raises(ValueError, match="opaque reference"):
+        conversation_integrations.create_connection(
+            "GOOGLE_MAIL",
+            granted_scopes=["mail.read"],
+            credential_ref="ya29.raw-token-must-never-live-here",
+        )
+
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read"],
+        credential_ref="keyring:chengzhu/google-mail/test-account",
+    )
+    assert connection["status"] == "DISCONNECTED"
+    assert connection["credential_ref"].startswith("keyring:")
+    with pytest.raises(ValueError, match="adapter 未接线"):
+        conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+
+
+def test_connector_snapshot_sync_freezes_explicit_source_and_manual_ask_never_promotes_truth(product_env, fake_mail_adapter):
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read"],
+        credential_ref="keyring:chengzhu/google-mail/test-account",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    space = conversations.create_space("Client", "CLIENT_CALL")
+
+    synced = conversation_integrations.sync_connection(connection["id"], space["id"])
+    snapshot = synced["snapshots"][0]
+    assert synced["connection"]["sync_cursor"] == "cursor-2"
+    assert snapshot["external_kind"] == "MAIL_THREAD"
+
+    conversations.update_space(space["id"], {
+        "selected_connector_snapshot_ids": [snapshot["id"]],
+    })
+    session = conversations.create_session(
+        space["id"],
+        consent_ack=True,
+        policy={"connector_permissions": ["mail.read"]},
+    )
+    check = conversations.preflight(session["id"])
+    assert check["blockers"] == []
+    assert check["integration_runtime"]["live_access"] == "AVAILABLE"
+    assert check["pack_preview"]["connector_snapshots"][0]["content_hash"] == snapshot["content_hash"]
+
+    started = conversations.start_session(session["id"])
+    frozen = started["pack"]["payload"]["connector_snapshots"][0]
+    assert frozen["id"] == snapshot["id"]
+    assert frozen["content_hash"] == snapshot["content_hash"]
+
+    result = conversations.ask(session["id"], "rollback evidence Friday")
+    assert result["grounded"] is True
+    assert result["truth_confirmed"] is False
+    match = next(x for x in result["matches"] if x["kind"] == "CONNECTOR_SNAPSHOT")
+    assert match["authority"] == "REFERENCE_SOURCE"
+    assert match["source_refs"][0]["content_hash"] == snapshot["content_hash"]
+
+    # A later external sync cannot rewrite the already-frozen Session Pack.
+    fake_mail_adapter.read_snapshots = lambda **kwargs: {
+        "items": [{
+            "external_kind": "MAIL_THREAD",
+            "external_id": "thread-1",
+            "title": "Client follow-up",
+            "excerpt": "Replacement now discusses 50x scale instead.",
+            "occurred_at": 200.0,
+            "visibility": "PRIVATE",
+        }],
+        "next_cursor": "cursor-3",
+    }
+    conversation_integrations.sync_connection(connection["id"], space["id"])
+    frozen_again = conversations.session_context(session["id"])
+    assert started["pack"]["digest"] == frozen_again["pack_digest"]
+    asked_new = conversations.ask(session["id"], "50x scale")
+    assert not any(x["kind"] == "CONNECTOR_SNAPSHOT" for x in asked_new["matches"])
+
+
+def test_connector_permission_is_exact_and_missing_scope_blocks_preflight(product_env, fake_mail_adapter):
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read"],
+        credential_ref="keyring:chengzhu/google-mail/read-only",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    space = conversations.create_space("Mail scope", "CLIENT_CALL")
+
+    read_session = conversations.create_session(
+        space["id"], consent_ack=True, policy={"connector_permissions": ["mail.read"]},
+    )
+    assert conversations.preflight(read_session["id"])["blockers"] == []
+
+    send_session = conversations.create_session(
+        space["id"], consent_ack=True, policy={"connector_permissions": ["mail.send"]},
+    )
+    check = conversations.preflight(send_session["id"])
+    assert any(x["key"] == "connector_runtime" for x in check["blockers"])
+    assert check["integration_runtime"]["missing_permissions"] == ["mail.send"]
+
+
+def test_external_execution_requires_approved_draft_scope_and_is_idempotent(product_env, fake_mail_adapter):
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read", "mail.send"],
+        credential_ref="keyring:chengzhu/google-mail/write",
+    )
+    conversation_integrations.set_connection_status(connection["id"], "CONNECTED")
+    started = conversations.create_adhoc(title="External", profile="CLIENT_CALL")
+    session_id = started["session"]["id"]
+    item = conversations.add_item(
+        session_id,
+        item_type="Decision",
+        title="send rollout summary",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "reviewed"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(session_id)
+    draft = conversations.followup_draft(session_id)
+
+    with pytest.raises(ValueError, match="APPROVED"):
+        conversation_integrations.request_execution(draft["id"], connection["id"], target="client@example.test")
+
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+    first = conversation_integrations.request_execution(
+        approved["id"], connection["id"], target="client@example.test",
+    )
+    second = conversation_integrations.request_execution(
+        approved["id"], connection["id"], target="client@example.test",
+    )
+    assert first["id"] == second["id"]
+    assert first["status"] == "PENDING"
+
+    executed = conversation_integrations.execute_request(first["id"])
+    assert executed["status"] == "SUCCEEDED"
+    assert executed["response"]["provider_message_id"] == "msg-1"
+    assert len(fake_mail_adapter.execute_calls) == 1
+
+    repeated = conversation_integrations.execute_request(first["id"])
+    assert repeated["status"] == "SUCCEEDED"
+    assert len(fake_mail_adapter.execute_calls) == 1
+
+
+def test_external_execution_failures_are_audited_not_fabricated(product_env, fake_mail_adapter):
+    read_only = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.read"],
+        credential_ref="keyring:chengzhu/google-mail/readonly",
+    )
+    conversation_integrations.set_connection_status(read_only["id"], "CONNECTED")
+    started = conversations.create_adhoc(title="Blocked send", profile="CLIENT_CALL")
+    session_id = started["session"]["id"]
+    decision = conversations.add_item(
+        session_id, item_type="Decision", title="Follow up",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "explicit"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(session_id)
+    draft = conversations.followup_draft(session_id)
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+
+    blocked = conversation_integrations.request_execution(
+        approved["id"], read_only["id"], target="client@example.test",
+    )
+    assert blocked["status"] == "BLOCKED"
+    assert "mail.send" in blocked["error"]
+    with pytest.raises(ValueError, match="mail.send"):
+        conversation_integrations.execute_request(blocked["id"])
+
+    writable = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_scopes=["mail.send"],
+        credential_ref="keyring:chengzhu/google-mail/failing",
+    )
+    conversation_integrations.set_connection_status(writable["id"], "CONNECTED")
+    fake_mail_adapter.fail_execute = True
+    pending = conversation_integrations.request_execution(
+        approved["id"], writable["id"], target="client@example.test",
+    )
+    failed = conversation_integrations.execute_request(pending["id"])
+    assert failed["status"] == "FAILED"
+    assert "provider unavailable" in failed["error"]
+    assert failed["response"] == {}
 
 
 def test_reviewed_derived_drafts_preserve_sources_and_never_claim_external_execution(product_env):

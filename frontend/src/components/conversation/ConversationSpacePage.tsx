@@ -610,8 +610,14 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Write-back {preflight.pack_preview.processing_runtime.data_path.writeback}</span>
                   <span>Screen {preflight.pack_preview.screen_runtime.mode === 'MANUAL' ? `${preflight.pack_preview.screen_runtime.route} · ${preflight.pack_preview.screen_runtime.fingerprint.slice(0, 8)}` : preflight.pack_preview.screen_runtime.mode}</span>
                   <span>Share Privacy {preflight.pack_preview.share_privacy_runtime.requested === 'PRIVATE_OVERLAY' ? 'verify at start' : 'off'}</span>
+                  <span>Connectors {preflight.pack_preview.connector_runtime.grants.length}/{preflight.pack_preview.connector_runtime.requested.length}</span>
                   <span>Raw image {preflight.pack_preview.screen_runtime.raw_image_persisted ? 'stored' : 'not stored'}</span>
                 </div>
+                {preflight.pack_preview.connector_runtime.grants.length ? <div className="mt-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen connector grants</div>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_runtime.grants.map((grant) => <div key={grant.capability} className="text-[11px] text-text-secondary">• {grant.capability} · {grant.provider_id}{grant.account_label ? ` · ${grant.account_label}` : ''}</div>)}</div>
+                  <p className="mt-1 text-[10px] text-text-muted">这里只是 read capability grant；不会顺带允许 email/task/issue write execution。</p>
+                </div> : null}
                 {preflight.pack_preview.sources.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen sources</div>
                   <div className="mt-1 space-y-1">{preflight.pack_preview.sources.map((source) => <div key={source.version_id || source.material_id} className="flex flex-wrap items-center gap-1 text-[11px] text-text-secondary"><span>• {source.title}</span><span className="text-text-muted">{source.kind} · {source.usage} · v {source.version_id.slice(0, 8)} · {source.is_personal_evidence ? 'personal evidence' : 'reference'}</span></div>)}</div>

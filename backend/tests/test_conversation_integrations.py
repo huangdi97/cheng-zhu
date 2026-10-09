@@ -110,6 +110,43 @@ def test_default_boundary_is_fail_closed_and_never_accepts_raw_credentials(produ
     assert resolved["blocked"] == [{"capability": "calendar.read", "reason": "NO_CONNECTED_ACCOUNT"}]
 
 
+
+
+def test_provider_scopes_are_derived_and_exact_least_privilege(product_env):
+    google = conversation_integrations.create_connection(
+        "GOOGLE_MAIL",
+        granted_capabilities=["mail.read", "email.send"],
+        credential_ref="provider:google/work",
+    )
+    assert google["provider_scopes"] == [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+    ]
+
+    with pytest.raises(ValueError, match="最小权限集合"):
+        conversation_integrations.create_connection(
+            "GOOGLE_MAIL",
+            granted_capabilities=["mail.read"],
+            provider_scopes=["https://mail.google.com/"],
+            credential_ref="provider:google/broad",
+        )
+
+    mcp = conversation_integrations.create_connection(
+        "MCP",
+        granted_capabilities=["calendar.read"],
+        credential_ref="plugin:mcp/work",
+    )
+    assert mcp["provider_scopes"] == ["server-defined"]
+
+    with pytest.raises(ValueError, match="server-defined"):
+        conversation_integrations.create_connection(
+            "MCP",
+            granted_capabilities=["calendar.read"],
+            provider_scopes=["calendar.read"],
+            credential_ref="plugin:mcp/bad",
+        )
+
+
 def test_connected_account_requires_exact_grants_and_session_permissions_remain_read_only(product_env):
     adapter = FakeAdapter({"calendar.read", "email.send"})
     connection = _connected(adapter, ["calendar.read", "email.send"])

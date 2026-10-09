@@ -432,7 +432,7 @@ jobs:
           $releaseState = gh release view $tag --json isDraft,isPrerelease --jq '{isDraft: .isDraft, isPrerelease: .isPrerelease}' | ConvertFrom-Json
           if ($releaseState.isDraft) { throw "verified release $tag did not publish" }
           if ([bool]$releaseState.isPrerelease -ne $isPrerelease) {
-            throw "release channel mismatch for $tag: expected prerelease=$isPrerelease"
+            throw "release channel mismatch for ${tag}: expected prerelease=$isPrerelease"
           }
           if ($isPrerelease) {
             $latestStable = (gh api "repos/${{ github.repository }}/releases/latest" --jq '.tag_name').Trim()

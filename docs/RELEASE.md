@@ -35,6 +35,8 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
+Published beta.2 provenance is recorded in `docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md`.
+
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 
 

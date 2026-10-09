@@ -3460,46 +3460,88 @@ def _retention_cutoff(days: int, now: float) -> float:
     return now if days <= 0 else now - days * 86400.0
 
 
+def _retention_candidates(space_id: str, policy: dict[str, Any], now_value: float) -> dict[str, list[dict[str, Any]]]:
+    space = require_space(space_id)
+    transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
+    guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
+    draft_cutoff = _retention_cutoff(int(policy.get("draft_days", 30) or 0), now_value)
+    connector_cutoff = _retention_cutoff(int(policy.get("connector_snapshot_days", 30) or 0), now_value)
+
+    transcript_rows = store.select(
+        "conversation_transcript_segment",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    )
+    screen_rows = store.select(
+        "conversation_screen_context",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    )
+    guidance_rows = store.rows(
+        "SELECT g.* FROM conversation_guidance_event g "
+        "JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? AND g.created_at <= ?",
+        (space_id, guidance_cutoff),
+    )
+
+    # Drafts that already have an external execution audit are retained.  The
+    # audit row is evidence of an attempted real-world side effect and must not
+    # disappear under ordinary cleanup.
+    audited_draft_ids = {
+        str(row.get("draft_action_id") or "")
+        for row in store.select("conversation_connector_execution")
+        if row.get("draft_action_id")
+    }
+    draft_rows = [
+        row for row in store.select(
+            "conversation_draft_action",
+            where="space_id = ? AND created_at <= ?",
+            params=(space_id, draft_cutoff),
+        )
+        if row["id"] not in audited_draft_ids
+    ]
+
+    selected_snapshot_ids = {
+        str(value)
+        for value in (space.get("selected_connector_snapshot_ids") or [])
+        if str(value)
+    }
+    connector_rows = [
+        row for row in store.select(
+            "conversation_connector_snapshot",
+            where="space_id = ? AND created_at <= ?",
+            params=(space_id, connector_cutoff),
+        )
+        if row["id"] not in selected_snapshot_ids
+    ]
+    return {
+        "transcript_segments": transcript_rows,
+        "guidance_events": guidance_rows,
+        "draft_actions": draft_rows,
+        "screen_context_observations": screen_rows,
+        "connector_snapshots": connector_rows,
+    }
+
+
 def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, Any]:
     space = require_space(space_id)
     policy = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
     now_value = float(now if now is not None else store.now())
-    transcript_days = int(policy.get("transcript_days", 30) or 0)
-    guidance_days = int(policy.get("guidance_days", 30) or 0)
-    draft_days = int(policy.get("draft_days", 30) or 0)
-    transcript_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_transcript_segment WHERE space_id = ? AND created_at <= ?",
-        (space_id, _retention_cutoff(transcript_days, now_value)),
-    ) or 0)
-    guidance_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_guidance_event g "
-        "JOIN conversation_session s ON s.id = g.session_id "
-        "WHERE s.space_id = ? AND g.created_at <= ?",
-        (space_id, _retention_cutoff(guidance_days, now_value)),
-    ) or 0)
-    draft_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_draft_action WHERE space_id = ? AND created_at <= ?",
-        (space_id, _retention_cutoff(draft_days, now_value)),
-    ) or 0)
-    screen_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_screen_context WHERE space_id = ? AND created_at <= ?",
-        (space_id, _retention_cutoff(transcript_days, now_value)),
-    ) or 0)
+    candidates = _retention_candidates(space_id, policy, now_value)
+    counts = {key: len(rows) for key, rows in candidates.items()}
     return {
         "space_id": space_id,
         "policy": policy,
-        "would_delete": {
-            "transcript_segments": transcript_count,
-            "guidance_events": guidance_count,
-            "draft_actions": draft_count,
-            "screen_context_observations": screen_count,
-        },
+        "would_delete": counts,
         "kept": {
             "confirmed_items": "KEEP",
             "session_packs": "KEEP",
             "provenance_tombstones": "KEEP",
+            "selected_connector_snapshots": "KEEP",
+            "external_execution_audit": "KEEP",
+            "drafts_with_external_execution_audit": "KEEP",
         },
-        "destructive": any((transcript_count, guidance_count, draft_count, screen_count)),
+        "destructive": any(counts.values()),
     }
 
 
@@ -3508,43 +3550,21 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
     if preview["destructive"] and not confirm:
         raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
     policy = preview["policy"]
-    now_value = store.now()
-    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0, "screen_context_observations": 0}
+    candidates = _retention_candidates(space_id, policy, store.now())
+    deleted = {key: 0 for key in candidates}
 
-    transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
-    for row in store.select(
-        "conversation_transcript_segment",
-        where="space_id = ? AND created_at <= ?",
-        params=(space_id, transcript_cutoff),
-    ):
-        deleted["transcript_segments"] += int(store.delete("conversation_transcript_segment", row["id"]))
-
-    for row in store.select(
-        "conversation_screen_context",
-        where="space_id = ? AND created_at <= ?",
-        params=(space_id, transcript_cutoff),
-    ):
-        deleted["screen_context_observations"] += int(store.delete("conversation_screen_context", row["id"]))
-
-    guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
-    guidance_rows = store.rows(
-        "SELECT g.* FROM conversation_guidance_event g "
-        "JOIN conversation_session s ON s.id = g.session_id "
-        "WHERE s.space_id = ? AND g.created_at <= ?",
-        (space_id, guidance_cutoff),
-    )
-    for row in guidance_rows:
-        deleted["guidance_events"] += int(store.delete("conversation_guidance_event", row["id"]))
-
-    draft_cutoff = _retention_cutoff(int(policy.get("draft_days", 30) or 0), now_value)
-    for row in store.select(
-        "conversation_draft_action",
-        where="space_id = ? AND created_at <= ?",
-        params=(space_id, draft_cutoff),
-    ):
-        deleted["draft_actions"] += int(store.delete("conversation_draft_action", row["id"]))
+    table_by_category = {
+        "transcript_segments": "conversation_transcript_segment",
+        "guidance_events": "conversation_guidance_event",
+        "draft_actions": "conversation_draft_action",
+        "screen_context_observations": "conversation_screen_context",
+        "connector_snapshots": "conversation_connector_snapshot",
+    }
+    for category, rows in candidates.items():
+        table = table_by_category[category]
+        for row in rows:
+            deleted[category] += int(store.delete(table, row["id"]))
     return {"space_id": space_id, "deleted": deleted, "policy": policy}
-
 
 def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[str, Any]:
     session = require_session(session_id)

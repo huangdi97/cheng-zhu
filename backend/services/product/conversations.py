@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
-from services.product import conversation_screen, materials
+from services.product import conversation_connectors, conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -997,6 +997,7 @@ def _preflight_context_fingerprint(
     policy: dict[str, Any],
     processing_runtime: dict[str, Any],
     screen_runtime: dict[str, Any],
+    connector_runtime: dict[str, Any],
 ) -> str:
     """Hash every mutable input that can materially change the eventual Pack.
 
@@ -1073,6 +1074,7 @@ def _preflight_context_fingerprint(
         },
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
+        "connector_runtime": connector_runtime,
     }
     raw = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -1106,12 +1108,19 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
-    connector_ok = not bool(policy.get("connector_permissions"))
+    connector_runtime = conversation_connectors.resolve_read_permissions(policy.get("connector_permissions") or [])
+    connector_ok = bool(connector_runtime["ok"])
     if not connector_ok:
+        blocked_names = ", ".join(
+            f"{item['capability']}:{item['reason']}" for item in connector_runtime["blocked"]
+        )
         blockers.append({
             "key": "connector_runtime",
             "label": "连接器权限",
-            "message": "Conversation read-only connector runtime 尚未接线；当前不能把非空 connector permission 伪装成已生效。",
+            "message": (
+                "本场请求的 connector capability 没有真实可用 provider；"
+                f"{blocked_names or 'NO_AVAILABLE_PROVIDER'}。不会用 placeholder 放行。"
+            ),
         })
 
     share_privacy_runtime = share_privacy_runtime_status(session)
@@ -1177,7 +1186,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         })
 
     context_fingerprint = _preflight_context_fingerprint(
-        session, space, pack_inputs, policy, processing_runtime, screen_runtime
+        session, space, pack_inputs, policy, processing_runtime, screen_runtime, connector_runtime
     )
     if record_fingerprint and session["status"] == "UPCOMING":
         state = dict(session.get("state") or {})
@@ -1251,6 +1260,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         "resolved_ai_behavior": ai_behavior,
         "processing_runtime": processing_runtime,
         "screen_runtime": screen_runtime,
+        "connector_runtime": connector_runtime,
         "share_privacy_runtime": share_privacy_runtime,
         "pack_preview": {
             "goal_ids": list(session.get("goal_ids") or []),
@@ -1283,6 +1293,7 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "resolved_ai_behavior": ai_behavior,
             "processing_runtime": processing_runtime,
             "screen_runtime": screen_runtime,
+            "connector_runtime": connector_runtime,
             "share_privacy_runtime": share_privacy_runtime,
             "policy": {
                 **policy,
@@ -1365,6 +1376,9 @@ def freeze_pack(
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
         "screen_runtime": conversation_screen.vision_runtime_status(session),
+        "connector_runtime": conversation_connectors.resolve_read_permissions(
+            _normalize_session_policy(session.get("policy")).get("connector_permissions") or []
+        ),
         "share_privacy_runtime": (
             dict(share_privacy_runtime)
             if isinstance(share_privacy_runtime, dict)
@@ -3788,7 +3802,11 @@ def diagnostics() -> dict[str, Any]:
             "export_delete_integrity": "AVAILABLE",
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
-            "external_connectors": "NOT_CONFIGURED",
+            "external_connectors": (
+                "AVAILABLE"
+                if conversation_connectors.diagnostics()["available_capabilities"]
+                else "NOT_CONFIGURED"
+            ),
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
             "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
@@ -3813,6 +3831,7 @@ def diagnostics() -> dict[str, Any]:
             "human_coach_truth_authority": "ADVICE_ONLY_NOT_EVIDENCE",
             "human_coach_public_relay": "BLOCKED_UNLESS_CONFIGURED",
         },
+        "connectors": conversation_connectors.diagnostics(),
     }
 
 

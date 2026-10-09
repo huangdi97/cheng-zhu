@@ -1,0 +1,748 @@
+"""Conversation external integration boundary.
+
+This module sits *above* conversation_connectors capability truth.
+
+conversation_connectors answers:
+    "Is there a real runtime provider for capability X?"
+
+This module answers:
+    "Which user-approved connection is allowed to use it, what immutable
+     external snapshot entered a Space/Session, and what explicit reviewed
+     external action was attempted?"
+
+No OAuth token, refresh token, provider secret or raw API key is stored in
+product.db.  credential_ref is an opaque handle resolved by provider-specific
+code (OS keychain, provider plugin, etc.).  With no registered adapter this
+runtime is intentionally fail-closed.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import Any, Optional, Protocol
+from urllib.parse import urlsplit, urlunsplit
+
+from services.product import conversation_connectors
+from services.storage import product as store
+
+
+CONNECTION_STATUSES = {"DISCONNECTED", "CONNECTED", "ERROR", "REVOKED"}
+EXECUTION_STATUSES = {"PENDING", "EXECUTING", "SUCCEEDED", "FAILED", "BLOCKED", "CANCELLED"}
+
+# Product capabilities are the canonical names from conversation_connectors.
+PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
+    "GOOGLE_CALENDAR": {
+        "label": "Google Calendar",
+        "capabilities": ["calendar.read"],
+        "external_kinds": ["CALENDAR_EVENT"],
+        "provider_scopes": {
+            "calendar.read": "https://www.googleapis.com/auth/calendar.readonly",
+        },
+        "sync": "INCREMENTAL_CURSOR",
+    },
+    "GOOGLE_MAIL": {
+        "label": "Gmail",
+        "capabilities": ["mail.read", "email.send"],
+        "external_kinds": ["MAIL_THREAD"],
+        "provider_scopes": {
+            "mail.read": "https://www.googleapis.com/auth/gmail.readonly",
+            "email.send": "https://www.googleapis.com/auth/gmail.send",
+        },
+        "sync": "PROVIDER_CURSOR",
+    },
+    "GOOGLE_DRIVE": {
+        "label": "Google Drive / Docs",
+        "capabilities": ["docs.read"],
+        "external_kinds": ["DOCUMENT"],
+        "provider_scopes": {
+            "docs.read": "https://www.googleapis.com/auth/drive.readonly",
+        },
+        "sync": "PROVIDER_CURSOR",
+    },
+    "MICROSOFT_GRAPH": {
+        "label": "Microsoft Graph",
+        "capabilities": [
+            "calendar.read", "mail.read", "docs.read", "project.read",
+            "email.send", "task.create",
+        ],
+        "external_kinds": ["CALENDAR_EVENT", "MAIL_THREAD", "DOCUMENT", "TASK"],
+        "provider_scopes": {
+            "calendar.read": "Calendars.Read",
+            "mail.read": "Mail.Read",
+            "docs.read": "Files.Read",
+            "project.read": "Tasks.Read",
+            "email.send": "Mail.Send",
+            "task.create": "Tasks.ReadWrite",
+        },
+        "sync": "PROVIDER_CURSOR",
+    },
+    "GITHUB": {
+        "label": "GitHub",
+        "capabilities": ["project.read", "issue.create"],
+        "external_kinds": ["ISSUE"],
+        "provider_scopes": {
+            "project.read": "Issues: read",
+            "issue.create": "Issues: write",
+        },
+        "sync": "ETAG_OR_CURSOR",
+    },
+    "MCP": {
+        "label": "Model Context Protocol",
+        "capabilities": sorted(conversation_connectors.KNOWN_CAPABILITIES),
+        "external_kinds": ["DOCUMENT", "TASK", "ISSUE", "CALENDAR_EVENT", "MAIL_THREAD"],
+        "provider_scopes": {
+            capability: "server-defined"
+            for capability in sorted(conversation_connectors.KNOWN_CAPABILITIES)
+        },
+        "sync": "SERVER_DEFINED",
+    },
+}
+
+DRAFT_CAPABILITY: dict[str, tuple[str, str]] = {
+    "FOLLOWUP_EMAIL_DRAFT": ("SEND_EMAIL", "email.send"),
+    "CREATE_TASK_DRAFT": ("CREATE_TASK", "task.create"),
+    "CREATE_ISSUE_DRAFT": ("CREATE_ISSUE", "issue.create"),
+    "UPDATE_DECISION_LOG_DRAFT": ("UPDATE_DECISION_LOG", "decision_log.write"),
+}
+
+
+class ConnectorAdapter(Protocol):
+    provider_id: str
+    capabilities: set[str]
+
+    def health(self, connection: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        """Return at minimum {"ok": bool}; may resolve credential_ref securely."""
+
+    def read_context(
+        self,
+        *,
+        connection: dict[str, Any],
+        capability: str,
+        query: dict[str, Any],
+        cursor: str,
+        limit: int,
+    ) -> dict[str, Any]:
+        """Return {"items": [...], "next_cursor": "..."}."""
+
+    def execute(
+        self,
+        *,
+        connection: dict[str, Any],
+        capability: str,
+        operation: str,
+        target: str,
+        payload: dict[str, Any],
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Execute one already-reviewed action and return provider metadata."""
+
+
+_ADAPTERS: dict[str, ConnectorAdapter] = {}
+_CREDENTIAL_REF_RE = re.compile(r"^(?:keyring|oskeychain|provider|plugin):[A-Za-z0-9._:/-]{1,240}$")
+_SENSITIVE_KEY_RE = re.compile(
+    r"(?:^|[_-])(token|secret|authorization|credential|cookie|api[_-]?key|"
+    r"refresh[_-]?token|access[_-]?token|password|client[_-]?secret|private[_-]?key)(?:$|[_-])",
+    re.IGNORECASE,
+)
+
+
+def _provider_id(value: str) -> str:
+    provider = str(value or "").strip().upper()
+    if provider not in PROVIDER_CATALOG:
+        raise ValueError("Connector provider 不受支持")
+    return provider
+
+
+def _capabilities(values: list[str] | tuple[str, ...] | set[str]) -> list[str]:
+    result = sorted({str(v or "").strip() for v in values if str(v or "").strip()})
+    unknown = [v for v in result if v not in conversation_connectors.KNOWN_CAPABILITIES]
+    if unknown:
+        raise ValueError(f"Connector capability 不受支持：{', '.join(unknown)}")
+    return result
+
+
+def _validate_credential_ref(value: str) -> str:
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    if not _CREDENTIAL_REF_RE.fullmatch(value):
+        raise ValueError(
+            "credential_ref 只能保存 keyring/oskeychain/provider/plugin 的 opaque reference；不能直接保存 token"
+        )
+    return value
+
+
+def _sanitize(value: Any, *, depth: int = 0) -> Any:
+    if depth > 6:
+        return "[TRUNCATED_DEPTH]"
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for raw_key, raw_value in list(value.items())[:200]:
+            key = str(raw_key)[:200]
+            if _SENSITIVE_KEY_RE.search(key):
+                continue
+            out[key] = _sanitize(raw_value, depth=depth + 1)
+        return out
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize(v, depth=depth + 1) for v in list(value)[:500]]
+    if isinstance(value, str):
+        return value[:20_000]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:20_000]
+
+
+def _safe_url(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parts = urlsplit(raw)
+        if parts.scheme not in {"http", "https"}:
+            return ""
+        # Strip query/fragment because provider URLs often carry sensitive IDs.
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))[:2000]
+    except ValueError:
+        return ""
+
+
+def register_adapter(adapter: ConnectorAdapter) -> None:
+    provider = _provider_id(getattr(adapter, "provider_id", ""))
+    supported = set(PROVIDER_CATALOG[provider]["capabilities"])
+    capabilities = set(_capabilities(set(getattr(adapter, "capabilities", set()) or set())))
+    if not capabilities:
+        raise ValueError("Connector adapter 至少声明一个 capability")
+    if not capabilities <= supported:
+        raise ValueError(
+            "Adapter 声明了 provider catalog 不允许的 capability: "
+            + ", ".join(sorted(capabilities - supported))
+        )
+    health = dict(adapter.health(None) or {})
+    if not bool(health.get("ok", False)):
+        raise ValueError(str(health.get("error") or "Connector adapter health check failed"))
+    _ADAPTERS[provider] = adapter
+    conversation_connectors.register_provider(
+        provider,
+        capabilities,
+        health="AVAILABLE",
+        account_label=str(health.get("label") or PROVIDER_CATALOG[provider]["label"])[:160],
+    )
+
+
+def unregister_adapter(provider_id: str) -> None:
+    provider = _provider_id(provider_id)
+    _ADAPTERS.pop(provider, None)
+    conversation_connectors.unregister_provider(provider)
+
+
+def clear_adapters_for_tests() -> None:
+    for provider in list(_ADAPTERS):
+        conversation_connectors.unregister_provider(provider)
+    _ADAPTERS.clear()
+
+
+def catalog() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for provider, spec in PROVIDER_CATALOG.items():
+        rows.append({
+            "provider_id": provider,
+            "label": spec["label"],
+            "capabilities": list(spec["capabilities"]),
+            "read_capabilities": [
+                cap for cap in spec["capabilities"]
+                if cap in conversation_connectors.READ_CAPABILITIES
+            ],
+            "write_capabilities": [
+                cap for cap in spec["capabilities"]
+                if cap in conversation_connectors.WRITE_CAPABILITIES
+            ],
+            "external_kinds": list(spec["external_kinds"]),
+            "provider_scopes": dict(spec["provider_scopes"]),
+            "sync": spec["sync"],
+            "adapter_available": provider in _ADAPTERS,
+        })
+    return rows
+
+
+def _require_connection(connection_id: str) -> dict[str, Any]:
+    row = store.get("conversation_connector_connection", connection_id)
+    if not row:
+        raise ValueError("Connector connection 不存在")
+    return row
+
+
+def create_connection(
+    provider_id: str,
+    *,
+    display_name: str = "",
+    granted_capabilities: Optional[list[str]] = None,
+    provider_scopes: Optional[list[str]] = None,
+    credential_ref: str = "",
+    account_hint: str = "",
+) -> dict[str, Any]:
+    provider = _provider_id(provider_id)
+    supported = set(PROVIDER_CATALOG[provider]["capabilities"])
+    granted = set(_capabilities(granted_capabilities or []))
+    if not granted:
+        raise ValueError("Connector connection 至少需要一个 capability")
+    if not granted <= supported:
+        raise ValueError(
+            "Provider 不支持 capability: " + ", ".join(sorted(granted - supported))
+        )
+    credential_ref = _validate_credential_ref(credential_ref)
+    ts = store.now()
+    row = {
+        "id": store.new_id("ccn_"),
+        "provider_id": provider,
+        "display_name": str(display_name or PROVIDER_CATALOG[provider]["label"])[:200],
+        "status": "DISCONNECTED",
+        "auth_mode": "OPAQUE_REFERENCE" if credential_ref else "NONE",
+        "credential_ref": credential_ref,
+        "granted_capabilities": sorted(granted),
+        "provider_scopes": sorted({str(x).strip() for x in (provider_scopes or []) if str(x).strip()}),
+        "account_hint": str(account_hint or "")[:300],
+        "sync_cursor": "",
+        "last_sync_at": None,
+        "last_error": "",
+        "created_at": ts,
+        "updated_at": ts,
+    }
+    store.insert("conversation_connector_connection", row)
+    return public_connection(_require_connection(row["id"]))
+
+
+def public_connection(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in row.items()
+        if key != "credential_ref"
+    } | {
+        "credential_ref_present": bool(row.get("credential_ref")),
+        "adapter_available": str(row.get("provider_id") or "") in _ADAPTERS,
+    }
+
+
+def list_connections() -> list[dict[str, Any]]:
+    return [
+        public_connection(row)
+        for row in store.select("conversation_connector_connection", order="created_at ASC")
+    ]
+
+
+def verify_and_connect(connection_id: str) -> dict[str, Any]:
+    row = _require_connection(connection_id)
+    provider = str(row["provider_id"])
+    adapter = _ADAPTERS.get(provider)
+    if adapter is None:
+        raise ValueError("Connector adapter 未接线，不能标记 CONNECTED")
+    if not row.get("credential_ref"):
+        raise ValueError("缺少 opaque credential_ref，不能标记 CONNECTED")
+    if not set(row.get("granted_capabilities") or []) <= set(getattr(adapter, "capabilities", set()) or set()):
+        raise ValueError("Adapter 不满足 connection 已授权 capability")
+    health = _sanitize(dict(adapter.health(row) or {}))
+    if not bool(health.get("ok", False)):
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": str(health.get("error") or "health check failed")[:2000],
+            "updated_at": store.now(),
+        })
+        raise ValueError(str(health.get("error") or "Connector health check failed"))
+    store.update("conversation_connector_connection", connection_id, {
+        "status": "CONNECTED",
+        "last_error": "",
+        "updated_at": store.now(),
+    })
+    return public_connection(_require_connection(connection_id))
+
+
+def disconnect(connection_id: str) -> dict[str, Any]:
+    _require_connection(connection_id)
+    store.update("conversation_connector_connection", connection_id, {
+        "status": "DISCONNECTED",
+        "updated_at": store.now(),
+    })
+    return public_connection(_require_connection(connection_id))
+
+
+def revoke(connection_id: str) -> dict[str, Any]:
+    _require_connection(connection_id)
+    store.update("conversation_connector_connection", connection_id, {
+        "status": "REVOKED",
+        "auth_mode": "NONE",
+        "credential_ref": "",
+        "sync_cursor": "",
+        "last_error": "",
+        "updated_at": store.now(),
+    })
+    return public_connection(_require_connection(connection_id))
+
+
+def _connection_usable(row: dict[str, Any], capability: str = "") -> bool:
+    provider = str(row.get("provider_id") or "")
+    adapter = _ADAPTERS.get(provider)
+    if row.get("status") != "CONNECTED" or adapter is None:
+        return False
+    if capability and capability not in set(row.get("granted_capabilities") or []):
+        return False
+    if capability and capability not in set(getattr(adapter, "capabilities", set()) or set()):
+        return False
+    try:
+        health = dict(adapter.health(row) or {})
+    except Exception:
+        return False
+    return bool(health.get("ok", False))
+
+
+def resolve_session_permissions(requested: list[str]) -> dict[str, Any]:
+    requested_caps = _capabilities(requested)
+    # Session Pack permissions are read-only. Writes have their own reviewed
+    # execution path and are never silently inherited from a read permission.
+    write_requested = [cap for cap in requested_caps if cap in conversation_connectors.WRITE_CAPABILITIES]
+    grants: list[dict[str, Any]] = []
+    blocked: list[dict[str, str]] = []
+    connections = store.select("conversation_connector_connection", order="created_at ASC")
+
+    for capability in requested_caps:
+        if capability in write_requested:
+            blocked.append({
+                "capability": capability,
+                "reason": "WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW",
+            })
+            continue
+        match = next(
+            (row for row in connections if _connection_usable(row, capability)),
+            None,
+        )
+        if match is None:
+            blocked.append({"capability": capability, "reason": "NO_CONNECTED_ACCOUNT"})
+            continue
+        grants.append({
+            "capability": capability,
+            "provider_id": match["provider_id"],
+            "connection_id": match["id"],
+            "account_hint": match.get("account_hint") or "",
+        })
+    return {
+        "requested": requested_caps,
+        "grants": grants,
+        "blocked": blocked,
+        "ok": not blocked,
+        "providers": conversation_connectors.providers(),
+        "write_execution_allowed": False,
+    }
+
+
+def _snapshot_hash(item: dict[str, Any]) -> str:
+    raw = json.dumps({
+        "capability": item.get("capability") or "",
+        "external_kind": item.get("external_kind") or "",
+        "external_id": item.get("external_id") or "",
+        "title": item.get("title") or "",
+        "excerpt": item.get("excerpt") or "",
+        "occurred_at": item.get("occurred_at"),
+        "metadata": item.get("metadata") or {},
+    }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _store_snapshot(
+    connection: dict[str, Any],
+    space_id: str,
+    capability: str,
+    raw: dict[str, Any],
+) -> dict[str, Any]:
+    kind = str(raw.get("external_kind") or "").upper()
+    if kind not in set(PROVIDER_CATALOG[connection["provider_id"]]["external_kinds"]):
+        raise ValueError(f"{connection['provider_id']} 不能提供 {kind or '空'} snapshot")
+    external_id = str(raw.get("external_id") or raw.get("id") or "").strip()
+    if not external_id:
+        raise ValueError("Connector snapshot 缺少 external_id")
+    normalized = {
+        "capability": capability,
+        "external_kind": kind,
+        "external_id": external_id[:500],
+        "title": str(raw.get("title") or "")[:500],
+        "excerpt": str(raw.get("excerpt") or raw.get("text") or "")[:20_000],
+        "occurred_at": raw.get("occurred_at"),
+        "metadata": _sanitize(dict(raw.get("metadata") or {})),
+    }
+    content_hash = str(raw.get("content_hash") or _snapshot_hash(normalized))
+    existing = store.rows(
+        "SELECT * FROM conversation_connector_snapshot "
+        "WHERE connection_id = ? AND capability = ? AND external_kind = ? "
+        "AND external_id = ? AND content_hash = ? LIMIT 1",
+        (connection["id"], capability, kind, external_id, content_hash),
+    )
+    if existing:
+        return existing[0]
+    row = {
+        "id": store.new_id("ccs_"),
+        "connection_id": connection["id"],
+        "space_id": space_id,
+        **normalized,
+        "content_hash": content_hash,
+        "source_url": _safe_url(str(raw.get("source_url") or "")),
+        "visibility": str(raw.get("visibility") or "PRIVATE").upper()[:80],
+        "created_at": store.now(),
+    }
+    store.insert("conversation_connector_snapshot", row)
+    return store.get("conversation_connector_snapshot", row["id"]) or row
+
+
+def sync_connection(
+    connection_id: str,
+    space_id: str,
+    *,
+    capabilities: Optional[list[str]] = None,
+    query: Optional[dict[str, Any]] = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    # Delayed import avoids service import cycles.
+    from services.product import conversations
+
+    conversations.require_space(space_id)
+    connection = _require_connection(connection_id)
+    provider = str(connection["provider_id"])
+    adapter = _ADAPTERS.get(provider)
+    if adapter is None or not _connection_usable(connection):
+        raise ValueError("Connector 未连接或 adapter 不可用")
+
+    requested = _capabilities(capabilities or list(connection.get("granted_capabilities") or []))
+    requested = [cap for cap in requested if cap in conversation_connectors.READ_CAPABILITIES]
+    allowed = set(connection.get("granted_capabilities") or [])
+    requested = [cap for cap in requested if cap in allowed]
+    if not requested:
+        raise ValueError("Connector 没有可同步的 read capability")
+
+    cursor = str(connection.get("sync_cursor") or "")
+    snapshots: list[dict[str, Any]] = []
+    try:
+        next_cursor = cursor
+        for capability in requested:
+            result = adapter.read_context(
+                connection=connection,
+                capability=capability,
+                query=dict(query or {}),
+                cursor=cursor,
+                limit=max(1, min(int(limit), 500)),
+            ) or {}
+            for raw in list(result.get("items") or [])[:max(1, min(int(limit), 500))]:
+                snapshots.append(_store_snapshot(connection, space_id, capability, dict(raw or {})))
+            if result.get("next_cursor"):
+                next_cursor = str(result["next_cursor"])[:4000]
+        store.update("conversation_connector_connection", connection_id, {
+            "sync_cursor": next_cursor,
+            "last_sync_at": store.now(),
+            "last_error": "",
+            "updated_at": store.now(),
+        })
+        return {"connection": public_connection(_require_connection(connection_id)), "snapshots": snapshots}
+    except Exception as exc:
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": str(exc)[:2000],
+            "updated_at": store.now(),
+        })
+        raise
+
+
+def list_snapshots(space_id: str, *, connection_id: str = "", limit: int = 200) -> list[dict[str, Any]]:
+    if connection_id:
+        return store.select(
+            "conversation_connector_snapshot",
+            where="space_id = ? AND connection_id = ?",
+            params=(space_id, connection_id),
+            order="COALESCE(occurred_at, created_at) DESC",
+            limit=max(1, min(int(limit), 1000)),
+        )
+    return store.select(
+        "conversation_connector_snapshot",
+        where="space_id = ?",
+        params=(space_id,),
+        order="COALESCE(occurred_at, created_at) DESC",
+        limit=max(1, min(int(limit), 1000)),
+    )
+
+
+def snapshot_source_ref(snapshot: dict[str, Any]) -> dict[str, Any]:
+    connection = _require_connection(snapshot["connection_id"])
+    return {
+        "kind": "CONNECTOR_SNAPSHOT",
+        "id": snapshot["id"],
+        "provider_id": connection["provider_id"],
+        "capability": snapshot["capability"],
+        "external_kind": snapshot["external_kind"],
+        "external_id": snapshot["external_id"],
+        "content_hash": snapshot["content_hash"],
+        "occurred_at": snapshot.get("occurred_at"),
+        "visibility": snapshot.get("visibility") or "PRIVATE",
+    }
+
+
+def request_execution(
+    draft_action_id: str,
+    connection_id: str,
+    *,
+    target: str = "",
+) -> dict[str, Any]:
+    draft = store.get("conversation_draft_action", draft_action_id)
+    if not draft:
+        raise ValueError("DraftAction 不存在")
+    if draft.get("status") != "APPROVED":
+        raise ValueError("只有 APPROVED DraftAction 才能请求外部执行")
+    mapping = DRAFT_CAPABILITY.get(str(draft.get("kind") or "").upper())
+    if not mapping:
+        raise ValueError("DraftAction 没有 external execution mapping")
+    operation, capability = mapping
+
+    session = store.get("conversation_session", str(draft.get("session_id") or ""))
+    if not session:
+        raise ValueError("DraftAction 对应 Session 不存在")
+    if str((session.get("policy") or {}).get("external_writeback") or "REVIEW_REQUIRED") == "OFF":
+        raise ValueError("本场 External Write-back 已关闭")
+
+    connection = _require_connection(connection_id)
+    status = "PENDING"
+    error = ""
+    if not _connection_usable(connection, capability):
+        status = "BLOCKED"
+        error = f"Connection 没有真实可用 capability: {capability}"
+
+    target_value = str(target or draft.get("target") or "")[:1000]
+    key_raw = "|".join([
+        draft["id"],
+        str(draft.get("updated_at") or ""),
+        connection_id,
+        capability,
+        operation,
+        target_value,
+    ])
+    idempotency_key = hashlib.sha256(key_raw.encode("utf-8")).hexdigest()
+    existing = store.rows(
+        "SELECT * FROM conversation_connector_execution WHERE idempotency_key = ? LIMIT 1",
+        (idempotency_key,),
+    )
+    if existing:
+        return existing[0]
+
+    ts = store.now()
+    row = {
+        "id": store.new_id("cce_"),
+        "draft_action_id": draft_action_id,
+        "connection_id": connection_id,
+        "capability": capability,
+        "operation": operation,
+        "target": target_value,
+        "idempotency_key": idempotency_key,
+        "status": status,
+        "request": _sanitize({
+            "draft_kind": draft["kind"],
+            "title": draft.get("title") or "",
+            "content": draft.get("content") or "",
+            "payload": draft.get("payload") or {},
+            "source_refs": draft.get("source_refs") or [],
+        }),
+        "response": {},
+        "error": error,
+        "created_at": ts,
+        "updated_at": ts,
+        "executed_at": None,
+    }
+    store.insert("conversation_connector_execution", row)
+    return store.get("conversation_connector_execution", row["id"]) or row
+
+
+def execute_request(execution_id: str) -> dict[str, Any]:
+    row = store.get("conversation_connector_execution", execution_id)
+    if not row:
+        raise ValueError("External execution request 不存在")
+    if row["status"] == "SUCCEEDED":
+        return row
+    if row["status"] == "BLOCKED":
+        raise ValueError(row.get("error") or "External execution request 已阻断")
+    if row["status"] not in {"PENDING", "FAILED"}:
+        raise ValueError("External execution request 当前状态不能执行")
+
+    draft = store.get("conversation_draft_action", row["draft_action_id"])
+    if not draft or draft.get("status") != "APPROVED":
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "BLOCKED",
+            "error": "DraftAction 不再是 APPROVED",
+            "updated_at": store.now(),
+        })
+        raise ValueError("DraftAction 不再是 APPROVED")
+
+    connection = _require_connection(row["connection_id"])
+    capability = str(row.get("capability") or "")
+    if not _connection_usable(connection, capability):
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "BLOCKED",
+            "error": f"Connection 不再具备 {capability}",
+            "updated_at": store.now(),
+        })
+        raise ValueError(f"Connection 不再具备 {capability}")
+
+    adapter = _ADAPTERS[str(connection["provider_id"])]
+    store.update("conversation_connector_execution", execution_id, {
+        "status": "EXECUTING",
+        "error": "",
+        "updated_at": store.now(),
+    })
+    try:
+        result = _sanitize(dict(adapter.execute(
+            connection=connection,
+            capability=capability,
+            operation=str(row.get("operation") or ""),
+            target=str(row.get("target") or ""),
+            payload=dict(row.get("request") or {}),
+            idempotency_key=str(row.get("idempotency_key") or ""),
+        ) or {}))
+    except Exception as exc:
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "FAILED",
+            "error": str(exc)[:4000],
+            "updated_at": store.now(),
+        })
+        return store.get("conversation_connector_execution", execution_id) or row
+
+    store.update("conversation_connector_execution", execution_id, {
+        "status": "SUCCEEDED",
+        "response": result,
+        "error": "",
+        "updated_at": store.now(),
+        "executed_at": store.now(),
+    })
+    return store.get("conversation_connector_execution", execution_id) or row
+
+
+def list_executions(*, draft_action_id: str = "", limit: int = 200) -> list[dict[str, Any]]:
+    if draft_action_id:
+        return store.select(
+            "conversation_connector_execution",
+            where="draft_action_id = ?",
+            params=(draft_action_id,),
+            order="created_at DESC",
+            limit=max(1, min(int(limit), 1000)),
+        )
+    return store.select(
+        "conversation_connector_execution",
+        order="created_at DESC",
+        limit=max(1, min(int(limit), 1000),
+    )
+
+
+def diagnostics() -> dict[str, Any]:
+    connections = list_connections()
+    connected = [row for row in connections if row["status"] == "CONNECTED" and row["adapter_available"]]
+    return {
+        "catalog": catalog(),
+        "connections": connections,
+        "connected_count": len(connected),
+        "registered_adapters": sorted(_ADAPTERS),
+        "snapshot_count": int(store.scalar("SELECT COUNT(*) FROM conversation_connector_snapshot") or 0),
+        "execution_count": int(store.scalar("SELECT COUNT(*) FROM conversation_connector_execution") or 0),
+        "external_execution": "REVIEW_AND_SECOND_EXPLICIT_EXECUTE",
+        "secret_storage": "OPAQUE_REFERENCE_ONLY",
+        "default": "NO_PROVIDER_ADAPTERS_CONFIGURED",
+    }

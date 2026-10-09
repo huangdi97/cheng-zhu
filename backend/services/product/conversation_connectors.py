@@ -43,6 +43,34 @@ CONNECTED = "CONNECTED"
 DISCONNECTED = "DISCONNECTED"
 ERROR = "ERROR"
 
+_SECRET_KEYS = {
+    "token", "access_token", "refresh_token", "id_token",
+    "api_key", "apikey", "secret", "client_secret", "password",
+    "authorization", "cookie", "set-cookie", "private_key",
+}
+
+
+def _sanitize_for_storage(value: Any, *, depth: int = 0) -> Any:
+    """Recursively remove credential-like fields from connector-owned payloads."""
+    if depth > 8:
+        return "[TRUNCATED_DEPTH]"
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for raw_key, raw_value in value.items():
+            key = str(raw_key)
+            normalized = key.lower().replace("-", "_")
+            if normalized in {k.replace("-", "_") for k in _SECRET_KEYS}:
+                continue
+            out[key[:200]] = _sanitize_for_storage(raw_value, depth=depth + 1)
+        return out
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_for_storage(item, depth=depth + 1) for item in list(value)[:500]]
+    if isinstance(value, str):
+        return value[:20_000]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:20_000]
+
 
 class ConnectorAdapter(Protocol):
     provider: str
@@ -116,7 +144,7 @@ def registered_providers() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for provider, runtime in items:
         try:
-            health = dict(runtime.health() or {})
+            health = _sanitize_for_storage(dict(runtime.health() or {}))
         except Exception as exc:
             health = {"ok": False, "error": str(exc)}
         out.append({
@@ -148,7 +176,7 @@ def connect(
     if not requested <= supported:
         missing = ", ".join(sorted(requested - supported))
         raise ValueError(f"adapter 不支持 capability: {missing}")
-    health = dict(runtime.health() or {})
+    health = _sanitize_for_storage(dict(runtime.health() or {}))
     if not bool(health.get("ok", False)):
         raise ValueError(str(health.get("error") or "connector runtime health check failed"))
 
@@ -163,14 +191,7 @@ def connect(
         "capabilities": sorted(requested),
         "scopes": sorted({str(x) for x in (scopes or []) if str(x)}),
         # Never accept obvious secret-like metadata keys into product.db.
-        "metadata": {
-            str(k): v
-            for k, v in dict(metadata or {}).items()
-            if str(k).lower() not in {
-                "token", "access_token", "refresh_token", "api_key", "apikey",
-                "secret", "client_secret", "password", "authorization",
-            }
-        },
+        "metadata": _sanitize_for_storage(dict(metadata or {})),
         "last_error": "",
         "created_at": (existing or {}).get("created_at") or now,
         "updated_at": now,
@@ -290,10 +311,10 @@ def collect_read_context(
                 "excerpt": excerpt,
                 "content_hash": hashlib.sha256(stable.encode("utf-8")).hexdigest(),
                 "visibility": str(raw.get("visibility") or "PRIVATE"),
-                "metadata": {
+                "metadata": _sanitize_for_storage({
                     str(k): v for k, v in raw.items()
-                    if k not in {"text", "excerpt", "authorization", "token", "access_token", "refresh_token"}
-                },
+                    if k not in {"text", "excerpt"}
+                }),
             })
     return snapshots
 
@@ -391,7 +412,8 @@ def execute_draft_action(
     })
 
     try:
-        result = dict(runtime.execute(capability, payload) or {})
+        raw_result = dict(runtime.execute(capability, payload) or {})
+        result = _sanitize_for_storage(raw_result)
         external_ref = str(result.get("external_ref") or result.get("id") or "")[:1000]
         store.update("conversation_external_execution", execution_id, {
             "result": result,

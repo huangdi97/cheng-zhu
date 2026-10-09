@@ -1309,7 +1309,7 @@ test.describe('v2.0 Conversation Profile', () => {
       if (pathname === '/api/product/conversation/integrations/connections') return {
         items: [{
           id: 'ccn-mcp', provider: 'MCP', display_name: 'Project MCP', status: 'CONNECTED',
-          auth_mode: 'OPAQUE_REFERENCE', credential_ref: 'plugin:redacted', granted_scopes: ['action.execute'],
+          auth_mode: 'OPAQUE_REFERENCE', credential_ref_present: true, granted_scopes: ['action.execute'],
           capabilities: { read: ['context.read'], write: ['action.execute'], external_kinds: ['DOCUMENT', 'TASK', 'ISSUE'] },
           account_hint: 'u…@example.com', sync_cursor: '', last_sync_at: null, last_error: '',
           adapter_available: true, created_at: 1, updated_at: 1,

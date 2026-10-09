@@ -525,6 +525,32 @@ def list_executions(*, draft_action_id: str = "", limit: int = 200) -> list[dict
     )
 
 
+def runtime_status(*, requested_permissions: Optional[list[str]] = None) -> dict[str, Any]:
+    requested = sorted({str(x).strip() for x in (requested_permissions or []) if str(x).strip()})
+    connections = list_connections()
+    usable = [
+        row for row in connections
+        if row["status"] == "CONNECTED" and row["provider"] in _ADAPTERS
+    ]
+    available_scopes: set[str] = set()
+    for row in usable:
+        available_scopes.update(row.get("granted_scopes") or [])
+    missing = [scope for scope in requested if scope not in available_scopes]
+    blockers = [
+        f"Connector permission {scope} 没有对应的已连接 adapter/scope；不会静默扩大权限。"
+        for scope in missing
+    ]
+    return {
+        "requested_permissions": requested,
+        "available_scopes": sorted(available_scopes),
+        "connected_provider_ids": [row["id"] for row in usable],
+        "missing_permissions": missing,
+        "blockers": blockers,
+        "live_access": "AVAILABLE" if requested and not missing else "NOT_REQUESTED" if not requested else "BLOCKED",
+        "snapshot_access": "EXPLICIT_SELECTION_ONLY",
+    }
+
+
 def diagnostics() -> dict[str, Any]:
     connections = list_connections()
     return {

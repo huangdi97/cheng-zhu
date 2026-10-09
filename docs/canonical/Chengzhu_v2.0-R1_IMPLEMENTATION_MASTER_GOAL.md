@@ -562,9 +562,9 @@ Capture start 必须二次校验，防止 Preflight 后配置改变。
 
 ---
 
-# 14. 当前明确 Blocked 的能力
+# 14. 当前 Runtime 能力与外部边界
 
-以下能力在真实 runtime 未接线前必须阻止开始或标明 unavailable：
+本节同时记录已经进入 beta.2 的真实 runtime，以及仍必须保持 unavailable / external-gated 的能力。禁止把“曾经 blocked”当成当前事实，也禁止把 external dependency 用 placeholder 冒充完成。
 
 ## Conversation Screen Context
 MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。MANUAL 每次由用户主动抓取；AUTO 的 policy 选择不会启动捕获，必须进入 Live 后再次显式 start，并持续显示 ACTIVE / OFF THE RECORD / AUTO STOPPED。AUTO 要求 participant consent/allowance status 与 transparency plan（均为用户报告），支持 duplicate-frame suppression、rate limit、bounded error fail-stop，Session end/delete/Space erase 强制停止。两种模式都不落原图，只保存 observation text + image/model-route provenance；LOCAL processing 下 remote vision fail-closed，冻结 vision fingerprint 在会中变化时拒绝继续抓取。
@@ -584,7 +584,7 @@ MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。M
 - 无键鼠远控；
 - public relay 未配置时继续 BLOCKED-EXTERNAL。
 
-当前允许声明 `RUNTIME_AVAILABLE`；只有 beta.2 exact-SHA Windows Release gate 与 public prerelease 完成后，才允许声明该能力已进入已发布的 packaged Beta。真实会话价值仍需独立用户证据。
+当前允许声明 `RUNTIME_AVAILABLE`，且该能力已经进入公开发布的 `v2.0.0-beta.2` packaged Beta（tag/source SHA = `cac605edf413ec248babf02ea9f73da708d156f8`）。这只证明真实 runtime 与发布 provenance 成立；Human Coach 的真实会话价值仍需独立用户证据。
 
 ## Conversation Private Overlay / Share Privacy
 已实现桌面 runtime：Conversation Session Policy 可请求 `PRIVATE_OVERLAY`；Preflight 只声明“Start 时验证”，点击开始前前端通过 Electron bridge 临时启用 `setContentProtection` 并再次读取状态，随后把 runtime proof 交给 backend。proof 缺失/无效时 Start fail-closed。verified state 冻结进 Session Pack，Live 显示保护状态；会话正常结束后恢复开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不得开始该 policy。该能力只降低受支持捕获路径中的意外暴露，不是安全、隐身或“不可检测”保证。
@@ -848,7 +848,7 @@ PMF_PROVEN = TRUE
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- Manual + explicit-start AUTO Screen Context 可用；coach / private overlay / connectors 明确 blocked；
+- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime 并进入 beta.2；Calendar / Docs / Mail / project-tracker connectors 与真实 external execution 仍明确 unavailable；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；
@@ -872,16 +872,18 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 先让 `v2.0.0-beta.2` 的 PR CI + Windows Release preflight 在 exact final head 全绿；
-2. 合并后由 exact green main SHA 发布 GitHub Prerelease，保持 v1.4.2 为 Stable Latest；
-3. 用该可下载安装包进行 local dogfood；
-4. 真实 Project Sync / Design Review 小规模使用；
-5. 收集 human-labeled Guidance / missed-moment / continuity evidence；
-6. 根据真实证据再决定是否继续投入：
-   - Human Coach 的 packaged/real-session evidence；
-   - Private Overlay；
-   - Calendar / Docs / Mail / project-tracker connectors；
-   - actual external write-back；
-   - Presentation / 1:1 / Client Call / Negotiation 专属行为优化。
+1. 使用已经公开发布的 `v2.0.0-beta.2` 进行 local dogfood，优先 Project Sync / Design Review；
+2. 进行真实 Project Sync / Design Review 小规模使用；
+3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
+4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；
+5. 根据真实使用再决定六类 Profile 的专属行为优化优先级；
+6. 外部依赖按独立能力推进：
+   - Calendar / Docs / Mail / project-tracker read connectors；
+   - actual external email/task/issue/decision-log execution；
+   - participant automatic chat notice / watermark；
+   - Organization / shared team truth registry；
+   - code signing、macOS signing/notarization 等发布治理。
 
-后四类不是“源码里再补几个字段就能完成”的缺口，而是需要真实 runtime、外部权限或真实用户证据才能合法升级状态。
+已经进入 beta.2 的 Human Coach、Share Privacy、Manual/AUTO Screen Context 不再列为“待实现”；它们下一步需要的是 dogfood / real-session evidence 与成熟度验证，而不是重复补一套 runtime。
+
+以上剩余项不是“再补几个字段就能合法完成”的纯仓库 gap：要么依赖真实用户证据，要么依赖外部系统权限/执行结果，要么属于 stable release / platform governance。

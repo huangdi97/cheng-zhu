@@ -32,18 +32,21 @@ def init_product_layer() -> dict:
     from services.product.google_drive_connector import register_google_drive_adapter_from_env
     from services.product.google_mail_connector import register_google_mail_adapter_from_env
     from services.product.microsoft_todo_connector import register_microsoft_todo_adapter_from_env
+    from services.product.mcp_decision_log_connector import register_mcp_decision_log_adapter_from_env
 
     github_connector = register_github_adapter_from_env()
     google_calendar_connector = register_google_calendar_adapter_from_env()
     google_drive_connector = register_google_drive_adapter_from_env()
     google_mail_connector = register_google_mail_adapter_from_env()
     microsoft_todo_connector = register_microsoft_todo_adapter_from_env()
+    mcp_decision_log_connector = register_mcp_decision_log_adapter_from_env()
     provider_state = {
         "github_connector": github_connector,
         "google_calendar_connector": google_calendar_connector,
         "google_drive_connector": google_drive_connector,
         "google_mail_connector": google_mail_connector,
         "microsoft_todo_connector": microsoft_todo_connector,
+        "mcp_decision_log_connector": mcp_decision_log_connector,
     }
     if isinstance(backfill, dict):
         return {**backfill, **provider_state}

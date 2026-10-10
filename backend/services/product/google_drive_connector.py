@@ -26,6 +26,7 @@ never presented as if their content had been read.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -44,9 +45,9 @@ _PAGE_SIZE = 100
 _MAX_TEXT_BYTES = 2_000_000
 
 _GOOGLE_EXPORTS: dict[str, tuple[str, bool, str]] = {
-    "application/vnd.google-apps.document": ("text/plain", False, "FULL_TEXT_EXPORT"),
-    "application/vnd.google-apps.presentation": ("text/plain", False, "FULL_TEXT_EXPORT"),
-    "application/vnd.google-apps.spreadsheet": ("text/csv", True, "FIRST_SHEET_CSV"),
+    "application/vnd.google-apps.document": ("text/plain", False, "TEXT_EXPORT_EXCERPT_20K"),
+    "application/vnd.google-apps.presentation": ("text/plain", False, "TEXT_EXPORT_EXCERPT_20K"),
+    "application/vnd.google-apps.spreadsheet": ("text/csv", True, "FIRST_SHEET_CSV_EXCERPT_20K"),
 }
 _TEXT_BLOB_MIMES = {
     "application/json",
@@ -337,7 +338,7 @@ class GoogleDriveRestAdapter:
                 "content_available": True,
                 "text": _decode_text(bytes(raw)),
                 "export_mime": mime,
-                "content_scope": "FULL_TEXT_BLOB",
+                "content_scope": "TEXT_BLOB_EXCERPT_20K",
                 "partial_content": False,
                 "reason": "",
             }
@@ -404,6 +405,9 @@ class GoogleDriveRestAdapter:
             if not file_id:
                 continue
             content = self._read_file_content(connection=connection, file=file)
+            full_text = str(content.get("text") or "")
+            full_bytes = full_text.encode("utf-8")
+            full_digest = hashlib.sha256(full_bytes).hexdigest() if content.get("content_available") else ""
             modified = str(file.get("modifiedTime") or "")
             snapshots.append({
                 "external_kind": "DOCUMENT",
@@ -425,6 +429,9 @@ class GoogleDriveRestAdapter:
                     "export_mime": str(content["export_mime"] or "")[:200],
                     "content_scope": str(content["content_scope"] or "")[:120],
                     "partial_content": bool(content["partial_content"]),
+                    "retrieval_scope": "FIRST_20000_CHARS" if content["content_available"] else "METADATA_ONLY",
+                    "source_text_bytes": len(full_bytes) if content["content_available"] else 0,
+                    "full_content_digest_sha256": full_digest,
                     "content_unavailable_reason": str(content["reason"] or "")[:200],
                 },
             })

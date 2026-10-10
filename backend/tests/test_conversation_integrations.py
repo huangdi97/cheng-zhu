@@ -524,7 +524,7 @@ def test_exports_include_connector_provenance_and_audit_but_never_credential_ref
 
 def test_diagnostics_distinguishes_boundary_from_real_provider_availability(product_env):
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 8
+    assert diag["schema_version"] == 9
     assert diag["health"]["external_connectors"] == "NOT_CONFIGURED"
     assert diag["health"]["external_writeback_execution"] == "REVIEWED_SECOND_EXPLICIT_EXECUTION_BOUNDARY"
     assert diag["integrations"]["connected_count"] == 0

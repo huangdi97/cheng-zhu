@@ -69,6 +69,8 @@ def test_google_mail_catalog_is_send_only_with_identity_scopes(product_env):
     assert row["identity_scopes"] == ["openid", "email"]
     assert "mail.read" not in row["capabilities"]
     assert "gmail.readonly" not in json.dumps(row)
+    assert row["setup"]["oauth_scope_classification"] == "GMAIL_SEND_SENSITIVE"
+    assert row["setup"]["public_release_gate"] == "GOOGLE_OAUTH_APP_VERIFICATION_REQUIRED"
 
     connection = conversation_integrations.create_connection(
         "GOOGLE_MAIL",

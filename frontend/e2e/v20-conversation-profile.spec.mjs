@@ -1338,7 +1338,7 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('- offline migration 采用 v2 · state=AGREED')).toBeVisible()
     await expect(page.getByText(/确认草稿 ≠ 外部执行/)).toBeVisible()
     await page.getByRole('button', { name: '确认草稿' }).click()
-    await expect(page.getByText('APPROVED')).toBeVisible()
+    await expect(page.getByText('APPROVED', { exact: true })).toBeVisible()
     await expect(page.getByText(/当前没有同时满足 adapter available \+ CONNECTED \+ decision_log.write grant/)).toBeVisible()
   })
 

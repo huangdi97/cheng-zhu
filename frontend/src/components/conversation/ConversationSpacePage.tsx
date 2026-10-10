@@ -658,7 +658,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           </Section>
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Next Session">
-              {space.next_session ? <div><div className="text-sm text-text-primary">{space.next_session.title}</div><div className="mt-1 text-[11px] text-text-muted">{space.next_session.scheduled_at ? new Date(space.next_session.scheduled_at * 1000).toLocaleString() : '未排期'} · {space.next_session.assistance_mode}</div></div> : <p className="text-xs text-text-muted">暂无已排期的下一场。</p>}
+              {space.next_session ? <div><div className="text-sm text-text-primary">{space.next_session.title}</div><div className="mt-1 text-[11px] text-text-muted">{space.next_session.scheduled_at ? new Date(space.next_session.scheduled_at * 1000).toLocaleString() : '未排期'} · {space.next_session.assistance_mode}</div>{space.next_session.source_calendar_event?.revision_status && space.next_session.source_calendar_event.revision_status !== 'CURRENT' ? <div className="mt-2 text-[11px] text-status-risk">Calendar source · {space.next_session.source_calendar_event.revision_status}{space.next_session.source_calendar_event.latest_title ? ` · latest: ${space.next_session.source_calendar_event.latest_title}` : ''}</div> : null}</div> : <p className="text-xs text-text-muted">暂无已排期的下一场。</p>}
             </Section>
             <Section title="Recent Decisions">
               {space.recent_decisions?.length ? <div className="space-y-1">{space.recent_decisions.map((d) => <div key={d.id} className="text-xs text-text-primary">• {d.title}</div>)}</div> : <p className="text-xs text-text-muted">暂无已确认 Decision。</p>}
@@ -864,6 +864,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       && typeof snapshot.occurred_at === 'number'
                       && snapshot.occurred_at > Date.now() / 1000
                       && !Boolean(calendarMeta.cancelled)
+                      && snapshot.is_latest_revision !== false
                     const imported = space.sessions.some((session) => session.source_calendar_event?.snapshot_id === snapshot.id)
                     return <div key={snapshot.id} className="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
                       <label className="flex min-w-0 flex-1 items-start gap-2">
@@ -874,7 +875,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                         ? <StatusBadge tone="ok">已导入</StatusBadge>
                         : calendarFuture
                           ? <SecondaryButton disabled={integrationBusy} onClick={() => scheduleCalendarSnapshot(snapshot.id)}>作为下一场</SecondaryButton>
-                          : <StatusBadge tone="muted">{Boolean(calendarMeta.cancelled) ? '已取消' : '非未来事件'}</StatusBadge>
+                          : <StatusBadge tone="muted">{Boolean(calendarMeta.cancelled) ? '已取消' : snapshot.is_latest_revision === false ? '历史 revision' : '非未来事件'}</StatusBadge>
                         : null}
                     </div>
                   })}</div> : <p className="text-[11px] text-text-muted">还没有外部 snapshot。真实连接 Sync 后才会出现；本场仍可完全离线使用。</p>}

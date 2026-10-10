@@ -469,7 +469,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     try {
       await conversationApi.verifyIntegrationConnection(connectionId)
       await integrationConnections.reload()
-      setLifecycleMessage('Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+      const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
+      setLifecycleMessage(connection?.provider_id === 'GOOGLE_CALENDAR'
+        ? 'Google Calendar read probe 已通过，连接状态为 CONNECTED。实际 calendar target 的完整读取仍由显式 Sync provider 响应证明。'
+        : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -798,6 +801,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     <span className="text-[10px] text-text-muted">credential ref = provider:github:env:{githubEnvVar || '<ENV_VAR>'}</span>
                   </div>
                 </div> : null}
+                {googleCalendarProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="google-calendar-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Google Calendar · read-only discovery</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleCalendarProvider.setup.runtime_opt_in_env || 'CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1'} 和一个只读 Calendar access-token 环境变量。当前只实现 calendar.read，不会创建/修改日历事件。</p>
+                    </div>
+                    <StatusBadge tone={googleCalendarProvider.adapter_available ? 'ok' : 'muted'}>{googleCalendarProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input aria-label="Google Calendar token 环境变量名" className={inputCls} value={googleCalendarEnvVar} onChange={(e) => setGoogleCalendarEnvVar(e.target.value)} placeholder="CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN" />
+                    <input aria-label="Google Calendar 默认 calendar id" className={inputCls} value={googleCalendarId} onChange={(e) => setGoogleCalendarId(e.target.value)} placeholder="primary 或 calendar id" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !googleCalendarProvider.adapter_available} onClick={createGoogleCalendarConnection}>创建 Calendar 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">scope · calendar.events.readonly · credential ref = provider:google-calendar:env:{googleCalendarEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Verify 只做一页 read probe；真正 full/incremental sync 只有你点击 Sync 时发生。sync token 失效时会显式 full resync，不会把截断结果当完整状态。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -809,9 +830,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       {connection.provider_id === 'GITHUB' ? <div className="mt-2">
                         <input aria-label={`GitHub Sync 仓库 ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? githubRepository} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="owner/repo · 每次 Sync 都显式指定" />
                       </div> : null}
+                      {connection.provider_id === 'GOOGLE_CALENDAR' ? <div className="mt-2">
+                        <input aria-label={`Google Calendar Sync calendar id ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="primary 或显式 calendar id" />
+                      </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim())} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>

@@ -254,6 +254,28 @@ snapshot provenance：
 
 ---
 
+## 9.1 Snapshot provenance hardening
+
+schema v9 冻结以下规则：
+
+```text
+snapshot identity =
+space_id
++ connection_id
++ capability
++ external_kind
++ external_id
++ Chengzhu canonical content_hash
+```
+
+- 相同外部对象同步到不同 Space 时必须形成各自 Space-scoped snapshot row；
+- provider 自报 content hash 仅作为 provenance metadata 保存，不控制 Chengzhu identity；
+- Space 不能持久化别的 Space 的 snapshot id；
+- 每个 read capability 独立维护 sync cursor，禁止 Calendar / Docs / Mail / Project cursor 串流；
+- 已开始 Session 继续使用 frozen snapshot，不被后续 Sync 改写。
+
+---
+
 ## 10. External source authority
 
 所有 connector snapshot 默认：
@@ -386,6 +408,9 @@ Provider unhealthy、credential 被撤销或 capability 不再存在时：
 - provider 明确 `ok=false` 记录 `FAILED`；
 - transport exception / timeout / malformed outcome 记录 `UNKNOWN_OUTCOME`；
 - `UNKNOWN_OUTCOME` 不改成 FAILED，也不能直接重试；
+- 必须先在 provider 侧核对并记录 reconciliation；
+- `CONFIRMED_SUCCEEDED` 保留为 USER_REPORTED_PROVIDER_CHECK，不伪造原 adapter 的 `ok=true`；
+- `CONFIRMED_NOT_APPLIED` 才能把同一 audit row 标为 `retry_safe=true`；
 - 任何失败/不确定结果都不改写 Conversation truth 或 DraftAction approval。
 
 ---
@@ -400,7 +425,7 @@ Provider URL 只保留：
 scheme + host + path
 ```
 
-query / fragment 删除。
+userinfo / query / fragment 删除。除了按 key 删除 token/secret/auth 字段外，还要对普通字符串中的明显 credential-shaped value 做 redaction；opaque credential reference 也不能用 `provider:/plugin:` 外壳夹带真实 token。
 
 ---
 

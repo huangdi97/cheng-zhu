@@ -153,7 +153,10 @@ def test_google_calendar_full_sync_pages_to_final_sync_token(monkeypatch):
         limit=500,
     )
     assert [x["external_id"] for x in result["items"]] == ["primary:evt-1", "primary:evt-2"]
-    assert result["next_cursor"] == "sync-token-1"
+    assert _decode_cursor(result["next_cursor"]) == {
+        "calendar_id": "primary",
+        "sync_token": "sync-token-1",
+    }
 
     first = parse_qs(urlparse(transport.calls[0]["url"]).query)
     second = parse_qs(urlparse(transport.calls[1]["url"]).query)
@@ -181,7 +184,10 @@ def test_google_calendar_incremental_sync_uses_token_without_time_filter(monkeyp
         cursor=_encode_cursor("primary", "sync-token-1"),
         limit=500,
     )
-    assert result["next_cursor"] == "sync-token-2"
+    assert _decode_cursor(result["next_cursor"]) == {
+        "calendar_id": "primary",
+        "sync_token": "sync-token-2",
+    }
     assert result["items"][0]["metadata"]["cancelled"] is True
     params = parse_qs(urlparse(transport.calls[0]["url"]).query)
     assert params["syncToken"] == ["sync-token-1"]

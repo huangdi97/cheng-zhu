@@ -360,6 +360,16 @@ Execution Request 生成稳定 idempotency key，至少绑定：
 
 已经 `SUCCEEDED` 的 audit row 再次 Execute 不重复外部调用。
 
+Idempotency key 只是 contract input，不等于所有 provider 天生幂等。Concrete adapter 必须真实把该 key 映射到 provider 的幂等机制，才能声明 provider-level retry safety。
+
+明确失败的结果 envelope：
+
+```json
+{"ok": false, "error": "...", "retry_safe": false}
+```
+
+只有 `retry_safe=true` 时，Chengzhu 才允许对同一 audit row 再次 Execute。
+
 ---
 
 ## 15. Failure / revocation
@@ -371,7 +381,10 @@ Provider unhealthy、credential 被撤销或 capability 不再存在时：
 - external execution 在执行前重新校验；
 - 已开始 Session 继续保留 frozen Pack；
 - 不把 stale provider state 当 fresh；
-- provider failure 记录 `FAILED` audit，不改成 success。
+- provider 明确 `ok=false` 记录 `FAILED`；
+- transport exception / timeout / malformed outcome 记录 `UNKNOWN_OUTCOME`；
+- `UNKNOWN_OUTCOME` 不改成 FAILED，也不能直接重试；
+- 任何失败/不确定结果都不改写 Conversation truth 或 DraftAction approval。
 
 ---
 
@@ -461,6 +474,7 @@ CONNECTOR_REGISTRY_DEFAULT = FAIL_CLOSED
 EXTERNAL_INTEGRATION_BOUNDARY = IMPLEMENTED
 IMMUTABLE_EXTERNAL_SNAPSHOT_PATH = IMPLEMENTED
 REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
+AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 ```
 
 仍禁止在缺少真实 adapter/account/runtime evidence 时声明：

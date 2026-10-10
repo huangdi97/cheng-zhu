@@ -710,13 +710,22 @@ def _apply_v8(conn: sqlite3.Connection) -> None:
 
 
 def _apply_v9(conn: sqlite3.Connection) -> None:
-    """Make immutable external snapshots Space-scoped.
+    """Harden connector provenance and incremental sync state.
 
-    v8 stored space_id on the snapshot row but its UNIQUE constraint omitted
-    space_id. The same unchanged provider object synced into two Conversation
-    Spaces could therefore alias the first Space's row. Rebuild the beta-only
-    table so provenance membership cannot cross Space boundaries.
+    - v8 snapshot uniqueness omitted space_id, so identical external content
+      synced into two Spaces could alias the first Space's row.
+    - v8 kept one sync_cursor for a connection even though one provider can
+      expose multiple independent capabilities.
     """
+    connection_cols = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_connector_connection)").fetchall()
+    }
+    if "sync_cursors_json" not in connection_cols:
+        conn.execute(
+            "ALTER TABLE conversation_connector_connection "
+            "ADD COLUMN sync_cursors_json TEXT NOT NULL DEFAULT '{}'"
+        )
+
     conn.execute(
         """
         CREATE TABLE conversation_connector_snapshot_v9 (

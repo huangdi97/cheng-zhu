@@ -136,6 +136,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [googleDriveEnvVar, setGoogleDriveEnvVar] = useState('CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN')
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState('root')
   const [googleMailEnvVar, setGoogleMailEnvVar] = useState('CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN')
+  const [microsoftTodoEnvVar, setMicrosoftTodoEnvVar] = useState('CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN')
+  const [microsoftTodoListId, setMicrosoftTodoListId] = useState('defaultList')
+  const [microsoftTodoReadEnabled, setMicrosoftTodoReadEnabled] = useState(true)
+  const [microsoftTodoWriteEnabled, setMicrosoftTodoWriteEnabled] = useState(true)
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -172,6 +176,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const googleCalendarProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_CALENDAR')
   const googleDriveProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_DRIVE')
   const googleMailProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_MAIL')
+  const microsoftTodoProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'MICROSOFT_GRAPH')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -181,7 +186,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const selectedExecutionConnection = compatibleExecutionConnections.find((connection) => connection.id === executionConnectionId)
   const executionNeedsRepository = selectedExecutionConnection?.provider_id === 'GITHUB' && draftCapability === 'issue.create'
   const executionNeedsEmail = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && draftCapability === 'email.send'
+  const executionNeedsTodoList = selectedExecutionConnection?.provider_id === 'MICROSOFT_GRAPH' && draftCapability === 'task.create'
   const validExecutionEmail = /^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(executionTarget.trim())
+  const validTodoListTarget = Boolean(executionTarget.trim())
+    && executionTarget.trim().length <= 512
+    && !/[\r\n\0]/.test(executionTarget.trim())
   const executionRetrySafe = execution?.status === 'FAILED'
     && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
   const executionReconciliation = (execution?.response as {
@@ -191,7 +200,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const outboundRedactionApplied = Boolean(
     (execution?.request as { outbound_redaction_applied?: boolean } | undefined)?.outbound_redaction_applied,
   )
-  const gmailRedactionBlocked = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && outboundRedactionApplied
+  const reviewedWriteRedactionBlocked = ['GOOGLE_MAIL', 'MICROSOFT_GRAPH'].includes(selectedExecutionConnection?.provider_id ?? '')
+    && outboundRedactionApplied
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -501,11 +511,47 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+
+  const createMicrosoftTodoConnection = async () => {
+    const envName = microsoftTodoEnvVar.trim()
+    const listId = microsoftTodoListId.trim() || 'defaultList'
+    const capabilities = [
+      ...(microsoftTodoReadEnabled ? ['project.read'] : []),
+      ...(microsoftTodoWriteEnabled ? ['task.create'] : []),
+    ]
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Microsoft To Do credential env 只允许环境变量名，例如 CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN。')
+      return
+    }
+    if (!listId || listId.length > 512 || /[\r\n\0]/.test(listId)) {
+      setSessionError('Microsoft To Do list target 必须是 defaultList 或明确的 todoTaskList id。')
+      return
+    }
+    if (!capabilities.length) {
+      setSessionError('Microsoft To Do connection 至少选择 project.read 或 task.create。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const created = await conversationApi.createIntegrationConnection({
+        provider_id: 'MICROSOFT_GRAPH',
+        display_name: `Microsoft To Do · ${listId}`,
+        granted_capabilities: capabilities,
+        credential_ref: `provider:microsoft-graph:env:${envName}`,
+      })
+      setConnectorTargets((current) => ({ ...current, [created.id]: listId }))
+      await integrationConnections.reload()
+      setLifecycleMessage('Microsoft To Do connection 元数据已创建。Verify 只确认 Microsoft identity + To Do permission；具体 list read/write 仍分别由显式 Sync / 第二次 Execute 证明。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
     const calendarId = (connectorTargets[connectionId] || connection?.account_hint || googleCalendarId || 'primary').trim()
     const driveFolderId = (connectorTargets[connectionId] || connection?.account_hint || googleDriveFolderId || 'root').trim()
+    const todoListId = (connectorTargets[connectionId] || microsoftTodoListId || 'defaultList').trim()
     if (connection?.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
       setSessionError('GitHub Sync 需要明确填写 owner/repo；不会从其他 Space 或历史连接猜测目标。')
       return
@@ -518,6 +564,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       setSessionError('Google Drive Sync 需要 root 或明确 folder id。')
       return
     }
+    if (connection?.provider_id === 'MICROSOFT_GRAPH' && (!todoListId || todoListId.length > 512 || /[\r\n\0]/.test(todoListId))) {
+      setSessionError('Microsoft To Do Sync 需要 defaultList 或明确 todoTaskList id。')
+      return
+    }
     setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.syncIntegrationConnection(connectionId, {
@@ -525,12 +575,14 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
         capabilities: connection?.provider_id === 'GITHUB'
           ? ['project.read']
           : connection?.provider_id === 'GOOGLE_CALENDAR' ? ['calendar.read']
-            : connection?.provider_id === 'GOOGLE_DRIVE' ? ['docs.read'] : undefined,
+            : connection?.provider_id === 'GOOGLE_DRIVE' ? ['docs.read']
+              : connection?.provider_id === 'MICROSOFT_GRAPH' ? ['project.read'] : undefined,
         query: connection?.provider_id === 'GITHUB'
           ? { repository }
           : connection?.provider_id === 'GOOGLE_CALENDAR' ? { calendar_id: calendarId }
-            : connection?.provider_id === 'GOOGLE_DRIVE' ? { folder_id: driveFolderId } : undefined,
-        limit: ['GOOGLE_CALENDAR', 'GOOGLE_DRIVE'].includes(connection?.provider_id ?? '') ? 500 : undefined,
+            : connection?.provider_id === 'GOOGLE_DRIVE' ? { folder_id: driveFolderId }
+              : connection?.provider_id === 'MICROSOFT_GRAPH' ? { todo_list_id: todoListId } : undefined,
+        limit: ['GOOGLE_CALENDAR', 'GOOGLE_DRIVE', 'MICROSOFT_GRAPH'].includes(connection?.provider_id ?? '') ? 500 : undefined,
       })
       setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
       await connectorSnapshots.reload(); await integrationConnections.reload()
@@ -550,7 +602,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           ? 'Google Drive account read probe 已通过，连接状态为 CONNECTED。具体 folder 是否可读仍由显式 Sync 的 folder probe + 完整分页证明。'
           : connection?.provider_id === 'GOOGLE_MAIL'
             ? 'Google OIDC identity 已验证。当前连接不具备 mailbox read；email.send 只有在 reviewed draft 的第二次显式 Execute 获得 Gmail ok=true 后才算真实证明。'
-            : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+            : connection?.provider_id === 'MICROSOFT_GRAPH'
+              ? 'Microsoft identity + To Do permission probe 已通过。具体 todo list 的完整读取由显式 Sync 证明；task.create 只有 reviewed Task Draft 的第二次显式 Execute 返回 Graph ok=true 才算真实证明。'
+              : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -645,6 +699,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     }
     if (executionNeedsEmail && !/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(target)) {
       setSessionError('Gmail 外发必须明确填写一个收件邮箱；不接受多个收件人或显示名。')
+      return
+    }
+    if (executionNeedsTodoList && (!target || target.length > 512 || /[\r\n\0]/.test(target))) {
+      setSessionError('Microsoft To Do 写回必须明确填写 defaultList 或 todoTaskList id。')
       return
     }
     setIntegrationBusy(true); setSessionError('')
@@ -937,6 +995,28 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <p className="mt-2 text-[10px] text-text-muted">Verify 仅通过 Google UserInfo 确认账号 identity，不读取邮箱；真正 email.send 能力只有在 APPROVED Follow-up Draft 的第二次显式 Execute 返回 Gmail ok=true 后才成立。</p>
                   <p className="mt-1 text-[10px] text-status-inferred">Public release gate · gmail.send 属于 Google Sensitive scope。当前 adapter 工程可用 ≠ 公共 OAuth 已获验证；面向公众稳定发布前仍需完成 Google OAuth consent / app verification。不会为了绕过验证扩大到 mailbox read。</p>
                 </div> : null}
+                {microsoftTodoProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="microsoft-todo-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Microsoft To Do · least-privilege Graph</div>
+                      <p className="mt-1 text-[10px] text-text-muted">只实现 project.read + reviewed task.create。身份只用 User.Read；只读使用 Tasks.Read；启用 task.create 时使用 Tasks.ReadWrite。这个 adapter 不申请 Mail / Calendar / Files 权限。</p>
+                    </div>
+                    <StatusBadge tone={microsoftTodoProvider.adapter_available ? 'ok' : 'muted'}>{microsoftTodoProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input aria-label="Microsoft To Do token 环境变量名" className={inputCls} value={microsoftTodoEnvVar} onChange={(e) => setMicrosoftTodoEnvVar(e.target.value)} placeholder="CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN" />
+                    <input aria-label="Microsoft To Do 默认 list id" className={inputCls} value={microsoftTodoListId} onChange={(e) => setMicrosoftTodoListId(e.target.value)} placeholder="defaultList 或明确 todoTaskList id" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-text-muted">
+                    <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={microsoftTodoReadEnabled} onChange={(e) => setMicrosoftTodoReadEnabled(e.target.checked)} /> project.read · Tasks.Read</label>
+                    <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={microsoftTodoWriteEnabled} onChange={(e) => setMicrosoftTodoWriteEnabled(e.target.checked)} /> task.create · Tasks.ReadWrite</label>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !microsoftTodoProvider.adapter_available} onClick={createMicrosoftTodoConnection}>创建 Microsoft To Do 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">credential ref = provider:microsoft-graph:env:{microsoftTodoEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Verify = User.Read identity + To Do read probe；Sync 只读你显式指定的 list；Task Draft 写回还需要选择同一连接、明确 list target、创建 Execution Request，再第二次点击 Execute。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -954,9 +1034,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       {connection.provider_id === 'GOOGLE_DRIVE' ? <div className="mt-2">
                         <input aria-label={`Google Drive Sync folder id ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="root 或显式 folder id" />
                       </div> : null}
+                      {connection.provider_id === 'MICROSOFT_GRAPH' ? <div className="mt-2">
+                        <input aria-label={`Microsoft To Do Sync list ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? microsoftTodoListId} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="defaultList 或明确 todoTaskList id" />
+                      </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' && connection.granted_capabilities.some((capability) => ['project.read', 'calendar.read', 'docs.read'].includes(capability)) ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' && connection.granted_capabilities.some((capability) => ['project.read', 'calendar.read', 'docs.read'].includes(capability)) ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim())) || (connection.provider_id === 'MICROSOFT_GRAPH' && (!(connectorTargets[connection.id] ?? microsoftTodoListId).trim() || (connectorTargets[connection.id] ?? microsoftTodoListId).trim().length > 512 || /[\r\n\0]/.test((connectorTargets[connection.id] ?? microsoftTodoListId).trim())))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>
@@ -1135,14 +1218,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   </select>
                   {executionNeedsRepository ? <input aria-label="GitHub Issue 目标仓库" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="owner/repo · 第二次显式动作的目标" /> : null}
                   {executionNeedsEmail ? <input aria-label="Gmail 收件邮箱" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="recipient@example.com · 单一明确收件人" /> : null}
-                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim())) || (executionNeedsEmail && !validExecutionEmail)} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                  {executionNeedsTodoList ? <input aria-label="Microsoft To Do 目标 list" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="defaultList 或明确 todoTaskList id · 第二次显式动作的目标" /> : null}
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim())) || (executionNeedsEmail && !validExecutionEmail) || (executionNeedsTodoList && !validTodoListTarget)} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
                     {outboundRedactionApplied ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
                       检测到 secret/token 形态的敏感值。Execution Request 中保存并实际发送给 provider 的内容已经脱敏，因此可能与刚才审核的本地 Draft 不完全一致；请在第二次 Execute 前按脱敏后的外发语义重新确认。
                     </div> : null}
-                    {gmailRedactionBlocked ? <div className="mt-2 text-[11px] text-status-risk">Gmail send-only provider 不会发送被安全层改写过、但尚未重新审核的内容。请回到 Draft 移除敏感值并重新确认，再创建新的 Execution Request。</div> : null}
-                    {executionCanExecute && !gmailRedactionBlocked ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
+                    {reviewedWriteRedactionBlocked ? <div className="mt-2 text-[11px] text-status-risk">Gmail / Microsoft To Do 这类直接外部写入 provider 不会发送被安全层改写过、但尚未重新审核的内容。请回到 Draft 移除敏感值并重新确认，再创建新的 Execution Request。</div> : null}
+                    {executionCanExecute && !reviewedWriteRedactionBlocked ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
                     {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
                     {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
                       <div>结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div>

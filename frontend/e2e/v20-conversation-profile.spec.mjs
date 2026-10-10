@@ -2099,6 +2099,8 @@ test.describe('v2.0 Conversation Profile', () => {
               secret_storage: 'PROCESS_ENV_ONLY',
               mailbox_read_support: 'NONE',
               oauth_required_scopes: 'openid email gmail.send',
+              oauth_scope_classification: 'GMAIL_SEND_SENSITIVE',
+              public_release_gate: 'GOOGLE_OAUTH_APP_VERIFICATION_REQUIRED',
             },
             adapter_available: true,
           }],
@@ -2209,6 +2211,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(setup).toBeVisible()
     await expect(setup.getByText(/reviewed send-only/)).toBeVisible()
     await expect(setup.getByText(/不读 inbox、不创建 mail snapshot/)).toBeVisible()
+    await expect(setup.getByText(/Sensitive scope/)).toBeVisible()
+    await expect(setup.getByText(/OAuth consent \/ app verification/)).toBeVisible()
     await page.getByLabel('Gmail token 环境变量名').fill('MY_GMAIL_TOKEN')
     await page.getByRole('button', { name: '创建 Gmail send-only 连接元数据' }).click()
 

@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 8
+LATEST_SCHEMA_VERSION = 9
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -709,6 +709,61 @@ def _apply_v8(conn: sqlite3.Connection) -> None:
         )
 
 
+def _apply_v9(conn: sqlite3.Connection) -> None:
+    """Make immutable external snapshots Space-scoped.
+
+    v8 stored space_id on the snapshot row but its UNIQUE constraint omitted
+    space_id. The same unchanged provider object synced into two Conversation
+    Spaces could therefore alias the first Space's row. Rebuild the beta-only
+    table so provenance membership cannot cross Space boundaries.
+    """
+    conn.execute(
+        """
+        CREATE TABLE conversation_connector_snapshot_v9 (
+            id TEXT PRIMARY KEY,
+            connection_id TEXT NOT NULL REFERENCES conversation_connector_connection(id) ON DELETE CASCADE,
+            space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+            capability TEXT NOT NULL,
+            external_kind TEXT NOT NULL,
+            external_id TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            excerpt TEXT NOT NULL DEFAULT '',
+            content_hash TEXT NOT NULL,
+            source_url TEXT NOT NULL DEFAULT '',
+            occurred_at REAL,
+            visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at REAL NOT NULL,
+            UNIQUE(space_id, connection_id, capability, external_kind, external_id, content_hash)
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO conversation_connector_snapshot_v9 (
+            id, connection_id, space_id, capability, external_kind, external_id,
+            title, excerpt, content_hash, source_url, occurred_at, visibility,
+            metadata_json, created_at
+        )
+        SELECT
+            id, connection_id, space_id, capability, external_kind, external_id,
+            title, excerpt, content_hash, source_url, occurred_at, visibility,
+            metadata_json, created_at
+        FROM conversation_connector_snapshot
+        """
+    )
+    conn.execute("DROP TABLE conversation_connector_snapshot")
+    conn.execute("ALTER TABLE conversation_connector_snapshot_v9 RENAME TO conversation_connector_snapshot")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_conversation_connector_snapshot_space "
+        "ON conversation_connector_snapshot(space_id, created_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_conversation_connector_snapshot_connection "
+        "ON conversation_connector_snapshot(connection_id, occurred_at)"
+    )
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -723,6 +778,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     6: (_apply_v6, "v2.0 temporal provenance for conversation items"),
     7: (lambda conn: _apply_statements(conn, _V7_TABLES + _V7_INDEXES), "v2.0 manual Conversation screen context observations"),
     8: (_apply_v8, "v2.0 external connector snapshots and reviewed execution audit"),
+    9: (_apply_v9, "v2.0 Space-scoped immutable connector snapshot provenance"),
 }
 
 

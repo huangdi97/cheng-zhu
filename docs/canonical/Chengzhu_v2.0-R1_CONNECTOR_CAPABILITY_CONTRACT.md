@@ -270,6 +270,7 @@ https://www.googleapis.com/auth/gmail.send
 - provider 没有可依赖的 server-side idempotency key；审计 header 不是幂等保证；
 - 4xx 明确拒绝可记录 FAILED；timeout / 5xx / 其他不确定传输进入 `UNKNOWN_OUTCOME`，禁止自动重试；
 - 如果外发安全层检测到 secret 并改写 reviewed Draft，Gmail adapter 拒绝发送，要求用户回到 Draft 重新审核；
+- Gmail provider 不会静默截断已审核 Subject/Body；超过 provider v1 安全上限时拒绝执行并要求修改/重新审核；
 - 当前没有真实 Google account/runtime replay，因此不得声明真实邮件已成功发出。
 
 实现说明：

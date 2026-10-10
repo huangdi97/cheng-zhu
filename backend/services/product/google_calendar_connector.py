@@ -19,6 +19,7 @@ No event write/create capability is implemented here.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -60,6 +61,36 @@ Transport = Callable[
     [str, str, dict[str, str], Optional[bytes], float],
     tuple[int, dict[str, str], Any],
 ]
+
+
+def _encode_cursor(calendar_id: str, sync_token: str) -> str:
+    payload = json.dumps(
+        {"v": 1, "calendar_id": calendar_id, "sync_token": sync_token},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return "gcal1." + base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def _decode_cursor(value: str) -> dict[str, str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return {"calendar_id": "", "sync_token": ""}
+    if not raw.startswith("gcal1."):
+        return {"calendar_id": "", "sync_token": ""}
+    encoded = raw.split(".", 1)[1]
+    encoded += "=" * (-len(encoded) % 4)
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(encoded.encode("ascii")).decode("utf-8"))
+    except Exception:
+        return {"calendar_id": "", "sync_token": ""}
+    if not isinstance(payload, dict) or int(payload.get("v") or 0) != 1:
+        return {"calendar_id": "", "sync_token": ""}
+    return {
+        "calendar_id": str(payload.get("calendar_id") or "")[:500],
+        "sync_token": str(payload.get("sync_token") or "")[:4000],
+    }
 
 
 def _timeout_seconds() -> float:
@@ -284,11 +315,13 @@ class GoogleCalendarRestAdapter:
         if capability != "calendar.read":
             raise ValueError("Google Calendar adapter 只支持 calendar.read")
         calendar_id = self._calendar_id(query, connection)
+        decoded_cursor = _decode_cursor(str(cursor or ""))
+        provider_cursor = decoded_cursor["sync_token"] if decoded_cursor["calendar_id"] == calendar_id else ""
         try:
             synced = self._list_events(
                 connection=connection,
                 calendar_id=calendar_id,
-                cursor=str(cursor or ""),
+                cursor=provider_cursor,
                 collect=True,
             )
         except GoogleCalendarFullSyncRequired:
@@ -363,7 +396,7 @@ class GoogleCalendarRestAdapter:
             )
         return {
             "items": snapshots,
-            "next_cursor": str(synced["next_cursor"]),
+            "next_cursor": _encode_cursor(calendar_id, str(synced["next_cursor"])),
             "calendar_id": calendar_id,
             "full_sync_required": False,
         }

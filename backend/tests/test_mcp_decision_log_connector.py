@@ -134,8 +134,9 @@ def test_mcp_endpoint_requires_https_except_loopback(monkeypatch):
             "tool_name": "chengzhu_update_decision_log",
         }),
     )
-    with pytest.raises(ValueError, match="HTTPS"):
-        adapter.health({**_connection(), "credential_ref": "provider:mcp:env:MCP_BAD"})
+    bad = adapter.health({**_connection(), "credential_ref": "provider:mcp:env:MCP_BAD"})
+    assert bad["ok"] is False
+    assert "HTTPS" in bad["error"]
 
     monkeypatch.setenv(
         "MCP_LOCAL",
@@ -161,11 +162,12 @@ def test_mcp_config_rejects_inline_secret(monkeypatch):
             "bearer_token": "do-not-store-here",
         }),
     )
-    with pytest.raises(ValueError, match="不允许内嵌"):
-        adapter.health({
-            **_connection(),
-            "credential_ref": "provider:mcp:env:MCP_INLINE_SECRET",
-        })
+    health = adapter.health({
+        **_connection(),
+        "credential_ref": "provider:mcp:env:MCP_INLINE_SECRET",
+    })
+    assert health["ok"] is False
+    assert "不允许内嵌" in health["error"]
 
 
 def test_mcp_health_discovers_exact_tool_schema_with_modern_headers(mcp_env):
@@ -282,6 +284,7 @@ def test_mcp_rejects_redacted_payload_empty_target_and_silent_truncation(mcp_env
         idempotency_key="b",
     )
     assert no_target["ok"] is False
+    assert no_target["retry_safe"] is False
     assert no_target["phase"] == "MCP_PREFLIGHT_PRE_WRITE"
 
     long_title = adapter.execute(

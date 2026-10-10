@@ -1733,7 +1733,7 @@ test.describe('v2.0 Conversation Profile', () => {
             target: requestBody.target,
             idempotency_key: 'github1234567890',
             status: 'PENDING',
-            request: { title: 'Architecture Review · Issue Draft' },
+            request: { title: 'Architecture Review · Issue Draft', outbound_redaction_applied: true },
             response: {},
             error: '',
             created_at: 8,
@@ -1769,6 +1769,7 @@ test.describe('v2.0 Conversation Profile', () => {
 
     expect(requestBody).toEqual({ connection_id: connection.id, target: 'acme/project' })
     await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Execution Request 中保存并实际发送给 provider 的内容已经脱敏/)).toBeVisible()
     await page.getByRole('button', { name: '执行外部动作' }).click()
     await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
     await expect(page.getByText(/acme\/project#24/)).toBeVisible()

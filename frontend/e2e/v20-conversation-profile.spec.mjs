@@ -1556,6 +1556,225 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('GitHub provider setup keeps PAT outside the UI and syncs an explicit owner/repo', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let syncBody = null
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'GITHUB',
+            label: 'GitHub',
+            capabilities: ['project.read', 'issue.create'],
+            read_capabilities: ['project.read'],
+            write_capabilities: ['issue.create'],
+            external_kinds: ['ISSUE'],
+            provider_scopes: { 'project.read': 'Issues: read', 'issue.create': 'Issues: write' },
+            sync: 'UPDATED_AT_CURSOR_WITH_OVERLAP',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_GITHUB_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:github:env:<ENV_VAR>',
+              read_target: 'owner/repo',
+              write_target: 'owner/repo',
+              secret_storage: 'PROCESS_ENV_ONLY',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') {
+          return { items: connection ? [connection] : [] }
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-github',
+            provider_id: 'GITHUB',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: createBody.granted_capabilities,
+            provider_scopes: ['Issues: read', 'Issues: write'],
+            account_hint: '',
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-github/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', account_hint: 'octocat', updated_at: 2 }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-github/sync' && method === 'POST') {
+          syncBody = request.postDataJSON()
+          return { connection, snapshots: [{
+            id: 'ccs-github-7',
+            connection_id: 'ccn-github',
+            space_id: SPACE.id,
+            capability: 'project.read',
+            external_kind: 'ISSUE',
+            external_id: 'acme/project#7',
+            title: 'Rollback owner unresolved',
+            excerpt: 'Need to confirm the rollback owner.',
+            content_hash: 'sha256:github7',
+            source_url: 'https://github.com/acme/project/issues/7',
+            occurred_at: 2,
+            visibility: 'PRIVATE',
+            metadata: { repository: 'acme/project', number: 7 },
+            created_at: 2,
+          }] }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) {
+          return { items: syncBody ? [{
+            id: 'ccs-github-7',
+            connection_id: 'ccn-github',
+            space_id: SPACE.id,
+            capability: 'project.read',
+            external_kind: 'ISSUE',
+            external_id: 'acme/project#7',
+            title: 'Rollback owner unresolved',
+            excerpt: 'Need to confirm the rollback owner.',
+            content_hash: 'sha256:github7',
+            source_url: 'https://github.com/acme/project/issues/7',
+            occurred_at: 2,
+            visibility: 'PRIVATE',
+            metadata: { repository: 'acme/project', number: 7 },
+            created_at: 2,
+          }] : [] }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('github-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/这里永远不输入 token 本身/)).toBeVisible()
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+    await page.getByLabel('GitHub token 环境变量名').fill('MY_GITHUB_PAT')
+    await page.getByLabel('GitHub 默认仓库').fill('acme/project')
+    await page.getByRole('button', { name: '创建 GitHub 连接元数据' }).click()
+
+    expect(createBody.credential_ref).toBe('provider:github:env:MY_GITHUB_PAT')
+    expect(JSON.stringify(createBody)).not.toContain('github_pat_')
+    expect(createBody.granted_capabilities).toEqual(['project.read', 'issue.create'])
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/octocat/)).toBeVisible()
+    await page.getByLabel('GitHub Sync 仓库 GitHub · acme/project').fill('acme/project')
+    await page.getByRole('button', { name: 'Sync read-only snapshot' }).click()
+
+    expect(syncBody.space_id).toBe(SPACE.id)
+    expect(syncBody.capabilities).toEqual(['project.read'])
+    expect(syncBody.query).toEqual({ repository: 'acme/project' })
+    await expect(page.getByText('Rollback owner unresolved')).toBeVisible()
+    await expect(page.getByText(/ISSUE · project.read/)).toBeVisible()
+  })
+
+
+  test('GitHub Issue execution requires an explicit owner/repo target before second Execute', async ({ context, page }) => {
+    const base = mocks()
+    const connection = {
+      id: 'ccn-github-write',
+      provider_id: 'GITHUB',
+      display_name: 'GitHub · acme/project',
+      status: 'CONNECTED',
+      auth_mode: 'OPAQUE_REFERENCE',
+      granted_capabilities: ['issue.create'],
+      provider_scopes: ['Issues: write'],
+      account_hint: 'octocat',
+      sync_cursor: '',
+      sync_cursors: {},
+      last_sync_at: 7,
+      last_error: '',
+      created_at: 1,
+      updated_at: 7,
+      credential_ref_present: true,
+      adapter_available: true,
+    }
+    let execution = null
+    let requestBody = null
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'GITHUB', label: 'GitHub',
+            capabilities: ['project.read', 'issue.create'],
+            read_capabilities: ['project.read'], write_capabilities: ['issue.create'],
+            external_kinds: ['ISSUE'],
+            provider_scopes: { 'project.read': 'Issues: read', 'issue.create': 'Issues: write' },
+            sync: 'UPDATED_AT_CURSOR_WITH_OVERLAP',
+            setup: { runtime_opt_in_env: 'CHENGZHU_GITHUB_CONNECTOR_ENABLE=1' },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections') return { items: [connection] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          requestBody = request.postDataJSON()
+          execution = {
+            id: 'cce-github',
+            draft_action_id: 'cda-derived',
+            connection_id: connection.id,
+            capability: 'issue.create',
+            operation: 'CREATE_ISSUE',
+            target: requestBody.target,
+            idempotency_key: 'github1234567890',
+            status: 'PENDING',
+            request: { title: 'Architecture Review · Issue Draft' },
+            response: {},
+            error: '',
+            created_at: 8,
+            updated_at: 8,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-github/execute' && method === 'POST') {
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: { ok: true, provider_id: 'GITHUB', external_id: 'acme/project#24', html_url: 'https://github.com/acme/project/issues/24' },
+            updated_at: 9,
+            executed_at: 9,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Issue Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption(connection.id)
+    const target = page.getByLabel('GitHub Issue 目标仓库')
+    await expect(target).toBeVisible()
+    await expect(page.getByRole('button', { name: '创建 Execution Request' })).toBeDisabled()
+    await target.fill('acme/project')
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+
+    expect(requestBody).toEqual({ connection_id: connection.id, target: 'acme/project' })
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/acme\/project#24/)).toBeVisible()
+  })
+
+
   test('approved draft requires Execution Request then a second explicit Execute before SUCCEEDED', async ({ context, page }) => {
     const base = mocks()
     const connection = {

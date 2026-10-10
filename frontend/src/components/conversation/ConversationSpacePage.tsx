@@ -165,6 +165,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   )
   const executionRetrySafe = execution?.status === 'FAILED'
     && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
+  const executionReconciliation = (execution?.response as {
+    reconciliation?: { source?: string; outcome?: string; note?: string; provider_reference?: string; recorded_at?: number }
+  } | undefined)?.reconciliation
   const executionCanExecute = execution?.status === 'PENDING' || executionRetrySafe
 
   const makePreflight = async () => {
@@ -858,7 +861,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       </div>
                       <div className="mt-2 text-[10px] text-text-muted">这两个动作只记录你在 provider 侧的核对结果，不会自动假设或重放外部动作。</div>
                     </div> : null}
-                    {execution.status === 'SUCCEEDED' ? <div className="mt-2"><div className="text-[11px] font-semibold text-status-direct">Provider 已明确返回 ok=true；这条 execution audit 会保留。</div>{Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}</div> : null}
+                    {execution.status === 'SUCCEEDED' ? <div className="mt-2">
+                      <div className="text-[11px] font-semibold text-status-direct">{executionReconciliation?.source === 'USER_REPORTED_PROVIDER_CHECK' ? '你已记录 provider-side reconciliation：确认外部动作已发生。实际执行时间未知；这不是原 adapter 的 ok=true 响应。' : 'Provider adapter 已明确返回 ok=true；这条 execution audit 会保留。'}</div>
+                      {executionReconciliation?.note ? <div className="mt-1 text-[10px] text-text-muted">核对说明 · {executionReconciliation.note}</div> : null}
+                      {Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}
+                    </div> : null}
                   </div>}
                 </> : <p className="mt-2 text-[11px] text-status-inferred">当前没有同时满足 adapter available + CONNECTED + {draftCapability} grant 的账户。本地 APPROVED 草稿会保留，但不会伪装成已发送/已创建。</p>}
               </div> : null}

@@ -455,6 +455,11 @@ def test_google_drive_integration_boundary_stores_immutable_document_and_pack_fr
     assert frozen[0]["id"] == snapshot["id"]
     assert frozen[0]["content_hash"] == snapshot["content_hash"]
     assert started["pack"]["payload"]["connector_runtime"]["grants"][0]["provider_id"] == "GOOGLE_DRIVE"
+    # Start performs one fresh Preflight health probe and freezes that exact
+    # resolved runtime. freeze_pack must not issue a second independent health
+    # check that could diverge from the Preview/fingerprint just confirmed.
+    about_calls = [call for call in transport.calls if "/about" in call["url"]]
+    assert len(about_calls) == 3  # initial Verify + Sync health + Start Preflight health
 
 
 def test_google_drive_sync_folder_target_failure_keeps_verified_connection_connected(product_env, monkeypatch):

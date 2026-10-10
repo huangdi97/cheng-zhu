@@ -86,7 +86,14 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             "project.read": "Issues: read",
             "issue.create": "Issues: write",
         },
-        "sync": "ETAG_OR_CURSOR",
+        "sync": "UPDATED_AT_CURSOR_WITH_OVERLAP",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:github:env:<ENV_VAR>",
+            "read_target": "owner/repo",
+            "write_target": "owner/repo",
+            "secret_storage": "PROCESS_ENV_ONLY",
+        },
     },
     "MCP": {
         "label": "Model Context Protocol",
@@ -202,6 +209,14 @@ def _capabilities(values: list[str] | tuple[str, ...] | set[str]) -> list[str]:
 
 
 def _expected_provider_scopes(provider: str, granted: set[str]) -> list[str]:
+    # GitHub fine-grained repository permissions are one level per permission,
+    # not independent read+write scopes. Issues: write subsumes read.
+    if provider == "GITHUB":
+        if "issue.create" in granted:
+            return ["Issues: write"]
+        if "project.read" in granted:
+            return ["Issues: read"]
+        return []
     scope_map = dict(PROVIDER_CATALOG[provider].get("provider_scopes") or {})
     expected = {
         str(scope_map.get(capability) or "").strip()
@@ -340,6 +355,7 @@ def catalog() -> list[dict[str, Any]]:
             "external_kinds": list(spec["external_kinds"]),
             "provider_scopes": dict(spec["provider_scopes"]),
             "sync": spec["sync"],
+            "setup": dict(spec.get("setup") or {}),
             "adapter_available": provider in _ADAPTERS,
         })
     return rows
@@ -444,8 +460,10 @@ def verify_and_connect(connection_id: str) -> dict[str, Any]:
             "updated_at": store.now(),
         })
         raise ValueError(safe_error)
+    safe_account_hint = _redact_secret_values(str(health.get("account_hint") or row.get("account_hint") or ""))[:300]
     store.update("conversation_connector_connection", connection_id, {
         "status": "CONNECTED",
+        "account_hint": safe_account_hint,
         "last_error": "",
         "updated_at": store.now(),
     })
@@ -562,16 +580,16 @@ def _store_snapshot(
     kind = str(raw.get("external_kind") or "").upper()
     if kind not in set(PROVIDER_CATALOG[connection["provider_id"]]["external_kinds"]):
         raise ValueError(f"{connection['provider_id']} 不能提供 {kind or '空'} snapshot")
-    external_id = str(raw.get("external_id") or raw.get("id") or "").strip()
+    external_id = _redact_secret_values(str(raw.get("external_id") or raw.get("id") or "").strip())[:500]
     if not external_id:
         raise ValueError("Connector snapshot 缺少 external_id")
     canonical_metadata = _sanitize(dict(raw.get("metadata") or {}))
     normalized = {
         "capability": capability,
         "external_kind": kind,
-        "external_id": external_id[:500],
-        "title": str(raw.get("title") or "")[:500],
-        "excerpt": str(raw.get("excerpt") or raw.get("text") or "")[:20_000],
+        "external_id": external_id,
+        "title": _redact_secret_values(str(raw.get("title") or ""))[:500],
+        "excerpt": _redact_secret_values(str(raw.get("excerpt") or raw.get("text") or ""))[:20_000],
         "source_url": _safe_url(str(raw.get("source_url") or "")),
         "occurred_at": raw.get("occurred_at"),
         "visibility": str(raw.get("visibility") or "PRIVATE").upper()[:80],
@@ -581,7 +599,7 @@ def _store_snapshot(
     # control Chengzhu's immutable identity and therefore are not hash inputs.
     content_hash = _snapshot_hash(normalized)
     stored_metadata = dict(canonical_metadata)
-    provider_content_hash = str(raw.get("content_hash") or "").strip()
+    provider_content_hash = _redact_secret_values(str(raw.get("content_hash") or "").strip())
     if provider_content_hash:
         stored_metadata["provider_content_hash"] = provider_content_hash[:500]
     existing = store.rows(
@@ -622,8 +640,26 @@ def sync_connection(
     connection = _require_connection(connection_id)
     provider = str(connection["provider_id"])
     adapter = _ADAPTERS.get(provider)
-    if adapter is None or not _connection_usable(connection):
+    if adapter is None or connection.get("status") != "CONNECTED":
         raise ValueError("Connector 未连接或 adapter 不可用")
+    try:
+        health = _sanitize(dict(adapter.health(connection) or {}))
+    except Exception as exc:
+        safe_error = _redact_secret_values(str(exc))[:2000] or "Connector health check failed"
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": safe_error,
+            "updated_at": store.now(),
+        })
+        raise ValueError(safe_error) from None
+    if not bool(health.get("ok", False)):
+        safe_error = _redact_secret_values(str(health.get("error") or "health check failed"))[:2000]
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": safe_error,
+            "updated_at": store.now(),
+        })
+        raise ValueError(safe_error)
 
     requested = _capabilities(capabilities or list(connection.get("granted_capabilities") or []))
     requested = [cap for cap in requested if cap in conversation_connectors.READ_CAPABILITIES]
@@ -663,8 +699,12 @@ def sync_connection(
         return {"connection": public_connection(_require_connection(connection_id)), "snapshots": snapshots}
     except Exception as exc:
         safe_error = _redact_secret_values(str(exc))[:2000] or "Connector sync failed"
+        # A concrete provider may know that the failure belongs to one target
+        # repository/resource rather than to account authentication itself.
+        # Keep that account CONNECTED while recording the target failure.
+        connection_fatal = bool(getattr(exc, "connection_fatal", True))
         store.update("conversation_connector_connection", connection_id, {
-            "status": "ERROR",
+            "status": "ERROR" if connection_fatal else str(connection.get("status") or "CONNECTED"),
             "last_error": safe_error,
             "updated_at": store.now(),
         })
@@ -770,6 +810,22 @@ def request_execution(
     if existing:
         return existing[0]
 
+    raw_request = {
+        "draft_kind": draft["kind"],
+        "title": draft.get("title") or "",
+        "content": draft.get("content") or "",
+        "payload": draft.get("payload") or {},
+        "source_refs": draft.get("source_refs") or [],
+    }
+    outbound_redaction_applied = _contains_secret_value(
+        json.dumps(raw_request, ensure_ascii=False, sort_keys=True, default=str)
+    )
+    safe_request = _sanitize(raw_request)
+    if isinstance(safe_request, dict):
+        # This key intentionally avoids secret/token naming so the sanitizer
+        # does not remove the audit marker itself.
+        safe_request["outbound_redaction_applied"] = outbound_redaction_applied
+
     ts = store.now()
     row = {
         "id": store.new_id("cce_"),
@@ -780,13 +836,7 @@ def request_execution(
         "target": target_value,
         "idempotency_key": idempotency_key,
         "status": status,
-        "request": _sanitize({
-            "draft_kind": draft["kind"],
-            "title": draft.get("title") or "",
-            "content": draft.get("content") or "",
-            "payload": draft.get("payload") or {},
-            "source_refs": draft.get("source_refs") or [],
-        }),
+        "request": safe_request,
         "response": {},
         "error": error,
         "created_at": ts,

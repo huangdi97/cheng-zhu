@@ -23,7 +23,15 @@ def init_product_layer() -> dict:
 
     store.init_db()
     ensure_builtin_banks()
-    return backfill_from_legacy()
+    backfill = backfill_from_legacy()
+
+    # Real provider adapters remain explicit opt-in.  The GitHub adapter code
+    # can ship without silently creating or connecting any external account.
+    from services.product.github_connector import register_github_adapter_from_env
+    github_connector = register_github_adapter_from_env()
+    if isinstance(backfill, dict):
+        return {**backfill, "github_connector": github_connector}
+    return {"backfill": backfill, "github_connector": github_connector}
 
 
 __all__ = ["router", "init_product_layer"]

@@ -28,6 +28,7 @@ class FakeAdapter:
         self.retry_safe_failure = False
         self.missing_ok = False
         self.execute_calls = 0
+        self.last_execute_payload = None
         self.read_calls = []
         self.items = {
             "calendar.read": [{
@@ -58,6 +59,7 @@ class FakeAdapter:
 
     def execute(self, *, connection, capability, operation, target, payload, idempotency_key):
         self.execute_calls += 1
+        self.last_execute_payload = dict(payload)
         if self.fail_execute:
             raise RuntimeError("transport timed out after provider may have accepted request")
         if self.missing_ok:
@@ -141,7 +143,11 @@ def test_connector_secret_values_are_redacted_even_when_hidden_in_safe_looking_f
     adapter = FakeAdapter({"calendar.read"})
     adapter.items["calendar.read"][0] = {
         **adapter.items["calendar.read"][0],
+        "external_id": "event/github_pat_abcdefghijklmnopqrstuvwxyz123456",
+        "title": "Leaked Bearer abcdefghijklmnopqrstuvwxyz must be redacted",
+        "excerpt": "paste sk-abcdefghijklmnopqrstuvwxyz123456 must never persist",
         "source_url": "https://alice:supersecret@calendar.example/event/1?access_token=ya29.leak#private",
+        "content_hash": "github_pat_abcdefghijklmnopqrstuvwxyz999999",
         "metadata": {
             "safe_note": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
             "nested": {"comment": "token-looking sk-abcdefghijklmnopqrstuvwxyz123456"},
@@ -159,6 +165,10 @@ def test_connector_secret_values_are_redacted_even_when_hidden_in_safe_looking_f
     assert "ya29.leak" not in serialized
     assert "abcdefghijklmnopqrstuvwxyz" not in serialized
     assert "[REDACTED_SECRET]" in serialized
+    assert snapshot["external_id"].startswith("event/")
+    assert snapshot["title"].count("[REDACTED_SECRET]") == 1
+    assert "[REDACTED_SECRET]" in snapshot["excerpt"]
+    assert "[REDACTED_SECRET]" in snapshot["metadata"]["provider_content_hash"]
 
 
 def test_connector_exception_and_reconciliation_evidence_redact_secret_values(product_env):
@@ -484,6 +494,44 @@ def test_selected_snapshot_is_frozen_into_pack_and_manual_ask_keeps_reference_au
     # Already-started session is pinned to the old immutable snapshot.
     assert conversations.ask(session["id"], "10x data scale")["grounded"] is True
     assert conversations.ask(session["id"], "50x data scale")["grounded"] is False
+
+
+
+
+def test_external_execution_redacts_secret_shaped_draft_values_and_surfaces_audit_marker(product_env):
+    adapter = FakeAdapter({"issue.create"})
+    connection = _connected(adapter, ["issue.create"])
+    space = conversations.create_space("Outbound Redaction", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    leaked = "github_pat_abcdefghijklmnopqrstuvwxyz123456"
+    draft = conversations.create_draft_action(
+        session["id"],
+        kind="CREATE_ISSUE_DRAFT",
+        title=f"Rotate {leaked}",
+        content=f"Do not send raw credential: {leaked}",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": f"contains {leaked}"}],
+    )
+    conversations.review_draft_action(draft["id"], "APPROVE")
+
+    request = conversation_integrations.request_execution(
+        draft["id"],
+        connection["id"],
+        target="acme/project",
+    )
+    serialized = str(request["request"])
+    assert leaked not in serialized
+    assert "[REDACTED_SECRET]" in serialized
+    assert request["request"]["outbound_redaction_applied"] is True
+
+    result = conversation_integrations.execute_request(request["id"])
+    assert result["status"] == "SUCCEEDED"
+    assert adapter.last_execute_payload is not None
+    sent = str(adapter.last_execute_payload)
+    assert leaked not in sent
+    assert "[REDACTED_SECRET]" in sent
+    assert adapter.last_execute_payload["outbound_redaction_applied"] is True
 
 
 def test_approved_draft_requires_request_then_second_execute_and_is_idempotent(product_env):

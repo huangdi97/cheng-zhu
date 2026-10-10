@@ -549,9 +549,10 @@ reviewed output evidence
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
 | Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；只回答 capability truth |
 | Local scheduled Conversation reminder | RUNTIME_AVAILABLE_DESKTOP | 只读取 Chengzhu 内手工排期的 UPCOMING Session；用户显式 opt-in；默认提前 10 分钟；通知不泄露 Session/Space 标题；点击进入对应 Space Prepare；不等于 Calendar connector |
-| External Integration Boundary | PR #61 CANDIDATE | schema v9：opaque credential ref、CONNECTED account、Space-scoped immutable snapshot、Chengzhu canonical hash、per-capability sync cursor、exact grant、retention/export、Execution Request / audit、UNKNOWN_OUTCOME reconciliation；默认无 adapter |
-| Calendar / Mail / Docs / project tracker provider | NOT CONFIGURED | external dependency；catalog/contract 已定义，但没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
-| External task/email/issue write-back execution boundary | PR #61 CANDIDATE | reviewed Draft → exact account → Execution Request → second Execute → provider result；并发执行单 side-effect boundary；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；没有真实 adapter/account 时保持 fail-closed |
+| External Integration Boundary | RUNTIME_AVAILABLE | PR #61 已合入 main：schema v9、opaque credential ref、CONNECTED account、Space-scoped immutable snapshot、canonical hash、per-capability cursor、exact grant、retention/export、Execution Request / audit、UNKNOWN_OUTCOME reconciliation |
+| GitHub project tracker / issue provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 首个真实 REST adapter：project.read + issue.create；默认不注册，需 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1；token 仅经 env credential reference 解析；没有真实账户连接/外部 action evidence 前不得宣称 GITHUB_ACCOUNT_CONNECTED |
+| Calendar / Mail / Docs / Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
+| External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub issue.create 已有 opt-in real adapter，其他 provider 仍 fail-closed |
 | Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
@@ -748,7 +749,8 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- real Google / Microsoft / GitHub / MCP adapter + account authorization；
+- real Google / Microsoft / MCP adapter + account authorization；
+- GitHub real-account authorization / real repository replay / real external Issue evidence（adapter code 已存在，真实账户证据仍是 external gate）；
 - external Calendar/meeting discovery；
 - Human Coach real-session evidence；
 - real external action evidence（边界/runtime 可在 repo 内实现；provider success 必须来自真实 adapter/account）；

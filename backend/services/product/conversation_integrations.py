@@ -294,7 +294,10 @@ def register_adapter(adapter: ConnectorAdapter) -> None:
             "Adapter 声明了 provider catalog 不允许的 capability: "
             + ", ".join(sorted(capabilities - supported))
         )
-    health = _sanitize(dict(adapter.health(None) or {}))
+    try:
+        health = _sanitize(dict(adapter.health(None) or {}))
+    except Exception as exc:
+        raise ValueError(_redact_secret_values(str(exc)) or "Connector adapter health check failed") from None
     if not bool(health.get("ok", False)):
         raise ValueError(_redact_secret_values(str(health.get("error") or "Connector adapter health check failed")))
     _ADAPTERS[provider] = adapter
@@ -423,14 +426,24 @@ def verify_and_connect(connection_id: str) -> dict[str, Any]:
     expected_scopes = _expected_provider_scopes(provider, granted)
     if sorted(row.get("provider_scopes") or []) != expected_scopes:
         raise ValueError("Connection provider scope 与最小 capability grant 不一致，拒绝 CONNECTED")
-    health = _sanitize(dict(adapter.health(row) or {}))
-    if not bool(health.get("ok", False)):
+    try:
+        health = _sanitize(dict(adapter.health(row) or {}))
+    except Exception as exc:
+        safe_error = _redact_secret_values(str(exc))[:2000] or "Connector health check failed"
         store.update("conversation_connector_connection", connection_id, {
             "status": "ERROR",
-            "last_error": str(health.get("error") or "health check failed")[:2000],
+            "last_error": safe_error,
             "updated_at": store.now(),
         })
-        raise ValueError(str(health.get("error") or "Connector health check failed"))
+        raise ValueError(safe_error) from None
+    if not bool(health.get("ok", False)):
+        safe_error = _redact_secret_values(str(health.get("error") or "health check failed"))[:2000]
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": safe_error,
+            "updated_at": store.now(),
+        })
+        raise ValueError(safe_error)
     store.update("conversation_connector_connection", connection_id, {
         "status": "CONNECTED",
         "last_error": "",
@@ -649,12 +662,13 @@ def sync_connection(
         })
         return {"connection": public_connection(_require_connection(connection_id)), "snapshots": snapshots}
     except Exception as exc:
+        safe_error = _redact_secret_values(str(exc))[:2000] or "Connector sync failed"
         store.update("conversation_connector_connection", connection_id, {
             "status": "ERROR",
-            "last_error": _redact_secret_values(str(exc))[:2000],
+            "last_error": safe_error,
             "updated_at": store.now(),
         })
-        raise
+        raise ValueError(safe_error) from None
 
 
 def list_snapshots(space_id: str, *, connection_id: str = "", limit: int = 200) -> list[dict[str, Any]]:

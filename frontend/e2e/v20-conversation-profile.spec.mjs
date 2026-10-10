@@ -1715,6 +1715,7 @@ test.describe('v2.0 Conversation Profile', () => {
     let syncBody = null
     let synced = false
     let selectedBody = null
+    let selectedConnectorSnapshotIds = []
     const snapshot = {
       id: 'ccs-drive-doc',
       connection_id: 'ccn-drive',
@@ -1802,7 +1803,13 @@ test.describe('v2.0 Conversation Profile', () => {
         if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: synced ? [snapshot] : [] }
         if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'PATCH') {
           selectedBody = request.postDataJSON()
-          return { ...SPACE, ...selectedBody }
+          selectedConnectorSnapshotIds = [...(selectedBody.selected_connector_snapshot_ids ?? selectedConnectorSnapshotIds)]
+          const current = await base(pathname, 'GET', request)
+          return { ...current, ...selectedBody, selected_connector_snapshot_ids: selectedConnectorSnapshotIds }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'GET') {
+          const current = await base(pathname, method, request)
+          return { ...current, selected_connector_snapshot_ids: selectedConnectorSnapshotIds }
         }
         return base(pathname, method, request)
       },
@@ -1836,6 +1843,7 @@ test.describe('v2.0 Conversation Profile', () => {
 
     const checkbox = page.locator('label').filter({ hasText: 'Architecture Brief' }).locator('input[type="checkbox"]')
     await checkbox.check()
+    await expect(checkbox).toBeChecked()
     expect(selectedBody.selected_connector_snapshot_ids).toContain(snapshot.id)
   })
 

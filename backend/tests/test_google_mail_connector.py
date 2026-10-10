@@ -342,7 +342,7 @@ def test_google_mail_reviewed_two_step_execution_succeeds_without_mail_read(prod
 
     # Request creation re-checks current provider health.
     transport.queue(200, {"sub": "u1", "email": "sender@example.com", "email_verified": True})
-    execution = conversation_integrations.create_execution_request(
+    execution = conversation_integrations.request_execution(
         draft["id"],
         connection["id"],
         target="recipient@example.com",
@@ -389,7 +389,7 @@ def test_google_mail_ambiguous_transport_becomes_unknown_outcome_and_cannot_retr
     conversations.review_draft_action(draft["id"], "APPROVE")
 
     transport.queue(200, {"sub": "u1", "email": "sender@example.com", "email_verified": True})
-    execution = conversation_integrations.create_execution_request(
+    execution = conversation_integrations.request_execution(
         draft["id"], connection["id"], target="recipient@example.com"
     )
     transport.queue(200, {"sub": "u1", "email": "sender@example.com", "email_verified": True})

@@ -1682,12 +1682,32 @@ test.describe('v2.0 Conversation Profile', () => {
         }
         if (pathname === '/api/product/conversation/integrations/executions/cce-ambiguous/execute' && method === 'POST') {
           executeCalls += 1
-          execution = {
+          execution = executeCalls === 1 ? {
             ...execution,
             status: 'UNKNOWN_OUTCOME',
             response: {},
             error: 'transport timed out after provider may have accepted request',
             updated_at: 9,
+          } : {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: { ok: true, external_id: 'replayed-after-confirmed-not-applied' },
+            error: '',
+            updated_at: 11,
+            executed_at: 11,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-ambiguous/reconcile' && method === 'POST') {
+          const body = request.postDataJSON()
+          execution = {
+            ...execution,
+            status: body.outcome === 'CONFIRMED_NOT_APPLIED' ? 'FAILED' : 'SUCCEEDED',
+            response: body.outcome === 'CONFIRMED_NOT_APPLIED'
+              ? { ok: false, retry_safe: true, reconciliation: { outcome: body.outcome, note: body.note } }
+              : { ok: true, reconciliation: { outcome: body.outcome, note: body.note, provider_reference: body.provider_reference } },
+            error: body.outcome === 'CONFIRMED_NOT_APPLIED' ? 'Provider-side reconciliation confirmed the side effect was not applied' : '',
+            updated_at: 10,
           }
           return execution
         }
@@ -1706,6 +1726,17 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByRole('button', { name: '执行外部动作' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '安全重试外部动作' })).toHaveCount(0)
     expect(executeCalls).toBe(1)
+
+    page.once('dialog', async (dialog) => {
+      expect(dialog.type()).toBe('prompt')
+      await dialog.accept('Checked provider activity log: no external action exists.')
+    })
+    await page.getByRole('button', { name: '已核对：未执行，可安全重试' }).click()
+    await expect(page.getByText('FAILED', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '安全重试外部动作' })).toBeVisible()
+    await page.getByRole('button', { name: '安全重试外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    expect(executeCalls).toBe(2)
   })
 
 

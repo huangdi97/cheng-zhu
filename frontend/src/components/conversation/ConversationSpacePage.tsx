@@ -163,6 +163,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       && connection.adapter_available
       && connection.granted_capabilities.includes(draftCapability),
   )
+  const executionRetrySafe = execution?.status === 'FAILED'
+    && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
+  const executionCanExecute = execution?.status === 'PENDING' || executionRetrySafe
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -463,7 +466,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   }
 
   const executeExternal = async () => {
-    if (!execution || !['PENDING', 'FAILED'].includes(execution.status)) return
+    if (!execution || !executionCanExecute) return
     setIntegrationBusy(true); setSessionError('')
     try { setExecution(await conversationApi.executeExternalRequest(execution.id)) }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
@@ -824,14 +827,16 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     {compatibleExecutionConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.display_name} · {connection.provider_id} · {connection.account_hint || connection.id.slice(0, 8)}</option>)}
                   </select>
                   {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : execution.status === 'FAILED' || execution.status === 'BLOCKED' ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
-                    {['PENDING', 'FAILED'].includes(execution.status) ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>执行外部动作</PrimaryButton></div> : null}
-                    {execution.status === 'SUCCEEDED' ? <div className="mt-2"><div className="text-[11px] font-semibold text-status-direct">Provider 已返回成功；这条 execution audit 会保留。</div>{Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}</div> : null}
+                    {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
+                    {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
+                    {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div> : null}
+                    {execution.status === 'SUCCEEDED' ? <div className="mt-2"><div className="text-[11px] font-semibold text-status-direct">Provider 已明确返回 ok=true；这条 execution audit 会保留。</div>{Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}</div> : null}
                   </div>}
                 </> : <p className="mt-2 text-[11px] text-status-inferred">当前没有同时满足 adapter available + CONNECTED + {draftCapability} grant 的账户。本地 APPROVED 草稿会保留，但不会伪装成已发送/已创建。</p>}
               </div> : null}
-              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。只有第二次 Execute 后 provider 明确返回成功才是 SUCCEEDED。</p>
+              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。只有 provider 明确返回 ok=true 才是 SUCCEEDED；网络异常/超时/缺少明确结果进入 UNKNOWN_OUTCOME，必须先人工核对，不能直接重试。</p>
             </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}

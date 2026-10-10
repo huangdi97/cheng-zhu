@@ -8,7 +8,7 @@ from services.storage import product as store
 
 
 def test_product_db_schema_is_versioned_and_idempotent(product_env):
-    assert store.schema_version() == 8
+    assert store.schema_version() == 9
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()

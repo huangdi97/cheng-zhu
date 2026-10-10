@@ -1,6 +1,9 @@
 """v2.0 external integration boundary: fail-closed accounts, frozen sources and audited execution."""
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 
 from services.product import conversation_integrations, conversations
@@ -431,6 +434,119 @@ def test_execution_without_write_grant_blocks_and_ambiguous_transport_failure_is
     with pytest.raises(ValueError, match="outcome 不确定"):
         conversation_integrations.execute_request(request["id"])
     assert ambiguous.execute_calls == 1
+
+
+
+
+def test_unknown_outcome_requires_explicit_provider_side_reconciliation(product_env):
+    adapter = FakeAdapter({"email.send"})
+    adapter.fail_execute = True
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Reconcile", "CLIENT_CALL")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    def approved(title):
+        draft = conversations.create_draft_action(
+            session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title=title, content="body",
+        )
+        conversations.review_draft_action(draft["id"], "APPROVE")
+        return draft
+
+    succeeded_draft = approved("Ambiguous but applied")
+    succeeded_request = conversation_integrations.request_execution(succeeded_draft["id"], connection["id"])
+    unknown = conversation_integrations.execute_request(succeeded_request["id"])
+    assert unknown["status"] == "UNKNOWN_OUTCOME"
+
+    with pytest.raises(ValueError, match="核对说明"):
+        conversation_integrations.reconcile_unknown_outcome(
+            unknown["id"], "CONFIRMED_SUCCEEDED", note="",
+        )
+
+    reconciled = conversation_integrations.reconcile_unknown_outcome(
+        unknown["id"],
+        "CONFIRMED_SUCCEEDED",
+        note="Checked provider sent-items; message exists.",
+        provider_reference="provider-message-123",
+    )
+    assert reconciled["status"] == "SUCCEEDED"
+    assert reconciled["response"]["ok"] is True
+    assert reconciled["response"]["reconciliation"]["source"] == "USER_REPORTED_PROVIDER_CHECK"
+    assert reconciled["response"]["reconciliation"]["provider_reference"] == "provider-message-123"
+    calls = adapter.execute_calls
+    assert conversation_integrations.execute_request(reconciled["id"])["status"] == "SUCCEEDED"
+    assert adapter.execute_calls == calls
+
+    retry_draft = approved("Ambiguous but not applied")
+    retry_request = conversation_integrations.request_execution(retry_draft["id"], connection["id"])
+    unknown_retry = conversation_integrations.execute_request(retry_request["id"])
+    assert unknown_retry["status"] == "UNKNOWN_OUTCOME"
+
+    reconciled_retry = conversation_integrations.reconcile_unknown_outcome(
+        unknown_retry["id"],
+        "CONFIRMED_NOT_APPLIED",
+        note="Checked provider activity log; no message/action was created.",
+    )
+    assert reconciled_retry["status"] == "FAILED"
+    assert reconciled_retry["response"]["retry_safe"] is True
+    assert reconciled_retry["response"]["reconciliation"]["outcome"] == "CONFIRMED_NOT_APPLIED"
+
+    adapter.fail_execute = False
+    retried = conversation_integrations.execute_request(reconciled_retry["id"])
+    assert retried["status"] == "SUCCEEDED"
+
+    with pytest.raises(ValueError, match="只有 UNKNOWN_OUTCOME"):
+        conversation_integrations.reconcile_unknown_outcome(
+            retried["id"], "CONFIRMED_SUCCEEDED", note="duplicate reconciliation",
+        )
+
+
+def test_external_execution_is_serialized_so_double_execute_calls_provider_once(product_env):
+    adapter = FakeAdapter({"email.send"})
+    entered = threading.Event()
+    release = threading.Event()
+
+    def slow_execute(**kwargs):
+        adapter.execute_calls += 1
+        entered.set()
+        assert release.wait(timeout=2), "test must release provider execution"
+        return {"ok": True, "external_id": "only-once"}
+
+    adapter.execute = slow_execute
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Concurrent Execute", "CLIENT_CALL")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    draft = conversations.create_draft_action(
+        session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="Follow-up", content="body",
+    )
+    conversations.review_draft_action(draft["id"], "APPROVE")
+    request = conversation_integrations.request_execution(draft["id"], connection["id"])
+
+    results = []
+    errors = []
+
+    def run():
+        try:
+            results.append(conversation_integrations.execute_request(request["id"]))
+        except Exception as exc:
+            errors.append(exc)
+
+    first = threading.Thread(target=run)
+    second = threading.Thread(target=run)
+    first.start()
+    assert entered.wait(timeout=1)
+    second.start()
+    time.sleep(0.05)
+    assert second.is_alive(), "second execute should wait behind the side-effect boundary"
+    release.set()
+    first.join(timeout=2)
+    second.join(timeout=2)
+
+    assert not errors
+    assert len(results) == 2
+    assert all(row["status"] == "SUCCEEDED" for row in results)
+    assert adapter.execute_calls == 1
 
 
 def test_external_execution_requires_explicit_ok_and_only_retry_safe_failure_can_retry(product_env):

@@ -47,6 +47,37 @@ def _connection(ref="provider:github:env:CHENGZHU_GITHUB_TOKEN"):
     }
 
 
+
+
+def test_github_adapter_requires_https_api_base():
+    with pytest.raises(ValueError, match="HTTPS"):
+        GitHubRestAdapter(api_base="http://api.github.test", transport=FakeTransport())
+
+
+def test_github_scope_model_collapses_read_plus_write_to_issues_write(product_env):
+    read_only = conversation_integrations.create_connection(
+        "GITHUB",
+        granted_capabilities=["project.read"],
+        credential_ref="provider:github:env:CHENGZHU_GITHUB_TOKEN",
+    )
+    assert read_only["provider_scopes"] == ["Issues: read"]
+
+    read_write = conversation_integrations.create_connection(
+        "GITHUB",
+        granted_capabilities=["project.read", "issue.create"],
+        credential_ref="provider:github:env:CHENGZHU_GITHUB_TOKEN",
+    )
+    assert read_write["provider_scopes"] == ["Issues: write"]
+
+    with pytest.raises(ValueError, match="最小权限集合"):
+        conversation_integrations.create_connection(
+            "GITHUB",
+            granted_capabilities=["project.read", "issue.create"],
+            provider_scopes=["Issues: read", "Issues: write"],
+            credential_ref="provider:github:env:CHENGZHU_GITHUB_TOKEN",
+        )
+
+
 def test_github_adapter_health_uses_external_env_credential(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GITHUB_TOKEN", "github_pat_test_only_secret")
     transport = FakeTransport()
@@ -127,6 +158,66 @@ def test_github_project_read_filters_pull_requests_and_returns_overlap_cursor(mo
     assert parsed.path == "/repos/acme/project/issues"
     assert params["since"] == ["2026-10-09T00:00:00Z"]
     assert params["labels"] == ["risk"]
+
+
+
+
+def test_github_target_sync_failure_does_not_invalidate_authenticated_account(product_env, monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GITHUB_TOKEN", "github_pat_test_only_secret")
+    transport = FakeTransport()
+    adapter = GitHubRestAdapter(transport=transport)
+    conversation_integrations.register_adapter(adapter)
+
+    transport.queue(200, {"login": "octocat", "id": 42})
+    connection = conversation_integrations.create_connection(
+        "GITHUB",
+        granted_capabilities=["project.read"],
+        credential_ref="provider:github:env:CHENGZHU_GITHUB_TOKEN",
+    )
+    connected = conversation_integrations.verify_and_connect(connection["id"])
+    assert connected["status"] == "CONNECTED"
+
+    space = conversations.create_space("Target Error", "PROJECT_SYNC")
+    transport.queue(404, GitHubProviderError(404, "GitHub HTTP 404: Not Found"))
+    with pytest.raises(ValueError, match="404"):
+        conversation_integrations.sync_connection(
+            connection["id"],
+            space["id"],
+            capabilities=["project.read"],
+            query={"repository": "missing/repo"},
+        )
+
+    after = next(row for row in conversation_integrations.list_connections() if row["id"] == connection["id"])
+    assert after["status"] == "CONNECTED"
+    assert "404" in after["last_error"]
+
+
+def test_github_auth_failure_during_sync_marks_connection_error(product_env, monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GITHUB_TOKEN", "github_pat_test_only_secret")
+    transport = FakeTransport()
+    adapter = GitHubRestAdapter(transport=transport)
+    conversation_integrations.register_adapter(adapter)
+
+    transport.queue(200, {"login": "octocat", "id": 42})
+    connection = conversation_integrations.create_connection(
+        "GITHUB",
+        granted_capabilities=["project.read"],
+        credential_ref="provider:github:env:CHENGZHU_GITHUB_TOKEN",
+    )
+    conversation_integrations.verify_and_connect(connection["id"])
+
+    space = conversations.create_space("Auth Error", "PROJECT_SYNC")
+    transport.queue(401, GitHubProviderError(401, "GitHub HTTP 401: Bad credentials"))
+    with pytest.raises(ValueError, match="401"):
+        conversation_integrations.sync_connection(
+            connection["id"],
+            space["id"],
+            capabilities=["project.read"],
+            query={"repository": "acme/project"},
+        )
+
+    after = next(row for row in conversation_integrations.list_connections() if row["id"] == connection["id"])
+    assert after["status"] == "ERROR"
 
 
 def test_github_issue_create_returns_explicit_provider_success(monkeypatch):

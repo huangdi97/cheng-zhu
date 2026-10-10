@@ -307,7 +307,11 @@ PENDING
 → second explicit Execute
 
 provider explicitly returns ok=true
-→ SUCCEEDED
+→ SUCCEEDED / source = DIRECT_PROVIDER_RESPONSE
+
+UNKNOWN_OUTCOME + user records provider-side reconciliation CONFIRMED_SUCCEEDED
+→ SUCCEEDED / source = USER_REPORTED_PROVIDER_CHECK
+→ executed_at stays unknown; reconciliation.recorded_at is only the audit time
 
 provider explicitly returns ok=false
 → FAILED

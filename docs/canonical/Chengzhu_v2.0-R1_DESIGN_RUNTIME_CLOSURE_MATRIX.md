@@ -1,9 +1,11 @@
 # Chengzhu v2.0-R1 Design → Runtime Closure Matrix
 
-> 日期：2026-10-08  
-> v2 closure：PR #19（已合并）  
-> post-merge semantics：已进入 main  
-> final pure-repo audit：`feat/chengzhu-v2-final-design-audit`  
+> 初始矩阵：2026-10-08  
+> Truth Sync：2026-10-10  
+> 历史 v2 closure：PR #19（已合并）  
+> 当前 pure-repo closure baseline：`main@383978fa480aac35d214dce3fa4e9fa5ebb17118`  
+> 当前 baseline CI：run `37901753321` = PASS  
+> 公开 beta：`v2.0.0-beta.2 @ cac605edf413ec248babf02ea9f73da708d156f8`  
 > Canonical：`Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md`  
 > 目标：证明“设计完成”对应真实 runtime / UI / tests / evidence，而不是只有文档、字段、数据库表或 mock。
 
@@ -664,12 +666,20 @@ PR #19 的 CI 必须同时通过：
 - shared Interview regressions；
 - ci-gate。
 
-代码闭环 checkpoint：
+历史 PR #19 代码闭环 checkpoint：
 
 ```text
-CODE_CLOSURE_HEAD = 873e92f98e357f49358fd6b04a4c440ec43f6750
-CODE_CLOSURE_CI_RUN = 37571903716
-CODE_CLOSURE_CI_GATE = PASS
+PR19_CODE_CLOSURE_HEAD = 873e92f98e357f49358fd6b04a4c440ec43f6750
+PR19_CODE_CLOSURE_CI_RUN = 37571903716
+PR19_CODE_CLOSURE_CI_GATE = PASS
+```
+
+当前 pure-repo closure baseline：
+
+```text
+CURRENT_MAIN_CLOSURE_HEAD = 383978fa480aac35d214dce3fa4e9fa5ebb17118
+CURRENT_MAIN_CI_RUN = 37901753321
+CURRENT_MAIN_CI_GATE = PASS
 ```
 
 该 run 已通过：
@@ -687,7 +697,7 @@ CODE_CLOSURE_CI_GATE = PASS
 
 PR #19 已合并到 main。post-merge 对象闭环由 PR #24 承接；PR #24 只包含 Open Thread Resolve / derived Conversation State / Expression Plan truth-boundary 及其测试/文档增量。它必须以自己的 final-head CI 作为合并证据。
 
-PR #19 之后，main 已继续补齐：
+PR #19 之后，main 已继续补齐并在当前 pure-repo baseline 前完成：
 
 - Conversation Beta packaged smoke；
 - Windows packaged Conversation UI evidence；
@@ -695,13 +705,22 @@ PR #19 之后，main 已继续补齐：
 - clean-install / installed-layout release gate；
 - human-label evaluation tooling；
 - schema v7 Manual Screen Context；
-- long-lived Open Thread provenance correctness。
+- long-lived Open Thread provenance correctness；
+- frozen Profile Playbooks；
+- auditable Expression Plan；
+- explicit-start AUTO Screen Context；
+- desktop Share Privacy；
+- Conversation Human Coach；
+- connector capability registry；
+- stable promotion evidence evaluator；
+- privacy-safe local Conversation reminders。
 
 因此当前发布层允许升级为：
 
 ```text
 V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
-V2_BETA_PRERELEASE_CANDIDATE = TRUE
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
+PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
@@ -766,9 +785,9 @@ stable packaged/release/security/public-truth review 仍是独立门禁。
 
 ---
 
-# 18. 本 PR 的闭环定义
+# 18. Closure Acceptance Definition
 
-PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
+历史 PR #19 完成第一轮 **v2 Design/Runtime Closure**；当前仓库只允许继续沿用该结论，因为后续 main 的 pure-repo closure baseline 同样满足以下条件：
 
 - canonical 与 runtime truth 一致；
 - 本矩阵每个 `RUNTIME_AVAILABLE` 项都有代码/测试证据；
@@ -780,3 +799,15 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - CI 全绿。
 
 这之后的下一阶段已经从“是否有 packaged evidence”推进为 **Conversation Beta public prerelease / dogfood / real-user evidence**。packaged evidence 与 human-eval tooling 已进入 main；剩余成熟度只能由公开 prerelease provenance、真实 dogfood 和真实用户研究继续推进，不能继续靠文档把状态写高。
+
+当前矩阵最终冻结：
+
+```text
+PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
+CURRENT_MAIN_CLOSURE_HEAD = 383978fa480aac35d214dce3fa4e9fa5ebb17118
+CURRENT_MAIN_CI_GATE = PASS
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

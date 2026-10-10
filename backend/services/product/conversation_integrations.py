@@ -819,6 +819,26 @@ def _recover_orphaned_executions() -> int:
         return recovered
 
 
+def _retry_history_for(row: dict[str, Any]) -> list[dict[str, Any]]:
+    if row.get("status") != "FAILED":
+        return []
+    previous = dict(row.get("response") or {})
+    history = list(previous.pop("retry_history", []) or [])
+    history.append({
+        "status": "FAILED",
+        "response": previous,
+        "error": str(row.get("error") or "")[:4000],
+        "recorded_at": row.get("updated_at"),
+    })
+    return history[-20:]
+
+
+def _with_retry_history(response: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, Any]:
+    if not history:
+        return response
+    return {**response, "retry_history": history}
+
+
 def execute_request(execution_id: str) -> dict[str, Any]:
     # Keep the state claim, final capability check, provider side effect and
     # persisted outcome in one ordering boundary. Revoke/disconnect uses the
@@ -848,6 +868,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
                 raise ValueError("上次 provider 明确失败但未声明 retry_safe；禁止直接重试")
         elif row["status"] != "PENDING":
             raise ValueError("External execution request 当前状态不能执行")
+        retry_history = _retry_history_for(row)
 
         draft = store.get("conversation_draft_action", row["draft_action_id"])
         if not draft or draft.get("status") != "APPROVED":
@@ -889,7 +910,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             except Exception as exc:
                 store.update("conversation_connector_execution", execution_id, {
                     "status": "UNKNOWN_OUTCOME",
-                    "response": {},
+                    "response": _with_retry_history({}, retry_history),
                     "error": _redact_secret_values(str(exc))[:4000],
                     "updated_at": store.now(),
                 })
@@ -898,7 +919,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             if not isinstance(result.get("ok"), bool):
                 store.update("conversation_connector_execution", execution_id, {
                     "status": "UNKNOWN_OUTCOME",
-                    "response": result,
+                    "response": _with_retry_history(result, retry_history),
                     "error": "Provider 未返回显式 boolean ok；无法确认外部副作用是否发生",
                     "updated_at": store.now(),
                 })
@@ -907,7 +928,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             if result["ok"] is False:
                 store.update("conversation_connector_execution", execution_id, {
                     "status": "FAILED",
-                    "response": result,
+                    "response": _with_retry_history(result, retry_history),
                     "error": str(result.get("error") or "Provider 明确返回失败")[:4000],
                     "updated_at": store.now(),
                 })
@@ -915,7 +936,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
 
             store.update("conversation_connector_execution", execution_id, {
                 "status": "SUCCEEDED",
-                "response": result,
+                "response": _with_retry_history(result, retry_history),
                 "error": "",
                 "updated_at": store.now(),
                 "executed_at": store.now(),

@@ -580,16 +580,16 @@ def _store_snapshot(
     kind = str(raw.get("external_kind") or "").upper()
     if kind not in set(PROVIDER_CATALOG[connection["provider_id"]]["external_kinds"]):
         raise ValueError(f"{connection['provider_id']} 不能提供 {kind or '空'} snapshot")
-    external_id = str(raw.get("external_id") or raw.get("id") or "").strip()
+    external_id = _redact_secret_values(str(raw.get("external_id") or raw.get("id") or "").strip())[:500]
     if not external_id:
         raise ValueError("Connector snapshot 缺少 external_id")
     canonical_metadata = _sanitize(dict(raw.get("metadata") or {}))
     normalized = {
         "capability": capability,
         "external_kind": kind,
-        "external_id": external_id[:500],
-        "title": str(raw.get("title") or "")[:500],
-        "excerpt": str(raw.get("excerpt") or raw.get("text") or "")[:20_000],
+        "external_id": external_id,
+        "title": _redact_secret_values(str(raw.get("title") or ""))[:500],
+        "excerpt": _redact_secret_values(str(raw.get("excerpt") or raw.get("text") or ""))[:20_000],
         "source_url": _safe_url(str(raw.get("source_url") or "")),
         "occurred_at": raw.get("occurred_at"),
         "visibility": str(raw.get("visibility") or "PRIVATE").upper()[:80],
@@ -599,7 +599,7 @@ def _store_snapshot(
     # control Chengzhu's immutable identity and therefore are not hash inputs.
     content_hash = _snapshot_hash(normalized)
     stored_metadata = dict(canonical_metadata)
-    provider_content_hash = str(raw.get("content_hash") or "").strip()
+    provider_content_hash = _redact_secret_values(str(raw.get("content_hash") or "").strip())
     if provider_content_hash:
         stored_metadata["provider_content_hash"] = provider_content_hash[:500]
     existing = store.rows(

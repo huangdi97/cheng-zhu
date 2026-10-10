@@ -301,6 +301,28 @@ def test_full_refresh_refuses_partial_snapshot_set(monkeypatch):
         )
 
 
+def test_target_lookup_failure_is_safe_failed_before_write(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN", "ms-secret-token")
+    transport = FakeTransport()
+    transport.queue(404, MicrosoftTodoProviderError(404, "Microsoft Graph HTTP 404: list not found"))
+    adapter = MicrosoftTodoGraphAdapter(transport=transport)
+
+    result = adapter.execute(
+        connection=_connection(),
+        capability="task.create",
+        operation="CREATE_TASK",
+        target="missing-list",
+        payload={"title": "Task", "content": "Body"},
+        idempotency_key="x",
+    )
+    assert result["ok"] is False
+    assert result["retry_safe"] is True
+    assert result["stage"] == "TARGET_RESOLUTION"
+    assert result["http_status"] == 404
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["method"] == "GET"
+
+
 def test_create_task_uses_reviewed_title_body_without_silent_truncation(monkeypatch):
     monkeypatch.setenv("CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN", "ms-secret-token")
     transport = FakeTransport()

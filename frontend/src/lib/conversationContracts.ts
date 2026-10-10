@@ -417,6 +417,7 @@ export interface ConversationConnectorCatalogItem {
   sync: string
   setup: Record<string, string>
   adapter_available: boolean
+  adapter_capabilities: string[]
 }
 
 export interface ConversationConnectorConnection {

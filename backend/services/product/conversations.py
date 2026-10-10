@@ -553,6 +553,8 @@ def create_space(
     title = str(title or "").strip()
     if not title:
         raise ValueError("对话空间名称不能为空")
+    if selected_connector_snapshot_ids:
+        raise ValueError("新建 Space 不能直接引用既有 Connector Snapshot；请先创建 Space、同步连接器，再显式选择属于该 Space 的 snapshot")
     profile = str(profile or "").upper()
     if profile not in SPACE_PROFILES:
         raise ValueError(f"对话模板不支持：{profile}")
@@ -654,6 +656,11 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         clean["status"] = str(clean["status"]).upper()
         if clean["status"] not in {"ACTIVE", "ARCHIVED"}:
             raise ValueError("对话空间状态不支持")
+    if "selected_connector_snapshot_ids" in clean:
+        clean["selected_connector_snapshot_ids"] = conversation_integrations.validate_snapshot_selection(
+            space_id,
+            list(clean.get("selected_connector_snapshot_ids") or []),
+        )
     if "retention_policy" in clean:
         raw_policy = clean["retention_policy"] if isinstance(clean["retention_policy"], dict) else {}
         preset = str(raw_policy.get("preset") or "CUSTOM").upper()

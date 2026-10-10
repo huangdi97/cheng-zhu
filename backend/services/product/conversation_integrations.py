@@ -28,7 +28,7 @@ from services.storage import product as store
 
 
 CONNECTION_STATUSES = {"DISCONNECTED", "CONNECTED", "ERROR", "REVOKED"}
-EXECUTION_STATUSES = {"PENDING", "EXECUTING", "SUCCEEDED", "FAILED", "BLOCKED", "CANCELLED"}
+EXECUTION_STATUSES = {"PENDING", "EXECUTING", "SUCCEEDED", "FAILED", "UNKNOWN_OUTCOME", "BLOCKED", "CANCELLED"}
 
 # Product capabilities are the canonical names from conversation_connectors.
 PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
@@ -135,7 +135,19 @@ class ConnectorAdapter(Protocol):
         payload: dict[str, Any],
         idempotency_key: str,
     ) -> dict[str, Any]:
-        """Execute one already-reviewed action and return provider metadata."""
+        """Execute one already-reviewed action.
+
+        The adapter MUST return an explicit outcome envelope:
+          {"ok": True, ...provider metadata...}
+        or:
+          {"ok": False, "error": "...", "retry_safe": bool, ...}
+
+        Raising, timing out, or returning no explicit boolean `ok` is an
+        ambiguous external outcome. Chengzhu records UNKNOWN_OUTCOME and MUST
+        NOT retry it automatically because the provider may already have
+        applied the side effect. The supplied idempotency_key is only a safety
+        primitive when the concrete provider actually enforces it.
+        """
 
 
 _ADAPTERS: dict[str, ConnectorAdapter] = {}
@@ -697,7 +709,15 @@ def execute_request(execution_id: str) -> dict[str, Any]:
         return row
     if row["status"] == "BLOCKED":
         raise ValueError(row.get("error") or "External execution request 已阻断")
-    if row["status"] not in {"PENDING", "FAILED"}:
+    if row["status"] == "UNKNOWN_OUTCOME":
+        raise ValueError(
+            "External execution outcome 不确定；必须先在 provider 侧核对，禁止直接重试"
+        )
+    if row["status"] == "FAILED":
+        prior_response = dict(row.get("response") or {})
+        if prior_response.get("retry_safe") is not True:
+            raise ValueError("上次 provider 明确失败但未声明 retry_safe；禁止直接重试")
+    elif row["status"] != "PENDING":
         raise ValueError("External execution request 当前状态不能执行")
 
     draft = store.get("conversation_draft_action", row["draft_action_id"])
@@ -726,21 +746,48 @@ def execute_request(execution_id: str) -> dict[str, Any]:
         "updated_at": store.now(),
     })
     try:
-        result = _sanitize(dict(adapter.execute(
+        raw_result = adapter.execute(
             connection=connection,
             capability=capability,
             operation=str(row.get("operation") or ""),
             target=str(row.get("target") or ""),
             payload=dict(row.get("request") or {}),
             idempotency_key=str(row.get("idempotency_key") or ""),
-        ) or {}))
+        )
+        result = _sanitize(dict(raw_result or {}))
     except Exception as exc:
+        # The provider may have applied the side effect before the response was
+        # lost. Treat transport/runtime exceptions as ambiguous rather than a
+        # retryable failure.
         store.update("conversation_connector_execution", execution_id, {
-            "status": "FAILED",
+            "status": "UNKNOWN_OUTCOME",
+            "response": {},
             "error": str(exc)[:4000],
             "updated_at": store.now(),
         })
         return store.get("conversation_connector_execution", execution_id) or row
+
+    if not isinstance(result.get("ok"), bool):
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "UNKNOWN_OUTCOME",
+            "response": result,
+            "error": "Provider 未返回显式 boolean ok；无法确认外部副作用是否发生",
+            "updated_at": store.now(),
+        })
+        return store.get("conversation_connector_execution", execution_id) or row
+
+    if result["ok"] is False:
+        retry_safe = result.get("retry_safe") is True
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "FAILED",
+            "response": result,
+            "error": str(result.get("error") or "Provider 明确返回失败")[:4000],
+            "updated_at": store.now(),
+        })
+        failed = store.get("conversation_connector_execution", execution_id) or row
+        if retry_safe:
+            return failed
+        return failed
 
     store.update("conversation_connector_execution", execution_id, {
         "status": "SUCCEEDED",
@@ -778,7 +825,10 @@ def diagnostics() -> dict[str, Any]:
         "registered_adapters": sorted(_ADAPTERS),
         "snapshot_count": int(store.scalar("SELECT COUNT(*) FROM conversation_connector_snapshot") or 0),
         "execution_count": int(store.scalar("SELECT COUNT(*) FROM conversation_connector_execution") or 0),
-        "external_execution": "REVIEW_AND_SECOND_EXPLICIT_EXECUTE",
+        "external_execution": "REVIEW_SECOND_EXECUTE_WITH_AMBIGUOUS_OUTCOME_GUARD",
+        "unknown_outcome_count": int(store.scalar(
+            "SELECT COUNT(*) FROM conversation_connector_execution WHERE status = 'UNKNOWN_OUTCOME'"
+        ) or 0),
         "secret_storage": "OPAQUE_REFERENCE_ONLY",
         "default": "NO_PROVIDER_ADAPTERS_CONFIGURED",
     }

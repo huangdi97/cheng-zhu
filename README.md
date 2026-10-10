@@ -56,12 +56,13 @@ v2 方向已经正式收敛为 **Personal Conversation Intelligence**：一个 C
 
 ### Conversation External Context · 当前 provider truth
 
-Conversation Beta 已有两个 concrete opt-in provider：
+Conversation Beta 已有三个 concrete opt-in provider：
 
 - **GitHub**：`project.read` + reviewed `issue.create`；
-- **Google Calendar**：只读 `calendar.read`，支持 native sync token、immutable event snapshots，以及用户显式把 future event 导入为 Space 的 UPCOMING Session。
+- **Google Calendar**：只读 `calendar.read`，支持 native sync token、immutable event snapshots，以及用户显式把 future event 导入为 Space 的 UPCOMING Session；
+- **Google Drive / Docs**：只读 `docs.read`，显式 folder full refresh → immutable DOCUMENT snapshots；Docs / Slides 文本导出，Sheets 明确标 first-sheet CSV partial，二进制只保存 metadata。
 
-两者默认都不自动连接账户；credential 只保存 opaque env reference。Google Calendar 当前**没有 event.write，也没有仓库内真实 Google account evidence**。详见 [Google Calendar Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md) 与 [Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)。
+三个 provider 默认都不自动连接账户；credential 只保存 opaque env reference。Google Calendar 没有 event.write，Google Drive 没有任何 write capability；两者目前都没有仓库内真实 Google account/runtime replay evidence。详见 [Google Calendar Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md)、[Google Drive Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md) 与 [Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)。
 
 ## 为什么值得试
 
@@ -147,7 +148,8 @@ Conversation Home
 - beta.2 public prerelease 已包含 frozen Profile Playbooks、auditable Expression Plan、explicit-start AUTO Screen Context、verified desktop Share Privacy 与 Conversation Human Coach；release tag 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`，且 Stable Latest 仍为 v1.4.2；
 - GitHub project tracker / issue provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GITHUB_CONNECTOR_ENABLE=1` + opaque env credential ref；`project.read` 可 Sync immutable issue snapshots，reviewed `CREATE_ISSUE_DRAFT` 可进入两阶段 `issue.create`；没有真实账号/runtime replay 前不得宣称已连接或已创建真实 Issue；
 - Google Calendar provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1` + opaque env credential ref；native sync token / immutable snapshots / explicit Next Session import 已实现；历史 revision 仅审计、上游改期/取消显式显示 drift；没有真实 Google account/runtime replay 前不得宣称已连接；
-- Gmail / Drive / Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
+- Google Drive / Docs provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1` + opaque env credential ref；显式 folder full refresh、immutable DOCUMENT snapshots、content availability / partial-content truth 已实现；没有真实 Google account/runtime replay 前不得宣称已连接；
+- Gmail / Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
 - external email/task/decision-log provider execution 仍无真实 provider；GitHub issue.create 是当前唯一真实 provider write adapter；
 - v2 packaged stable release；
 - real-user / PMF evidence。
@@ -160,6 +162,8 @@ Conversation Home
 - [v2.0.0-beta.2 Public Prerelease Provenance](docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md)
 - [v2 Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)
 - [GitHub Conversation Connector](docs/architecture/GITHUB_CONVERSATION_CONNECTOR.md)
+- [Google Calendar Conversation Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md)
+- [Google Drive Conversation Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
 - [v2 Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)
 
 ### 当前 Live 层级

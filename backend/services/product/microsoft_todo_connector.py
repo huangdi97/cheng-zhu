@@ -287,18 +287,27 @@ class MicrosoftTodoTaskAdapter:
         try:
             list_target = self._target(target)
             list_id, list_name = self._resolve_list(token=token, target=list_target)
-        except (ValueError, MicrosoftGraphProviderError) as exc:
-            if isinstance(exc, MicrosoftGraphProviderError):
-                if 400 <= exc.status < 500 and exc.status not in {408, 425, 429}:
-                    return {
-                        "ok": False,
-                        "error": str(exc),
-                        "retry_safe": False,
-                        "http_status": exc.status,
-                    }
-            if isinstance(exc, ValueError):
-                return {"ok": False, "error": str(exc), "retry_safe": False}
-            raise
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc), "retry_safe": False}
+        except MicrosoftGraphProviderError as exc:
+            # Target resolution is a read-only probe and happens before any
+            # create-task POST. Even a throttled/server-failed probe therefore
+            # cannot have created the reviewed task. It is safe to retry this
+            # same execution request after the provider recovers.
+            return {
+                "ok": False,
+                "error": str(exc),
+                "retry_safe": exc.status in {408, 425, 429} or exc.status >= 500,
+                "http_status": exc.status,
+                "phase": "TARGET_RESOLUTION_PRE_WRITE",
+            }
+        except RuntimeError as exc:
+            return {
+                "ok": False,
+                "error": str(exc),
+                "retry_safe": True,
+                "phase": "TARGET_RESOLUTION_PRE_WRITE",
+            }
 
         task_payload: dict[str, Any] = {
             "title": title,

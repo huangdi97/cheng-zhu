@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, ipcMain, screen, Notification } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -78,6 +78,13 @@ const {
   relayChildOutput,
 } = require('./windowOptions');
 const { createMultiScreenBatch } = require('./multiScreenBatch');
+const {
+  DEFAULT_LEAD_MINUTES: CONVERSATION_REMINDER_LEAD_MINUTES,
+  mergeReminderRegistry,
+  dueReminders,
+  markDelivered,
+  runtimeSnapshot: reminderRuntimeSnapshot,
+} = require('./conversationReminders');
 
 const pkg = require('./package.json');
 
@@ -133,6 +140,9 @@ let _overlayDragging = false;
 let _blurTimer = null;
 let overlayAutoResizeUntil = 0;
 let overlayPositionSaveTimer = null;
+let conversationReminderRegistry = [];
+let conversationReminderTimer = null;
+let conversationReminderEnabled = false;
 let lastOverlayState = {
   initialized: false,
   enabled: false,
@@ -991,6 +1001,80 @@ function startPythonBackend() {
   });
 }
 
+function conversationReminderFile() {
+  return path.join(app.getPath('userData'), 'conversation-reminders.json');
+}
+
+function loadConversationReminders() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(conversationReminderFile(), 'utf8'));
+    conversationReminderEnabled = Boolean(parsed?.enabled);
+    conversationReminderRegistry = Array.isArray(parsed?.items) ? parsed.items : [];
+  } catch {
+    conversationReminderEnabled = false;
+    conversationReminderRegistry = [];
+  }
+}
+
+function persistConversationReminders() {
+  try {
+    fs.writeFileSync(
+      conversationReminderFile(),
+      JSON.stringify({
+        version: 1,
+        enabled: conversationReminderEnabled,
+        items: conversationReminderRegistry,
+        updated_at: new Date().toISOString(),
+      }, null, 2),
+    );
+  } catch {
+    // Reminder persistence must never affect app startup or shutdown.
+  }
+}
+
+function getConversationReminderRuntime() {
+  return reminderRuntimeSnapshot(
+    conversationReminderRegistry,
+    Notification.isSupported(),
+    conversationReminderEnabled,
+  );
+}
+
+function openConversationReminder(item) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send('conversation-reminder-open', {
+    sessionId: item.session_id,
+    spaceId: item.space_id,
+  });
+}
+
+function checkConversationReminders() {
+  if (!conversationReminderEnabled || !Notification.isSupported()) return;
+  const due = dueReminders(conversationReminderRegistry, Date.now());
+  if (!due.length) return;
+  for (const item of due) {
+    const notification = new Notification({
+      title: `${APP_DISPLAY_NAME} · 对话提醒`,
+      body: '你有一场已排期对话将在 10 分钟后开始。打开成竹查看准备内容。',
+      silent: false,
+    });
+    notification.on('click', () => openConversationReminder(item));
+    notification.show();
+    conversationReminderRegistry = markDelivered(conversationReminderRegistry, item.session_id, Date.now());
+  }
+  persistConversationReminders();
+}
+
+function startConversationReminderRuntime() {
+  loadConversationReminders();
+  checkConversationReminders();
+  if (conversationReminderTimer) clearInterval(conversationReminderTimer);
+  conversationReminderTimer = setInterval(checkConversationReminders, 60 * 1000);
+  conversationReminderTimer.unref?.();
+}
+
 // Pull the persisted Share Privacy default from the backend config.
 function syncSharePrivacyFromConfig() {
   http.get(`${SERVER_URL}/api/config`, { timeout: 3000 }, (res) => {
@@ -1616,6 +1700,20 @@ ipcMain.handle('get-window-state', () => ({
   })(),
   visible: mainWindow?.isVisible() ?? false,
 }));
+ipcMain.handle('sync-conversation-reminders', (_event, payload = {}) => {
+  conversationReminderEnabled = Boolean(payload.enabled);
+  conversationReminderRegistry = conversationReminderEnabled
+    ? mergeReminderRegistry(
+        conversationReminderRegistry,
+        Array.isArray(payload.items) ? payload.items : [],
+        payload.leadMinutes ?? CONVERSATION_REMINDER_LEAD_MINUTES,
+      )
+    : [];
+  persistConversationReminders();
+  checkConversationReminders();
+  return getConversationReminderRuntime();
+});
+ipcMain.handle('get-conversation-reminder-runtime', () => getConversationReminderRuntime());
 ipcMain.handle('sync-overlay-window', (_event, payload = {}) => {
   const style = {};
   if ('opacity' in payload) {
@@ -1932,6 +2030,7 @@ app.whenReady().then(async () => {
   writeRuntimeEvidenceStage('app-ready');
   try {
     app.setName(APP_DISPLAY_NAME);
+    if (process.platform === 'win32') app.setAppUserModelId('com.huangdi97.chengzhu');
   } catch {
     /* 个别平台/版本可能不支持 */
   }
@@ -1990,6 +2089,7 @@ app.whenReady().then(async () => {
 
   syncSharePrivacyFromConfig();
   createWindow();
+  startConversationReminderRuntime();
   writeRuntimeEvidenceStage('window-created', { server_url: SERVER_URL });
   if (runtimeEvidencePlanPath()) {
     // File-plan mode avoids a localhost listener entirely. Wait until the real
@@ -2048,6 +2148,10 @@ app.on('activate', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (conversationReminderTimer) {
+    clearInterval(conversationReminderTimer);
+    conversationReminderTimer = null;
+  }
   if (overlayPositionSaveTimer) {
     clearTimeout(overlayPositionSaveTimer);
     overlayPositionSaveTimer = null;

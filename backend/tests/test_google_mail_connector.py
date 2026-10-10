@@ -211,6 +211,36 @@ def test_google_mail_rejects_ambiguous_or_header_injection_recipient(monkeypatch
     assert transport.calls == []
 
 
+
+
+@pytest.mark.parametrize(
+    ("title", "content", "message"),
+    [
+        ("x" * 999, "Body", "主题过长"),
+        ("Follow-up", "x" * 20_001, "正文超过 20000"),
+    ],
+)
+def test_google_mail_rejects_oversized_reviewed_content_instead_of_truncating(monkeypatch, title, content, message):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN", "ya29.gmail_test_secret")
+    transport = FakeTransport()
+    adapter = GoogleMailSendAdapter(transport=transport)
+    result = adapter.execute(
+        connection=_connection(),
+        capability="email.send",
+        operation="SEND_EMAIL",
+        target="recipient@example.com",
+        payload={
+            "title": title,
+            "content": content,
+            "outbound_redaction_applied": False,
+        },
+        idempotency_key="x",
+    )
+    assert result["ok"] is False
+    assert message in result["error"]
+    assert transport.calls == []
+
+
 def test_google_mail_blocks_send_if_outbound_redaction_changed_reviewed_draft(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN", "ya29.gmail_test_secret")
     transport = FakeTransport()

@@ -1,9 +1,9 @@
 # Chengzhu v2 Conversation Connector Capability Contract
 ## Post-beta.2 Capability Registry + Audited Integration Boundary
 
-**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY CANDIDATE  
+**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY IMPLEMENTED / GITHUB ADAPTER OPT-IN CANDIDATE  
 **适用**：Calendar / Docs / Mail / project tracker / MCP / reviewed external write-back  
-**实现 PR**：#61（current-main rebuild；合并前不声明 stable runtime）
+**主线边界**：PR #61 已合入 main（merge commit `72e810c1`）；当前 GitHub real adapter 在 `feat/chengzhu-v2-github-provider`，合并前不声明真实账户可用
 
 ---
 
@@ -106,12 +106,19 @@ Conversation truth
 | GitHub | project.read / issue.create |
 | MCP | server-defined subset of canonical capability vocabulary |
 
-默认：
+默认仍然是：
 
 ```text
-adapter_available = false
 connected account = 0
 ```
+
+GitHub adapter 代码可随应用发布，但只有显式设置：
+
+```text
+CHENGZHU_GITHUB_CONNECTOR_ENABLE=1
+```
+
+才注册为 `adapter_available=true`；其余 provider 仍默认无 adapter。
 
 ---
 
@@ -488,6 +495,46 @@ CONNECTED
 - connected count；
 - snapshot count；
 - execution count。
+
+---
+
+## 19.5 GitHub real provider
+
+首个真实 provider 采用 GitHub REST：
+
+```text
+project.read
+→ GET /repos/{owner}/{repo}/issues
+→ filter pull_request rows
+→ immutable ISSUE snapshot
+→ explicit Space selection
+→ Session Pack freeze
+
+CREATE_ISSUE_DRAFT
+→ APPROVED
+→ exact GitHub connection
+→ explicit owner/repo target
+→ Execution Request
+→ second Execute
+→ POST /repos/{owner}/{repo}/issues
+→ provider ok=true / FAILED / UNKNOWN_OUTCOME
+```
+
+安全约束：
+
+- fine-grained PAT 最小权限只需 Issues read/write；
+- token 不进入 product.db，不进入前端，不进入 export；
+- product.db 只保存 `provider:github:env:<ENV_VAR>`；
+- verify 时真实调用 `/user`；
+- Sync 与 write target 都必须显式填写 `owner/repo`；
+- GitHub issues endpoint 返回的 Pull Request 必须过滤；
+- provider 5xx / transport failure 继续走 UNKNOWN_OUTCOME，不自动 retry；
+- issue body 带 Chengzhu execution marker，便于 provider-side reconciliation；
+- 没有真实 token/account/runtime evidence 时，禁止声明 `GITHUB_ACCOUNT_CONNECTED = TRUE`。
+
+实现与使用说明见：
+
+- [GitHub Conversation Connector](../architecture/GITHUB_CONVERSATION_CONNECTOR.md)
 
 ---
 

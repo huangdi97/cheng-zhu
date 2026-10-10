@@ -66,7 +66,15 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
         "provider_scopes": {
             "docs.read": "https://www.googleapis.com/auth/drive.readonly",
         },
-        "sync": "PROVIDER_CURSOR",
+        "sync": "FULL_TARGET_REFRESH",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:google-drive:env:<ENV_VAR>",
+            "read_target": "folder_id (default root)",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "write_support": "NONE",
+            "workspace_export": "Docs/Slides=text/plain; Sheets=first-sheet CSV",
+        },
     },
     "MICROSOFT_GRAPH": {
         "label": "Microsoft Graph",
@@ -683,7 +691,10 @@ def sync_connection(
     try:
         for capability in requested:
             cursor = str(cursors.get(capability) or (legacy_cursor if len(requested) == 1 else ""))
-            effective_limit = 500 if provider == "GOOGLE_CALENDAR" and capability == "calendar.read" else max(1, min(int(limit), 500))
+            effective_limit = 500 if (
+                (provider == "GOOGLE_CALENDAR" and capability == "calendar.read")
+                or (provider == "GOOGLE_DRIVE" and capability == "docs.read")
+            ) else max(1, min(int(limit), 500))
             result = adapter.read_context(
                 connection=connection,
                 capability=capability,

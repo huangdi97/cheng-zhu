@@ -303,11 +303,19 @@ APPROVED
 → select exact CONNECTED account
 → create Execution Request
 
-PENDING / FAILED
+PENDING
 → second explicit Execute
 
-provider returns success
+provider explicitly returns ok=true
 → SUCCEEDED
+
+provider explicitly returns ok=false
+→ FAILED
+→ retry only when provider explicitly returns retry_safe=true
+
+transport exception / timeout / missing explicit ok
+→ UNKNOWN_OUTCOME
+→ reconcile at provider before any retry
 ```
 
 Therefore:
@@ -315,7 +323,9 @@ Therefore:
 ```text
 APPROVED != external side effect
 Execution Request != external side effect
-SUCCEEDED == provider adapter returned success
+SUCCEEDED == provider adapter explicitly returned ok=true
+FAILED == provider explicitly returned ok=false
+UNKNOWN_OUTCOME == Chengzhu cannot know whether the side effect already happened
 ```
 
 ---
@@ -359,11 +369,20 @@ PENDING
 EXECUTING
 SUCCEEDED
 FAILED
+UNKNOWN_OUTCOME
 BLOCKED
 CANCELLED
 ```
 
-Provider failure is stored as `FAILED`, not converted into success.
+Outcome semantics are deliberately conservative:
+
+- adapter result MUST contain an explicit boolean `ok`;
+- `ok=true` → `SUCCEEDED`;
+- `ok=false` → `FAILED`; retry is exposed only when the provider also explicitly returns `retry_safe=true`;
+- exception / timeout / malformed result without boolean `ok` → `UNKNOWN_OUTCOME`;
+- `UNKNOWN_OUTCOME` cannot be executed again through Chengzhu until provider-side reconciliation establishes what happened.
+
+The idempotency key is passed to the adapter, but it is not treated as magic: a concrete provider must actually enforce idempotency before retry safety can be claimed.
 
 ---
 
@@ -460,6 +479,7 @@ CONNECTOR_CAPABILITY_REGISTRY = IMPLEMENTED
 EXTERNAL_INTEGRATION_BOUNDARY = IMPLEMENTED
 IMMUTABLE_EXTERNAL_SNAPSHOT_PATH = IMPLEMENTED
 REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
+AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 DEFAULT_EXTERNAL_PROVIDER_STATE = FAIL_CLOSED
 ```
 

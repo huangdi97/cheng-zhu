@@ -139,6 +139,7 @@ email.send    → Microsoft Mail.Send
 
 project.read  → GitHub Issues: read
 issue.create  → GitHub Issues: write
+project.read + issue.create → GitHub Issues: write
 ```
 
 对于 catalog provider：
@@ -188,12 +189,18 @@ credential_ref_present = true / false
 ```text
 create connection metadata
 → DISCONNECTED
-→ verify adapter + credential + scope + capability + health
+→ verify adapter + credential reference + configured capability contract + provider identity health
 → CONNECTED
 → DISCONNECTED / ERROR / REVOKED
 ```
 
 不提供“UI 直接把 status 改成 CONNECTED”的接口。
+
+`CONNECTED` 表示 provider account identity / credential health 已验证；它不等于“任意目标资源的 capability 已证明”。对需要显式 target 的 provider（当前 GitHub）：
+
+- `project.read` 在真实 Sync 到具体 `owner/repo` 时证明；
+- `issue.create` 在 reviewed + second explicit Execute 的真实 provider 响应时证明；
+- 不使用 `GET /user` 冒充 repo-level write permission proof。
 
 Revoke：
 

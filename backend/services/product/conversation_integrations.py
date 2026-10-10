@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
 from typing import Any, Optional, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
@@ -152,6 +153,11 @@ class ConnectorAdapter(Protocol):
 
 _ADAPTERS: dict[str, ConnectorAdapter] = {}
 _ACTIVE_EXECUTIONS: set[str] = set()
+# External side effects are deliberately serialized in the personal Desktop
+# runtime. This makes request claim + connection revoke/disconnect ordering
+# deterministic and prevents two UI/API execute requests from calling the
+# provider for one audit row at the same time.
+_EXECUTION_LOCK = threading.RLock()
 _CREDENTIAL_REF_RE = re.compile(r"^(?:keyring|oskeychain|provider|plugin):[A-Za-z0-9._:/-]{1,240}$")
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:^|[_-])(token|secret|authorization|credential|cookie|api[_-]?key|"
@@ -408,26 +414,28 @@ def verify_and_connect(connection_id: str) -> dict[str, Any]:
 
 
 def disconnect(connection_id: str) -> dict[str, Any]:
-    _require_connection(connection_id)
-    store.update("conversation_connector_connection", connection_id, {
-        "status": "DISCONNECTED",
-        "updated_at": store.now(),
-    })
-    return public_connection(_require_connection(connection_id))
+    with _EXECUTION_LOCK:
+        _require_connection(connection_id)
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "DISCONNECTED",
+            "updated_at": store.now(),
+        })
+        return public_connection(_require_connection(connection_id))
 
 
 def revoke(connection_id: str) -> dict[str, Any]:
-    _require_connection(connection_id)
-    store.update("conversation_connector_connection", connection_id, {
-        "status": "REVOKED",
-        "auth_mode": "NONE",
-        "credential_ref": "",
-        "sync_cursor": "",
-        "sync_cursors": {},
-        "last_error": "",
-        "updated_at": store.now(),
-    })
-    return public_connection(_require_connection(connection_id))
+    with _EXECUTION_LOCK:
+        _require_connection(connection_id)
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "REVOKED",
+            "auth_mode": "NONE",
+            "credential_ref": "",
+            "sync_cursor": "",
+            "sync_cursors": {},
+            "last_error": "",
+            "updated_at": store.now(),
+        })
+        return public_connection(_require_connection(connection_id))
 
 
 def _connection_usable(row: dict[str, Any], capability: str = "") -> bool:
@@ -750,140 +758,188 @@ def request_execution(
 
 
 def _recover_orphaned_executions() -> int:
-    """Convert persisted EXECUTING rows with no live in-process call to UNKNOWN.
-
-    Chengzhu Desktop runs one backend process. After process restart the
-    in-memory active set is empty, so a persisted EXECUTING row means the
-    process was interrupted after outbound execution began. The side effect may
-    already exist remotely and therefore cannot be retried safely.
-    """
-    recovered = 0
-    for row in store.select(
-        "conversation_connector_execution",
-        where="status = 'EXECUTING'",
-        order="updated_at ASC",
-        limit=1000,
-    ):
-        execution_id = str(row.get("id") or "")
-        if not execution_id or execution_id in _ACTIVE_EXECUTIONS:
-            continue
-        store.update("conversation_connector_execution", execution_id, {
-            "status": "UNKNOWN_OUTCOME",
-            "error": "Backend execution was interrupted; provider outcome must be reconciled before retry",
-            "updated_at": store.now(),
-        })
-        recovered += 1
-    return recovered
+    """Convert persisted EXECUTING rows with no live in-process call to UNKNOWN."""
+    with _EXECUTION_LOCK:
+        recovered = 0
+        for row in store.select(
+            "conversation_connector_execution",
+            where="status = 'EXECUTING'",
+            order="updated_at ASC",
+            limit=1000,
+        ):
+            execution_id = str(row.get("id") or "")
+            if not execution_id or execution_id in _ACTIVE_EXECUTIONS:
+                continue
+            store.update("conversation_connector_execution", execution_id, {
+                "status": "UNKNOWN_OUTCOME",
+                "error": "Backend execution was interrupted; provider outcome must be reconciled before retry",
+                "updated_at": store.now(),
+            })
+            recovered += 1
+        return recovered
 
 
 def execute_request(execution_id: str) -> dict[str, Any]:
-    row = store.get("conversation_connector_execution", execution_id)
-    if not row:
-        raise ValueError("External execution request 不存在")
-    if row["status"] == "EXECUTING":
-        if execution_id in _ACTIVE_EXECUTIONS:
-            raise ValueError("External execution request 正在当前进程执行")
-        store.update("conversation_connector_execution", execution_id, {
-            "status": "UNKNOWN_OUTCOME",
-            "error": "Backend execution was interrupted; provider outcome must be reconciled before retry",
-            "updated_at": store.now(),
-        })
-        row = store.get("conversation_connector_execution", execution_id) or row
-    if row["status"] == "SUCCEEDED":
-        return row
-    if row["status"] == "BLOCKED":
-        raise ValueError(row.get("error") or "External execution request 已阻断")
-    if row["status"] == "UNKNOWN_OUTCOME":
-        raise ValueError(
-            "External execution outcome 不确定；必须先在 provider 侧核对，禁止直接重试"
-        )
-    if row["status"] == "FAILED":
-        prior_response = dict(row.get("response") or {})
-        if prior_response.get("retry_safe") is not True:
-            raise ValueError("上次 provider 明确失败但未声明 retry_safe；禁止直接重试")
-    elif row["status"] != "PENDING":
-        raise ValueError("External execution request 当前状态不能执行")
+    # Keep the state claim, final capability check, provider side effect and
+    # persisted outcome in one ordering boundary. Revoke/disconnect uses the
+    # same lock, so no new provider call can begin after revocation wins.
+    with _EXECUTION_LOCK:
+        row = store.get("conversation_connector_execution", execution_id)
+        if not row:
+            raise ValueError("External execution request 不存在")
+        if row["status"] == "EXECUTING":
+            if execution_id in _ACTIVE_EXECUTIONS:
+                raise ValueError("External execution request 正在当前进程执行")
+            store.update("conversation_connector_execution", execution_id, {
+                "status": "UNKNOWN_OUTCOME",
+                "error": "Backend execution was interrupted; provider outcome must be reconciled before retry",
+                "updated_at": store.now(),
+            })
+            row = store.get("conversation_connector_execution", execution_id) or row
+        if row["status"] == "SUCCEEDED":
+            return row
+        if row["status"] == "BLOCKED":
+            raise ValueError(row.get("error") or "External execution request 已阻断")
+        if row["status"] == "UNKNOWN_OUTCOME":
+            raise ValueError("External execution outcome 不确定；必须先在 provider 侧核对并记录 reconciliation，禁止直接重试")
+        if row["status"] == "FAILED":
+            prior_response = dict(row.get("response") or {})
+            if prior_response.get("retry_safe") is not True:
+                raise ValueError("上次 provider 明确失败但未声明 retry_safe；禁止直接重试")
+        elif row["status"] != "PENDING":
+            raise ValueError("External execution request 当前状态不能执行")
 
-    draft = store.get("conversation_draft_action", row["draft_action_id"])
-    if not draft or draft.get("status") != "APPROVED":
-        store.update("conversation_connector_execution", execution_id, {
-            "status": "BLOCKED",
-            "error": "DraftAction 不再是 APPROVED",
-            "updated_at": store.now(),
-        })
-        raise ValueError("DraftAction 不再是 APPROVED")
+        draft = store.get("conversation_draft_action", row["draft_action_id"])
+        if not draft or draft.get("status") != "APPROVED":
+            store.update("conversation_connector_execution", execution_id, {
+                "status": "BLOCKED",
+                "error": "DraftAction 不再是 APPROVED",
+                "updated_at": store.now(),
+            })
+            raise ValueError("DraftAction 不再是 APPROVED")
 
-    connection = _require_connection(row["connection_id"])
-    capability = str(row.get("capability") or "")
-    if not _connection_usable(connection, capability):
-        store.update("conversation_connector_execution", execution_id, {
-            "status": "BLOCKED",
-            "error": f"Connection 不再具备 {capability}",
-            "updated_at": store.now(),
-        })
-        raise ValueError(f"Connection 不再具备 {capability}")
+        connection = _require_connection(row["connection_id"])
+        capability = str(row.get("capability") or "")
+        if not _connection_usable(connection, capability):
+            store.update("conversation_connector_execution", execution_id, {
+                "status": "BLOCKED",
+                "error": f"Connection 不再具备 {capability}",
+                "updated_at": store.now(),
+            })
+            raise ValueError(f"Connection 不再具备 {capability}")
 
-    adapter = _ADAPTERS[str(connection["provider_id"])]
-    _ACTIVE_EXECUTIONS.add(execution_id)
-    store.update("conversation_connector_execution", execution_id, {
-        "status": "EXECUTING",
-        "error": "",
-        "updated_at": store.now(),
-    })
-    try:
-        raw_result = adapter.execute(
-            connection=connection,
-            capability=capability,
-            operation=str(row.get("operation") or ""),
-            target=str(row.get("target") or ""),
-            payload=dict(row.get("request") or {}),
-            idempotency_key=str(row.get("idempotency_key") or ""),
-        )
-        result = _sanitize(dict(raw_result or {}))
-    except Exception as exc:
-        # The provider may have applied the side effect before the response was
-        # lost. Treat transport/runtime exceptions as ambiguous rather than a
-        # retryable failure.
+        adapter = _ADAPTERS[str(connection["provider_id"])]
+        _ACTIVE_EXECUTIONS.add(execution_id)
         store.update("conversation_connector_execution", execution_id, {
-            "status": "UNKNOWN_OUTCOME",
-            "response": {},
-            "error": str(exc)[:4000],
+            "status": "EXECUTING",
+            "error": "",
             "updated_at": store.now(),
         })
-        _ACTIVE_EXECUTIONS.discard(execution_id)
+        try:
+            try:
+                raw_result = adapter.execute(
+                    connection=connection,
+                    capability=capability,
+                    operation=str(row.get("operation") or ""),
+                    target=str(row.get("target") or ""),
+                    payload=dict(row.get("request") or {}),
+                    idempotency_key=str(row.get("idempotency_key") or ""),
+                )
+                result = _sanitize(dict(raw_result or {}))
+            except Exception as exc:
+                store.update("conversation_connector_execution", execution_id, {
+                    "status": "UNKNOWN_OUTCOME",
+                    "response": {},
+                    "error": str(exc)[:4000],
+                    "updated_at": store.now(),
+                })
+                return store.get("conversation_connector_execution", execution_id) or row
+
+            if not isinstance(result.get("ok"), bool):
+                store.update("conversation_connector_execution", execution_id, {
+                    "status": "UNKNOWN_OUTCOME",
+                    "response": result,
+                    "error": "Provider 未返回显式 boolean ok；无法确认外部副作用是否发生",
+                    "updated_at": store.now(),
+                })
+                return store.get("conversation_connector_execution", execution_id) or row
+
+            if result["ok"] is False:
+                store.update("conversation_connector_execution", execution_id, {
+                    "status": "FAILED",
+                    "response": result,
+                    "error": str(result.get("error") or "Provider 明确返回失败")[:4000],
+                    "updated_at": store.now(),
+                })
+                return store.get("conversation_connector_execution", execution_id) or row
+
+            store.update("conversation_connector_execution", execution_id, {
+                "status": "SUCCEEDED",
+                "response": result,
+                "error": "",
+                "updated_at": store.now(),
+                "executed_at": store.now(),
+            })
+            return store.get("conversation_connector_execution", execution_id) or row
+        finally:
+            _ACTIVE_EXECUTIONS.discard(execution_id)
+
+
+def reconcile_unknown_outcome(
+    execution_id: str,
+    outcome: str,
+    *,
+    note: str,
+    provider_reference: str = "",
+) -> dict[str, Any]:
+    """Record a human/provider-side reconciliation for UNKNOWN_OUTCOME.
+
+    This never guesses the provider state. The user must first verify the
+    outcome in the provider and leave an audit note.
+    """
+    outcome = str(outcome or "").upper()
+    if outcome not in {"CONFIRMED_SUCCEEDED", "CONFIRMED_NOT_APPLIED"}:
+        raise ValueError("reconciliation 只支持 CONFIRMED_SUCCEEDED / CONFIRMED_NOT_APPLIED")
+    note = str(note or "").strip()
+    if not note:
+        raise ValueError("reconciliation 必须记录 provider-side 核对说明")
+
+    with _EXECUTION_LOCK:
+        row = store.get("conversation_connector_execution", execution_id)
+        if not row:
+            raise ValueError("External execution request 不存在")
+        if row.get("status") != "UNKNOWN_OUTCOME":
+            raise ValueError("只有 UNKNOWN_OUTCOME 才能记录 reconciliation")
+
+        previous = dict(row.get("response") or {})
+        audit = {
+            "outcome": outcome,
+            "provider_reference": str(provider_reference or "")[:1000],
+            "note": note[:4000],
+            "recorded_at": store.now(),
+            "source": "USER_REPORTED_PROVIDER_CHECK",
+        }
+        if outcome == "CONFIRMED_SUCCEEDED":
+            status = "SUCCEEDED"
+            response = {**previous, "ok": True, "reconciliation": audit}
+            error = ""
+            executed_at = store.now()
+        else:
+            status = "FAILED"
+            # A provider-side check explicitly confirmed no side effect. This
+            # is the only reconciliation path that can make a retry safe.
+            response = {**previous, "ok": False, "retry_safe": True, "reconciliation": audit}
+            error = "Provider-side reconciliation confirmed the side effect was not applied"
+            executed_at = None
+
+        store.update("conversation_connector_execution", execution_id, {
+            "status": status,
+            "response": response,
+            "error": error,
+            "updated_at": store.now(),
+            "executed_at": executed_at,
+        })
         return store.get("conversation_connector_execution", execution_id) or row
-
-    if not isinstance(result.get("ok"), bool):
-        store.update("conversation_connector_execution", execution_id, {
-            "status": "UNKNOWN_OUTCOME",
-            "response": result,
-            "error": "Provider 未返回显式 boolean ok；无法确认外部副作用是否发生",
-            "updated_at": store.now(),
-        })
-        _ACTIVE_EXECUTIONS.discard(execution_id)
-        return store.get("conversation_connector_execution", execution_id) or row
-
-    if result["ok"] is False:
-        store.update("conversation_connector_execution", execution_id, {
-            "status": "FAILED",
-            "response": result,
-            "error": str(result.get("error") or "Provider 明确返回失败")[:4000],
-            "updated_at": store.now(),
-        })
-        failed = store.get("conversation_connector_execution", execution_id) or row
-        _ACTIVE_EXECUTIONS.discard(execution_id)
-        return failed
-
-    store.update("conversation_connector_execution", execution_id, {
-        "status": "SUCCEEDED",
-        "response": result,
-        "error": "",
-        "updated_at": store.now(),
-        "executed_at": store.now(),
-    })
-    _ACTIVE_EXECUTIONS.discard(execution_id)
-    return store.get("conversation_connector_execution", execution_id) or row
-
 
 def list_executions(*, draft_action_id: str = "", limit: int = 200) -> list[dict[str, Any]]:
     _recover_orphaned_executions()

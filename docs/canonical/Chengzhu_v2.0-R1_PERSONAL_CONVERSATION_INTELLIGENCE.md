@@ -3,8 +3,10 @@
 
 **版本**：v2.0-R1  
 **日期**：2026-10-06  
-**状态**：CANONICAL DESIGN COMPLETE / CONVERSATION BETA RUNTIME AVAILABLE / STABLE v2 RELEASE NOT CLAIMED  
-**基线**：v1.4.2 Windows reproducible Interview release + merged Conversation runtime PR #18 + v2 closure PR #19  
+**状态**：CANONICAL DESIGN COMPLETE / CONVERSATION BETA RUNTIME AVAILABLE / PURE-REPO CLOSURE REACHED / STABLE v2 RELEASE NOT CLAIMED  
+**Truth Sync**：2026-10-10  
+**当前工程基线**：`main@383978fa480aac35d214dce3fa4e9fa5ebb17118`；CI run `37901753321` = PASS  
+**公开 Conversation prerelease**：`v2.0.0-beta.2 @ cac605edf413ec248babf02ea9f73da708d156f8`；Stable Latest = `v1.4.2`  
 **产品定义**：Personal Conversation Intelligence  
 **首发验证楔子**：项目周会 / 技术设计评审  
 **核心原则**：Help me know **what is worth saying, why, to whom, and whether I should stay silent.**
@@ -74,18 +76,21 @@ PMF_PROVEN = FALSE
 - **PRODUCTIZED_RELEASE**：完成 packaged runtime、release artifact、download-back 与公开发布门禁；
 - **REAL_USER_VALIDATED**：需要真实参与者，当前不得宣称。
 
-截至 2026-10-06 的真实状态：
+截至 2026-10-10 的真实状态：
 
 ```text
 V2_DESIGN_COMPLETE = TRUE
 V2_CONTRACT_COMPLETE = TRUE
 V2_RUNTIME_AVAILABLE = TRUE
+V2_BETA_PACKAGED_ENGINEERING_EVIDENCE = TRUE
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
+PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
 V2_PRODUCTIZED_RELEASE = FALSE
 REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-Conversation runtime 已由 PR #18 落地；PR #19 负责 canonical/runtime closure。Project Sync / Design Review 是 launch wedge。其余模板可运行于 shared runtime，但 profile-specific behavior 尚未分别证明。
+历史 PR #18 建立 Conversation runtime，PR #19 完成第一轮 canonical/runtime closure；其后 main 已继续完成 packaged Beta、Profile Playbooks、auditable Expression Plan、AUTO Screen Context、desktop Share Privacy、Conversation Human Coach、connector capability registry、stable promotion evidence evaluator 与 privacy-safe local reminders。Project Sync / Design Review 仍是 launch wedge。其余模板可运行于 shared runtime，但 profile-specific behavior 仍需要真实会话证据。
 
 ---
 

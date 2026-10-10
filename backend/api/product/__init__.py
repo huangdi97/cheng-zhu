@@ -28,10 +28,17 @@ def init_product_layer() -> dict:
     # Real provider adapters remain explicit opt-in.  The GitHub adapter code
     # can ship without silently creating or connecting any external account.
     from services.product.github_connector import register_github_adapter_from_env
+    from services.product.google_calendar_connector import register_google_calendar_adapter_from_env
+
     github_connector = register_github_adapter_from_env()
+    google_calendar_connector = register_google_calendar_adapter_from_env()
+    provider_state = {
+        "github_connector": github_connector,
+        "google_calendar_connector": google_calendar_connector,
+    }
     if isinstance(backfill, dict):
-        return {**backfill, "github_connector": github_connector}
-    return {"backfill": backfill, "github_connector": github_connector}
+        return {**backfill, **provider_state}
+    return {"backfill": backfill, **provider_state}
 
 
 __all__ = ["router", "init_product_layer"]

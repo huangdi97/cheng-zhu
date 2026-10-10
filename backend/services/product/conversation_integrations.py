@@ -38,9 +38,16 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
         "capabilities": ["calendar.read"],
         "external_kinds": ["CALENDAR_EVENT"],
         "provider_scopes": {
-            "calendar.read": "https://www.googleapis.com/auth/calendar.readonly",
+            "calendar.read": "https://www.googleapis.com/auth/calendar.events.readonly",
         },
-        "sync": "INCREMENTAL_CURSOR",
+        "sync": "NATIVE_SYNC_TOKEN",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:google-calendar:env:<ENV_VAR>",
+            "read_target": "calendar_id (default primary)",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "write_support": "NONE",
+        },
     },
     "GOOGLE_MAIL": {
         "label": "Gmail",
@@ -676,14 +683,31 @@ def sync_connection(
     try:
         for capability in requested:
             cursor = str(cursors.get(capability) or (legacy_cursor if len(requested) == 1 else ""))
+            effective_limit = 500 if provider == "GOOGLE_CALENDAR" and capability == "calendar.read" else max(1, min(int(limit), 500))
             result = adapter.read_context(
                 connection=connection,
                 capability=capability,
                 query=dict(query or {}),
                 cursor=cursor,
-                limit=max(1, min(int(limit), 500)),
+                limit=effective_limit,
             ) or {}
-            for raw in list(result.get("items") or [])[:max(1, min(int(limit), 500))]:
+            if bool(result.get("full_sync_required")):
+                # Native provider sync tokens (e.g. Google Calendar) can be
+                # invalidated. Reset only this capability cursor, then perform
+                # one explicit full resync. Immutable historical snapshots are
+                # provenance/audit records rather than a mutable provider
+                # mirror, so they are not erased here.
+                cursors[capability] = ""
+                result = adapter.read_context(
+                    connection=connection,
+                    capability=capability,
+                    query=dict(query or {}),
+                    cursor="",
+                    limit=effective_limit,
+                ) or {}
+                if bool(result.get("full_sync_required")):
+                    raise RuntimeError("Provider full sync reset did not converge")
+            for raw in list(result.get("items") or [])[:effective_limit]:
                 snapshots.append(_store_snapshot(connection, space_id, capability, dict(raw or {})))
             if result.get("next_cursor") is not None:
                 cursors[capability] = str(result.get("next_cursor") or "")[:4000]
@@ -711,22 +735,52 @@ def sync_connection(
         raise ValueError(safe_error) from None
 
 
+def _snapshot_revision_view(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Annotate immutable provenance with current-provider revision truth.
+
+    Historical snapshots remain readable/exportable. is_latest_revision
+    answers whether this is the newest observed version of the same external
+    object inside this Space/connection/capability.
+    """
+    rows = store.rows(
+        "SELECT id FROM conversation_connector_snapshot "
+        "WHERE space_id = ? AND connection_id = ? AND capability = ? "
+        "AND external_kind = ? AND external_id = ? "
+        "ORDER BY created_at DESC, id DESC LIMIT 1",
+        (
+            snapshot.get("space_id"),
+            snapshot.get("connection_id"),
+            snapshot.get("capability"),
+            snapshot.get("external_kind"),
+            snapshot.get("external_id"),
+        ),
+    )
+    latest_id = str(rows[0]["id"]) if rows else str(snapshot.get("id") or "")
+    return {
+        **snapshot,
+        "is_latest_revision": str(snapshot.get("id") or "") == latest_id,
+        "latest_snapshot_id": latest_id,
+    }
+
+
 def list_snapshots(space_id: str, *, connection_id: str = "", limit: int = 200) -> list[dict[str, Any]]:
     if connection_id:
-        return store.select(
+        rows = store.select(
             "conversation_connector_snapshot",
             where="space_id = ? AND connection_id = ?",
             params=(space_id, connection_id),
             order="COALESCE(occurred_at, created_at) DESC",
             limit=max(1, min(int(limit), 1000)),
         )
-    return store.select(
-        "conversation_connector_snapshot",
-        where="space_id = ?",
-        params=(space_id,),
-        order="COALESCE(occurred_at, created_at) DESC",
-        limit=max(1, min(int(limit), 1000)),
-    )
+    else:
+        rows = store.select(
+            "conversation_connector_snapshot",
+            where="space_id = ?",
+            params=(space_id,),
+            order="COALESCE(occurred_at, created_at) DESC",
+            limit=max(1, min(int(limit), 1000)),
+        )
+    return [_snapshot_revision_view(row) for row in rows]
 
 
 def validate_snapshot_selection(space_id: str, snapshot_ids: list[str]) -> list[str]:

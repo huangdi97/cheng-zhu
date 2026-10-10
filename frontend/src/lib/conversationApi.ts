@@ -77,6 +77,11 @@ export const conversationApi = {
     request<unknown>(
       `${B}/spaces/${encodeURIComponent(spaceId)}/connector-snapshots?connection_id=${encodeURIComponent(connectionId)}&limit=${limit}`,
     ).then((p) => list<ConversationConnectorSnapshot>(p)),
+  scheduleCalendarSnapshot: (spaceId: string, snapshotId: string) =>
+    request<{ session: ConversationSession; snapshot_selected: boolean; created: boolean }>(
+      `${B}/spaces/${encodeURIComponent(spaceId)}/calendar-snapshots/${encodeURIComponent(snapshotId)}/schedule`,
+      json('POST'),
+    ),
   requestExternalExecution: (draftId: string, connection_id: string, target = '') =>
     request<ConversationExternalExecution>(
       `${B}/draft-actions/${encodeURIComponent(draftId)}/execution`,

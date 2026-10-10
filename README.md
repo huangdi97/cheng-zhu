@@ -54,6 +54,15 @@ v2 方向已经正式收敛为 **Personal Conversation Intelligence**：一个 C
   </tr>
 </table>
 
+### Conversation External Context · 当前 provider truth
+
+Conversation Beta 已有两个 concrete opt-in provider：
+
+- **GitHub**：`project.read` + reviewed `issue.create`；
+- **Google Calendar**：只读 `calendar.read`，支持 native sync token、immutable event snapshots，以及用户显式把 future event 导入为 Space 的 UPCOMING Session。
+
+两者默认都不自动连接账户；credential 只保存 opaque env reference。Google Calendar 当前**没有 event.write，也没有仓库内真实 Google account evidence**。详见 [Google Calendar Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md) 与 [Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)。
+
 ## 为什么值得试
 
 > 不是“回答生成器”，而是把一个具体求职目标从准备一直带到下一次行动。
@@ -137,7 +146,8 @@ Conversation Home
 - Conversation Human Coach 已有真实 runtime：仅在 frozen policy = `HUMAN_ALLOWED` 且记录 transparency plan 时允许；Live 中显式生成一次性、session-scoped 教练链接，逐项授权 transcript / AI Guidance / frozen Session Context；helper 不读取 Interview Resume/JD；建议标记为 `HUMAN_COACH` 且 `is_evidence=false`，Session 结束/删除自动 revoke；runtime 可用且已进入 beta.2 public prerelease，仍不等于 stable v2 或真实用户验证；
 - beta.2 public prerelease 已包含 frozen Profile Playbooks、auditable Expression Plan、explicit-start AUTO Screen Context、verified desktop Share Privacy 与 Conversation Human Coach；release tag 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`，且 Stable Latest 仍为 v1.4.2；
 - GitHub project tracker / issue provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GITHUB_CONNECTOR_ENABLE=1` + opaque env credential ref；`project.read` 可 Sync immutable issue snapshots，reviewed `CREATE_ISSUE_DRAFT` 可进入两阶段 `issue.create`；没有真实账号/runtime replay 前不得宣称已连接或已创建真实 Issue；
-- Calendar / Gmail / Drive / Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
+- Google Calendar provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1` + opaque env credential ref；native sync token / immutable snapshots / explicit Next Session import 已实现；历史 revision 仅审计、上游改期/取消显式显示 drift；没有真实 Google account/runtime replay 前不得宣称已连接；
+- Gmail / Drive / Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
 - external email/task/decision-log provider execution 仍无真实 provider；GitHub issue.create 是当前唯一真实 provider write adapter；
 - v2 packaged stable release；
 - real-user / PMF evidence。

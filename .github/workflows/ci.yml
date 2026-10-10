@@ -317,6 +317,11 @@ jobs:
           node-version: 22
       - name: Build frontend dist
         working-directory: frontend
+        env:
+          # GitHub-hosted Windows runners share a machine-level npm cache path
+          # that can retain locked temp files across provisioning boundaries.
+          # Isolate this release gate without changing dependency resolution.
+          npm_config_cache: ${{ runner.temp }}\npm-cache-packaged-smoke
         run: |
           npm ci
           npm run build

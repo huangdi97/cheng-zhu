@@ -176,7 +176,23 @@ export interface ConversationSession {
   policy: ConversationSessionPolicy
   pack_id: string
   status: 'UPCOMING' | 'ACTIVE' | 'ENDED'
-  state: { current_topic?: string; open_threads?: string[]; last_guidance_id?: string }
+  state: { current_topic?: string; open_threads?: string[]; last_guidance_id?: string; calendar_imported?: boolean }
+  source_calendar_event: {
+    snapshot_id?: string
+    provider_id?: string
+    connection_id?: string
+    external_id?: string
+    content_hash?: string
+    calendar_id?: string
+    event_id?: string
+    imported_at?: number
+    revision_status?: 'CURRENT' | 'SOURCE_DRIFT' | 'CANCELLED_UPSTREAM' | 'SOURCE_MISSING'
+    latest_snapshot_id?: string
+    latest_content_hash?: string
+    latest_title?: string
+    latest_scheduled_at?: number | null
+    latest_cancelled?: boolean
+  }
   created_at: number
   updated_at: number
 }
@@ -436,6 +452,8 @@ export interface ConversationConnectorSnapshot {
   visibility: string
   metadata: Record<string, unknown>
   provider_id?: string
+  is_latest_revision?: boolean
+  latest_snapshot_id?: string
   created_at: number
 }
 

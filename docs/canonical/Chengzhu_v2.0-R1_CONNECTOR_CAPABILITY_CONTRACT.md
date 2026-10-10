@@ -112,13 +112,14 @@ Conversation truth
 connected account = 0
 ```
 
-GitHub adapter 代码可随应用发布，但只有显式设置：
+GitHub 与 Google Calendar adapter 代码可随应用发布，但都必须显式 opt-in：
 
 ```text
 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1
+CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1
 ```
 
-才注册为 `adapter_available=true`；其余 provider 仍默认无 adapter。
+才注册为 `adapter_available=true`。Gmail / Drive / Microsoft / MCP 当前仍不能仅凭 catalog 条目冒充真实 adapter。
 
 ---
 
@@ -129,7 +130,7 @@ Catalog provider 的 scope 必须由 granted capability 推导，并保存为最
 示例：
 
 ```text
-calendar.read → Google calendar.readonly
+calendar.read → Google calendar.events.readonly
 mail.read     → Gmail readonly
 email.send    → Gmail send
 
@@ -153,6 +154,37 @@ server-defined
 ```
 
 Chengzhu 不伪造 MCP scope。
+
+---
+
+## 5.1 Google Calendar native read contract
+
+当前 `GOOGLE_CALENDAR` concrete adapter 只实现：
+
+```text
+calendar.read
+→ CALENDAR_EVENT immutable snapshots
+```
+
+关键约束：
+
+- access token 只通过 `provider:google-calendar:env:<ENV_VAR>` 解析；
+- Verify 只做一页只读 probe，不偷偷执行 full sync；
+- initial sync 使用 Google Events 原生分页并获得最后一页 `nextSyncToken`；
+- HTTP 410 只重置 `calendar.read` cursor 并执行一次 full resync；
+- cursor 与显式 `calendar_id` 绑定，禁止跨 calendar 复用 token；
+- complete change set 超过 Chengzhu 当前 500 snapshot 安全上限时整次失败，不推进 token；
+- cancelled event 保留为 immutable external observation；
+- event snapshot 仍是 `REFERENCE_SOURCE`，不自动升级 Decision / Commitment / Deadline；
+- 同一 external event 的历史 revision 继续保留审计，但只有 latest revision 可被新导入；
+- 已导入 Session 遇到后续 reschedule/cancel 时保持本地冻结值，同时显式标记 `SOURCE_DRIFT / CANCELLED_UPSTREAM`；
+- all-day event 不伪造 UTC midnight；`focusTime / outOfOffice / workingLocation` 不能导入为 Conversation Session；
+- provider timezone 会进入 time semantics；
+- future、non-cancelled、latest-revision meeting-like event 只有用户显式点击“作为下一场”后才创建本地 UPCOMING Session；
+- 导入后 provider 后续变化不静默改写已创建 Session。
+
+实现说明：
+[Google Calendar Conversation Connector](../architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md)
 
 ---
 
@@ -554,7 +586,7 @@ CREATE_ISSUE_DRAFT
 
 ## 20. 当前 repo truth
 
-PR #61 合并后允许声明：
+PR #61 + GitHub provider + Calendar provider 合并后，repo engineering truth 允许声明：
 
 ```text
 CONNECTOR_CAPABILITY_CONTRACT = IMPLEMENTED
@@ -563,15 +595,17 @@ EXTERNAL_INTEGRATION_BOUNDARY = IMPLEMENTED
 IMMUTABLE_EXTERNAL_SNAPSHOT_PATH = IMPLEMENTED
 REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
 AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
+GITHUB_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+GOOGLE_CALENDAR_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 ```
 
 仍禁止在缺少真实 adapter/account/runtime evidence 时声明：
 
 ```text
-CALENDAR_CONNECTOR_AVAILABLE = TRUE
 MAIL_CONNECTOR_AVAILABLE = TRUE
 DOCS_CONNECTOR_AVAILABLE = TRUE
-PROJECT_TRACKER_CONNECTOR_AVAILABLE = TRUE
+CALENDAR_ACCOUNT_CONNECTED = TRUE
+PROJECT_TRACKER_ACCOUNT_CONNECTED = TRUE
 GOOGLE_ACCOUNT_CONNECTED = TRUE
 MICROSOFT_ACCOUNT_CONNECTED = TRUE
 GITHUB_ACCOUNT_CONNECTED = TRUE

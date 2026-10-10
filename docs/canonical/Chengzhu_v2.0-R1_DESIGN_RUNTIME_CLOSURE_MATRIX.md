@@ -551,7 +551,8 @@ reviewed output evidence
 | Local scheduled Conversation reminder | RUNTIME_AVAILABLE_DESKTOP | 只读取 Chengzhu 内手工排期的 UPCOMING Session；用户显式 opt-in；默认提前 10 分钟；通知不泄露 Session/Space 标题；点击进入对应 Space Prepare；不等于 Calendar connector |
 | External Integration Boundary | RUNTIME_AVAILABLE | PR #61 已合入 main：schema v9、opaque credential ref、CONNECTED account、Space-scoped immutable snapshot、canonical hash、per-capability cursor、exact grant、retention/export、Execution Request / audit、UNKNOWN_OUTCOME reconciliation |
 | GitHub project tracker / issue provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 首个真实 REST adapter：project.read + issue.create；默认不注册，需 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1；token 仅经 env credential reference 解析；没有真实账户连接/外部 action evidence 前不得宣称 GITHUB_ACCOUNT_CONNECTED |
-| Calendar / Mail / Docs / Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
+| Google Calendar provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `calendar.read` concrete adapter；native sync token + 410 reset；immutable revision audit；latest-revision import；upstream drift 可见；默认关闭；没有真实 Google account replay 前不得声明 account connected |
+| Mail / Docs / Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
 | External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub issue.create 已有 opt-in real adapter，其他 provider 仍 fail-closed |
 | Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
@@ -802,3 +803,22 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - CI 全绿。
 
 这之后的下一阶段已经从“是否有 packaged evidence”推进为 **Conversation Beta public prerelease / dogfood / real-user evidence**。packaged evidence 与 human-eval tooling 已进入 main；剩余成熟度只能由公开 prerelease provenance、真实 dogfood 和真实用户研究继续推进，不能继续靠文档把状态写高。
+
+## Google Calendar read-only provider closure · 2026-10-10
+
+当前 branch 新增第二个 concrete Conversation provider：
+
+```text
+GOOGLE_CALENDAR_ADAPTER_CODE = TRUE
+CALENDAR_READ_ONLY = TRUE
+NATIVE_SYNC_TOKEN = TRUE
+SYNC_TOKEN_410_RESET = TRUE
+CALENDAR_TARGET_BOUND_CURSOR = TRUE
+CALENDAR_EVENT_SNAPSHOT = TRUE
+EXPLICIT_EVENT_TO_NEXT_SESSION = TRUE
+CALENDAR_WRITE = FALSE
+REAL_GOOGLE_ACCOUNT_EVIDENCE_PENDING = TRUE
+```
+
+工程证据允许证明 adapter / fake transport / pagination / cursor / immutable snapshot / product flow；没有真实 Google OAuth/account 时不得声明真实 Calendar 已连接或真实 event 已同步。
+

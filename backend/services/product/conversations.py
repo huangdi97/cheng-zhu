@@ -959,6 +959,141 @@ def create_session(
     return require_session(row["id"])
 
 
+def _latest_calendar_snapshot(snapshot: dict[str, Any]) -> Optional[dict[str, Any]]:
+    rows = store.rows(
+        "SELECT * FROM conversation_connector_snapshot "
+        "WHERE space_id = ? AND connection_id = ? AND capability = 'calendar.read' "
+        "AND external_kind = 'CALENDAR_EVENT' AND external_id = ? "
+        "ORDER BY created_at DESC, id DESC LIMIT 1",
+        (
+            snapshot.get("space_id"),
+            snapshot.get("connection_id"),
+            snapshot.get("external_id"),
+        ),
+    )
+    return rows[0] if rows else None
+
+
+def _calendar_source_status(session: dict[str, Any]) -> dict[str, Any]:
+    source = dict(session.get("source_calendar_event") or {})
+    if str(source.get("provider_id") or "") != "GOOGLE_CALENDAR" or not source.get("external_id"):
+        return source
+    imported = store.get("conversation_connector_snapshot", str(source.get("snapshot_id") or ""))
+    if not imported:
+        return {**source, "revision_status": "SOURCE_MISSING"}
+    latest = _latest_calendar_snapshot(imported)
+    if not latest:
+        return {**source, "revision_status": "SOURCE_MISSING"}
+    latest_meta = dict(latest.get("metadata") or {})
+    status = "CURRENT"
+    if str(latest.get("id") or "") != str(imported.get("id") or ""):
+        status = "CANCELLED_UPSTREAM" if (
+            bool(latest_meta.get("cancelled"))
+            or str(latest_meta.get("status") or "") == "cancelled"
+        ) else "SOURCE_DRIFT"
+    return {
+        **source,
+        "revision_status": status,
+        "latest_snapshot_id": latest.get("id") or "",
+        "latest_content_hash": latest.get("content_hash") or "",
+        "latest_title": latest.get("title") or "",
+        "latest_scheduled_at": latest.get("occurred_at"),
+        "latest_cancelled": bool(latest_meta.get("cancelled"))
+            or str(latest_meta.get("status") or "") == "cancelled",
+    }
+
+
+def schedule_from_calendar_snapshot(space_id: str, snapshot_id: str) -> dict[str, Any]:
+    """Explicitly import one immutable Google Calendar snapshot as UPCOMING.
+
+    The imported session is intentionally detached from later provider
+    mutations. source_calendar_event preserves provenance; future Sync does not
+    silently rewrite title/time. Re-importing the exact same snapshot is
+    idempotent.
+    """
+    space = require_space(space_id)
+    snapshot = store.get("conversation_connector_snapshot", str(snapshot_id or ""))
+    if not snapshot or str(snapshot.get("space_id") or "") != space_id:
+        raise ValueError("Calendar snapshot 不存在或不属于当前 Space")
+    if str(snapshot.get("external_kind") or "") != "CALENDAR_EVENT":
+        raise ValueError("只有 CALENDAR_EVENT snapshot 可以导入为下一场")
+    if str(snapshot.get("capability") or "") != "calendar.read":
+        raise ValueError("Calendar snapshot capability 不匹配")
+
+    connection = store.get(
+        "conversation_connector_connection",
+        str(snapshot.get("connection_id") or ""),
+    )
+    if not connection or str(connection.get("provider_id") or "") != "GOOGLE_CALENDAR":
+        raise ValueError("当前 snapshot 不是 Google Calendar provider 产生")
+
+    latest = _latest_calendar_snapshot(snapshot)
+    if latest and str(latest.get("id") or "") != str(snapshot.get("id") or ""):
+        latest_meta = dict(latest.get("metadata") or {})
+        if bool(latest_meta.get("cancelled")) or str(latest_meta.get("status") or "") == "cancelled":
+            raise ValueError("该 Calendar event 已在更新版本中取消；旧 snapshot 仅保留审计，不能再导入")
+        raise ValueError("该 Calendar snapshot 已不是最新 revision；请使用最新同步结果导入")
+
+    metadata = dict(snapshot.get("metadata") or {})
+    if bool(metadata.get("cancelled")) or str(metadata.get("status") or "") == "cancelled":
+        raise ValueError("已取消的 Calendar event 不能导入为下一场")
+    if bool(metadata.get("all_day")):
+        raise ValueError("All-day Calendar event 没有明确开始时刻；不能直接导入为 Conversation Session")
+    event_type = str(metadata.get("event_type") or "default")
+    if event_type in {"focusTime", "outOfOffice", "workingLocation"}:
+        raise ValueError(f"Calendar {event_type} 状态事件不是 Conversation Session")
+    scheduled_at = snapshot.get("occurred_at")
+    if scheduled_at is None:
+        raise ValueError("Calendar event 缺少可解析的开始时间")
+    scheduled_at = float(scheduled_at)
+    if scheduled_at <= store.now():
+        raise ValueError("只有未来 Calendar event 可以导入为 UPCOMING Session")
+
+    for existing in list_sessions(space_id):
+        source = dict(existing.get("source_calendar_event") or {})
+        if str(source.get("snapshot_id") or "") == snapshot["id"]:
+            return {
+                "session": existing,
+                "snapshot_selected": snapshot["id"] in set(space.get("selected_connector_snapshot_ids") or []),
+                "created": False,
+            }
+
+    session = create_session(
+        space_id,
+        title=str(snapshot.get("title") or space["title"])[:200],
+        scheduled_at=scheduled_at,
+        assistance_mode=space.get("default_mode") or "",
+    )
+    provenance = {
+        "snapshot_id": snapshot["id"],
+        "provider_id": "GOOGLE_CALENDAR",
+        "connection_id": snapshot.get("connection_id") or "",
+        "external_id": snapshot.get("external_id") or "",
+        "content_hash": snapshot.get("content_hash") or "",
+        "calendar_id": str(metadata.get("calendar_id") or ""),
+        "event_id": str(metadata.get("event_id") or ""),
+        "imported_at": store.now(),
+    }
+    state = dict(session.get("state") or {})
+    state["calendar_imported"] = True
+    store.update("conversation_session", session["id"], {
+        "source_calendar_event": provenance,
+        "state": state,
+        "updated_at": store.now(),
+    })
+
+    selected = list(space.get("selected_connector_snapshot_ids") or [])
+    if snapshot["id"] not in selected:
+        selected.append(snapshot["id"])
+        update_space(space_id, {"selected_connector_snapshot_ids": selected})
+
+    return {
+        "session": require_session(session["id"]),
+        "snapshot_selected": True,
+        "created": True,
+    }
+
+
 def list_sessions(space_id: str) -> list[dict[str, Any]]:
     require_space(space_id)
     return store.select(
@@ -3157,7 +3292,10 @@ def set_guidance_action(guidance_id: str, action: str) -> dict[str, Any]:
 def space_detail(space_id: str) -> dict[str, Any]:
     space = require_space(space_id)
     goals = store.select("conversation_goal", where="space_id = ?", params=(space_id,), order="priority DESC, created_at ASC")
-    sessions = list_sessions(space_id)
+    sessions = [
+        {**session, "source_calendar_event": _calendar_source_status(session)}
+        for session in list_sessions(space_id)
+    ]
     participants = store.select("conversation_participant", where="space_id = ?", params=(space_id,), order="created_at ASC")
     items = store.select("conversation_item", where="space_id = ?", params=(space_id,), order="created_at DESC", limit=200)
     threads = store.select("conversation_open_thread", where="space_id = ? AND status = 'OPEN'", params=(space_id,), order="created_at DESC")

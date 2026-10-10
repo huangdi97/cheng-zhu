@@ -131,6 +131,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [integrationBusy, setIntegrationBusy] = useState(false)
   const [githubEnvVar, setGithubEnvVar] = useState('CHENGZHU_GITHUB_TOKEN')
   const [githubRepository, setGithubRepository] = useState('')
+  const [googleCalendarEnvVar, setGoogleCalendarEnvVar] = useState('CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN')
+  const [googleCalendarId, setGoogleCalendarId] = useState('primary')
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -164,6 +166,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   if (detail.error || !detail.data) return <Page><ErrorState message={detail.error ?? '对话空间不存在'} onRetry={detail.reload} /></Page>
   const space = detail.data
   const githubProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GITHUB')
+  const googleCalendarProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_CALENDAR')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -370,6 +373,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSourceSaving(false) }
   }
 
+  const scheduleCalendarSnapshot = async (snapshotId: string) => {
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.scheduleCalendarSnapshot(spaceId, snapshotId)
+      setLifecycleMessage(result.created
+        ? 'Calendar event 已显式导入为这个 Space 的 UPCOMING Session，并把该 immutable snapshot 选入 Space；后续 Calendar 更新不会静默改写这场。'
+        : '这个 Calendar snapshot 已经导入过；没有重复创建 Session。')
+      await detail.reload(); await prepare.reload(); await connectorSnapshots.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const createGitHubConnection = async () => {
     const envName = githubEnvVar.trim()
     const repository = githubRepository.trim()
@@ -404,19 +419,56 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const createGoogleCalendarConnection = async () => {
+    const envName = googleCalendarEnvVar.trim()
+    const calendarId = googleCalendarId.trim() || 'primary'
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Google Calendar credential env 只允许环境变量名，例如 CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN。')
+      return
+    }
+    if (calendarId.length > 500 || /[\r\n\0]/.test(calendarId)) {
+      setSessionError('Google Calendar calendar id 非法。可使用 primary 或显式 calendar id。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const created = await conversationApi.createIntegrationConnection({
+        provider_id: 'GOOGLE_CALENDAR',
+        display_name: `Google Calendar · ${calendarId}`,
+        granted_capabilities: ['calendar.read'],
+        credential_ref: `provider:google-calendar:env:${envName}`,
+        account_hint: calendarId,
+      })
+      setConnectorTargets((current) => ({ ...current, [created.id]: calendarId }))
+      await integrationConnections.reload()
+      setLifecycleMessage('Google Calendar connection 元数据已创建。下一步点击“验证连接”；这里只记录 opaque env reference，不保存 access token。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
+    const calendarId = (connectorTargets[connectionId] || connection?.account_hint || googleCalendarId || 'primary').trim()
     if (connection?.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
       setSessionError('GitHub Sync 需要明确填写 owner/repo；不会从其他 Space 或历史连接猜测目标。')
+      return
+    }
+    if (connection?.provider_id === 'GOOGLE_CALENDAR' && (!calendarId || calendarId.length > 500 || /[\r\n\0]/.test(calendarId))) {
+      setSessionError('Google Calendar Sync 需要 primary 或明确 calendar id。')
       return
     }
     setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.syncIntegrationConnection(connectionId, {
         space_id: spaceId,
-        capabilities: connection?.provider_id === 'GITHUB' ? ['project.read'] : undefined,
-        query: connection?.provider_id === 'GITHUB' ? { repository } : undefined,
+        capabilities: connection?.provider_id === 'GITHUB'
+          ? ['project.read']
+          : connection?.provider_id === 'GOOGLE_CALENDAR' ? ['calendar.read'] : undefined,
+        query: connection?.provider_id === 'GITHUB'
+          ? { repository }
+          : connection?.provider_id === 'GOOGLE_CALENDAR' ? { calendar_id: calendarId } : undefined,
+        limit: connection?.provider_id === 'GOOGLE_CALENDAR' ? 500 : undefined,
       })
       setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
       await connectorSnapshots.reload(); await integrationConnections.reload()
@@ -429,7 +481,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     try {
       await conversationApi.verifyIntegrationConnection(connectionId)
       await integrationConnections.reload()
-      setLifecycleMessage('Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+      const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
+      setLifecycleMessage(connection?.provider_id === 'GOOGLE_CALENDAR'
+        ? 'Google Calendar read probe 已通过，连接状态为 CONNECTED。实际 calendar target 的完整读取仍由显式 Sync provider 响应证明。'
+        : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -603,7 +658,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
           </Section>
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Next Session">
-              {space.next_session ? <div><div className="text-sm text-text-primary">{space.next_session.title}</div><div className="mt-1 text-[11px] text-text-muted">{space.next_session.scheduled_at ? new Date(space.next_session.scheduled_at * 1000).toLocaleString() : '未排期'} · {space.next_session.assistance_mode}</div></div> : <p className="text-xs text-text-muted">暂无已排期的下一场。</p>}
+              {space.next_session ? <div><div className="text-sm text-text-primary">{space.next_session.title}</div><div className="mt-1 text-[11px] text-text-muted">{space.next_session.scheduled_at ? new Date(space.next_session.scheduled_at * 1000).toLocaleString() : '未排期'} · {space.next_session.assistance_mode}</div>{space.next_session.source_calendar_event?.revision_status && space.next_session.source_calendar_event.revision_status !== 'CURRENT' ? <div className="mt-2 text-[11px] text-status-risk">Calendar source · {space.next_session.source_calendar_event.revision_status}{space.next_session.source_calendar_event.latest_title ? ` · latest: ${space.next_session.source_calendar_event.latest_title}` : ''}</div> : null}</div> : <p className="text-xs text-text-muted">暂无已排期的下一场。</p>}
             </Section>
             <Section title="Recent Decisions">
               {space.recent_decisions?.length ? <div className="space-y-1">{space.recent_decisions.map((d) => <div key={d.id} className="text-xs text-text-primary">• {d.title}</div>)}</div> : <p className="text-xs text-text-muted">暂无已确认 Decision。</p>}
@@ -758,6 +813,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     <span className="text-[10px] text-text-muted">credential ref = provider:github:env:{githubEnvVar || '<ENV_VAR>'}</span>
                   </div>
                 </div> : null}
+                {googleCalendarProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="google-calendar-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Google Calendar · read-only discovery</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleCalendarProvider.setup?.runtime_opt_in_env || 'CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1'} 和一个只读 Calendar access-token 环境变量。当前只实现 calendar.read，不会创建/修改日历事件。</p>
+                    </div>
+                    <StatusBadge tone={googleCalendarProvider.adapter_available ? 'ok' : 'muted'}>{googleCalendarProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input aria-label="Google Calendar token 环境变量名" className={inputCls} value={googleCalendarEnvVar} onChange={(e) => setGoogleCalendarEnvVar(e.target.value)} placeholder="CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN" />
+                    <input aria-label="Google Calendar 默认 calendar id" className={inputCls} value={googleCalendarId} onChange={(e) => setGoogleCalendarId(e.target.value)} placeholder="primary 或 calendar id" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !googleCalendarProvider.adapter_available} onClick={createGoogleCalendarConnection}>创建 Calendar 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">scope · calendar.events.readonly · credential ref = provider:google-calendar:env:{googleCalendarEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Verify 只做一页 read probe；真正 full/incremental sync 只有你点击 Sync 时发生。sync token 失效时会显式 full resync，不会把截断结果当完整状态。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -769,9 +842,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       {connection.provider_id === 'GITHUB' ? <div className="mt-2">
                         <input aria-label={`GitHub Sync 仓库 ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? githubRepository} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="owner/repo · 每次 Sync 都显式指定" />
                       </div> : null}
+                      {connection.provider_id === 'GOOGLE_CALENDAR' ? <div className="mt-2">
+                        <input aria-label={`Google Calendar Sync calendar id ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="primary 或显式 calendar id" />
+                      </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim())} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>
@@ -783,10 +859,25 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Immutable snapshots · 显式选入 Space</div>
                   {(connectorSnapshots.data?.items ?? []).length ? <div className="space-y-1.5">{connectorSnapshots.data!.items.map((snapshot) => {
                     const checked = (space.selected_connector_snapshot_ids ?? []).includes(snapshot.id)
-                    return <label key={snapshot.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
-                      <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
-                      <span><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
-                    </label>
+                    const calendarMeta = snapshot.metadata ?? {}
+                    const calendarFuture = snapshot.external_kind === 'CALENDAR_EVENT'
+                      && typeof snapshot.occurred_at === 'number'
+                      && snapshot.occurred_at > Date.now() / 1000
+                      && !Boolean(calendarMeta.cancelled)
+                      && snapshot.is_latest_revision !== false
+                    const imported = space.sessions.some((session) => session.source_calendar_event?.snapshot_id === snapshot.id)
+                    return <div key={snapshot.id} className="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
+                      <label className="flex min-w-0 flex-1 items-start gap-2">
+                        <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
+                        <span className="min-w-0"><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{typeof snapshot.occurred_at === 'number' ? <span className="ml-1 text-text-muted">· {new Date(snapshot.occurred_at * 1000).toLocaleString()}</span> : null}{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
+                      </label>
+                      {snapshot.external_kind === 'CALENDAR_EVENT' ? imported
+                        ? <StatusBadge tone="ok">已导入</StatusBadge>
+                        : calendarFuture
+                          ? <SecondaryButton disabled={integrationBusy} onClick={() => scheduleCalendarSnapshot(snapshot.id)}>作为下一场</SecondaryButton>
+                          : <StatusBadge tone="muted">{Boolean(calendarMeta.cancelled) ? '已取消' : snapshot.is_latest_revision === false ? '历史 revision' : '非未来事件'}</StatusBadge>
+                        : null}
+                    </div>
                   })}</div> : <p className="text-[11px] text-text-muted">还没有外部 snapshot。真实连接 Sync 后才会出现；本场仍可完全离线使用。</p>}
                 </div>
               </>}

@@ -1852,6 +1852,274 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('Microsoft To Do setup keeps token outside UI and syncs one explicit list', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let syncBody = null
+    const snapshot = {
+      id: 'ccs-ms-task-1',
+      connection_id: 'ccn-ms-todo',
+      space_id: SPACE.id,
+      capability: 'project.read',
+      external_kind: 'TASK',
+      external_id: 'list-default:task-1',
+      title: 'Review rollback plan',
+      excerpt: 'Confirm owner before Friday.',
+      content_hash: 'sha256:mstask1',
+      source_url: '',
+      occurred_at: 7,
+      visibility: 'PRIVATE',
+      metadata: { todo_list_id: 'list-default', todo_list_name: 'Tasks', task_id: 'task-1', status: 'notStarted' },
+      created_at: 7,
+    }
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'MICROSOFT_GRAPH',
+            label: 'Microsoft To Do (Graph)',
+            capabilities: ['project.read', 'task.create'],
+            read_capabilities: ['project.read'],
+            write_capabilities: ['task.create'],
+            external_kinds: ['TASK'],
+            provider_scopes: { 'project.read': 'Tasks.Read', 'task.create': 'Tasks.ReadWrite' },
+            identity_scopes: ['User.Read'],
+            sync: 'FULL_TARGET_REFRESH',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:microsoft-graph:env:<ENV_VAR>',
+              read_target: 'todo_list_id or defaultList',
+              write_target: 'todo_list_id or defaultList',
+              identity_scope: 'User.Read',
+              read_scope: 'Tasks.Read',
+              write_scope: 'Tasks.ReadWrite',
+              mail_calendar_files_support: 'NONE_IN_THIS_ADAPTER',
+            },
+            adapter_available: true,
+            adapter_capabilities: ['project.read', 'task.create'],
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') return { items: connection ? [connection] : [] }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-ms-todo',
+            provider_id: 'MICROSOFT_GRAPH',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: createBody.granted_capabilities,
+            provider_scopes: ['Tasks.ReadWrite', 'User.Read'],
+            account_hint: '',
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-ms-todo/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', account_hint: 'user@example.com', updated_at: 2 }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-ms-todo/sync' && method === 'POST') {
+          syncBody = request.postDataJSON()
+          return { connection, snapshots: [snapshot] }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) {
+          return { items: syncBody ? [snapshot] : [] }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('microsoft-todo-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/不申请 Mail \/ Calendar \/ Files 权限/)).toBeVisible()
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+    await page.getByLabel('Microsoft To Do token 环境变量名').fill('MY_MS_TODO_TOKEN')
+    await page.getByLabel('Microsoft To Do 默认 list id').fill('defaultList')
+    await page.getByRole('button', { name: '创建 Microsoft To Do 连接元数据' }).click()
+
+    expect(createBody.credential_ref).toBe('provider:microsoft-graph:env:MY_MS_TODO_TOKEN')
+    expect(createBody.granted_capabilities).toEqual(['project.read', 'task.create'])
+    expect(JSON.stringify(createBody)).not.toContain('ms-secret-token')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/user@example.com/)).toBeVisible()
+    await page.getByLabel('Microsoft To Do Sync list Microsoft To Do · defaultList').fill('defaultList')
+    await page.getByRole('button', { name: 'Sync read-only snapshot' }).click()
+
+    expect(syncBody.space_id).toBe(SPACE.id)
+    expect(syncBody.capabilities).toEqual(['project.read'])
+    expect(syncBody.query).toEqual({ todo_list_id: 'defaultList' })
+    expect(syncBody.limit).toBe(500)
+    await expect(page.getByText('Review rollback plan')).toBeVisible()
+    await expect(page.getByText(/TASK · project.read/)).toBeVisible()
+    await expect(page.getByText(/Confirm owner before Friday/)).toBeVisible()
+  })
+
+
+  test('Microsoft To Do Task execution requires an explicit list target and second Execute', async ({ context, page }) => {
+    const base = mocks()
+    const reviewedCommitment = {
+      ...COMMITMENT_CANDIDATE,
+      id: 'ci-commitment-reviewed',
+      state: 'COMMITTED',
+      owner_id: 'me',
+      review_status: 'USER_CONFIRMED',
+      epistemic_status: 'OBSERVED',
+    }
+    const connection = {
+      id: 'ccn-ms-todo-write',
+      provider_id: 'MICROSOFT_GRAPH',
+      display_name: 'Microsoft To Do · defaultList',
+      status: 'CONNECTED',
+      auth_mode: 'OPAQUE_REFERENCE',
+      granted_capabilities: ['task.create'],
+      provider_scopes: ['Tasks.ReadWrite', 'User.Read'],
+      account_hint: 'user@example.com',
+      sync_cursor: '',
+      sync_cursors: {},
+      last_sync_at: 7,
+      last_error: '',
+      created_at: 1,
+      updated_at: 7,
+      credential_ref_present: true,
+      adapter_available: true,
+    }
+    let taskDraft = null
+    let execution = null
+    let requestBody = null
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'MICROSOFT_GRAPH',
+            label: 'Microsoft To Do (Graph)',
+            capabilities: ['project.read', 'task.create'],
+            read_capabilities: ['project.read'],
+            write_capabilities: ['task.create'],
+            external_kinds: ['TASK'],
+            provider_scopes: { 'project.read': 'Tasks.Read', 'task.create': 'Tasks.ReadWrite' },
+            identity_scopes: ['User.Read'],
+            sync: 'FULL_TARGET_REFRESH',
+            setup: { runtime_opt_in_env: 'CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1' },
+            adapter_available: true,
+            adapter_capabilities: ['project.read', 'task.create'],
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections') return { items: [connection] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) return {
+          session: { ...SESSION, status: 'ENDED', ended_at: 3 },
+          decisions: [DECISION],
+          commitments: [reviewedCommitment],
+          open_questions: [REVIEWED_OPEN],
+          candidates: [],
+          what_changed: [reviewedCommitment],
+          pins: [],
+          next_focus: null,
+          review_required: 0,
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/derived-draft` && method === 'POST') {
+          expect(request.postDataJSON().kind).toBe('CREATE_TASK_DRAFT')
+          taskDraft = {
+            id: 'cda-ms-task',
+            space_id: SPACE.id,
+            session_id: SESSION.id,
+            kind: 'CREATE_TASK_DRAFT',
+            title: 'Architecture Review · Task Draft',
+            content: '- 补 rollout plan · owner=me',
+            target: '',
+            payload: { derived_item_ids: [reviewedCommitment.id], execution: 'LOCAL_REVIEW_ONLY', external_execution: false },
+            source_refs: reviewedCommitment.source_refs,
+            status: 'DRAFT',
+            created_at: 3,
+            updated_at: 3,
+          }
+          return taskDraft
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-ms-task/review' && method === 'POST') {
+          taskDraft = { ...taskDraft, status: 'APPROVED', updated_at: 4 }
+          return taskDraft
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-ms-task/execution' && method === 'POST') {
+          requestBody = request.postDataJSON()
+          execution = {
+            id: 'cce-ms-task',
+            draft_action_id: 'cda-ms-task',
+            connection_id: connection.id,
+            capability: 'task.create',
+            operation: 'CREATE_TASK',
+            target: requestBody.target,
+            idempotency_key: 'mstodo1234567890',
+            status: 'PENDING',
+            request: { title: taskDraft.title, content: taskDraft.content, outbound_redaction_applied: false },
+            response: {},
+            error: '',
+            created_at: 8,
+            updated_at: 8,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-ms-task/execute' && method === 'POST') {
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: {
+              ok: true,
+              provider_id: 'MICROSOFT_GRAPH',
+              provider_surface: 'MICROSOFT_TODO',
+              todo_list_id: 'list-default',
+              task_id: 'task-real-1',
+              task_title: 'Architecture Review · Task Draft',
+              provider_idempotency: 'NONE',
+            },
+            updated_at: 9,
+            executed_at: 9,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Task Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption(connection.id)
+
+    const target = page.getByLabel('Microsoft To Do 目标 list')
+    await expect(target).toBeVisible()
+    await expect(page.getByRole('button', { name: '创建 Execution Request' })).toBeDisabled()
+    await target.fill('defaultList')
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+
+    expect(requestBody).toEqual({ connection_id: connection.id, target: 'defaultList' })
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/task-real-1/)).toBeVisible()
+    await expect(page.getByText(/Provider 已明确返回 ok=true/)).toBeVisible()
+  })
+
+
   test('GitHub provider setup keeps PAT outside the UI and syncs an explicit owner/repo', async ({ context, page }) => {
     const base = mocks()
     let connection = null

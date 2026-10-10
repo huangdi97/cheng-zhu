@@ -445,6 +445,10 @@ def test_google_drive_integration_boundary_stores_immutable_document_and_pack_fr
         consent_ack=True,
         policy={"connector_permissions": ["docs.read"]},
     )
+    # Session Preflight re-validates current connector health before freezing
+    # the grant. Keep that fail-closed runtime behavior; the fake provider must
+    # answer the second about.get probe instead of bypassing it in product code.
+    transport.queue(200, {"user": {"emailAddress": "lei@example.test"}})
     started = conversations.start_session(session["id"])
     frozen = started["pack"]["payload"]["connector_snapshots"]
     assert len(frozen) == 1

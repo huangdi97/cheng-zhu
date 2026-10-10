@@ -426,7 +426,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     try {
       await conversationApi.verifyIntegrationConnection(connectionId)
       await integrationConnections.reload()
-      setLifecycleMessage('Connector adapter + opaque credential reference 已通过 health check，连接状态为 CONNECTED。')
+      setLifecycleMessage('Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }

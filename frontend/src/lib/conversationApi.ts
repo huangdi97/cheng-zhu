@@ -88,6 +88,15 @@ export const conversationApi = {
     ).then((p) => list<ConversationExternalExecution>(p)),
   executeExternalRequest: (id: string) =>
     request<ConversationExternalExecution>(`${B}/integrations/executions/${encodeURIComponent(id)}/execute`, json('POST')),
+  reconcileExternalRequest: (
+    id: string,
+    outcome: 'CONFIRMED_SUCCEEDED' | 'CONFIRMED_NOT_APPLIED',
+    note: string,
+    provider_reference = '',
+  ) => request<ConversationExternalExecution>(
+    `${B}/integrations/executions/${encodeURIComponent(id)}/reconcile`,
+    json('POST', { outcome, note, provider_reference }),
+  ),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
     scenario: string

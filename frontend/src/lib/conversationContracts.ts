@@ -445,7 +445,7 @@ export interface ConversationExternalExecution {
   operation: string
   target: string
   idempotency_key: string
-  status: 'PENDING' | 'EXECUTING' | 'SUCCEEDED' | 'FAILED' | 'BLOCKED' | 'CANCELLED' | string
+  status: 'PENDING' | 'EXECUTING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN_OUTCOME' | 'BLOCKED' | 'CANCELLED' | string
   request: Record<string, unknown>
   response: Record<string, unknown>
   error: string

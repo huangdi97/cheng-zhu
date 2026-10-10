@@ -548,6 +548,7 @@ reviewed output evidence
 | Conversation Human Coach | RUNTIME_AVAILABLE | Conversation-specific session kind/target + frozen HUMAN_ALLOWED policy + transparency gate + per-field permissions + helper-side session scoping + Interview Resume/JD isolation + advice-only audit + lifecycle revoke；beta.2 public prerelease / real-session evidence 仍是独立发布/用户证据门禁 |
 | Conversation Private Overlay / Share Privacy | RUNTIME_AVAILABLE_DESKTOP | 复用 Electron `setContentProtection`，但由 Conversation Session Policy 显式请求；Start 前临时启用并验证 runtime proof，Pack 冻结 verified state，Live 显示 ACTIVE/UNKNOWN，End 后恢复会话前全局默认；Web fallback fail-closed；best-effort only，不声称安全/隐身/不可检测 |
 | Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；只回答 capability truth |
+| Local scheduled Conversation reminder | RUNTIME_AVAILABLE_DESKTOP | 只读取 Chengzhu 内手工排期的 UPCOMING Session；用户显式 opt-in；默认提前 10 分钟；通知不泄露 Session/Space 标题；点击进入对应 Space Prepare；不等于 Calendar connector |
 | External Integration Boundary | PR #61 CANDIDATE | schema v8：opaque credential ref、CONNECTED account、immutable snapshot、exact grant、retention/export、Execution Request / audit；默认无 adapter |
 | Calendar / Mail / Docs / project tracker provider | NOT CONFIGURED | external dependency；catalog/contract 已定义，但没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
 | External task/email/issue write-back execution boundary | PR #61 CANDIDATE | reviewed Draft → exact account → Execution Request → second Execute → provider result；没有真实 adapter/account 时保持 fail-closed |
@@ -740,12 +741,13 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 - ad-hoc 统一为 Space-backed continuity truth，不再设计第二套 standalone truth；
 - schema v6 temporal provenance + Deadline ambiguity review gate；
 - subsystem-level Conversation Diagnostics；
+- privacy-first local scheduled Conversation reminder（非 Calendar discovery）；
 - stale Reality Report / historical Goal truth sync。
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
 - real Google / Microsoft / GitHub / MCP adapter + account authorization；
-- OS notification/discovery；
+- external Calendar/meeting discovery；
 - Human Coach real-session evidence；
 - real external action evidence（边界/runtime 可在 repo 内实现；provider success 必须来自真实 adapter/account）；
 - participant auto chat notice / watermark；

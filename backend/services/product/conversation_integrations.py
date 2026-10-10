@@ -1175,5 +1175,5 @@ def diagnostics() -> dict[str, Any]:
         ) or 0),
         "orphaned_executions_recovered": recovered_orphans,
         "secret_storage": "OPAQUE_REFERENCE_ONLY",
-        "default": "NO_PROVIDER_ADAPTERS_CONFIGURED",
+        "default": "PROVIDERS_REQUIRE_EXPLICIT_CONNECTION" if _ADAPTERS else "NO_PROVIDER_ADAPTERS_CONFIGURED",
     }

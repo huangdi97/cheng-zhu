@@ -398,6 +398,7 @@ export interface ConversationConnectorCatalogItem {
   external_kinds: string[]
   provider_scopes: Record<string, string>
   sync: string
+  setup: Record<string, string>
   adapter_available: boolean
 }
 

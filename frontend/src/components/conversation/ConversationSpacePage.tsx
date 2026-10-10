@@ -373,6 +373,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSourceSaving(false) }
   }
 
+  const scheduleCalendarSnapshot = async (snapshotId: string) => {
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.scheduleCalendarSnapshot(spaceId, snapshotId)
+      setLifecycleMessage(result.created
+        ? 'Calendar event 已显式导入为这个 Space 的 UPCOMING Session，并把该 immutable snapshot 选入 Space；后续 Calendar 更新不会静默改写这场。'
+        : '这个 Calendar snapshot 已经导入过；没有重复创建 Session。')
+      await detail.reload(); await prepare.reload(); await connectorSnapshots.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const createGitHubConnection = async () => {
     const envName = githubEnvVar.trim()
     const repository = githubRepository.trim()
@@ -847,10 +859,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Immutable snapshots · 显式选入 Space</div>
                   {(connectorSnapshots.data?.items ?? []).length ? <div className="space-y-1.5">{connectorSnapshots.data!.items.map((snapshot) => {
                     const checked = (space.selected_connector_snapshot_ids ?? []).includes(snapshot.id)
-                    return <label key={snapshot.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
-                      <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
-                      <span><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
-                    </label>
+                    const calendarMeta = snapshot.metadata ?? {}
+                    const calendarFuture = snapshot.external_kind === 'CALENDAR_EVENT'
+                      && typeof snapshot.occurred_at === 'number'
+                      && snapshot.occurred_at > Date.now() / 1000
+                      && !Boolean(calendarMeta.cancelled)
+                    const imported = space.sessions.some((session) => session.source_calendar_event?.snapshot_id === snapshot.id)
+                    return <div key={snapshot.id} className="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
+                      <label className="flex min-w-0 flex-1 items-start gap-2">
+                        <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
+                        <span className="min-w-0"><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{typeof snapshot.occurred_at === 'number' ? <span className="ml-1 text-text-muted">· {new Date(snapshot.occurred_at * 1000).toLocaleString()}</span> : null}{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
+                      </label>
+                      {snapshot.external_kind === 'CALENDAR_EVENT' ? imported
+                        ? <StatusBadge tone="ok">已导入</StatusBadge>
+                        : calendarFuture
+                          ? <SecondaryButton disabled={integrationBusy} onClick={() => scheduleCalendarSnapshot(snapshot.id)}>作为下一场</SecondaryButton>
+                          : <StatusBadge tone="muted">{Boolean(calendarMeta.cancelled) ? '已取消' : '非未来事件'}</StatusBadge>
+                        : null}
+                    </div>
                   })}</div> : <p className="text-[11px] text-text-muted">还没有外部 snapshot。真实连接 Sync 后才会出现；本场仍可完全离线使用。</p>}
                 </div>
               </>}

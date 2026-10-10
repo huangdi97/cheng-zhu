@@ -241,18 +241,21 @@ class GoogleCalendarRestAdapter:
                 "runtime": "OPT_IN_REAL_PROVIDER",
             }
         calendar_id = str(connection.get("account_hint") or "primary").strip() or "primary"
-        result = self._list_events(
-            connection=connection,
-            calendar_id=calendar_id,
-            cursor="",
-            collect=False,
+        token = self._resolve_token(connection)
+        path = f"/calendars/{quote(calendar_id, safe='')}/events"
+        status, _headers, payload = self._request(
+            path,
+            token=token,
+            params={"maxResults": 1, "singleEvents": "true", "showDeleted": "true"},
         )
+        if status != 200 or not isinstance(payload, dict) or not isinstance(payload.get("items", []), list):
+            return {"ok": False, "error": f"Google Calendar verify returned HTTP {status}"}
         return {
             "ok": True,
             "label": "Google Calendar",
             "account_hint": calendar_id[:300],
             "calendar_id": calendar_id[:500],
-            "events_seen_during_verify": int(result["seen"]),
+            "verify": "READ_PROBE_ONLY",
         }
 
     def read_context(

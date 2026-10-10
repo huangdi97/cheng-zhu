@@ -279,6 +279,63 @@ def test_google_drive_target_failure_is_nonfatal_but_auth_failure_is_fatal(monke
         )
 
 
+
+
+def test_google_drive_more_than_500_files_fails_before_any_content_download(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
+    transport = FakeTransport()
+    transport.queue(200, _folder())
+    # Six pages make the adapter cross the 500 direct-child safety ceiling.
+    for page in range(6):
+        rows = [_file(f"doc-{page}-{i}", f"Doc {page}-{i}") for i in range(100)]
+        transport.queue(200, {
+            "files": rows,
+            "nextPageToken": f"page-{page + 2}" if page < 5 else "",
+        })
+    adapter = GoogleDriveRestAdapter(transport=transport)
+
+    with pytest.raises(ValueError, match="超过安全上限 500"):
+        adapter.read_context(
+            connection=_connection(folder="folder-1"),
+            capability="docs.read",
+            query={"folder_id": "folder-1"},
+            cursor="",
+            limit=500,
+        )
+    # 1 folder probe + 6 list pages; no export/media request should happen.
+    assert len(transport.calls) == 7
+    assert not any("/export" in call["url"] or "alt=media" in call["url"] for call in transport.calls)
+
+
+def test_google_drive_target_must_be_an_actual_nontrashed_folder(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
+    transport = FakeTransport()
+    transport.queue(200, _file("not-folder", "Not a folder", "application/vnd.google-apps.document"))
+    adapter = GoogleDriveRestAdapter(transport=transport)
+    with pytest.raises(ValueError, match="不是 folder"):
+        adapter.read_context(
+            connection=_connection(folder="not-folder"),
+            capability="docs.read",
+            query={"folder_id": "not-folder"},
+            cursor="",
+            limit=500,
+        )
+
+    transport2 = FakeTransport()
+    trashed = _folder("folder-trash")
+    trashed["trashed"] = True
+    transport2.queue(200, trashed)
+    adapter2 = GoogleDriveRestAdapter(transport=transport2)
+    with pytest.raises(ValueError, match="回收站"):
+        adapter2.read_context(
+            connection=_connection(folder="folder-trash"),
+            capability="docs.read",
+            query={"folder_id": "folder-trash"},
+            cursor="",
+            limit=500,
+        )
+
+
 def test_google_drive_registration_is_explicit_opt_in(product_env, monkeypatch):
     conversation_integrations.clear_adapters_for_tests()
     monkeypatch.delenv("CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE", raising=False)
@@ -331,6 +388,9 @@ def test_google_drive_integration_boundary_stores_immutable_document_and_pack_fr
     assert snapshot["external_kind"] == "DOCUMENT"
     assert snapshot["capability"] == "docs.read"
     assert snapshot["excerpt"].startswith("Architecture decision source")
+    assert snapshot["source_url"] == "https://drive.google.com/file/d/doc-1/view"
+    assert "ya29.drive_test_secret" not in str(snapshot)
+    assert "secret=no" not in str(snapshot)
 
     conversations.update_space(space["id"], {"selected_connector_snapshot_ids": [snapshot["id"]]})
     session = conversations.create_session(

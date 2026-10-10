@@ -1551,6 +1551,158 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('Google Calendar read-only provider discovers a future event and explicitly imports Next Session', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let syncBody = null
+    let synced = false
+    let scheduled = false
+    const eventStart = Date.now() / 1000 + 7200
+    const snapshot = {
+      id: 'ccs-gcal-next',
+      connection_id: 'ccn-gcal',
+      space_id: SPACE.id,
+      capability: 'calendar.read',
+      external_kind: 'CALENDAR_EVENT',
+      external_id: 'primary:evt-next',
+      title: 'Calendar Architecture Review',
+      excerpt: 'Review rollout and rollback owner.',
+      content_hash: 'sha256:gcal-next',
+      source_url: 'https://calendar.google.com/calendar/event',
+      occurred_at: eventStart,
+      visibility: 'PRIVATE',
+      metadata: { calendar_id: 'primary', event_id: 'evt-next', status: 'confirmed', cancelled: false },
+      created_at: 2,
+    }
+    const calendarSession = {
+      ...SESSION,
+      id: 'cv-calendar-next',
+      title: snapshot.title,
+      scheduled_at: eventStart,
+      started_at: null,
+      ended_at: null,
+      status: 'UPCOMING',
+      source_calendar_event: {
+        snapshot_id: snapshot.id,
+        provider_id: 'GOOGLE_CALENDAR',
+        connection_id: 'ccn-gcal',
+        external_id: snapshot.external_id,
+        content_hash: snapshot.content_hash,
+        calendar_id: 'primary',
+        event_id: 'evt-next',
+        imported_at: 3,
+      },
+      state: { ...SESSION.state, calendar_imported: true },
+    }
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'GOOGLE_CALENDAR',
+            label: 'Google Calendar',
+            capabilities: ['calendar.read'],
+            read_capabilities: ['calendar.read'],
+            write_capabilities: [],
+            external_kinds: ['CALENDAR_EVENT'],
+            provider_scopes: { 'calendar.read': 'https://www.googleapis.com/auth/calendar.events.readonly' },
+            sync: 'NATIVE_SYNC_TOKEN',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:google-calendar:env:<ENV_VAR>',
+              read_target: 'calendar_id (default primary)',
+              secret_storage: 'PROCESS_ENV_ONLY',
+              write_support: 'NONE',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') return { items: connection ? [connection] : [] }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-gcal',
+            provider_id: 'GOOGLE_CALENDAR',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: ['calendar.read'],
+            provider_scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+            account_hint: createBody.account_hint,
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-gcal/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', updated_at: 2 }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-gcal/sync' && method === 'POST') {
+          syncBody = request.postDataJSON()
+          synced = true
+          connection = { ...connection, sync_cursors: { 'calendar.read': 'sync-token-1' }, sync_cursor: 'sync-token-1', last_sync_at: 2 }
+          return { connection, snapshots: [snapshot] }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: synced ? [snapshot] : [] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/calendar-snapshots/${snapshot.id}/schedule` && method === 'POST') {
+          scheduled = true
+          return { session: calendarSession, snapshot_selected: true, created: true }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'GET' && scheduled) {
+          const result = await base(pathname, method, request)
+          return {
+            ...result,
+            sessions: [calendarSession, ...(result.sessions ?? [])],
+            next_session: calendarSession,
+            selected_connector_snapshot_ids: [snapshot.id],
+          }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('google-calendar-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/read-only discovery/)).toBeVisible()
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+    await page.getByLabel('Google Calendar token 环境变量名').fill('MY_GCAL_TOKEN')
+    await page.getByLabel('Google Calendar 默认 calendar id').fill('primary')
+    await page.getByRole('button', { name: '创建 Calendar 连接元数据' }).click()
+
+    expect(createBody.credential_ref).toBe('provider:google-calendar:env:MY_GCAL_TOKEN')
+    expect(createBody.granted_capabilities).toEqual(['calendar.read'])
+    expect(createBody.account_hint).toBe('primary')
+    expect(JSON.stringify(createBody)).not.toContain('ya29.')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await page.getByLabel('Google Calendar Sync calendar id Google Calendar · primary').fill('primary')
+    await page.getByRole('button', { name: 'Sync read-only snapshot' }).click()
+
+    expect(syncBody.capabilities).toEqual(['calendar.read'])
+    expect(syncBody.query).toEqual({ calendar_id: 'primary' })
+    expect(syncBody.limit).toBe(500)
+    await expect(page.getByText('Calendar Architecture Review')).toBeVisible()
+    await expect(page.getByText(/CALENDAR_EVENT · calendar.read/)).toBeVisible()
+    await page.getByRole('button', { name: '作为下一场' }).click()
+    await expect(page.getByText(/Calendar event 已显式导入/)).toBeVisible()
+
+    await page.getByRole('button', { name: '概览' }).click()
+    await expect(page.getByText('Next Session')).toBeVisible()
+    await expect(page.getByText('Calendar Architecture Review')).toBeVisible()
+  })
+
+
   test('GitHub provider setup keeps PAT outside the UI and syncs an explicit owner/repo', async ({ context, page }) => {
     const base = mocks()
     let connection = null

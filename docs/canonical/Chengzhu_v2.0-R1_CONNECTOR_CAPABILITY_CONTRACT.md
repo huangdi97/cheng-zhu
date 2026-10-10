@@ -304,6 +304,8 @@ Preflight 冻结：
 - blocked reasons；
 - explicit selected connector snapshot ids。
 
+Start 必须先执行一次最新 Preflight/health + context fingerprint 校验，然后把**这次已经验证并进入 fingerprint 的 connector runtime 原样冻结到 Session Pack**。freeze_pack 不得再独立 resolve 第二套 provider health 结果，否则 Preview 与 Pack 可能发生 TOCTOU 漂移。
+
 No placeholder provider.
 
 ---

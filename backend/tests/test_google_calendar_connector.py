@@ -489,6 +489,137 @@ def test_calendar_snapshot_import_rejects_cancelled_past_cross_space_and_non_goo
         conversations.schedule_from_calendar_snapshot(space["id"], fake_calendar_from_github["id"])
 
 
+
+
+def test_calendar_only_latest_revision_can_be_imported_and_old_revision_stays_audit_only(product_env):
+    space = conversations.create_space("Calendar Revision", "PROJECT_SYNC")
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_CALENDAR",
+        granted_capabilities=["calendar.read"],
+        credential_ref="provider:google-calendar:env:CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN",
+        account_hint="primary",
+    )
+    now = store.now()
+    old = conversation_integrations._store_snapshot(
+        connection, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-revision",
+            "title": "Architecture Review",
+            "excerpt": "Old time",
+            "occurred_at": now + 3600,
+            "metadata": {"calendar_id": "primary", "event_id": "evt-revision", "status": "confirmed", "cancelled": False},
+        },
+    )
+    latest = conversation_integrations._store_snapshot(
+        connection, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-revision",
+            "title": "Architecture Review · Rescheduled",
+            "excerpt": "New time",
+            "occurred_at": now + 7200,
+            "metadata": {"calendar_id": "primary", "event_id": "evt-revision", "status": "confirmed", "cancelled": False},
+        },
+    )
+
+    listed = {row["id"]: row for row in conversation_integrations.list_snapshots(space["id"])}
+    assert listed[old["id"]]["is_latest_revision"] is False
+    assert listed[old["id"]]["latest_snapshot_id"] == latest["id"]
+    assert listed[latest["id"]]["is_latest_revision"] is True
+
+    with pytest.raises(ValueError, match="不是最新 revision"):
+        conversations.schedule_from_calendar_snapshot(space["id"], old["id"])
+    imported = conversations.schedule_from_calendar_snapshot(space["id"], latest["id"])
+    assert imported["session"]["scheduled_at"] == latest["occurred_at"]
+
+
+def test_calendar_cancelled_latest_revision_blocks_old_import_and_marks_existing_session_drift(product_env):
+    space = conversations.create_space("Calendar Cancellation", "PROJECT_SYNC")
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_CALENDAR",
+        granted_capabilities=["calendar.read"],
+        credential_ref="provider:google-calendar:env:CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN",
+        account_hint="primary",
+    )
+    now = store.now()
+    confirmed = conversation_integrations._store_snapshot(
+        connection, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-cancel",
+            "title": "Client Review",
+            "occurred_at": now + 3600,
+            "metadata": {"calendar_id": "primary", "event_id": "evt-cancel", "status": "confirmed", "cancelled": False},
+        },
+    )
+    imported = conversations.schedule_from_calendar_snapshot(space["id"], confirmed["id"])
+    original_time = imported["session"]["scheduled_at"]
+
+    cancelled = conversation_integrations._store_snapshot(
+        connection, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-cancel",
+            "title": "[Cancelled event]",
+            "occurred_at": now + 3600,
+            "metadata": {"calendar_id": "primary", "event_id": "evt-cancel", "status": "cancelled", "cancelled": True},
+        },
+    )
+
+    with pytest.raises(ValueError, match="更新版本中取消"):
+        conversations.schedule_from_calendar_snapshot(space["id"], confirmed["id"])
+    with pytest.raises(ValueError, match="已取消"):
+        conversations.schedule_from_calendar_snapshot(space["id"], cancelled["id"])
+
+    detail = conversations.space_detail(space["id"])
+    session = next(x for x in detail["sessions"] if x["id"] == imported["session"]["id"])
+    assert session["scheduled_at"] == original_time
+    assert session["source_calendar_event"]["revision_status"] == "CANCELLED_UPSTREAM"
+    assert session["source_calendar_event"]["latest_snapshot_id"] == cancelled["id"]
+    assert session["source_calendar_event"]["latest_cancelled"] is True
+
+
+def test_calendar_rescheduled_latest_revision_marks_existing_session_source_drift_without_rewriting(product_env):
+    space = conversations.create_space("Calendar Drift", "PROJECT_SYNC")
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_CALENDAR",
+        granted_capabilities=["calendar.read"],
+        credential_ref="provider:google-calendar:env:CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN",
+        account_hint="primary",
+    )
+    now = store.now()
+    first = conversation_integrations._store_snapshot(
+        connection, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-drift",
+            "title": "Design Review",
+            "occurred_at": now + 3600,
+            "metadata": {"calendar_id": "primary", "event_id": "evt-drift", "status": "confirmed", "cancelled": False},
+        },
+    )
+    imported = conversations.schedule_from_calendar_snapshot(space["id"], first["id"])
+    moved = conversation_integrations._store_snapshot(
+        connection, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-drift",
+            "title": "Design Review · Moved",
+            "occurred_at": now + 10800,
+            "metadata": {"calendar_id": "primary", "event_id": "evt-drift", "status": "confirmed", "cancelled": False},
+        },
+    )
+
+    detail = conversations.space_detail(space["id"])
+    session = next(x for x in detail["sessions"] if x["id"] == imported["session"]["id"])
+    assert session["scheduled_at"] == first["occurred_at"]
+    assert session["title"] == "Design Review"
+    assert session["source_calendar_event"]["revision_status"] == "SOURCE_DRIFT"
+    assert session["source_calendar_event"]["latest_snapshot_id"] == moved["id"]
+    assert session["source_calendar_event"]["latest_scheduled_at"] == moved["occurred_at"]
+
+
 def test_calendar_cursor_never_crosses_explicit_calendar_targets(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN", "ya29.test_calendar_token")
     transport = FakeTransport()

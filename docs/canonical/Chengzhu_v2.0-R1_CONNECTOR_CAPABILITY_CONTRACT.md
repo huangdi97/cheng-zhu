@@ -272,6 +272,7 @@ https://www.googleapis.com/auth/gmail.send
 - 如果外发安全层检测到 secret 并改写 reviewed Draft，Gmail adapter 拒绝发送，要求用户回到 Draft 重新审核；
 - Gmail provider 不会静默截断已审核 Subject/Body；超过 provider v1 安全上限时拒绝执行并要求修改/重新审核；
 - 当前没有真实 Google account/runtime replay，因此不得声明真实邮件已成功发出。
+- Google 官方将 `gmail.send` 归类为 **Sensitive scope**；公共/稳定 provider 还需要适用的 OAuth consent / app verification。CI/adapter 存在不能替代该外部发布门槛。
 
 实现说明：
 [Google Mail Conversation Connector](../architecture/GOOGLE_MAIL_CONVERSATION_CONNECTOR.md)

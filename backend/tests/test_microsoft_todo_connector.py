@@ -207,6 +207,34 @@ def test_microsoft_todo_explicit_list_target_is_probed_before_create(monkeypatch
     assert transport.calls[1]["method"] == "POST"
 
 
+
+
+def test_microsoft_todo_target_probe_failure_is_retry_safe_before_any_write(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN", "ms-test-token")
+    transport = FakeTransport()
+    transport.queue(503, MicrosoftGraphProviderError(503, "Microsoft Graph HTTP 503 during list probe"))
+    adapter = MicrosoftTodoTaskAdapter(transport=transport)
+
+    result = adapter.execute(
+        connection=_connection(),
+        capability="task.create",
+        operation="CREATE_TASK",
+        target="default",
+        payload={
+            "title": "Task not yet sent",
+            "content": "body",
+            "outbound_redaction_applied": False,
+        },
+        idempotency_key="pre-write-failure",
+    )
+
+    assert result["ok"] is False
+    assert result["retry_safe"] is True
+    assert result["phase"] == "TARGET_RESOLUTION_PRE_WRITE"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["method"] == "GET"
+
+
 def test_microsoft_todo_never_silently_mutates_reviewed_payload(monkeypatch):
     monkeypatch.setenv("CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN", "ms-test-token")
     adapter = MicrosoftTodoTaskAdapter(transport=FakeTransport())

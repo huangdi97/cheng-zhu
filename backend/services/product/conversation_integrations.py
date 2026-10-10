@@ -134,7 +134,7 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             "write_target": "relative .md path under configured root (default decisions.md)",
             "secret_storage": "NONE_ROOT_PATH_FROM_PROCESS_ENV",
             "read_support": "NONE",
-            "local_only": True,
+            "local_only": "true",
         },
     },
     "MCP": {

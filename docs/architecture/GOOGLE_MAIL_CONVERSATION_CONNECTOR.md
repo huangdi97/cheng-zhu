@@ -67,6 +67,8 @@ X-Chengzhu-Execution-ID 仅用于审计关联，不是 provider-side idempotency
 
 如果 shared execution safety 层发现 secret 并导致 outbound 内容与刚审核的 Draft 不同，Gmail adapter 拒绝发送。
 
+同样，Subject 超过 998 字符或正文超过 20000 字符时也直接拒绝；不会用截断后的新内容替代用户已经审核的 Draft。
+
 正确路径是：remove secret → regenerate/review Draft → new Execution Request → second explicit Execute。
 
 ## 8. Failure / idempotency semantics

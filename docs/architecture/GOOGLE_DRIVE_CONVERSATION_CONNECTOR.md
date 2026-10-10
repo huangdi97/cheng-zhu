@@ -139,7 +139,7 @@ Sync 先执行 folder metadata probe，要求：
 application/vnd.google-apps.document
 → files.export
 → text/plain
-→ FULL_TEXT_EXPORT
+→ TEXT_EXPORT_EXCERPT_20K
 ```
 
 ### Google Slides
@@ -148,7 +148,7 @@ application/vnd.google-apps.document
 application/vnd.google-apps.presentation
 → files.export
 → text/plain
-→ FULL_TEXT_EXPORT
+→ TEXT_EXPORT_EXCERPT_20K
 ```
 
 ### Google Sheets
@@ -157,11 +157,27 @@ application/vnd.google-apps.presentation
 application/vnd.google-apps.spreadsheet
 → files.export
 → text/csv
-→ FIRST_SHEET_CSV
+→ FIRST_SHEET_CSV_EXCERPT_20K
 → partial_content = true
 ```
 
 不能把第一张 sheet CSV 说成完整 spreadsheet。
+
+### Retrieval 与 revision 必须分开
+
+Provider 会完整读取/导出不超过 2MB 的可文本化内容，用完整内容计算本地 `full_content_digest_sha256`；该 digest 进入 snapshot metadata，因此即使文档前 20k 字完全相同、只有尾部变化，也会产生新的 immutable revision。
+
+但 generic connector snapshot 当前只持久化/检索前 20,000 字符：
+
+```text
+retrieval_scope = FIRST_20000_CHARS
+```
+
+所以：
+- `full_content_digest_sha256` 证明 revision identity 覆盖完整读取内容；
+- `excerpt` 只代表当前可检索窗口；
+- 不得把 Drive v1 provider 描述成“全文长期存储 / 全文检索”；
+- 超过 20k 的正文尾部可以改变 revision，但不会自动进入当前 Manual Ask 的检索窗口。
 
 ### Common text blobs
 
@@ -169,7 +185,7 @@ application/vnd.google-apps.spreadsheet
 text/*
 application/json/xml/yaml/sql/javascript
 → files.get?alt=media
-→ FULL_TEXT_BLOB
+→ TEXT_BLOB_EXCERPT_20K
 ```
 
 ### PDF / image / office binary / unsupported

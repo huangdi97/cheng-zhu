@@ -417,9 +417,6 @@ class MicrosoftTodoGraphAdapter:
                 "retry_safe": False,
             }
 
-        token = self._resolve_token(connection)
-        task_list = self._resolve_list(connection=connection, target=target or "defaultList", token=token)
-        list_id = task_list["id"]
         title = str(payload.get("title") or "").strip()
         content = str(payload.get("content") or "").rstrip()
         if not title:
@@ -436,6 +433,17 @@ class MicrosoftTodoGraphAdapter:
                 "error": "Microsoft To Do task body 超过 Chengzhu 安全上限 20000；拒绝静默截断已审核正文",
                 "retry_safe": False,
             }
+        if bool(payload.get("outbound_redaction_applied")):
+            return {
+                "ok": False,
+                "error": "安全层改写了已审核 Task 内容；请移除敏感值并重新审核 Draft 后再执行",
+                "retry_safe": False,
+            }
+
+        # Do not touch Microsoft Graph for invalid/review-changed content.
+        token = self._resolve_token(connection)
+        task_list = self._resolve_list(connection=connection, target=target or "defaultList", token=token)
+        list_id = task_list["id"]
 
         request_payload: dict[str, Any] = {"title": title}
         if content:

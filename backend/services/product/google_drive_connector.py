@@ -299,6 +299,15 @@ class GoogleDriveRestAdapter:
 
         if mime in _GOOGLE_EXPORTS:
             export_mime, partial, scope = _GOOGLE_EXPORTS[mime]
+            if not can_download:
+                return {
+                    "content_available": False,
+                    "text": "",
+                    "export_mime": export_mime,
+                    "content_scope": "METADATA_ONLY",
+                    "partial_content": False,
+                    "reason": "DOWNLOAD_RESTRICTED",
+                }
             status, _headers, raw = self._request(
                 f"/files/{quote(file_id, safe='')}/export",
                 token=token,
@@ -306,9 +315,19 @@ class GoogleDriveRestAdapter:
             )
             if status != 200 or not isinstance(raw, (bytes, bytearray)):
                 raise RuntimeError(f"Google Drive files.export returned ambiguous HTTP {status}")
+            raw_bytes = bytes(raw)
+            if len(raw_bytes) > _MAX_TEXT_BYTES:
+                return {
+                    "content_available": False,
+                    "text": "",
+                    "export_mime": export_mime,
+                    "content_scope": "METADATA_ONLY",
+                    "partial_content": False,
+                    "reason": "TEXT_TOO_LARGE",
+                }
             return {
                 "content_available": True,
-                "text": _decode_text(bytes(raw)),
+                "text": _decode_text(raw_bytes),
                 "export_mime": export_mime,
                 "content_scope": scope,
                 "partial_content": partial,

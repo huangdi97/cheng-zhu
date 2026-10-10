@@ -133,6 +133,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [githubRepository, setGithubRepository] = useState('')
   const [googleCalendarEnvVar, setGoogleCalendarEnvVar] = useState('CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN')
   const [googleCalendarId, setGoogleCalendarId] = useState('primary')
+  const [googleDriveEnvVar, setGoogleDriveEnvVar] = useState('CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN')
+  const [googleDriveFolderId, setGoogleDriveFolderId] = useState('root')
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -167,6 +169,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const space = detail.data
   const githubProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GITHUB')
   const googleCalendarProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_CALENDAR')
+  const googleDriveProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_DRIVE')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -446,10 +449,38 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const createGoogleDriveConnection = async () => {
+    const envName = googleDriveEnvVar.trim()
+    const folderId = googleDriveFolderId.trim() || 'root'
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Google Drive credential env 只允许环境变量名，例如 CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN。')
+      return
+    }
+    if (!/^(?:root|[A-Za-z0-9_-]{1,256})$/.test(folderId)) {
+      setSessionError('Google Drive folder id 非法。可使用 root 或明确的 folder id。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const created = await conversationApi.createIntegrationConnection({
+        provider_id: 'GOOGLE_DRIVE',
+        display_name: `Google Drive · ${folderId}`,
+        granted_capabilities: ['docs.read'],
+        credential_ref: `provider:google-drive:env:${envName}`,
+        account_hint: folderId,
+      })
+      setConnectorTargets((current) => ({ ...current, [created.id]: folderId }))
+      await integrationConnections.reload()
+      setLifecycleMessage('Google Drive connection 元数据已创建。下一步点击“验证连接”；这里只记录 opaque env reference，不保存 access token。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
     const calendarId = (connectorTargets[connectionId] || connection?.account_hint || googleCalendarId || 'primary').trim()
+    const driveFolderId = (connectorTargets[connectionId] || connection?.account_hint || googleDriveFolderId || 'root').trim()
     if (connection?.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
       setSessionError('GitHub Sync 需要明确填写 owner/repo；不会从其他 Space 或历史连接猜测目标。')
       return
@@ -458,17 +489,23 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       setSessionError('Google Calendar Sync 需要 primary 或明确 calendar id。')
       return
     }
+    if (connection?.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test(driveFolderId)) {
+      setSessionError('Google Drive Sync 需要 root 或明确 folder id。')
+      return
+    }
     setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.syncIntegrationConnection(connectionId, {
         space_id: spaceId,
         capabilities: connection?.provider_id === 'GITHUB'
           ? ['project.read']
-          : connection?.provider_id === 'GOOGLE_CALENDAR' ? ['calendar.read'] : undefined,
+          : connection?.provider_id === 'GOOGLE_CALENDAR' ? ['calendar.read']
+            : connection?.provider_id === 'GOOGLE_DRIVE' ? ['docs.read'] : undefined,
         query: connection?.provider_id === 'GITHUB'
           ? { repository }
-          : connection?.provider_id === 'GOOGLE_CALENDAR' ? { calendar_id: calendarId } : undefined,
-        limit: connection?.provider_id === 'GOOGLE_CALENDAR' ? 500 : undefined,
+          : connection?.provider_id === 'GOOGLE_CALENDAR' ? { calendar_id: calendarId }
+            : connection?.provider_id === 'GOOGLE_DRIVE' ? { folder_id: driveFolderId } : undefined,
+        limit: ['GOOGLE_CALENDAR', 'GOOGLE_DRIVE'].includes(connection?.provider_id ?? '') ? 500 : undefined,
       })
       setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
       await connectorSnapshots.reload(); await integrationConnections.reload()
@@ -484,7 +521,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
       const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
       setLifecycleMessage(connection?.provider_id === 'GOOGLE_CALENDAR'
         ? 'Google Calendar read probe 已通过，连接状态为 CONNECTED。实际 calendar target 的完整读取仍由显式 Sync provider 响应证明。'
-        : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+        : connection?.provider_id === 'GOOGLE_DRIVE'
+          ? 'Google Drive account read probe 已通过，连接状态为 CONNECTED。具体 folder 是否可读仍由显式 Sync 的 folder probe + 完整分页证明。'
+          : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -831,6 +870,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   </div>
                   <p className="mt-2 text-[10px] text-text-muted">Verify 只做一页 read probe；真正 full/incremental sync 只有你点击 Sync 时发生。sync token 失效时会显式 full resync，不会把截断结果当完整状态。</p>
                 </div> : null}
+                {googleDriveProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="google-drive-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Google Drive / Docs · read-only context</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleDriveProvider.setup?.runtime_opt_in_env || 'CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1'} 和只读 Drive access-token 环境变量。每次 Sync 都只刷新你明确指定的 folder，不做 account-wide background mirror。</p>
+                    </div>
+                    <StatusBadge tone={googleDriveProvider.adapter_available ? 'ok' : 'muted'}>{googleDriveProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input aria-label="Google Drive token 环境变量名" className={inputCls} value={googleDriveEnvVar} onChange={(e) => setGoogleDriveEnvVar(e.target.value)} placeholder="CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN" />
+                    <input aria-label="Google Drive 默认 folder id" className={inputCls} value={googleDriveFolderId} onChange={(e) => setGoogleDriveFolderId(e.target.value)} placeholder="root 或 folder id" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !googleDriveProvider.adapter_available} onClick={createGoogleDriveConnection}>创建 Drive 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">scope · drive.readonly · credential ref = provider:google-drive:env:{googleDriveEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Docs / Slides 导出纯文本；Sheets 仅第一 sheet CSV 并明确标 partial；PDF/二进制只保存 metadata，不会假装已读取正文。Sync 完成后仍需逐条选入 Space。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -845,9 +902,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       {connection.provider_id === 'GOOGLE_CALENDAR' ? <div className="mt-2">
                         <input aria-label={`Google Calendar Sync calendar id ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="primary 或显式 calendar id" />
                       </div> : null}
+                      {connection.provider_id === 'GOOGLE_DRIVE' ? <div className="mt-2">
+                        <input aria-label={`Google Drive Sync folder id ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="root 或显式 folder id" />
+                      </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim())} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>
@@ -869,7 +929,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     return <div key={snapshot.id} className="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
                       <label className="flex min-w-0 flex-1 items-start gap-2">
                         <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
-                        <span className="min-w-0"><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{typeof snapshot.occurred_at === 'number' ? <span className="ml-1 text-text-muted">· {new Date(snapshot.occurred_at * 1000).toLocaleString()}</span> : null}{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
+                        <span className="min-w-0"><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{snapshot.external_kind === 'DOCUMENT' && snapshot.metadata?.content_available === false ? <span className="ml-1 text-status-inferred">· metadata only</span> : null}{snapshot.external_kind === 'DOCUMENT' && snapshot.metadata?.partial_content === true ? <span className="ml-1 text-status-inferred">· partial content</span> : null}{typeof snapshot.occurred_at === 'number' ? <span className="ml-1 text-text-muted">· {new Date(snapshot.occurred_at * 1000).toLocaleString()}</span> : null}{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
                       </label>
                       {snapshot.external_kind === 'CALENDAR_EVENT' ? imported
                         ? <StatusBadge tone="ok">已导入</StatusBadge>

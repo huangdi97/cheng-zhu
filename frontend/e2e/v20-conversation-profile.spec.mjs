@@ -1708,6 +1708,146 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('Google Drive read-only provider syncs an explicit folder into immutable DOCUMENT context', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let syncBody = null
+    let synced = false
+    let selectedBody = null
+    let selectedConnectorSnapshotIds = []
+    const snapshot = {
+      id: 'ccs-drive-doc',
+      connection_id: 'ccn-drive',
+      space_id: SPACE.id,
+      capability: 'docs.read',
+      external_kind: 'DOCUMENT',
+      external_id: 'doc-architecture',
+      title: 'Architecture Brief',
+      excerpt: 'Architecture says rollback owner is Alex and migration uses v2.',
+      content_hash: 'sha256:drive-doc',
+      source_url: 'https://drive.google.com/document/d/doc-architecture/edit',
+      occurred_at: 3,
+      visibility: 'PRIVATE',
+      metadata: {
+        folder_id: 'folder-architecture',
+        file_id: 'doc-architecture',
+        mime_type: 'application/vnd.google-apps.document',
+        content_available: true,
+        export_mime: 'text/plain',
+        content_scope: 'FULL_TEXT_EXPORT',
+        partial_content: false,
+      },
+      is_latest_revision: true,
+      latest_snapshot_id: 'ccs-drive-doc',
+      created_at: 3,
+    }
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'GOOGLE_DRIVE',
+            label: 'Google Drive / Docs',
+            capabilities: ['docs.read'],
+            read_capabilities: ['docs.read'],
+            write_capabilities: [],
+            external_kinds: ['DOCUMENT'],
+            provider_scopes: { 'docs.read': 'https://www.googleapis.com/auth/drive.readonly' },
+            sync: 'FULL_TARGET_REFRESH',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:google-drive:env:<ENV_VAR>',
+              read_target: 'folder_id (default root)',
+              secret_storage: 'PROCESS_ENV_ONLY',
+              write_support: 'NONE',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') return { items: connection ? [connection] : [] }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-drive',
+            provider_id: 'GOOGLE_DRIVE',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: ['docs.read'],
+            provider_scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+            account_hint: createBody.account_hint,
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-drive/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', updated_at: 2 }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-drive/sync' && method === 'POST') {
+          syncBody = request.postDataJSON()
+          synced = true
+          connection = { ...connection, sync_cursors: { 'docs.read': 'gdrive-folder:folder-architecture' }, sync_cursor: 'gdrive-folder:folder-architecture', last_sync_at: 3 }
+          return { connection, snapshots: [snapshot] }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: synced ? [snapshot] : [] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'PATCH') {
+          selectedBody = request.postDataJSON()
+          selectedConnectorSnapshotIds = [...(selectedBody.selected_connector_snapshot_ids ?? selectedConnectorSnapshotIds)]
+          const current = await base(pathname, 'GET', request)
+          return { ...current, ...selectedBody, selected_connector_snapshot_ids: selectedConnectorSnapshotIds }
+        }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}` && method === 'GET') {
+          const current = await base(pathname, method, request)
+          return { ...current, selected_connector_snapshot_ids: selectedConnectorSnapshotIds }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('google-drive-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/read-only context/)).toBeVisible()
+    await expect(page.locator('input[type="password"]')).toHaveCount(0)
+    await page.getByLabel('Google Drive token 环境变量名').fill('MY_DRIVE_TOKEN')
+    await page.getByLabel('Google Drive 默认 folder id').fill('folder-architecture')
+    await page.getByRole('button', { name: '创建 Drive 连接元数据' }).click()
+
+    expect(createBody.credential_ref).toBe('provider:google-drive:env:MY_DRIVE_TOKEN')
+    expect(createBody.granted_capabilities).toEqual(['docs.read'])
+    expect(createBody.account_hint).toBe('folder-architecture')
+    expect(JSON.stringify(createBody)).not.toContain('ya29.')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await page.getByLabel('Google Drive Sync folder id Google Drive · folder-architecture').fill('folder-architecture')
+    await page.getByRole('button', { name: 'Sync read-only snapshot' }).click()
+
+    expect(syncBody.capabilities).toEqual(['docs.read'])
+    expect(syncBody.query).toEqual({ folder_id: 'folder-architecture' })
+    expect(syncBody.limit).toBe(500)
+    await expect(page.getByText('Architecture Brief')).toBeVisible()
+    await expect(page.getByText(/DOCUMENT · docs.read/)).toBeVisible()
+    await expect(page.getByText(/rollback owner is Alex/)).toBeVisible()
+
+    const checkbox = page.locator('label').filter({ hasText: 'Architecture Brief' }).locator('input[type="checkbox"]')
+    await checkbox.check()
+    await expect(checkbox).toBeChecked()
+    expect(selectedBody.selected_connector_snapshot_ids).toContain(snapshot.id)
+  })
+
+
   test('GitHub provider setup keeps PAT outside the UI and syncs an explicit owner/repo', async ({ context, page }) => {
     const base = mocks()
     let connection = null

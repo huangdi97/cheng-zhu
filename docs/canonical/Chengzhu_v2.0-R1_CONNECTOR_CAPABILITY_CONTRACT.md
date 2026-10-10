@@ -112,14 +112,15 @@ Conversation truth
 connected account = 0
 ```
 
-GitHub 与 Google Calendar adapter 代码可随应用发布，但都必须显式 opt-in：
+GitHub、Google Calendar 与 Google Drive adapter 代码可随应用发布，但都必须显式 opt-in：
 
 ```text
 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1
+CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1
 ```
 
-才注册为 `adapter_available=true`。Gmail / Drive / Microsoft / MCP 当前仍不能仅凭 catalog 条目冒充真实 adapter。
+才注册为 `adapter_available=true`。Gmail / Microsoft / MCP 当前仍不能仅凭 catalog 条目冒充真实 adapter。
 
 ---
 
@@ -188,6 +189,42 @@ calendar.read
 
 ---
 
+## 5.2 Google Drive / Docs target-scoped read contract
+
+当前 `GOOGLE_DRIVE` concrete adapter 只实现：
+
+```text
+docs.read
+→ explicit folder FULL_TARGET_REFRESH
+→ DOCUMENT immutable snapshots
+```
+
+关键约束：
+
+- access token 只通过 `provider:google-drive:env:<ENV_VAR>` 解析；
+- Verify 只做 account read probe，不把账号认证冒充 folder 可读；
+- 每次 Sync 必须显式指定 `root` 或具体 folder id；
+- Sync 先读取 folder metadata，证明 target 存在、是 folder、且未在 trash；
+- folder direct children 必须完整分页后才能向 integration boundary 返回结果；
+- direct children 超过 500 时整次失败，不保存“前 500 个”再假装完整；
+- v1 provider 采用 user-triggered `FULL_TARGET_REFRESH`，不做 account-wide background mirror；
+- Google Docs / Slides → `text/plain`，完整读取用于本地 full-content digest，但 snapshot retrieval 仅冻结前 20k 字符（`TEXT_EXPORT_EXCERPT_20K`）；
+- Google Sheets → `text/csv`，并冻结 `partial_content=true / FIRST_SHEET_CSV_EXCERPT_20K`；
+- 可文本化 blob 同样以完整读取内容计算 revision digest，但当前 retrieval scope = `FIRST_20000_CHARS`；
+- full-content digest 进入 canonical snapshot hash metadata，使“前 20k 相同、尾部变化”的文档仍形成新 revision；
+- 常见小型文本 blob → `files.get?alt=media`；
+- PDF / image / binary / unsupported → metadata-only DOCUMENT，`content_available=false`；
+- 超过 2MB 的文本不做静默截断后冒充完整正文；
+- Drive snapshot 仍是 `REFERENCE_SOURCE`，不自动升级 Decision / Commitment / Deadline；
+- user 必须显式勾选 snapshot 后它才进入 Space / Session Pack；
+- 后续再次 Sync 生成新 immutable revision，不静默改写已开始 Session Pack；
+- provider 没有任何 Drive write capability。
+
+实现说明：
+[Google Drive Conversation Connector](../architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
+
+---
+
 ## 6. Credential boundary
 
 `product.db` 只能保存 opaque credential reference：
@@ -228,11 +265,13 @@ create connection metadata
 
 不提供“UI 直接把 status 改成 CONNECTED”的接口。
 
-`CONNECTED` 表示 provider account identity / credential health 已验证；它不等于“任意目标资源的 capability 已证明”。对需要显式 target 的 provider（当前 GitHub）：
+`CONNECTED` 表示 provider account identity / credential health 已验证；它不等于“任意目标资源的 capability 已证明”。对需要显式 target 的 provider（当前 GitHub / Google Calendar / Google Drive）：
 
 - `project.read` 在真实 Sync 到具体 `owner/repo` 时证明；
+- `calendar.read` 在真实 Sync 到具体 `calendar_id` 时证明；
+- `docs.read` 在真实 folder probe + 完整 refresh 时证明；
 - `issue.create` 在 reviewed + second explicit Execute 的真实 provider 响应时证明；
-- 不使用 `GET /user` 冒充 repo-level write permission proof。
+- 不使用 account-level health probe 冒充 target-level capability proof。
 
 Revoke：
 
@@ -264,6 +303,8 @@ Preflight 冻结：
 - safe account hint；
 - blocked reasons；
 - explicit selected connector snapshot ids。
+
+Start 必须先执行一次最新 Preflight/health + context fingerprint 校验，然后把**这次已经验证并进入 fingerprint 的 connector runtime 原样冻结到 Session Pack**。freeze_pack 不得再独立 resolve 第二套 provider health 结果，否则 Preview 与 Pack 可能发生 TOCTOU 漂移。
 
 No placeholder provider.
 
@@ -597,13 +638,15 @@ REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
 AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 GITHUB_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_CALENDAR_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+GOOGLE_DRIVE_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 ```
 
 仍禁止在缺少真实 adapter/account/runtime evidence 时声明：
 
 ```text
 MAIL_CONNECTOR_AVAILABLE = TRUE
-DOCS_CONNECTOR_AVAILABLE = TRUE
+DRIVE_ACCOUNT_CONNECTED = TRUE
+REAL_DRIVE_DOCUMENT_SYNC_PROVEN = TRUE
 CALENDAR_ACCOUNT_CONNECTED = TRUE
 PROJECT_TRACKER_ACCOUNT_CONNECTED = TRUE
 GOOGLE_ACCOUNT_CONNECTED = TRUE
@@ -616,5 +659,6 @@ REAL_EXTERNAL_ACTION_EVIDENCE = TRUE
 进一步实现细节见：
 
 - [Conversation Integration Boundary](../architecture/CONVERSATION_INTEGRATION_BOUNDARY.md)
+- [Google Drive Conversation Connector](../architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
 
 外部 provider 真正接线后，仍需独立 adapter tests、授权 evidence、runtime replay 与 external result evidence。

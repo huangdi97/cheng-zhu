@@ -552,7 +552,8 @@ reviewed output evidence
 | External Integration Boundary | RUNTIME_AVAILABLE | PR #61 已合入 main：schema v9、opaque credential ref、CONNECTED account、Space-scoped immutable snapshot、canonical hash、per-capability cursor、exact grant、retention/export、Execution Request / audit、UNKNOWN_OUTCOME reconciliation |
 | GitHub project tracker / issue provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 首个真实 REST adapter：project.read + issue.create；默认不注册，需 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1；token 仅经 env credential reference 解析；没有真实账户连接/外部 action evidence 前不得宣称 GITHUB_ACCOUNT_CONNECTED |
 | Google Calendar provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `calendar.read` concrete adapter；native sync token + 410 reset；immutable revision audit；latest-revision import；upstream drift 可见；默认关闭；没有真实 Google account replay 前不得声明 account connected |
-| Mail / Docs / Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
+| Google Drive / Docs provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `docs.read` concrete adapter；显式 folder FULL_TARGET_REFRESH；Docs/Slides text export、Sheets first-sheet CSV partial truth、binary metadata-only truth；默认关闭；没有真实 Google account replay 前不得声明 account connected |
+| Mail / Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
 | External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub issue.create 已有 opt-in real adapter，其他 provider 仍 fail-closed |
 | Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
@@ -821,4 +822,24 @@ REAL_GOOGLE_ACCOUNT_EVIDENCE_PENDING = TRUE
 ```
 
 工程证据允许证明 adapter / fake transport / pagination / cursor / immutable snapshot / product flow；没有真实 Google OAuth/account 时不得声明真实 Calendar 已连接或真实 event 已同步。
+
+## Google Drive read-only provider closure · 2026-10-10
+
+当前 branch 新增第三个 concrete Conversation provider：
+
+```text
+GOOGLE_DRIVE_ADAPTER_CODE = TRUE
+DOCS_READ_ONLY = TRUE
+EXPLICIT_FOLDER_TARGET = TRUE
+FULL_TARGET_REFRESH = TRUE
+COMPLETE_PAGINATION = TRUE
+IMMUTABLE_DOCUMENT_SNAPSHOT = TRUE
+DOCS_SLIDES_TEXT_EXPORT = TRUE
+SHEETS_FIRST_SHEET_PARTIAL_TRUTH = TRUE
+BINARY_METADATA_ONLY_TRUTH = TRUE
+DRIVE_WRITE = FALSE
+REAL_GOOGLE_DRIVE_ACCOUNT_EVIDENCE_PENDING = TRUE
+```
+
+工程证据只证明 adapter / fake transport / folder target / pagination / export semantics / immutable snapshot / product flow；没有真实 Google OAuth/account replay 时不得声明真实 Drive 已连接或真实文档已同步。
 

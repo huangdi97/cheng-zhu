@@ -128,6 +128,88 @@ def test_default_boundary_is_fail_closed_and_never_accepts_raw_credentials(produ
 
 
 
+
+
+def test_connector_secret_values_are_redacted_even_when_hidden_in_safe_looking_fields(product_env):
+    with pytest.raises(ValueError, match="opaque reference"):
+        conversation_integrations.create_connection(
+            "GOOGLE_MAIL",
+            granted_capabilities=["mail.read"],
+            credential_ref="provider:google/ya29.this-is-a-real-looking-secret-value",
+        )
+
+    adapter = FakeAdapter({"calendar.read"})
+    adapter.items["calendar.read"][0] = {
+        **adapter.items["calendar.read"][0],
+        "source_url": "https://alice:supersecret@calendar.example/event/1?access_token=ya29.leak#private",
+        "metadata": {
+            "safe_note": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+            "nested": {"comment": "token-looking sk-abcdefghijklmnopqrstuvwxyz123456"},
+        },
+    }
+    connection = _connected(adapter, ["calendar.read"])
+    space = conversations.create_space("Secret Redaction", "PROJECT_SYNC")
+    snapshot = conversation_integrations.sync_connection(
+        connection["id"], space["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+
+    assert snapshot["source_url"] == "https://calendar.example/event/1"
+    serialized = str(snapshot)
+    assert "supersecret" not in serialized
+    assert "ya29.leak" not in serialized
+    assert "abcdefghijklmnopqrstuvwxyz" not in serialized
+    assert "[REDACTED_SECRET]" in serialized
+
+
+def test_connector_exception_and_reconciliation_evidence_redact_secret_values(product_env):
+    adapter = FakeAdapter({"email.send"})
+
+    def secret_failure(**kwargs):
+        adapter.execute_calls += 1
+        raise RuntimeError("provider timeout Bearer abcdefghijklmnopqrstuvwxyz after accept")
+
+    adapter.execute = secret_failure
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Secret Audit", "CLIENT_CALL")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    draft = conversations.create_draft_action(
+        session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="Follow-up", content="body",
+    )
+    conversations.review_draft_action(draft["id"], "APPROVE")
+    request = conversation_integrations.request_execution(draft["id"], connection["id"])
+    unknown = conversation_integrations.execute_request(request["id"])
+
+    assert unknown["status"] == "UNKNOWN_OUTCOME"
+    assert "abcdefghijklmnopqrstuvwxyz" not in unknown["error"]
+    assert "[REDACTED_SECRET]" in unknown["error"]
+
+    reconciled = conversation_integrations.reconcile_unknown_outcome(
+        unknown["id"],
+        "CONFIRMED_SUCCEEDED",
+        note="Checked sent items with Bearer zyxwvutsrqponmlkjihgfedcba",
+        provider_reference="github_pat_abcdefghijklmnopqrstuvwxyz123456",
+    )
+    exported_text = str(reconciled)
+    assert "zyxwvutsrqponmlkjihgfedcba" not in exported_text
+    assert "github_pat_abcdefghijklmnopqrstuvwxyz123456" not in exported_text
+    assert "[REDACTED_SECRET]" in exported_text
+
+
+def test_public_connection_metadata_redacts_accidentally_pasted_secret_values(product_env):
+    connection = conversation_integrations.create_connection(
+        "MCP",
+        display_name="Work Bearer abcdefghijklmnopqrstuvwxyz",
+        granted_capabilities=["calendar.read"],
+        credential_ref="plugin:mcp/work",
+        account_hint="account sk-abcdefghijklmnopqrstuvwxyz123456",
+    )
+    assert "abcdefghijklmnopqrstuvwxyz" not in connection["display_name"]
+    assert "abcdefghijklmnopqrstuvwxyz123456" not in connection["account_hint"]
+    assert "[REDACTED_SECRET]" in connection["display_name"]
+    assert "[REDACTED_SECRET]" in connection["account_hint"]
+
+
 def test_provider_scopes_are_derived_and_exact_least_privilege(product_env):
     google = conversation_integrations.create_connection(
         "GOOGLE_MAIL",

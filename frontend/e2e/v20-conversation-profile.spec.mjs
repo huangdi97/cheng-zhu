@@ -2422,6 +2422,168 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('MCP decision-log provider fixes the tool at setup and requires an explicit external target', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let requestBody = null
+    let executeCalls = 0
+    let execution = null
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'MCP',
+            label: 'Model Context Protocol',
+            capabilities: ['decision_log.write'],
+            read_capabilities: [],
+            write_capabilities: ['decision_log.write'],
+            external_kinds: [],
+            provider_scopes: { 'decision_log.write': 'server-defined' },
+            identity_scopes: [],
+            sync: 'SERVER_DEFINED',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_MCP_DECISION_LOG_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:mcp:env:<CONFIG_ENV>',
+              concrete_adapter_capabilities: 'decision_log.write',
+              protocol: '2026-07-28 Streamable HTTP',
+              write_target: 'explicit decision-log target',
+              tool_mapping: 'fixed in config env; frontend cannot choose arbitrary tool',
+              secret_storage: 'PROCESS_ENV_ONLY',
+              read_support: 'NONE_IN_CONCRETE_ADAPTER',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') {
+          return { items: connection ? [connection] : [] }
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-mcp-decision-log',
+            provider_id: 'MCP',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: ['decision_log.write'],
+            provider_scopes: ['server-defined'],
+            account_hint: '',
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-mcp-decision-log/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', account_hint: 'work-mcp', updated_at: 2 }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          requestBody = request.postDataJSON()
+          execution = {
+            id: 'cce-mcp-decision-log',
+            draft_action_id: 'cda-derived',
+            connection_id: 'ccn-mcp-decision-log',
+            capability: 'decision_log.write',
+            operation: 'UPDATE_DECISION_LOG',
+            target: requestBody.target,
+            idempotency_key: 'mcpdecisionabcdef',
+            status: 'PENDING',
+            request: {
+              title: 'Architecture Review · Decision Log Draft',
+              content: '- offline migration 采用 v2 · state=AGREED',
+              payload: { execution: 'LOCAL_REVIEW_ONLY' },
+              outbound_redaction_applied: false,
+            },
+            response: {},
+            error: '',
+            created_at: 5,
+            updated_at: 5,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-mcp-decision-log/execute' && method === 'POST') {
+          executeCalls += 1
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: {
+              provider_id: 'MCP',
+              tool_name: 'chengzhu_update_decision_log',
+              target: 'architecture-decisions',
+              provider_result_type: 'complete',
+              provider_idempotency: 'UNVERIFIED_APPLICATION_ARGUMENT',
+            },
+            updated_at: 6,
+            executed_at: 6,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('mcp-decision-log-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/reviewed decision-log write/)).toBeVisible()
+    await expect(setup.getByText(/2026-07-28 server\/discover \+ tools\/list/)).toBeVisible()
+    await expect(setup.getByText(/前端不能换成任意 MCP tool/)).toBeVisible()
+    await page.getByLabel('MCP Decision Log config 环境变量名').fill('MY_MCP_DECISION_CONFIG')
+    await page.getByRole('button', { name: '创建 MCP Decision Log 连接元数据' }).click()
+
+    expect(createBody).toEqual({
+      provider_id: 'MCP',
+      display_name: 'MCP · decision-log write',
+      granted_capabilities: ['decision_log.write'],
+      provider_scopes: ['server-defined'],
+      credential_ref: 'provider:mcp:env:MY_MCP_DECISION_CONFIG',
+    })
+    expect(JSON.stringify(createBody)).not.toContain('tool_name')
+    expect(JSON.stringify(createBody)).not.toContain('bearer')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/server\/discover \+ exact tools\/list schema 校验已通过/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sync read-only snapshot' })).toHaveCount(0)
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption('ccn-mcp-decision-log')
+
+    const target = page.getByLabel('MCP Decision Log 外部目标')
+    await expect(target).toBeVisible()
+    await expect(page.getByRole('button', { name: '创建 Execution Request' })).toBeDisabled()
+    await target.fill('architecture-decisions')
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+
+    expect(requestBody).toEqual({
+      connection_id: 'ccn-mcp-decision-log',
+      target: 'architecture-decisions',
+    })
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    expect(executeCalls).toBe(0)
+
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/chengzhu_update_decision_log/)).toBeVisible()
+    await expect(page.getByText(/architecture-decisions/)).toBeVisible()
+    expect(executeCalls).toBe(1)
+  })
+
+
   test('approved draft requires Execution Request then a second explicit Execute before SUCCEEDED', async ({ context, page }) => {
     const base = mocks()
     const connection = {

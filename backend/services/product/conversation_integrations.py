@@ -209,6 +209,14 @@ def _capabilities(values: list[str] | tuple[str, ...] | set[str]) -> list[str]:
 
 
 def _expected_provider_scopes(provider: str, granted: set[str]) -> list[str]:
+    # GitHub fine-grained repository permissions are one level per permission,
+    # not independent read+write scopes. Issues: write subsumes read.
+    if provider == "GITHUB":
+        if "issue.create" in granted:
+            return ["Issues: write"]
+        if "project.read" in granted:
+            return ["Issues: read"]
+        return []
     scope_map = dict(PROVIDER_CATALOG[provider].get("provider_scopes") or {})
     expected = {
         str(scope_map.get(capability) or "").strip()
@@ -673,8 +681,12 @@ def sync_connection(
         return {"connection": public_connection(_require_connection(connection_id)), "snapshots": snapshots}
     except Exception as exc:
         safe_error = _redact_secret_values(str(exc))[:2000] or "Connector sync failed"
+        # A concrete provider may know that the failure belongs to one target
+        # repository/resource rather than to account authentication itself.
+        # Keep that account CONNECTED while recording the target failure.
+        connection_fatal = bool(getattr(exc, "connection_fatal", True))
         store.update("conversation_connector_connection", connection_id, {
-            "status": "ERROR",
+            "status": "ERROR" if connection_fatal else str(connection.get("status") or "CONNECTED"),
             "last_error": safe_error,
             "updated_at": store.now(),
         })

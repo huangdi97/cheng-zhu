@@ -484,13 +484,21 @@ def resolve_session_permissions(requested: list[str]) -> dict[str, Any]:
 
 
 def _snapshot_hash(item: dict[str, Any]) -> str:
+    """Canonical Chengzhu hash for one normalized external snapshot.
+
+    Provider-supplied hashes are metadata only. Provenance identity is derived
+    from the exact normalized fields Chengzhu freezes, including visibility and
+    the query-stripped source URL.
+    """
     raw = json.dumps({
         "capability": item.get("capability") or "",
         "external_kind": item.get("external_kind") or "",
         "external_id": item.get("external_id") or "",
         "title": item.get("title") or "",
         "excerpt": item.get("excerpt") or "",
+        "source_url": item.get("source_url") or "",
         "occurred_at": item.get("occurred_at"),
+        "visibility": item.get("visibility") or "PRIVATE",
         "metadata": item.get("metadata") or {},
     }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -508,21 +516,27 @@ def _store_snapshot(
     external_id = str(raw.get("external_id") or raw.get("id") or "").strip()
     if not external_id:
         raise ValueError("Connector snapshot 缺少 external_id")
+    metadata = _sanitize(dict(raw.get("metadata") or {}))
+    provider_content_hash = str(raw.get("content_hash") or "").strip()
+    if provider_content_hash:
+        metadata = {**metadata, "provider_content_hash": provider_content_hash[:500]}
     normalized = {
         "capability": capability,
         "external_kind": kind,
         "external_id": external_id[:500],
         "title": str(raw.get("title") or "")[:500],
         "excerpt": str(raw.get("excerpt") or raw.get("text") or "")[:20_000],
+        "source_url": _safe_url(str(raw.get("source_url") or "")),
         "occurred_at": raw.get("occurred_at"),
-        "metadata": _sanitize(dict(raw.get("metadata") or {})),
+        "visibility": str(raw.get("visibility") or "PRIVATE").upper()[:80],
+        "metadata": metadata,
     }
-    content_hash = str(raw.get("content_hash") or _snapshot_hash(normalized))
+    content_hash = _snapshot_hash(normalized)
     existing = store.rows(
         "SELECT * FROM conversation_connector_snapshot "
-        "WHERE connection_id = ? AND capability = ? AND external_kind = ? "
+        "WHERE space_id = ? AND connection_id = ? AND capability = ? AND external_kind = ? "
         "AND external_id = ? AND content_hash = ? LIMIT 1",
-        (connection["id"], capability, kind, external_id, content_hash),
+        (space_id, connection["id"], capability, kind, external_id, content_hash),
     )
     if existing:
         return existing[0]
@@ -532,8 +546,8 @@ def _store_snapshot(
         "space_id": space_id,
         **normalized,
         "content_hash": content_hash,
-        "source_url": _safe_url(str(raw.get("source_url") or "")),
-        "visibility": str(raw.get("visibility") or "PRIVATE").upper()[:80],
+        "source_url": normalized["source_url"],
+        "visibility": normalized["visibility"],
         "created_at": store.now(),
     }
     store.insert("conversation_connector_snapshot", row)

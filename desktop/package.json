@@ -37,6 +37,7 @@
       "sharePrivacy.js",
       "conversationReminders.js",
       "backendLauncher.js",
+      "overlayLayout.js",
       "app-title.json",
       "icon.png",
       "package.json"

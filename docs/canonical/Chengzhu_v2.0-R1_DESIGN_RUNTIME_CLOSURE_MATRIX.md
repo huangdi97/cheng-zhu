@@ -888,3 +888,33 @@ REAL_MICROSOFT_ACCOUNT_EVIDENCE_PENDING = TRUE
 
 工程证据只证明 adapter / fake transport / least-privilege scope / list target resolution / reviewed execution / failure ambiguity / product flow。没有真实 Microsoft delegated token/account replay 时不得声明真实 Microsoft To Do 已连接或真实 Task 已创建。
 
+
+
+---
+
+## 2026-10-11 本地全量收口结论（Local Full Closure）
+
+完整事实见 [`docs/evidence/V2_LOCAL_FULL_CLOSURE_2026-10-11.md`](../evidence/V2_LOCAL_FULL_CLOSURE_2026-10-11.md)。
+基线 = `origin/main c581c0d764cf6dd4f59a254957b90dd7eb409f45`，分支
+`chore/v2-local-full-closure-2026-10-11`，在隔离 worktree 中执行（原 checkout 未被改动）。
+
+```text
+V2_DESIGN_COMPLETE      = TRUE
+V2_CONTRACT_COMPLETE    = TRUE
+V2_RUNTIME_AVAILABLE    = TRUE
+V2_ENGINEERING_EVIDENCE = TRUE   (backend 1336 passed · frontend 428 passed · desktop 38 passed ·
+                                  Playwright 65 + visual + a11y · e2e smoke · packaged smoke ·
+                                  migration matrix additive · secret scan 0 blocking)
+V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS +
+                                  clean-install replay，PATH 中无 Python/Node)
+V2_CONNECTOR_RUNTIME    = PARTIAL (GitHub 真实账号 replay PASS；Google Calendar / Drive /
+                                  Gmail / Microsoft To Do = BLOCKED_ACCOUNT，本机无凭据)
+V2_PRODUCTIZED_RELEASE  = FALSE  (只有 prerelease；stable promotion 需要真实用户证据)
+REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
+```
+
+收口期间发现并修复三个真实缺陷：打包版 Windows 应用因 `build.files` 漏掉 `overlayLayout.js`
+而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
+`30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
+
+建议下一版：`v2.0.0-beta.3` prerelease 候选，不声明 stable。

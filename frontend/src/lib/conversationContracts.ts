@@ -186,6 +186,12 @@ export interface ConversationSession {
     calendar_id?: string
     event_id?: string
     imported_at?: number
+    revision_status?: 'CURRENT' | 'SOURCE_DRIFT' | 'CANCELLED_UPSTREAM' | 'SOURCE_MISSING'
+    latest_snapshot_id?: string
+    latest_content_hash?: string
+    latest_title?: string
+    latest_scheduled_at?: number | null
+    latest_cancelled?: boolean
   }
   created_at: number
   updated_at: number

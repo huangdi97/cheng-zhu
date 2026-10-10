@@ -430,14 +430,32 @@ class McpDecisionLogAdapter:
             config = self._config(connection)
             # Re-verify exact tool schema immediately before a side effect.
             self._discover_and_tool(config)
-        except (ValueError, McpProviderError, RuntimeError) as exc:
-            # Everything above is pre-write. No tools/call was issued.
-            status = int(getattr(exc, "status", 0) or 0)
+        except ValueError as exc:
+            # Deterministic local/config/schema failure. No side effect happened,
+            # but replaying the same immutable Execution Request cannot fix it.
             return {
                 "ok": False,
                 "error": str(exc),
-                "retry_safe": True if status == 0 or status in {408, 425, 429} or status >= 500 else False,
-                "http_status": status or None,
+                "retry_safe": False,
+                "phase": "MCP_PREFLIGHT_PRE_WRITE",
+            }
+        except McpProviderError as exc:
+            # server/discover/tools/list are pre-write. Throttle/server failures
+            # can be retried safely because tools/call was never issued.
+            return {
+                "ok": False,
+                "error": str(exc),
+                "retry_safe": exc.status in {408, 425, 429} or exc.status >= 500,
+                "http_status": exc.status,
+                "phase": "MCP_PREFLIGHT_PRE_WRITE",
+            }
+        except RuntimeError as exc:
+            # Transport/decoding failure during read-only preflight happened
+            # before tools/call, so an identical request is safe to retry.
+            return {
+                "ok": False,
+                "error": str(exc),
+                "retry_safe": True,
                 "phase": "MCP_PREFLIGHT_PRE_WRITE",
             }
 

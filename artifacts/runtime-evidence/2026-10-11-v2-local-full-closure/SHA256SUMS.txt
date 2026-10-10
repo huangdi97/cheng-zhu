@@ -1,0 +1,2 @@
+93dd5ed02b454aea9fb0be4938862b430715a2afaa908cae622fa11e30bd73a6  Chengzhu-Setup-x64.exe
+b0075b7db54780cc11bdd11a56e428c5b5e62be5878ee079992af65f38fb9f08  Chengzhu-Portable-x64.zip

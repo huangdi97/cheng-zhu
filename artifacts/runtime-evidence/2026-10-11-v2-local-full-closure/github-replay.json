@@ -1,0 +1,954 @@
+{
+  "evidence_type": "GITHUB_REAL_ACCOUNT_REPLAY",
+  "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
+  "disabled_run": {
+    "catalog_row": {
+      "provider_id": "GITHUB",
+      "label": "GitHub",
+      "capabilities": [
+        "project.read",
+        "issue.create"
+      ],
+      "read_capabilities": [
+        "project.read"
+      ],
+      "write_capabilities": [
+        "issue.create"
+      ],
+      "external_kinds": [
+        "ISSUE"
+      ],
+      "provider_scopes": {
+        "project.read": "Issues: read",
+        "issue.create": "Issues: write"
+      },
+      "identity_scopes": [],
+      "sync": "UPDATED_AT_CURSOR_WITH_OVERLAP",
+      "setup": {
+        "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+        "credential_ref_format": "provider:github:env:<ENV_VAR>",
+        "read_target": "owner/repo",
+        "write_target": "owner/repo",
+        "secret_storage": "PROCESS_ENV_ONLY"
+      },
+      "adapter_available": false
+    },
+    "connection_count": 0
+  },
+  "enabled_run": {
+    "catalog_github": {
+      "provider_id": "GITHUB",
+      "label": "GitHub",
+      "capabilities": [
+        "project.read",
+        "issue.create"
+      ],
+      "read_capabilities": [
+        "project.read"
+      ],
+      "write_capabilities": [
+        "issue.create"
+      ],
+      "external_kinds": [
+        "ISSUE"
+      ],
+      "provider_scopes": {
+        "project.read": "Issues: read",
+        "issue.create": "Issues: write"
+      },
+      "identity_scopes": [],
+      "sync": "UPDATED_AT_CURSOR_WITH_OVERLAP",
+      "setup": {
+        "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+        "credential_ref_format": "provider:github:env:<ENV_VAR>",
+        "read_target": "owner/repo",
+        "write_target": "owner/repo",
+        "secret_storage": "PROCESS_ENV_ONLY"
+      },
+      "adapter_available": true
+    },
+    "connection": {
+      "id": "ccn_aea80c1b32444239",
+      "provider_id": "GITHUB",
+      "display_name": "Closure replay GitHub",
+      "status": "DISCONNECTED",
+      "auth_mode": "OPAQUE_REFERENCE",
+      "granted_capabilities": [
+        "issue.create",
+        "project.read"
+      ],
+      "provider_scopes": [
+        "Issues: write"
+      ],
+      "account_hint": "",
+      "sync_cursor": "",
+      "last_sync_at": null,
+      "last_error": "",
+      "created_at": 1791666182.0152955,
+      "updated_at": 1791666182.0152955,
+      "sync_cursors": {},
+      "credential_ref_present": true,
+      "adapter_available": true
+    },
+    "verify": {
+      "id": "ccn_aea80c1b32444239",
+      "provider_id": "GITHUB",
+      "display_name": "Closure replay GitHub",
+      "status": "CONNECTED",
+      "auth_mode": "OPAQUE_REFERENCE",
+      "granted_capabilities": [
+        "issue.create",
+        "project.read"
+      ],
+      "provider_scopes": [
+        "Issues: write"
+      ],
+      "account_hint": "huangdi97",
+      "sync_cursor": "",
+      "last_sync_at": null,
+      "last_error": "",
+      "created_at": 1791666182.0152955,
+      "updated_at": 1791666183.6632721,
+      "sync_cursors": {},
+      "credential_ref_present": true,
+      "adapter_available": true
+    },
+    "space_id": "cs_cdc4c0d8252e4467",
+    "sync": {
+      "connection": {
+        "id": "ccn_aea80c1b32444239",
+        "provider_id": "GITHUB",
+        "display_name": "Closure replay GitHub",
+        "status": "CONNECTED",
+        "auth_mode": "OPAQUE_REFERENCE",
+        "granted_capabilities": [
+          "issue.create",
+          "project.read"
+        ],
+        "provider_scopes": [
+          "Issues: write"
+        ],
+        "account_hint": "huangdi97",
+        "sync_cursor": "2026-10-10T20:58:30Z",
+        "last_sync_at": 1791666187.7927437,
+        "last_error": "",
+        "created_at": 1791666182.0152955,
+        "updated_at": 1791666187.7927442,
+        "sync_cursors": {
+          "project.read": "2026-10-10T20:58:30Z"
+        },
+        "credential_ref_present": true,
+        "adapter_available": true
+      },
+      "snapshots": [
+        {
+          "id": "ccs_c6e175d844894af2",
+          "connection_id": "ccn_aea80c1b32444239",
+          "space_id": "cs_cdc4c0d8252e4467",
+          "capability": "project.read",
+          "external_kind": "ISSUE",
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#1",
+          "title": "Replay seed 1: cache invalidation",
+          "excerpt": "Seed issue for connector read replay.",
+          "content_hash": "e31aaaf1b123ae234feaee34f660b112e5da1d3fa399547132e3b9c224e05354",
+          "source_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/1",
+          "occurred_at": 1791664009.0,
+          "visibility": "PRIVATE",
+          "metadata": {
+            "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
+            "number": 1,
+            "state": "open",
+            "labels": [],
+            "assignees": [],
+            "created_at": "2026-10-10T20:26:49Z",
+            "updated_at": "2026-10-10T20:26:49Z",
+            "provider_node_id": "I_kwDOVEJaTs8AAAABWWiWbQ"
+          },
+          "created_at": 1791666187.7153962
+        },
+        {
+          "id": "ccs_15451893483c4ed3",
+          "connection_id": "ccn_aea80c1b32444239",
+          "space_id": "cs_cdc4c0d8252e4467",
+          "capability": "project.read",
+          "external_kind": "ISSUE",
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#2",
+          "title": "Replay seed 2: retry budget",
+          "excerpt": "Seed issue for connector pagination replay.",
+          "content_hash": "7afd511c078b4e3470d42d40d833492d60c22531e28b8c4f938e35b5d6956a83",
+          "source_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/2",
+          "occurred_at": 1791664011.0,
+          "visibility": "PRIVATE",
+          "metadata": {
+            "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
+            "number": 2,
+            "state": "open",
+            "labels": [],
+            "assignees": [],
+            "created_at": "2026-10-10T20:26:51Z",
+            "updated_at": "2026-10-10T20:26:51Z",
+            "provider_node_id": "I_kwDOVEJaTs8AAAABWWiXgg"
+          },
+          "created_at": 1791666187.7336047
+        },
+        {
+          "id": "ccs_fe671375937e43d1",
+          "connection_id": "ccn_aea80c1b32444239",
+          "space_id": "cs_cdc4c0d8252e4467",
+          "capability": "project.read",
+          "external_kind": "ISSUE",
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#3",
+          "title": "Chengzhu v2 closure replay: reviewed issue draft",
+          "excerpt": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:7903f0c75c7ce443d3b6e9136421262d762b3fee5d4b66f04970294687fc201c -->",
+          "content_hash": "422837aa9aa246973d90568e21164c9853685e0000f62a1ce3af415ce41b2f44",
+          "source_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/3",
+          "occurred_at": 1791665506.0,
+          "visibility": "PRIVATE",
+          "metadata": {
+            "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
+            "number": 3,
+            "state": "open",
+            "labels": [],
+            "assignees": [],
+            "created_at": "2026-10-10T20:51:46Z",
+            "updated_at": "2026-10-10T20:51:46Z",
+            "provider_node_id": "I_kwDOVEJaTs8AAAABWWtQxA"
+          },
+          "created_at": 1791666187.7538662
+        },
+        {
+          "id": "ccs_e104a697005743af",
+          "connection_id": "ccn_aea80c1b32444239",
+          "space_id": "cs_cdc4c0d8252e4467",
+          "capability": "project.read",
+          "external_kind": "ISSUE",
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
+          "title": "Chengzhu v2 closure replay: reviewed issue draft 20261010T205800Z",
+          "excerpt": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:24f96e553c4d1524c582cc885856035e383f9d3865f2a094541e17d2bd56b3d0 -->",
+          "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
+          "source_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/4",
+          "occurred_at": 1791665911.0,
+          "visibility": "PRIVATE",
+          "metadata": {
+            "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
+            "number": 4,
+            "state": "open",
+            "labels": [],
+            "assignees": [],
+            "created_at": "2026-10-10T20:58:31Z",
+            "updated_at": "2026-10-10T20:58:31Z",
+            "provider_node_id": "I_kwDOVEJaTs8AAAABWWwNxA"
+          },
+          "created_at": 1791666187.7747955
+        }
+      ]
+    },
+    "snapshot_count": 4,
+    "snapshot_sample": {
+      "id": "ccs_e104a697005743af",
+      "connection_id": "ccn_aea80c1b32444239",
+      "capability": "project.read",
+      "external_kind": "ISSUE",
+      "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
+      "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
+      "provider_id": null,
+      "is_latest_revision": true,
+      "occurred_at": 1791665911.0
+    },
+    "space_selection": [
+      "ccs_e104a697005743af",
+      "ccs_fe671375937e43d1"
+    ],
+    "session_id": "cv_76b37d61fcbb4a07",
+    "preflight": {
+      "blockers": [],
+      "warnings": [],
+      "pack_preview_snapshot_ids": [
+        "ccs_e104a697005743af",
+        "ccs_fe671375937e43d1"
+      ],
+      "pack_preview_snapshots": 2,
+      "connector_runtime": {
+        "requested": [
+          "project.read"
+        ],
+        "grants": [
+          {
+            "capability": "project.read",
+            "provider_id": "GITHUB",
+            "connection_id": "ccn_aea80c1b32444239",
+            "account_hint": "huangdi97"
+          }
+        ],
+        "blocked": [],
+        "ok": true,
+        "providers": [
+          {
+            "provider_id": "GITHUB",
+            "capabilities": [
+              "issue.create",
+              "project.read"
+            ],
+            "health": "AVAILABLE",
+            "account_label": "GitHub REST adapter"
+          }
+        ],
+        "write_execution_allowed": false
+      }
+    },
+    "start": {
+      "start_response_keys": [
+        "pack",
+        "session"
+      ],
+      "session_status": "ACTIVE"
+    },
+    "frozen": {
+      "pack_digest": "f63c9b75b8702197b2e9f4f75982dac10c3bbbd8d7a2c69200ac17d0e487d92f",
+      "connector_snapshots": 2,
+      "connector_grants": [
+        {
+          "capability": "project.read",
+          "provider_id": "GITHUB",
+          "connection_id": "ccn_aea80c1b32444239",
+          "account_hint": "huangdi97"
+        }
+      ],
+      "conversation_state": {
+        "phase": "PARTICIPATE",
+        "current_topic": "",
+        "user_speaking": false,
+        "direct_question_pending": false,
+        "audience_context": {},
+        "items": [],
+        "open_threads": [],
+        "last_guidance_id": ""
+      }
+    },
+    "write_grant_gate": "POST /api/product/conversation/sessions/cv_72d96af28d9346a5/start -> 400: {\"detail\":\"本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；issue.create:WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW。不会用 provider catalog 或 placeholder 放行。\"}",
+    "ask": {
+      "question": "20261010T205800Z Chengzhu closure",
+      "grounded": true,
+      "truth_confirmed": false,
+      "top_kind": "CONNECTOR_SNAPSHOT",
+      "top_authority": "REFERENCE_SOURCE",
+      "top_title": "Chengzhu v2 closure replay: reviewed issue draft 20261010T205800Z",
+      "top_source_refs": [
+        {
+          "kind": "CONNECTOR_SNAPSHOT",
+          "id": "ccs_e104a697005743af",
+          "provider_id": "GITHUB",
+          "connection_id": "ccn_aea80c1b32444239",
+          "capability": "project.read",
+          "external_kind": "ISSUE",
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
+          "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
+          "occurred_at": 1791665911.0,
+          "visibility": "PRIVATE"
+        }
+      ]
+    },
+    "ask_negative": {
+      "grounded": false
+    },
+    "draft": {
+      "id": "cda_775840c79bbd4ac0",
+      "status": "DRAFT",
+      "kind": "CREATE_ISSUE_DRAFT"
+    },
+    "review": "APPROVED",
+    "no_target_gate": {
+      "request_status": "PENDING",
+      "request_target": "",
+      "result_status": "UNKNOWN_OUTCOME",
+      "result_error": "GitHub repository 必须使用 owner/repo"
+    },
+    "execution_request": {
+      "id": "cce_b98d7942ca41433c",
+      "status": "PENDING",
+      "target": "huangdi97/chengzhu-connector-replay-2026-10-11"
+    },
+    "execution_result": {
+      "status": "SUCCEEDED",
+      "target": "huangdi97/chengzhu-connector-replay-2026-10-11",
+      "has_response": true
+    },
+    "execution_replay_status": "SUCCEEDED",
+    "audit_row": {
+      "id": "cce_b98d7942ca41433c",
+      "draft_action_id": "cda_775840c79bbd4ac0",
+      "connection_id": "ccn_aea80c1b32444239",
+      "capability": "issue.create",
+      "operation": "CREATE_ISSUE",
+      "target": "huangdi97/chengzhu-connector-replay-2026-10-11",
+      "status": "SUCCEEDED",
+      "idempotency_key": "65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37"
+    },
+    "github_issues": {
+      "total": 5,
+      "matching_title": 1,
+      "matching_numbers": [
+        5
+      ],
+      "body_starts_with_reviewed_content": true,
+      "audit_idempotency_marker_present": true,
+      "created_body": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37 -->",
+      "created_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/5"
+    }
+  },
+  "checks": {
+    "disabled_adapter_not_available": {
+      "ok": true,
+      "detail": {
+        "provider_id": "GITHUB",
+        "label": "GitHub",
+        "capabilities": [
+          "project.read",
+          "issue.create"
+        ],
+        "read_capabilities": [
+          "project.read"
+        ],
+        "write_capabilities": [
+          "issue.create"
+        ],
+        "external_kinds": [
+          "ISSUE"
+        ],
+        "provider_scopes": {
+          "project.read": "Issues: read",
+          "issue.create": "Issues: write"
+        },
+        "identity_scopes": [],
+        "sync": "UPDATED_AT_CURSOR_WITH_OVERLAP",
+        "setup": {
+          "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+          "credential_ref_format": "provider:github:env:<ENV_VAR>",
+          "read_target": "owner/repo",
+          "write_target": "owner/repo",
+          "secret_storage": "PROCESS_ENV_ONLY"
+        },
+        "adapter_available": false
+      }
+    },
+    "disabled_no_connections": {
+      "ok": true,
+      "detail": null
+    },
+    "enabled_adapter_available": {
+      "ok": true,
+      "detail": true
+    },
+    "catalog_capabilities": {
+      "ok": true,
+      "detail": [
+        "project.read",
+        "issue.create"
+      ]
+    },
+    "catalog_provider_scopes": {
+      "ok": true,
+      "detail": {
+        "project.read": "Issues: read",
+        "issue.create": "Issues: write"
+      }
+    },
+    "catalog_credential_ref_format": {
+      "ok": true,
+      "detail": {
+        "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+        "credential_ref_format": "provider:github:env:<ENV_VAR>",
+        "read_target": "owner/repo",
+        "write_target": "owner/repo",
+        "secret_storage": "PROCESS_ENV_ONLY"
+      }
+    },
+    "catalog_runtime_opt_in_env": {
+      "ok": true,
+      "detail": {
+        "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+        "credential_ref_format": "provider:github:env:<ENV_VAR>",
+        "read_target": "owner/repo",
+        "write_target": "owner/repo",
+        "secret_storage": "PROCESS_ENV_ONLY"
+      }
+    },
+    "catalog_secret_storage": {
+      "ok": true,
+      "detail": {
+        "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+        "credential_ref_format": "provider:github:env:<ENV_VAR>",
+        "read_target": "owner/repo",
+        "write_target": "owner/repo",
+        "secret_storage": "PROCESS_ENV_ONLY"
+      }
+    },
+    "connection_disconnected_initially": {
+      "ok": true,
+      "detail": "DISCONNECTED"
+    },
+    "connection_credential_ref_present": {
+      "ok": true,
+      "detail": {
+        "id": "ccn_aea80c1b32444239",
+        "provider_id": "GITHUB",
+        "display_name": "Closure replay GitHub",
+        "status": "DISCONNECTED",
+        "auth_mode": "OPAQUE_REFERENCE",
+        "granted_capabilities": [
+          "issue.create",
+          "project.read"
+        ],
+        "provider_scopes": [
+          "Issues: write"
+        ],
+        "account_hint": "",
+        "sync_cursor": "",
+        "last_sync_at": null,
+        "last_error": "",
+        "created_at": 1791666182.0152955,
+        "updated_at": 1791666182.0152955,
+        "sync_cursors": {},
+        "credential_ref_present": true,
+        "adapter_available": true
+      }
+    },
+    "connection_does_not_return_credential_ref": {
+      "ok": true,
+      "detail": [
+        "id",
+        "provider_id",
+        "display_name",
+        "status",
+        "auth_mode",
+        "granted_capabilities",
+        "provider_scopes",
+        "account_hint",
+        "sync_cursor",
+        "last_sync_at",
+        "last_error",
+        "created_at",
+        "updated_at",
+        "sync_cursors",
+        "credential_ref_present",
+        "adapter_available"
+      ]
+    },
+    "connection_scope_collapsed_to_write": {
+      "ok": true,
+      "detail": [
+        "Issues: write"
+      ]
+    },
+    "verify_connected": {
+      "ok": true,
+      "detail": "CONNECTED"
+    },
+    "verify_account_hint_login": {
+      "ok": true,
+      "detail": "huangdi97"
+    },
+    "sync_returned_snapshots": {
+      "ok": true,
+      "detail": 4
+    },
+    "snapshot_has_content_hash": {
+      "ok": true,
+      "detail": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12"
+    },
+    "snapshot_revision_view_present": {
+      "ok": true,
+      "detail": [
+        "id",
+        "connection_id",
+        "space_id",
+        "capability",
+        "external_kind",
+        "external_id",
+        "title",
+        "excerpt",
+        "content_hash",
+        "source_url",
+        "occurred_at",
+        "visibility",
+        "metadata",
+        "created_at",
+        "is_latest_revision",
+        "latest_snapshot_id"
+      ]
+    },
+    "snapshot_is_immutable_projection": {
+      "ok": true,
+      "detail": "project.read"
+    },
+    "space_selected_snapshots": {
+      "ok": true,
+      "detail": [
+        "ccs_e104a697005743af",
+        "ccs_fe671375937e43d1"
+      ]
+    },
+    "preflight_has_no_blockers": {
+      "ok": true,
+      "detail": []
+    },
+    "preflight_pack_preview_has_snapshot": {
+      "ok": true,
+      "detail": [
+        "ccs_e104a697005743af",
+        "ccs_fe671375937e43d1"
+      ]
+    },
+    "session_started_active": {
+      "ok": true,
+      "detail": "ACTIVE"
+    },
+    "frozen_pack_has_snapshot": {
+      "ok": true,
+      "detail": 2
+    },
+    "frozen_pack_has_connector_grant": {
+      "ok": true,
+      "detail": [
+        {
+          "capability": "project.read",
+          "provider_id": "GITHUB",
+          "connection_id": "ccn_aea80c1b32444239",
+          "account_hint": "huangdi97"
+        }
+      ]
+    },
+    "frozen_pack_grant_has_account_hint": {
+      "ok": true,
+      "detail": [
+        {
+          "capability": "project.read",
+          "provider_id": "GITHUB",
+          "connection_id": "ccn_aea80c1b32444239",
+          "account_hint": "huangdi97"
+        }
+      ]
+    },
+    "session_pack_write_grant_blocked": {
+      "ok": true,
+      "detail": "POST /api/product/conversation/sessions/cv_72d96af28d9346a5/start -> 400: {\"detail\":\"本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；issue.create:WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW。不会用 provider catalog 或 placeholder 放行。\"}"
+    },
+    "ask_grounded_on_snapshot": {
+      "ok": true,
+      "detail": true
+    },
+    "ask_authority_reference_source": {
+      "ok": true,
+      "detail": "REFERENCE_SOURCE"
+    },
+    "ask_source_kind_connector_snapshot": {
+      "ok": true,
+      "detail": "CONNECTOR_SNAPSHOT"
+    },
+    "ask_not_promoted_to_confirmed_truth": {
+      "ok": true,
+      "detail": false
+    },
+    "ask_source_ref_carries_connector_provenance": {
+      "ok": true,
+      "detail": [
+        {
+          "kind": "CONNECTOR_SNAPSHOT",
+          "id": "ccs_e104a697005743af",
+          "provider_id": "GITHUB",
+          "connection_id": "ccn_aea80c1b32444239",
+          "capability": "project.read",
+          "external_kind": "ISSUE",
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
+          "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
+          "occurred_at": 1791665911.0,
+          "visibility": "PRIVATE"
+        }
+      ]
+    },
+    "ask_negative_not_grounded": {
+      "ok": true,
+      "detail": false
+    },
+    "draft_created_not_executed": {
+      "ok": true,
+      "detail": "DRAFT"
+    },
+    "draft_approved": {
+      "ok": true,
+      "detail": "APPROVED"
+    },
+    "explicit_target_required": {
+      "ok": true,
+      "detail": {
+        "request_status": "PENDING",
+        "request_target": "",
+        "result_status": "UNKNOWN_OUTCOME",
+        "result_error": "GitHub repository 必须使用 owner/repo"
+      }
+    },
+    "execution_request_pending": {
+      "ok": true,
+      "detail": "PENDING"
+    },
+    "execution_request_target_recorded": {
+      "ok": true,
+      "detail": "huangdi97/chengzhu-connector-replay-2026-10-11"
+    },
+    "execution_succeeded": {
+      "ok": true,
+      "detail": "SUCCEEDED"
+    },
+    "second_execute_is_idempotent": {
+      "ok": true,
+      "detail": "SUCCEEDED"
+    },
+    "audit_row_present": {
+      "ok": true,
+      "detail": [
+        "id",
+        "draft_action_id",
+        "connection_id",
+        "capability",
+        "operation",
+        "target",
+        "idempotency_key",
+        "status",
+        "request",
+        "response",
+        "error",
+        "created_at"
+      ]
+    },
+    "audit_records_target": {
+      "ok": true,
+      "detail": "huangdi97/chengzhu-connector-replay-2026-10-11"
+    },
+    "audit_response_sanitized": {
+      "ok": true,
+      "detail": true
+    },
+    "audit_never_contains_token": {
+      "ok": true,
+      "detail": "token value absent from audit row"
+    },
+    "github_exactly_one_issue": {
+      "ok": true,
+      "detail": [
+        5
+      ]
+    },
+    "github_issue_body_matches_reviewed_content": {
+      "ok": true,
+      "detail": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37 -->"
+    },
+    "github_issue_carries_audit_idempotency_marker": {
+      "ok": true,
+      "detail": "65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37"
+    },
+    "token_absent_from_product_db": {
+      "ok": true,
+      "detail": "scanned product.db bytes"
+    },
+    "token_absent_from_space_export": {
+      "ok": true,
+      "detail": "scanned space export"
+    }
+  },
+  "assertions": [
+    {
+      "name": "disabled_adapter_not_available",
+      "ok": true
+    },
+    {
+      "name": "disabled_no_connections",
+      "ok": true
+    },
+    {
+      "name": "enabled_adapter_available",
+      "ok": true
+    },
+    {
+      "name": "catalog_capabilities",
+      "ok": true
+    },
+    {
+      "name": "catalog_provider_scopes",
+      "ok": true
+    },
+    {
+      "name": "catalog_credential_ref_format",
+      "ok": true
+    },
+    {
+      "name": "catalog_runtime_opt_in_env",
+      "ok": true
+    },
+    {
+      "name": "catalog_secret_storage",
+      "ok": true
+    },
+    {
+      "name": "connection_disconnected_initially",
+      "ok": true
+    },
+    {
+      "name": "connection_credential_ref_present",
+      "ok": true
+    },
+    {
+      "name": "connection_does_not_return_credential_ref",
+      "ok": true
+    },
+    {
+      "name": "connection_scope_collapsed_to_write",
+      "ok": true
+    },
+    {
+      "name": "verify_connected",
+      "ok": true
+    },
+    {
+      "name": "verify_account_hint_login",
+      "ok": true
+    },
+    {
+      "name": "sync_returned_snapshots",
+      "ok": true
+    },
+    {
+      "name": "snapshot_has_content_hash",
+      "ok": true
+    },
+    {
+      "name": "snapshot_revision_view_present",
+      "ok": true
+    },
+    {
+      "name": "snapshot_is_immutable_projection",
+      "ok": true
+    },
+    {
+      "name": "space_selected_snapshots",
+      "ok": true
+    },
+    {
+      "name": "preflight_has_no_blockers",
+      "ok": true
+    },
+    {
+      "name": "preflight_pack_preview_has_snapshot",
+      "ok": true
+    },
+    {
+      "name": "session_started_active",
+      "ok": true
+    },
+    {
+      "name": "frozen_pack_has_snapshot",
+      "ok": true
+    },
+    {
+      "name": "frozen_pack_has_connector_grant",
+      "ok": true
+    },
+    {
+      "name": "frozen_pack_grant_has_account_hint",
+      "ok": true
+    },
+    {
+      "name": "session_pack_write_grant_blocked",
+      "ok": true
+    },
+    {
+      "name": "ask_grounded_on_snapshot",
+      "ok": true
+    },
+    {
+      "name": "ask_authority_reference_source",
+      "ok": true
+    },
+    {
+      "name": "ask_source_kind_connector_snapshot",
+      "ok": true
+    },
+    {
+      "name": "ask_not_promoted_to_confirmed_truth",
+      "ok": true
+    },
+    {
+      "name": "ask_source_ref_carries_connector_provenance",
+      "ok": true
+    },
+    {
+      "name": "ask_negative_not_grounded",
+      "ok": true
+    },
+    {
+      "name": "draft_created_not_executed",
+      "ok": true
+    },
+    {
+      "name": "draft_approved",
+      "ok": true
+    },
+    {
+      "name": "explicit_target_required",
+      "ok": true
+    },
+    {
+      "name": "execution_request_pending",
+      "ok": true
+    },
+    {
+      "name": "execution_request_target_recorded",
+      "ok": true
+    },
+    {
+      "name": "execution_succeeded",
+      "ok": true
+    },
+    {
+      "name": "second_execute_is_idempotent",
+      "ok": true
+    },
+    {
+      "name": "audit_row_present",
+      "ok": true
+    },
+    {
+      "name": "audit_records_target",
+      "ok": true
+    },
+    {
+      "name": "audit_response_sanitized",
+      "ok": true
+    },
+    {
+      "name": "audit_never_contains_token",
+      "ok": true
+    },
+    {
+      "name": "github_exactly_one_issue",
+      "ok": true
+    },
+    {
+      "name": "github_issue_body_matches_reviewed_content",
+      "ok": true
+    },
+    {
+      "name": "github_issue_carries_audit_idempotency_marker",
+      "ok": true
+    },
+    {
+      "name": "token_absent_from_product_db",
+      "ok": true
+    },
+    {
+      "name": "token_absent_from_space_export",
+      "ok": true
+    }
+  ],
+  "passed": true,
+  "backend_log_tail": "INFO:     Started server process [22564]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:53138 (Press CTRL+C to quit)\nINFO:     127.0.0.1:53147 - \"GET /api/options HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53148 - \"GET /api/product/conversation/integrations/catalog HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53149 - \"POST /api/product/conversation/integrations/connections HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53150 - \"POST /api/product/conversation/integrations/connections/ccn_aea80c1b32444239/verify HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53157 - \"POST /api/product/conversation/spaces HTTP/1.1\" 200 OK\n2026-10-11 05:03:05 | WARNING | stt.engines | Whisper CUDA warmup failed; falling back to CPU: Library cublas64_12.dll is not found or cannot be loaded\nINFO:     127.0.0.1:53158 - \"POST /api/product/conversation/integrations/connections/ccn_aea80c1b32444239/sync HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53166 - \"GET /api/product/conversation/spaces/cs_cdc4c0d8252e4467/connector-snapshots HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53167 - \"PATCH /api/product/conversation/spaces/cs_cdc4c0d8252e4467 HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53168 - \"POST /api/product/conversation/spaces/cs_cdc4c0d8252e4467/sessions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53169 - \"GET /api/product/conversation/sessions/cv_76b37d61fcbb4a07/preflight HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53174 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53177 - \"GET /api/product/conversation/sessions/cv_76b37d61fcbb4a07 HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53178 - \"GET /api/product/conversation/sessions/cv_76b37d61fcbb4a07/context HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53179 - \"POST /api/product/conversation/spaces/cs_cdc4c0d8252e4467/sessions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53180 - \"POST /api/product/conversation/sessions/cv_72d96af28d9346a5/start HTTP/1.1\" 400 Bad Request\nINFO:     127.0.0.1:53192 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/ask HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53193 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/ask HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53194 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/draft-actions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53195 - \"POST /api/product/conversation/draft-actions/cda_775840c79bbd4ac0/review HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53196 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/draft-actions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53197 - \"POST /api/product/conversation/draft-actions/cda_b6a5bfe61f84408f/review HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53198 - \"POST /api/product/conversation/draft-actions/cda_b6a5bfe61f84408f/execution HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53207 - \"POST /api/product/conversation/integrations/executions/cce_d91d0391824e4ba6/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53212 - \"POST /api/product/conversation/draft-actions/cda_775840c79bbd4ac0/execution HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53215 - \"POST /api/product/conversation/integrations/executions/cce_b98d7942ca41433c/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53225 - \"POST /api/product/conversation/integrations/executions/cce_b98d7942ca41433c/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53226 - \"GET /api/product/conversation/integrations/executions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53243 - \"GET /api/product/conversation/spaces/cs_cdc4c0d8252e4467/export HTTP/1.1\" 200 OK\n"
+}

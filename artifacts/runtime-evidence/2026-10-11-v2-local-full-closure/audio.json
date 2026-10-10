@@ -1,0 +1,657 @@
+{
+  "evidence_type": "LOCAL_REAL_DEVICE_AUDIO",
+  "stt_provider": "whisper (local, no remote STT)",
+  "assertions": [
+    {
+      "name": "devices_enumerated",
+      "ok": true,
+      "detail": 10
+    },
+    {
+      "name": "loopback_device_present",
+      "ok": true,
+      "detail": [
+        {
+          "id": 20000,
+          "name": "★ 扬声器 (EDIFIER M30 Plus) (系统音频)",
+          "is_default_output": true
+        },
+        {
+          "id": 20001,
+          "name": "OF24Q (NVIDIA High Definition Audio) (系统音频)",
+          "is_default_output": false
+        }
+      ]
+    },
+    {
+      "name": "microphone_present",
+      "ok": true,
+      "detail": 8
+    },
+    {
+      "name": "audio_preflight_has_no_blockers",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "live_capture_cannot_be_stolen_by_another_session",
+      "ok": true,
+      "detail": "POST /api/product/conversation/sessions/cv_06f0284f729140e5/capture/start -> 400: {\"detail\":\"另一场 Conversation 正在占用音频采集\"}"
+    },
+    {
+      "name": "stop_is_idempotent",
+      "ok": true,
+      "detail": "second stop returned without deadlock"
+    },
+    {
+      "name": "transport_released_after_stop",
+      "ok": true,
+      "detail": {
+        "active": true,
+        "session_id": "cv_06f0284f729140e5",
+        "owns_requested_session": true,
+        "device_id": 20000,
+        "candidate_mic_device_id": null,
+        "mode": "TRANSCRIPTION_ONLY",
+        "paused": false,
+        "stopping": false
+      }
+    },
+    {
+      "name": "rapid_start_stop_no_deadlock",
+      "ok": true,
+      "detail": 1.66
+    },
+    {
+      "name": "audio_suite_ran",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "audio_suite_no_segment_drop",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "audio_suite_preflight_all_succeeded",
+      "ok": true,
+      "detail": {
+        "preflight_failure_count": 0,
+        "replay_failure_rounds": 0,
+        "total_failure_count": 0,
+        "preflight_success_count": 3,
+        "replay_success_rounds": 6,
+        "max_raw_queue_drop_count": 0,
+        "max_segment_dropped": 0,
+        "max_loopback_discontinuity_count": 0
+      }
+    }
+  ],
+  "passed": true,
+  "devices": {
+    "count": 10,
+    "loopback": [
+      {
+        "id": 20000,
+        "name": "★ 扬声器 (EDIFIER M30 Plus) (系统音频)",
+        "is_default_output": true
+      },
+      {
+        "id": 20001,
+        "name": "OF24Q (NVIDIA High Definition Audio) (系统音频)",
+        "is_default_output": false
+      }
+    ],
+    "microphone_count": 8,
+    "microphone_sample": [
+      {
+        "id": 0,
+        "name": "Microsoft 声音映射器 - Input"
+      },
+      {
+        "id": 6,
+        "name": "主声音捕获驱动程序"
+      },
+      {
+        "id": 1,
+        "name": "麦克风 (EDIFIER M30 Plus)"
+      },
+      {
+        "id": 7,
+        "name": "麦克风 (EDIFIER M30 Plus)"
+      }
+    ]
+  },
+  "loopback_device_id": 20000,
+  "capture_start": {
+    "active": true,
+    "session_id": "cv_c0f81fe766d44b98",
+    "owns_requested_session": true,
+    "device_id": 20000,
+    "candidate_mic_device_id": null,
+    "mode": "TRANSCRIPTION_ONLY",
+    "paused": false,
+    "stopping": false
+  },
+  "capture_active_status": {
+    "active": true,
+    "session_id": "cv_c0f81fe766d44b98",
+    "owns_requested_session": true,
+    "device_id": 20000,
+    "candidate_mic_device_id": null,
+    "mode": "TRANSCRIPTION_ONLY",
+    "paused": false,
+    "stopping": false
+  },
+  "capture_paused": {
+    "active": true,
+    "session_id": "cv_c0f81fe766d44b98",
+    "owns_requested_session": true,
+    "device_id": 20000,
+    "candidate_mic_device_id": null,
+    "mode": "TRANSCRIPTION_ONLY",
+    "paused": true,
+    "stopping": false
+  },
+  "capture_resumed": {
+    "active": true,
+    "session_id": "cv_c0f81fe766d44b98",
+    "owns_requested_session": true,
+    "device_id": 20000,
+    "candidate_mic_device_id": null,
+    "mode": "TRANSCRIPTION_ONLY",
+    "paused": false,
+    "stopping": false
+  },
+  "cross_session_steal": "POST /api/product/conversation/sessions/cv_06f0284f729140e5/capture/start -> 400: {\"detail\":\"另一场 Conversation 正在占用音频采集\"}",
+  "capture_stop": {
+    "active": false,
+    "session_id": "",
+    "owns_requested_session": false,
+    "device_id": null,
+    "candidate_mic_device_id": null,
+    "mode": "IDLE",
+    "paused": false,
+    "stopping": false
+  },
+  "capture_stop_again": {
+    "active": false,
+    "session_id": "",
+    "owns_requested_session": false,
+    "device_id": null,
+    "candidate_mic_device_id": null,
+    "mode": "IDLE",
+    "paused": false,
+    "stopping": false
+  },
+  "transport_released_after_stop": {
+    "active": true,
+    "session_id": "cv_06f0284f729140e5",
+    "owns_requested_session": true,
+    "device_id": 20000,
+    "candidate_mic_device_id": null,
+    "mode": "TRANSCRIPTION_ONLY",
+    "paused": false,
+    "stopping": false
+  },
+  "rapid_start_stop": {
+    "rounds": 3,
+    "elapsed_sec": 1.66
+  },
+  "transcript_after_lifecycle": {
+    "segments": 0,
+    "sample": []
+  },
+  "backend_log_tail": "ersation/sessions/cv_06f0284f729140e5/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51132 - \"POST /api/product/conversation/sessions/cv_06f0284f729140e5/capture/start HTTP/1.1\" 400 Bad Request\nINFO:     127.0.0.1:51133 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/stop HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51134 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/stop HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51135 - \"POST /api/product/conversation/sessions/cv_06f0284f729140e5/capture/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51136 - \"POST /api/product/conversation/sessions/cv_06f0284f729140e5/capture/stop HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51139 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51143 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/stop HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:51144 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:65164 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/stop HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:65167 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:65170 - \"POST /api/product/conversation/sessions/cv_c0f81fe766d44b98/capture/stop HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:65171 - \"GET /api/product/conversation/sessions/cv_c0f81fe766d44b98/transcript HTTP/1.1\" 200 OK\n",
+  "audio_validation_suite": {
+    "device_id": 20000,
+    "preflight": {
+      "device_id": 20000,
+      "repeats": 3,
+      "success_count": 3,
+      "failure_count": 0,
+      "provider": "whisper",
+      "expected_phrase": "请介绍一下你最近做过的项目",
+      "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\assets\\preflight_phrase.wav",
+      "summary": {
+        "avg_stt_ms": 2741,
+        "max_stt_ms": 6020,
+        "avg_total_ms": 6156,
+        "max_total_ms": 9435,
+        "max_raw_queue_drop_count": 0,
+        "max_loopback_discontinuity_count": 0
+      },
+      "rounds": [
+        {
+          "round": 1,
+          "ok": true,
+          "detail": "识别匹配",
+          "transcript": "请介绍一下你最近做过的项目。",
+          "rms": 0.17024146020412445,
+          "peak": 0.9593874216079712,
+          "playback_sec": 2.960735599976033,
+          "stt_ms": 6020,
+          "total_ms": 9435,
+          "provider": "whisper",
+          "capture": {
+            "dropped_chunks_count": 0,
+            "loopback_discontinuity_count": 0,
+            "max_queue_chunk_samples": 1024,
+            "last_queue_chunk_samples": 1024
+          }
+        },
+        {
+          "round": 2,
+          "ok": true,
+          "detail": "识别匹配",
+          "transcript": "请介绍一下你最近做过的项目。",
+          "rms": 0.100714311003685,
+          "peak": 0.954323410987854,
+          "playback_sec": 2.9478507000021636,
+          "stt_ms": 1061,
+          "total_ms": 4477,
+          "provider": "whisper",
+          "capture": {
+            "dropped_chunks_count": 0,
+            "loopback_discontinuity_count": 0,
+            "max_queue_chunk_samples": 1024,
+            "last_queue_chunk_samples": 1024
+          }
+        },
+        {
+          "round": 3,
+          "ok": true,
+          "detail": "识别匹配",
+          "transcript": "请介绍一下你最近做过的项目。",
+          "rms": 0.14730781316757202,
+          "peak": 0.9615334868431091,
+          "playback_sec": 2.9532777999993414,
+          "stt_ms": 1143,
+          "total_ms": 4558,
+          "provider": "whisper",
+          "capture": {
+            "dropped_chunks_count": 0,
+            "loopback_discontinuity_count": 0,
+            "max_queue_chunk_samples": 1024,
+            "last_queue_chunk_samples": 1024
+          }
+        }
+      ]
+    },
+    "replay_suite": {
+      "device_id": 20000,
+      "stt_provider": "whisper",
+      "answer_model": "请在 config.json 中配置",
+      "max_parallel_answers": 2,
+      "isolate_answers": true,
+      "scenario_count": 6,
+      "success_rounds": 6,
+      "failure_rounds": 0,
+      "total_rounds": 6,
+      "summary": {
+        "max_raw_queue_drop_count": 0,
+        "max_segment_dropped": 0,
+        "max_loopback_discontinuity_count": 0,
+        "max_segment_queue_depth": 1,
+        "max_qa_count": 0,
+        "answer_models": [],
+        "drain_timeout_count": 0
+      },
+      "scenarios": [
+        {
+          "scenario_id": "separated_cn",
+          "manifest_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\separated_cn.json",
+          "stt_provider": "whisper",
+          "answer_model": "请在 config.json 中配置",
+          "result": {
+            "device_id": 20000,
+            "repeats": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\separated_cn.wav",
+            "expected_phrase": "请先做一个简单的自我介绍。\n你最近做过的项目里，最有挑战的一次是什么？\n如果让你重新设计这个项目，你会优先改什么？",
+            "isolate_answers": true,
+            "min_transcript_count": 3,
+            "min_segment_emitted": 3,
+            "summary": {
+              "avg_total_ms": 25815,
+              "max_total_ms": 25815,
+              "max_qa_count": 0,
+              "answer_models": [],
+              "max_raw_queue_drop_count": 0,
+              "max_segment_dropped": 0,
+              "max_segment_queue_depth": 1,
+              "max_loopback_discontinuity_count": 0,
+              "max_raw_chunk_samples": 1024,
+              "drain_timeout_count": 0
+            },
+            "rounds": [
+              {
+                "round": 1,
+                "ok": true,
+                "detail": "识别匹配",
+                "playback_sec": 19.06200030000764,
+                "total_ms": 25815,
+                "transcript_count": 3,
+                "transcript": "请先做一个简单的自我介绍。\n你最近做过的项目里最有挑战的一次是什么?\n如果让你重新设计这个项目你会优先改什么?",
+                "qa_count": 0,
+                "answer_models": [],
+                "qa_pairs": [],
+                "runtime": {
+                  "live": false,
+                  "raw_queue_drop_count": 0,
+                  "loopback_discontinuity_count": 0,
+                  "segment_emitted": 3,
+                  "segment_dropped": 0,
+                  "segment_queue_depth": 0,
+                  "segment_backlog": 0,
+                  "max_observed_segment_queue_depth": 1,
+                  "max_raw_chunk_samples": 1024,
+                  "drained": true,
+                  "drain_timed_out": false,
+                  "remaining_after_drain": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "scenario_id": "mixed_followups_cn",
+          "manifest_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\mixed_followups_cn.json",
+          "stt_provider": "whisper",
+          "answer_model": "请在 config.json 中配置",
+          "result": {
+            "device_id": 20000,
+            "repeats": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\mixed_followups_cn.wav",
+            "expected_phrase": "请介绍一下你最近做过的项目。\n你在里面主要负责哪一块？\n如果线上性能突然下降，你会先看什么指标？",
+            "isolate_answers": true,
+            "min_transcript_count": 2,
+            "min_segment_emitted": 3,
+            "summary": {
+              "avg_total_ms": 22530,
+              "max_total_ms": 22530,
+              "max_qa_count": 0,
+              "answer_models": [],
+              "max_raw_queue_drop_count": 0,
+              "max_segment_dropped": 0,
+              "max_segment_queue_depth": 1,
+              "max_loopback_discontinuity_count": 0,
+              "max_raw_chunk_samples": 1024,
+              "drain_timeout_count": 0
+            },
+            "rounds": [
+              {
+                "round": 1,
+                "ok": true,
+                "detail": "识别近似匹配",
+                "playback_sec": 15.790804199990816,
+                "total_ms": 22530,
+                "transcript_count": 3,
+                "transcript": "请介绍一下你最近做过的项目。\n你在里面主要负责每一块。\n如果线上性能突然下降你会先看什么指标。",
+                "qa_count": 0,
+                "answer_models": [],
+                "qa_pairs": [],
+                "runtime": {
+                  "live": false,
+                  "raw_queue_drop_count": 0,
+                  "loopback_discontinuity_count": 0,
+                  "segment_emitted": 3,
+                  "segment_dropped": 0,
+                  "segment_queue_depth": 0,
+                  "segment_backlog": 0,
+                  "max_observed_segment_queue_depth": 1,
+                  "max_raw_chunk_samples": 1024,
+                  "drained": true,
+                  "drain_timed_out": false,
+                  "remaining_after_drain": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "scenario_id": "rapid_short_followups_cn",
+          "manifest_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\rapid_short_followups_cn.json",
+          "stt_provider": "whisper",
+          "answer_model": "请在 config.json 中配置",
+          "result": {
+            "device_id": 20000,
+            "repeats": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\rapid_short_followups_cn.wav",
+            "expected_phrase": "那怎么验证？\n失败怎么回滚？\n指标看哪些？",
+            "isolate_answers": true,
+            "min_transcript_count": 1,
+            "min_segment_emitted": 1,
+            "summary": {
+              "avg_total_ms": 13370,
+              "max_total_ms": 13370,
+              "max_qa_count": 0,
+              "answer_models": [],
+              "max_raw_queue_drop_count": 0,
+              "max_segment_dropped": 0,
+              "max_segment_queue_depth": 1,
+              "max_loopback_discontinuity_count": 0,
+              "max_raw_chunk_samples": 1024,
+              "drain_timeout_count": 0
+            },
+            "rounds": [
+              {
+                "round": 1,
+                "ok": true,
+                "detail": "识别近似匹配",
+                "playback_sec": 7.657536699989578,
+                "total_ms": 13370,
+                "transcript_count": 3,
+                "transcript": "那怎么验证?\n失败怎么回滚?\n指标砍哪些?",
+                "qa_count": 0,
+                "answer_models": [],
+                "qa_pairs": [],
+                "runtime": {
+                  "live": false,
+                  "raw_queue_drop_count": 0,
+                  "loopback_discontinuity_count": 0,
+                  "segment_emitted": 3,
+                  "segment_dropped": 0,
+                  "segment_queue_depth": 0,
+                  "segment_backlog": 0,
+                  "max_observed_segment_queue_depth": 1,
+                  "max_raw_chunk_samples": 1024,
+                  "drained": true,
+                  "drain_timed_out": false,
+                  "remaining_after_drain": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "scenario_id": "terms_mixed_cn_en",
+          "manifest_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\terms_mixed_cn_en.json",
+          "stt_provider": "whisper",
+          "answer_model": "请在 config.json 中配置",
+          "result": {
+            "device_id": 20000,
+            "repeats": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\terms_mixed_cn_en.wav",
+            "expected_phrase": "rules 和 skills 的区别是什么？不要结合项目。\npipeline 里怎么做 retry 和 timeout？\nSQL 索引失效你会怎么排查？",
+            "isolate_answers": true,
+            "min_transcript_count": 3,
+            "min_segment_emitted": 3,
+            "summary": {
+              "avg_total_ms": 23670,
+              "max_total_ms": 23670,
+              "max_qa_count": 0,
+              "answer_models": [],
+              "max_raw_queue_drop_count": 0,
+              "max_segment_dropped": 0,
+              "max_segment_queue_depth": 1,
+              "max_loopback_discontinuity_count": 0,
+              "max_raw_chunk_samples": 1024,
+              "drain_timeout_count": 0
+            },
+            "rounds": [
+              {
+                "round": 1,
+                "ok": true,
+                "detail": "识别匹配",
+                "playback_sec": 16.94963310001185,
+                "total_ms": 23670,
+                "transcript_count": 3,
+                "transcript": "rules和Skills 的区别是什么?不要结合项目。\nPipeline里怎么做 retry和 timeout?\nSQL 索引失效你会怎么排查。",
+                "qa_count": 0,
+                "answer_models": [],
+                "qa_pairs": [],
+                "runtime": {
+                  "live": false,
+                  "raw_queue_drop_count": 0,
+                  "loopback_discontinuity_count": 0,
+                  "segment_emitted": 3,
+                  "segment_dropped": 0,
+                  "segment_queue_depth": 0,
+                  "segment_backlog": 0,
+                  "max_observed_segment_queue_depth": 1,
+                  "max_raw_chunk_samples": 1024,
+                  "drained": true,
+                  "drain_timed_out": false,
+                  "remaining_after_drain": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "scenario_id": "filler_noise_then_question_cn",
+          "manifest_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\filler_noise_then_question_cn.json",
+          "stt_provider": "whisper",
+          "answer_model": "请在 config.json 中配置",
+          "result": {
+            "device_id": 20000,
+            "repeats": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\filler_noise_then_question_cn.wav",
+            "expected_phrase": "嗯嗯，稍等，我看一下。\n好，那你讲一下 Redis 持久化怎么选？\n再说一下 AOF 重写有什么风险？",
+            "isolate_answers": true,
+            "min_transcript_count": 2,
+            "min_segment_emitted": 2,
+            "summary": {
+              "avg_total_ms": 21866,
+              "max_total_ms": 21866,
+              "max_qa_count": 0,
+              "answer_models": [],
+              "max_raw_queue_drop_count": 0,
+              "max_segment_dropped": 0,
+              "max_segment_queue_depth": 1,
+              "max_loopback_discontinuity_count": 0,
+              "max_raw_chunk_samples": 1024,
+              "drain_timeout_count": 0
+            },
+            "rounds": [
+              {
+                "round": 1,
+                "ok": true,
+                "detail": "识别近似匹配",
+                "playback_sec": 15.207180700002937,
+                "total_ms": 21866,
+                "transcript_count": 3,
+                "transcript": "文化文 稍等我看一下。\n好那你将一下Redis 19画怎么选?\n再说一下AOF重写有什么风险。",
+                "qa_count": 0,
+                "answer_models": [],
+                "qa_pairs": [],
+                "runtime": {
+                  "live": false,
+                  "raw_queue_drop_count": 0,
+                  "loopback_discontinuity_count": 0,
+                  "segment_emitted": 3,
+                  "segment_dropped": 0,
+                  "segment_queue_depth": 0,
+                  "segment_backlog": 0,
+                  "max_observed_segment_queue_depth": 1,
+                  "max_raw_chunk_samples": 1024,
+                  "drained": true,
+                  "drain_timed_out": false,
+                  "remaining_after_drain": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "scenario_id": "tail_stop_flush_cn",
+          "manifest_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\tail_stop_flush_cn.json",
+          "stt_provider": "whisper",
+          "answer_model": "请在 config.json 中配置",
+          "result": {
+            "device_id": 20000,
+            "repeats": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "audio_path": "E:\\AI\\面试助手\\.pi\\closure-wt\\backend\\tmp\\tail_stop_flush_cn.wav",
+            "expected_phrase": "最后一个问题。\n如果线上接口突然变慢，你第一步看什么？",
+            "isolate_answers": true,
+            "min_transcript_count": 1,
+            "min_segment_emitted": 1,
+            "summary": {
+              "avg_total_ms": 10856,
+              "max_total_ms": 10856,
+              "max_qa_count": 0,
+              "answer_models": [],
+              "max_raw_queue_drop_count": 0,
+              "max_segment_dropped": 0,
+              "max_segment_queue_depth": 1,
+              "max_loopback_discontinuity_count": 0,
+              "max_raw_chunk_samples": 1024,
+              "drain_timeout_count": 0
+            },
+            "rounds": [
+              {
+                "round": 1,
+                "ok": true,
+                "detail": "识别匹配",
+                "playback_sec": 7.98248199999216,
+                "total_ms": 10856,
+                "transcript_count": 2,
+                "transcript": "最后一个问题。\n如果线上接口突然变慢你第一步看什么?",
+                "qa_count": 0,
+                "answer_models": [],
+                "qa_pairs": [],
+                "runtime": {
+                  "live": false,
+                  "raw_queue_drop_count": 0,
+                  "loopback_discontinuity_count": 0,
+                  "segment_emitted": 2,
+                  "segment_dropped": 0,
+                  "segment_queue_depth": 0,
+                  "segment_backlog": 0,
+                  "max_observed_segment_queue_depth": 1,
+                  "max_raw_chunk_samples": 1024,
+                  "drained": true,
+                  "drain_timed_out": false,
+                  "remaining_after_drain": 0
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "summary": {
+      "preflight_failure_count": 0,
+      "replay_failure_rounds": 0,
+      "total_failure_count": 0,
+      "preflight_success_count": 3,
+      "replay_success_rounds": 6,
+      "max_raw_queue_drop_count": 0,
+      "max_segment_dropped": 0,
+      "max_loopback_discontinuity_count": 0
+    }
+  },
+  "audio_validation_suite_exit": 0
+}

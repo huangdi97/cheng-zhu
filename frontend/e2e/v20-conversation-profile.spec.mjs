@@ -2383,7 +2383,7 @@ test.describe('v2.0 Conversation Profile', () => {
     const setup = page.getByTestId('microsoft-todo-connector-setup')
     await expect(setup).toBeVisible()
     await expect(setup.getByText(/reviewed task-create/)).toBeVisible()
-    await expect(setup.getByText(/Tasks.ReadWrite/)).toBeVisible()
+    await expect(setup.getByText(/delegated permission · Tasks\.ReadWrite/)).toBeVisible()
     await expect(setup.getByText(/不读 Outlook Mail \/ Calendar \/ OneDrive/)).toBeVisible()
     await page.getByLabel('Microsoft To Do token 环境变量名').fill('MY_MS_GRAPH_TOKEN')
     await page.getByRole('button', { name: '创建 Microsoft To Do 连接元数据' }).click()

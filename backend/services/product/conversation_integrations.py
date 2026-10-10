@@ -87,21 +87,26 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
         },
     },
     "MICROSOFT_GRAPH": {
-        "label": "Microsoft Graph",
-        "capabilities": [
-            "calendar.read", "mail.read", "docs.read", "project.read",
-            "email.send", "task.create",
-        ],
-        "external_kinds": ["CALENDAR_EVENT", "MAIL_THREAD", "DOCUMENT", "TASK"],
+        "label": "Microsoft To Do (Graph)",
+        "capabilities": ["project.read", "task.create"],
+        "external_kinds": ["TASK"],
         "provider_scopes": {
-            "calendar.read": "Calendars.Read",
-            "mail.read": "Mail.Read",
-            "docs.read": "Files.Read",
             "project.read": "Tasks.Read",
-            "email.send": "Mail.Send",
             "task.create": "Tasks.ReadWrite",
         },
-        "sync": "PROVIDER_CURSOR",
+        "identity_scopes": ["User.Read"],
+        "sync": "FULL_TARGET_REFRESH",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:microsoft-graph:env:<ENV_VAR>",
+            "read_target": "todo_list_id or defaultList",
+            "write_target": "todo_list_id or defaultList",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "identity_scope": "User.Read",
+            "read_scope": "Tasks.Read",
+            "write_scope": "Tasks.ReadWrite",
+            "mail_calendar_files_support": "NONE_IN_THIS_ADAPTER",
+        },
     },
     "GITHUB": {
         "label": "GitHub",
@@ -251,6 +256,15 @@ def _expected_provider_scopes(provider: str, granted: set[str]) -> list[str]:
         if "project.read" in granted:
             return ["Issues: read"]
         return []
+    # Microsoft To Do uses User.Read only for signed-in identity. Tasks.ReadWrite
+    # already includes task-list/task read, so do not redundantly request
+    # Tasks.Read when task.create is granted.
+    if provider == "MICROSOFT_GRAPH":
+        if "task.create" in granted:
+            return ["Tasks.ReadWrite", "User.Read"]
+        if "project.read" in granted:
+            return ["Tasks.Read", "User.Read"]
+        return []
     scope_map = dict(PROVIDER_CATALOG[provider].get("provider_scopes") or {})
     expected = {
         str(scope_map.get(capability) or "").strip()
@@ -392,6 +406,9 @@ def catalog() -> list[dict[str, Any]]:
             "sync": spec["sync"],
             "setup": dict(spec.get("setup") or {}),
             "adapter_available": provider in _ADAPTERS,
+            "adapter_capabilities": sorted(
+                set(getattr(_ADAPTERS.get(provider), "capabilities", set()) or set())
+            ) if provider in _ADAPTERS else [],
         })
     return rows
 
@@ -421,6 +438,13 @@ def create_connection(
         raise ValueError(
             "provider 不支持 capability: " + ", ".join(sorted(granted - supported))
         )
+    adapter = _ADAPTERS.get(provider)
+    if adapter is not None:
+        runtime_capabilities = set(getattr(adapter, "capabilities", set()) or set())
+        if not granted <= runtime_capabilities:
+            raise ValueError(
+                "当前 adapter 不支持 capability: " + ", ".join(sorted(granted - runtime_capabilities))
+            )
     credential_ref = _validate_credential_ref(credential_ref)
     validated_scopes = _validated_provider_scopes(provider, granted, provider_scopes)
     ts = store.now()

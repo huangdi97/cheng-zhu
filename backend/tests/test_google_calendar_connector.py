@@ -168,6 +168,95 @@ def test_google_calendar_full_sync_pages_to_final_sync_token(monkeypatch):
     assert second["maxResults"] == ["250"]
 
 
+
+
+def test_google_calendar_preserves_timezone_and_does_not_invent_all_day_time(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN", "ya29.test_calendar_token")
+    transport = FakeTransport()
+    timed = _event("evt-tz")
+    timed["start"] = {"dateTime": "2026-10-11T09:00:00", "timeZone": "Asia/Shanghai"}
+    all_day = _event("evt-all-day", "Conference day")
+    all_day["start"] = {"date": "2026-10-12"}
+    all_day["end"] = {"date": "2026-10-13"}
+    transport.queue(200, {
+        "items": [timed, all_day],
+        "nextSyncToken": "sync-token-time",
+    })
+    adapter = GoogleCalendarRestAdapter(transport=transport)
+
+    result = adapter.read_context(
+        connection=_connection(),
+        capability="calendar.read",
+        query={"calendar_id": "primary"},
+        cursor="",
+        limit=500,
+    )
+    by_id = {row["external_id"]: row for row in result["items"]}
+    timed_snapshot = by_id["primary:evt-tz"]
+    assert timed_snapshot["metadata"]["timezone"] == "Asia/Shanghai"
+    assert timed_snapshot["metadata"]["all_day"] is False
+    assert timed_snapshot["occurred_at"] is not None
+
+    all_day_snapshot = by_id["primary:evt-all-day"]
+    assert all_day_snapshot["metadata"]["all_day"] is True
+    assert all_day_snapshot["metadata"]["when"] == "2026-10-12"
+    assert all_day_snapshot["occurred_at"] is None
+
+
+def test_calendar_import_rejects_all_day_and_status_events(product_env):
+    space = conversations.create_space("Calendar Non Meetings", "PROJECT_SYNC")
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_CALENDAR",
+        granted_capabilities=["calendar.read"],
+        credential_ref="provider:google-calendar:env:CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN",
+        account_hint="primary",
+    )
+    all_day = conversation_integrations._store_snapshot(
+        connection,
+        space["id"],
+        "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:all-day",
+            "title": "Conference Day",
+            "occurred_at": None,
+            "metadata": {
+                "calendar_id": "primary",
+                "event_id": "all-day",
+                "status": "confirmed",
+                "cancelled": False,
+                "all_day": True,
+                "event_type": "default",
+            },
+        },
+    )
+    with pytest.raises(ValueError, match="All-day"):
+        conversations.schedule_from_calendar_snapshot(space["id"], all_day["id"])
+
+    for event_type in ("focusTime", "outOfOffice", "workingLocation"):
+        status_event = conversation_integrations._store_snapshot(
+            connection,
+            space["id"],
+            "calendar.read",
+            {
+                "external_kind": "CALENDAR_EVENT",
+                "external_id": f"primary:{event_type}",
+                "title": event_type,
+                "occurred_at": store.now() + 3600,
+                "metadata": {
+                    "calendar_id": "primary",
+                    "event_id": event_type,
+                    "status": "confirmed",
+                    "cancelled": False,
+                    "all_day": False,
+                    "event_type": event_type,
+                },
+            },
+        )
+        with pytest.raises(ValueError, match="不是 Conversation Session"):
+            conversations.schedule_from_calendar_snapshot(space["id"], status_event["id"])
+
+
 def test_google_calendar_incremental_sync_uses_token_without_time_filter(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN", "ya29.test_calendar_token")
     transport = FakeTransport()

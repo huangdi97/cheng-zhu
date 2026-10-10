@@ -26,3 +26,9 @@ pypdf>=4.3.0,<6.0
 # --- Knowledge base (可选，需要时手动安装) ---
 # rapidocr-onnxruntime>=1.3.0  # PDF L2 OCR（扫描件/图片文字）
 # pypdfium2 已在上面必装（简历 PDF 转图 & KB L2/L3 页渲染共用）
+
+# IANA time zone database for zoneinfo. Windows ships no system tz database, so
+# zoneinfo.ZoneInfo("Asia/Shanghai") raises ZoneInfoNotFoundError there and the
+# Calendar connector would silently drop event instants. Declared explicitly so
+# every runner, developer machine and the packaged sidecar behave identically.
+tzdata>=2024.1

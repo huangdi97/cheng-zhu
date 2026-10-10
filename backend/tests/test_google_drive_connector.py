@@ -382,6 +382,31 @@ def test_google_drive_target_failure_is_nonfatal_but_auth_failure_is_fatal(monke
 
 
 
+
+
+def test_google_drive_incomplete_search_fails_closed_before_content_download(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
+    transport = FakeTransport()
+    transport.queue(200, _folder())
+    transport.queue(200, {
+        "files": [_file("doc-1", "Maybe Missing Siblings")],
+        "incompleteSearch": True,
+        "nextPageToken": "",
+    })
+    adapter = GoogleDriveRestAdapter(transport=transport)
+
+    with pytest.raises(GoogleDriveTargetError, match="incompleteSearch=true"):
+        adapter.read_context(
+            connection=_connection(folder="folder-1"),
+            capability="docs.read",
+            query={"folder_id": "folder-1"},
+            cursor="",
+            limit=500,
+        )
+    assert len(transport.calls) == 2
+    assert not any("/export" in call["url"] or "alt=media" in call["url"] for call in transport.calls)
+
+
 def test_google_drive_more_than_500_files_fails_before_any_content_download(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
     transport = FakeTransport()

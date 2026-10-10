@@ -86,6 +86,26 @@ Prepare / Connector setup 显示 send-only、runtime opt-in env、token env vari
 
 Verify 后只显示 verified account identity；Continue 中仍需 Follow-up Draft → local APPROVE → exact Gmail connection → single recipient → Execution Request → second Execute。只有 provider 明确成功才显示 SUCCEEDED。
 
+## 9.5 OAuth sensitivity / public release gate
+
+Google 官方把 `https://www.googleapis.com/auth/gmail.send` 归类为 **Sensitive scope**。因此：
+
+```text
+adapter/unit/E2E engineering evidence
+!= Google public OAuth approval
+!= production Gmail connector launch
+```
+
+本实现不会为了简化授权扩大到 `gmail.readonly`、`gmail.modify` 或 `gmail.compose`。
+
+在对公众把 Gmail provider 提升为 stable/public-ready 之前，还需要：
+
+- 适用的 Google OAuth consent screen 配置；
+- Google OAuth app verification（针对 sensitive scope）；
+- 真实 Google account runtime replay；
+- 真实 reviewed send provider response；
+- recipient delivery 仍是更后一级证据，不由 `messages.send` 成功自动证明。
+
 ## 10. Evidence truth
 
 仓库内可证明：GMAIL_ADAPTER_CODE、GMAIL_SEND_ONLY_CONTRACT、OIDC_IDENTITY_CONTRACT、REVIEWED_TWO_STEP_SEND、UNKNOWN_OUTCOME_PROTECTION 均成立，MAILBOX_READ=false。

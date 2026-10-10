@@ -431,7 +431,14 @@ Provider unhealthy、credential 被撤销或 capability 不再存在时：
 
 ## 16. Privacy / sanitization
 
-Connector snapshot metadata 与 execution response 必须递归清洗敏感 key。
+Connector snapshot 的 external id / title / excerpt / provider hash / metadata，以及 execution response 都必须做 value-level / key-level secret sanitization。
+
+Reviewed DraftAction 进入 Execution Request 时也必须先生成 provider-safe payload：
+
+- secret/token-shaped value 不得进入 execution audit 的 request；
+- 不得原样发给 provider；
+- audit 中冻结 `outbound_redaction_applied = true/false`；
+- 若发生脱敏，第二次显式 Execute 前 UI 必须让用户看到“实际外发 payload 与本地 Draft 可能不同”。
 
 Provider URL 只保留：
 

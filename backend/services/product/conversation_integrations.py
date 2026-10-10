@@ -651,7 +651,7 @@ def sync_connection(
     except Exception as exc:
         store.update("conversation_connector_connection", connection_id, {
             "status": "ERROR",
-            "last_error": str(exc)[:2000],
+            "last_error": _redact_secret_values(str(exc))[:2000],
             "updated_at": store.now(),
         })
         raise

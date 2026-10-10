@@ -1597,7 +1597,7 @@ test.describe('v2.0 Conversation Profile', () => {
             status: 'DISCONNECTED',
             auth_mode: 'OPAQUE_REFERENCE',
             granted_capabilities: createBody.granted_capabilities,
-            provider_scopes: ['Issues: read', 'Issues: write'],
+            provider_scopes: ['Issues: write'],
             account_hint: '',
             sync_cursor: '',
             sync_cursors: {},

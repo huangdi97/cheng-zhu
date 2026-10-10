@@ -86,7 +86,14 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             "project.read": "Issues: read",
             "issue.create": "Issues: write",
         },
-        "sync": "ETAG_OR_CURSOR",
+        "sync": "UPDATED_AT_CURSOR_WITH_OVERLAP",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:github:env:<ENV_VAR>",
+            "read_target": "owner/repo",
+            "write_target": "owner/repo",
+            "secret_storage": "PROCESS_ENV_ONLY",
+        },
     },
     "MCP": {
         "label": "Model Context Protocol",
@@ -340,6 +347,7 @@ def catalog() -> list[dict[str, Any]]:
             "external_kinds": list(spec["external_kinds"]),
             "provider_scopes": dict(spec["provider_scopes"]),
             "sync": spec["sync"],
+            "setup": dict(spec.get("setup") or {}),
             "adapter_available": provider in _ADAPTERS,
         })
     return rows

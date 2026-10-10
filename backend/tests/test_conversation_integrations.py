@@ -21,6 +21,9 @@ class FakeAdapter:
         })
         self.healthy = True
         self.fail_execute = False
+        self.explicit_failure = False
+        self.retry_safe_failure = False
+        self.missing_ok = False
         self.execute_calls = 0
         self.items = {
             "calendar.read": [{
@@ -51,7 +54,15 @@ class FakeAdapter:
     def execute(self, *, connection, capability, operation, target, payload, idempotency_key):
         self.execute_calls += 1
         if self.fail_execute:
-            raise RuntimeError("provider rejected request")
+            raise RuntimeError("transport timed out after provider may have accepted request")
+        if self.missing_ok:
+            return {"external_id": "ambiguous-1", "note": "provider omitted explicit outcome"}
+        if self.explicit_failure:
+            return {
+                "ok": False,
+                "error": "provider explicitly rejected request",
+                "retry_safe": self.retry_safe_failure,
+            }
         return {
             "ok": True,
             "external_id": f"{operation.lower()}-1",
@@ -280,7 +291,7 @@ def test_approved_draft_requires_request_then_second_execute_and_is_idempotent(p
     assert adapter.execute_calls == 1
 
 
-def test_execution_without_write_grant_blocks_and_provider_failure_is_audited(product_env):
+def test_execution_without_write_grant_blocks_and_ambiguous_transport_failure_is_not_retryable(product_env):
     read_adapter = FakeAdapter({"calendar.read"})
     read_connection = _connected(read_adapter, ["calendar.read"])
     space = conversations.create_space("Blocked Write", "PROJECT_SYNC")
@@ -300,14 +311,93 @@ def test_execution_without_write_grant_blocks_and_provider_failure_is_audited(pr
         conversation_integrations.execute_request(blocked["id"])
 
     conversation_integrations.clear_adapters_for_tests()
-    failing = FakeAdapter({"email.send"})
-    failing.fail_execute = True
-    write_connection = _connected(failing, ["email.send"])
-    failed_request = conversation_integrations.request_execution(draft["id"], write_connection["id"])
+    ambiguous = FakeAdapter({"email.send"})
+    ambiguous.fail_execute = True
+    write_connection = _connected(ambiguous, ["email.send"])
+    request = conversation_integrations.request_execution(draft["id"], write_connection["id"])
+    unknown = conversation_integrations.execute_request(request["id"])
+    assert unknown["status"] == "UNKNOWN_OUTCOME"
+    assert "transport timed out" in unknown["error"]
+    assert ambiguous.execute_calls == 1
+
+    with pytest.raises(ValueError, match="outcome 不确定"):
+        conversation_integrations.execute_request(request["id"])
+    assert ambiguous.execute_calls == 1
+
+
+def test_external_execution_requires_explicit_ok_and_only_retry_safe_failure_can_retry(product_env):
+    adapter = FakeAdapter({"email.send"})
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Execution Semantics", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    def approved_draft(title):
+        draft = conversations.create_draft_action(
+            session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title=title, content="body",
+        )
+        conversations.review_draft_action(draft["id"], "APPROVE")
+        return draft
+
+    missing_ok = approved_draft("Ambiguous envelope")
+    adapter.missing_ok = True
+    request = conversation_integrations.request_execution(missing_ok["id"], connection["id"])
+    unknown = conversation_integrations.execute_request(request["id"])
+    assert unknown["status"] == "UNKNOWN_OUTCOME"
+    assert "显式 boolean ok" in unknown["error"]
+    with pytest.raises(ValueError, match="outcome 不确定"):
+        conversation_integrations.execute_request(request["id"])
+
+    adapter.missing_ok = False
+    adapter.explicit_failure = True
+    adapter.retry_safe_failure = False
+    failed_draft = approved_draft("Definitive failure")
+    failed_request = conversation_integrations.request_execution(failed_draft["id"], connection["id"])
     failed = conversation_integrations.execute_request(failed_request["id"])
     assert failed["status"] == "FAILED"
-    assert "provider rejected request" in failed["error"]
-    assert failing.execute_calls == 1
+    assert failed["response"]["ok"] is False
+    assert failed["response"]["retry_safe"] is False
+    with pytest.raises(ValueError, match="未声明 retry_safe"):
+        conversation_integrations.execute_request(failed_request["id"])
+
+    adapter.retry_safe_failure = True
+    retry_draft = approved_draft("Retry safe")
+    retry_request = conversation_integrations.request_execution(retry_draft["id"], connection["id"])
+    first = conversation_integrations.execute_request(retry_request["id"])
+    assert first["status"] == "FAILED"
+    assert first["response"]["retry_safe"] is True
+    calls_before_retry = adapter.execute_calls
+
+    adapter.explicit_failure = False
+    retried = conversation_integrations.execute_request(retry_request["id"])
+    assert retried["status"] == "SUCCEEDED"
+    assert adapter.execute_calls == calls_before_retry + 1
+
+
+def test_external_execution_unknown_outcome_never_rewrites_conversation_truth(product_env):
+    adapter = FakeAdapter({"email.send"})
+    adapter.fail_execute = True
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Truth Isolation", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    decision = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="保留原 Decision",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确确认"}],
+    )
+    reviewed = conversations.review_item(decision["id"], "CONFIRM")
+    draft = conversations.create_draft_action(
+        session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="Follow-up", content="body",
+    )
+    approved = conversations.review_draft_action(draft["id"], "APPROVE")
+
+    request = conversation_integrations.request_execution(approved["id"], connection["id"])
+    unknown = conversation_integrations.execute_request(request["id"])
+    assert unknown["status"] == "UNKNOWN_OUTCOME"
+    assert conversations.require_item(decision["id"])["state"] == reviewed["state"]
+    assert store.get("conversation_draft_action", draft["id"])["status"] == "APPROVED"
 
 
 def test_retention_keeps_selected_snapshots_and_execution_audit(product_env):
@@ -403,6 +493,7 @@ def test_diagnostics_distinguishes_boundary_from_real_provider_availability(prod
     assert diag["health"]["external_connectors"] == "NOT_CONFIGURED"
     assert diag["health"]["external_writeback_execution"] == "REVIEWED_SECOND_EXPLICIT_EXECUTION_BOUNDARY"
     assert diag["integrations"]["connected_count"] == 0
+    assert diag["integrations"]["unknown_outcome_count"] == 0
     assert diag["integrations"]["default"] == "NO_PROVIDER_ADAPTERS_CONFIGURED"
 
     adapter = FakeAdapter({"calendar.read"})

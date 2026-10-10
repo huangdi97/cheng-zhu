@@ -133,10 +133,13 @@ Sync 先执行 folder metadata probe，要求：
 
 ## 6. Content truth
 
+在读取任何正文前，provider 都先尊重 Drive 返回的 `capabilities.canDownload`。如果该文件禁止下载/导出，Chengzhu 只保留 metadata-only snapshot，并记录 `DOWNLOAD_RESTRICTED`；不会用失败 export 冒充“正文不可解析”。
+
 ### Google Docs
 
 ```text
 application/vnd.google-apps.document
+→ canDownload = true
 → files.export
 → text/plain
 → TEXT_EXPORT_EXCERPT_20K
@@ -210,7 +213,8 @@ content_unavailable_reason = UNSUPPORTED_OR_BINARY
 - 超过上限整次失败；
 - 不保存“前 500 个”再假装完整；
 - 单个文本正文上限 2MB；
-- 超大文本不做静默截断后冒充全文。
+- Google Workspace export 或 text blob 超过 2MB 时，该文件降为 `METADATA_ONLY / TEXT_TOO_LARGE`；
+- 超大文本不做静默截断后冒充全文，也不会因为一个大文件把同 folder 内其他可读文件整批丢弃。
 
 snapshot excerpt 仍由 integration boundary 做长度与 secret redaction。
 

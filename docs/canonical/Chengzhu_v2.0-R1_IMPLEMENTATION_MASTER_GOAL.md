@@ -1,10 +1,15 @@
 # 成竹 Chengzhu v2.0-R1
 ## Personal Conversation Intelligence｜Implementation & Rollout Master Goal
-**日期**：2026-10-06  
-**状态**：CANONICAL IMPLEMENTATION GOAL  
-**工作分支**：`feat/chengzhu-v2-conversation-design-closure`  
-**当前 PR**：#19（承接已合入的 Conversation runtime PR #18）  
+**初始日期**：2026-10-06  
+**Truth Sync**：2026-10-10  
+**状态**：CANONICAL IMPLEMENTATION & ROLLOUT GOAL / PURE-REPO CLOSURE REACHED  
+**当前工程基线**：`main@383978fa480aac35d214dce3fa4e9fa5ebb17118`  
+**当前基线 CI**：GitHub Actions CI run `37901753321` = PASS  
+**公开 Conversation prerelease**：`v2.0.0-beta.2 @ cac605edf413ec248babf02ea9f73da708d156f8`  
+**Stable Latest**：`v1.4.2`  
 **最高设计依据**：`Chengzhu_v2.0-R1_PERSONAL_CONVERSATION_INTELLIGENCE.md`
+
+> PR #18 / #19 继续作为历史 provenance：#18 建立 Conversation runtime，#19 完成第一轮 design/runtime closure；它们不再代表当前工作分支或当前完成状态。
 
 ---
 
@@ -79,7 +84,7 @@ Interview v1.4.x 已有正式 Windows packaged release 与 release provenance ev
 
 ## 2.2 Conversation Profile
 
-PR #18 已建立真实 Conversation runtime：
+Conversation runtime 已经由历史 PR #18 建立，并在后续 main 持续扩展：
 
 - opt-in Conversation Beta；
 - Profile Switcher；
@@ -103,9 +108,9 @@ PR #18 已建立真实 Conversation runtime：
 - local DraftActions；
 - synthetic/runtime/E2E gates。
 
-PR #19 负责 canonical closure，不得重新定义成第三套产品。
+历史 PR #19 已完成第一轮 canonical/runtime closure。其后 main 又继续完成 packaged Beta、Profile Playbooks、auditable Expression Plan、AUTO Screen Context、desktop Share Privacy、Conversation Human Coach、connector capability registry、stable promotion evidence evaluator 与 privacy-safe local reminders。
 
-当前目标状态：
+当前仓库状态：
 
 ```text
 V2_DESIGN_COMPLETE = TRUE
@@ -856,20 +861,27 @@ PMF_PROVEN = TRUE
 - Deadline / temporal Commitment 使用 schema v6 time semantics，模糊时间 review-first；
 - ad-hoc 只使用 Space-backed continuity，不制造 standalone 第二真相；
 - README / canonical / Reality Report 不再写“v2 runtime 尚不存在”；
-- PR #19 最终 CI 全绿。
+- 当前纯仓库 closure baseline `main@383978fa480aac35d214dce3fa4e9fa5ebb17118` 的 CI 全绿（run `37901753321`）。
 
 ---
 
 # 20. 当前下一阶段
 
-PR #19 后，以下已经进入 main，不再列为未来项：
+截至 2026-10-10，以下已经进入 main，不再列为未来项：
 
 - Windows packaged Conversation Beta evidence；
 - independent Conversation screenshot evidence；
 - local human-evaluation tooling；
-- Manual Screen Context；
+- Manual + explicit-start AUTO Screen Context；
+- desktop Conversation Share Privacy；
+- session-scoped Conversation Human Coach；
+- frozen Profile Playbooks；
+- auditable Expression Plan；
 - Conversation search/export；
-- long-lived Open Thread correctness。
+- long-lived Open Thread correctness；
+- fail-closed connector capability registry；
+- stable promotion evidence evaluator；
+- opt-in privacy-safe local Conversation reminders（只读成竹内已排期 Session，不等于 Calendar discovery）。
 
 当前下一阶段按顺序是：
 
@@ -889,3 +901,17 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 已经进入 beta.2 的 Human Coach、Share Privacy、Manual/AUTO Screen Context 不再列为“待实现”；它们下一步需要的是 dogfood / real-session evidence 与成熟度验证，而不是重复补一套 runtime。
 
 以上剩余项不是“再补几个字段就能合法完成”的纯仓库 gap：要么依赖真实用户证据，要么依赖外部系统权限/执行结果，要么属于 stable release / platform governance。
+
+因此当前允许冻结：
+
+```text
+PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
+CURRENT_MAIN_CLOSURE_BASELINE = 383978fa480aac35d214dce3fa4e9fa5ebb17118
+CURRENT_MAIN_CI = PASS
+V2_BETA_PRERELEASE_PUBLISHED = TRUE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+下一阶段不是继续无边界堆 runtime，而是取得真实 pilot / human-label evidence，或接入一个真正有授权、有健康状态、有 provenance 的外部 provider。

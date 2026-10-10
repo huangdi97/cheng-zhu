@@ -442,7 +442,20 @@ class MicrosoftTodoGraphAdapter:
 
         # Do not touch Microsoft Graph for invalid/review-changed content.
         token = self._resolve_token(connection)
-        task_list = self._resolve_list(connection=connection, target=target or "defaultList", token=token)
+        try:
+            task_list = self._resolve_list(connection=connection, target=target or "defaultList", token=token)
+        except Exception as exc:
+            # Target resolution is GET-only. No task-create side effect has
+            # been attempted yet, so even an ambiguous lookup transport error
+            # is safe to retry after the user fixes/rechecks the target/account.
+            status = getattr(exc, "status", None)
+            return {
+                "ok": False,
+                "error": str(exc)[:2000] or "Microsoft To Do list target resolution failed",
+                "retry_safe": True,
+                "stage": "TARGET_RESOLUTION",
+                **({"http_status": int(status)} if isinstance(status, int) else {}),
+            }
         list_id = task_list["id"]
 
         request_payload: dict[str, Any] = {"title": title}

@@ -14,6 +14,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSharePrivacy: (mode) => ipcRenderer.invoke('set-share-privacy', mode),
   getSharePrivacy: () => ipcRenderer.invoke('get-share-privacy'),
   getWindowState: () => ipcRenderer.invoke('get-window-state'),
+  syncConversationReminders: (payload) => ipcRenderer.invoke('sync-conversation-reminders', payload),
+  getConversationReminderRuntime: () => ipcRenderer.invoke('get-conversation-reminder-runtime'),
+  onConversationReminderOpen: (listener) => {
+    const wrapped = (_event, payload) => listener(payload);
+    ipcRenderer.on('conversation-reminder-open', wrapped);
+    return () => ipcRenderer.removeListener('conversation-reminder-open', wrapped);
+  },
   captureRegion: () => ipcRenderer.invoke('capture-region-start'),
   syncOverlayWindow: (payload) => ipcRenderer.invoke('sync-overlay-window', payload),
   resizeOverlayWindow: (payload) => ipcRenderer.invoke('resize-overlay-window', payload),

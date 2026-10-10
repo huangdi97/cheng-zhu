@@ -262,6 +262,27 @@ This is required for temporal reproducibility.
 
 ---
 
+## 9.1 Space-scoped snapshot identity and sync cursors
+
+Connector snapshot identity is scoped by Conversation Space:
+
+```text
+space_id
++ connection_id
++ capability
++ external_kind
++ external_id
++ Chengzhu canonical content_hash
+```
+
+The provider may report its own content hash, but that value is provenance metadata only; it never controls Chengzhu deduplication or frozen identity.
+
+One account may expose multiple independent read capabilities. Incremental sync cursor state is therefore stored **per capability**. A Calendar cursor must never be reused for Docs/Mail/Project reads.
+
+Cross-Space snapshot IDs are rejected before Space state is persisted.
+
+---
+
 ## 10. Preflight
 
 For every requested read capability, Preflight requires:
@@ -327,8 +348,8 @@ Therefore:
 ```text
 APPROVED != external side effect
 Execution Request != external side effect
-SUCCEEDED == provider adapter explicitly returned ok=true
-FAILED == provider explicitly returned ok=false
+SUCCEEDED == either DIRECT_PROVIDER_RESPONSE(ok=true) or explicit USER_REPORTED_PROVIDER_CHECK(CONFIRMED_SUCCEEDED)
+FAILED == provider explicitly returned ok=false, or provider-side reconciliation confirmed NOT_APPLIED
 UNKNOWN_OUTCOME == Chengzhu cannot know whether the side effect already happened
 ```
 
@@ -384,7 +405,10 @@ Outcome semantics are deliberately conservative:
 - `ok=true` → `SUCCEEDED`;
 - `ok=false` → `FAILED`; retry is exposed only when the provider also explicitly returns `retry_safe=true`;
 - exception / timeout / malformed result without boolean `ok` → `UNKNOWN_OUTCOME`;
-- `UNKNOWN_OUTCOME` cannot be executed again through Chengzhu until provider-side reconciliation establishes what happened.
+- `UNKNOWN_OUTCOME` cannot be executed again through Chengzhu until provider-side reconciliation establishes what happened;
+- reconciliation never rewrites the ambiguous adapter response into a fake `ok=true`;
+- `CONFIRMED_SUCCEEDED` records a distinct user-reported provider check and leaves `executed_at` unknown;
+- `CONFIRMED_NOT_APPLIED` is the only reconciliation path that sets `retry_safe=true`.
 
 The idempotency key is passed to the adapter, but it is not treated as magic: a concrete provider must actually enforce idempotency before retry safety can be claimed.
 
@@ -404,7 +428,7 @@ Source URLs retain only:
 scheme + host + path
 ```
 
-Query and fragment are stripped.
+userinfo / query / fragment are stripped. In addition to sensitive-key removal, obvious credential-shaped values (Bearer tokens, OAuth token forms, PAT/API-key/JWT-like values) are redacted before persistence. Opaque credential references are rejected if they merely wrap a token-looking secret.
 
 ---
 

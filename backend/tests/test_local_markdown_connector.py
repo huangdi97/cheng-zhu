@@ -103,6 +103,46 @@ def test_local_markdown_rejects_target_escape_and_non_markdown_before_write(monk
     assert not (root / "Decisions.txt").exists()
 
 
+
+
+def test_local_markdown_rejects_symlink_file_and_oversized_target_before_read(monkeypatch, tmp_path):
+    root = tmp_path / "vault"
+    root.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("outside", encoding="utf-8")
+    link = root / "linked.md"
+    try:
+        link.symlink_to(outside)
+    except OSError:
+        pytest.skip("symlink creation is not available in this test environment")
+
+    monkeypatch.setenv("CHENGZHU_DECISION_LOG_ROOT", str(root))
+    adapter = LocalMarkdownDecisionLogAdapter()
+    base = {
+        "connection": _connection(),
+        "capability": "decision_log.write",
+        "operation": "UPDATE_DECISION_LOG",
+        "payload": {"title": "Decision", "content": "Use v2.", "outbound_redaction_applied": False},
+        "idempotency_key": "exec-safe",
+    }
+
+    symlinked = adapter.execute(target="linked.md", **base)
+    assert symlinked["ok"] is False
+    assert symlinked["retry_safe"] is True
+    assert symlinked["phase"] == "TARGET_VALIDATION_PRE_WRITE"
+    assert outside.read_text(encoding="utf-8") == "outside"
+
+    oversized = root / "oversized.md"
+    with oversized.open("wb") as handle:
+        handle.seek((10 * 1024 * 1024) + 1)
+        handle.write(b"x")
+    result = adapter.execute(target="oversized.md", **base)
+    assert result["ok"] is False
+    assert result["retry_safe"] is True
+    assert result["phase"] == "TARGET_VALIDATION_PRE_WRITE"
+    assert oversized.stat().st_size > 10 * 1024 * 1024
+
+
 def test_local_markdown_writes_reviewed_entry_and_marker_deduplicates(monkeypatch, tmp_path):
     root = tmp_path / "vault"
     root.mkdir()

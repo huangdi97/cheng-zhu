@@ -803,9 +803,8 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             "error": str(exc)[:4000],
             "updated_at": store.now(),
         })
-        return store.get("conversation_connector_execution", execution_id) or row
-    finally:
         _ACTIVE_EXECUTIONS.discard(execution_id)
+        return store.get("conversation_connector_execution", execution_id) or row
 
     if not isinstance(result.get("ok"), bool):
         store.update("conversation_connector_execution", execution_id, {
@@ -814,6 +813,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             "error": "Provider 未返回显式 boolean ok；无法确认外部副作用是否发生",
             "updated_at": store.now(),
         })
+        _ACTIVE_EXECUTIONS.discard(execution_id)
         return store.get("conversation_connector_execution", execution_id) or row
 
     if result["ok"] is False:
@@ -825,6 +825,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             "updated_at": store.now(),
         })
         failed = store.get("conversation_connector_execution", execution_id) or row
+        _ACTIVE_EXECUTIONS.discard(execution_id)
         if retry_safe:
             return failed
         return failed
@@ -836,6 +837,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
         "updated_at": store.now(),
         "executed_at": store.now(),
     })
+    _ACTIVE_EXECUTIONS.discard(execution_id)
     return store.get("conversation_connector_execution", execution_id) or row
 
 

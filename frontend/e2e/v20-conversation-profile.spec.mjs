@@ -1842,9 +1842,13 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(/rollback owner is Alex/)).toBeVisible()
 
     const checkbox = page.locator('label').filter({ hasText: 'Architecture Brief' }).locator('input[type="checkbox"]')
-    await checkbox.check()
+    // This checkbox is intentionally controlled by persisted Space truth. The
+    // click starts an async PATCH + reload, so Playwright .check() can treat
+    // the transient controlled re-render as failure even though persistence is
+    // working. Assert the persisted write first, then the reloaded UI state.
+    await checkbox.click()
+    await expect.poll(() => selectedBody?.selected_connector_snapshot_ids ?? []).toContain(snapshot.id)
     await expect(checkbox).toBeChecked()
-    expect(selectedBody.selected_connector_snapshot_ids).toContain(snapshot.id)
   })
 
 

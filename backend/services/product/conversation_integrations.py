@@ -165,6 +165,26 @@ _SENSITIVE_KEY_RE = re.compile(
     re.IGNORECASE,
 )
 
+_SECRET_VALUE_PATTERNS = (
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"),
+    re.compile(r"\bya29\.[A-Za-z0-9._-]{8,}"),
+    re.compile(r"\b(?:ghp|gho|ghu|ghs|github_pat)_[A-Za-z0-9_]{8,}"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"\b[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b"),
+)
+
+
+def _redact_secret_values(value: str) -> str:
+    text = str(value or "")
+    for pattern in _SECRET_VALUE_PATTERNS:
+        text = pattern.sub("[REDACTED_SECRET]", text)
+    return text[:20_000]
+
+
+def _contains_secret_value(value: str) -> bool:
+    text = str(value or "")
+    return any(pattern.search(text) for pattern in _SECRET_VALUE_PATTERNS)
+
 
 def _provider_id(value: str) -> str:
     provider = str(value or "").strip().upper()
@@ -216,9 +236,9 @@ def _validate_credential_ref(value: str) -> str:
     value = str(value or "").strip()
     if not value:
         return ""
-    if not _CREDENTIAL_REF_RE.fullmatch(value):
+    if not _CREDENTIAL_REF_RE.fullmatch(value) or _contains_secret_value(value):
         raise ValueError(
-            "credential_ref 只能保存 keyring/oskeychain/provider/plugin 的 opaque reference；不能直接保存 token"
+            "credential_ref 只能保存 keyring/oskeychain/provider/plugin 的 opaque reference；不能直接或伪装保存 token"
         )
     return value
 
@@ -237,7 +257,7 @@ def _sanitize(value: Any, *, depth: int = 0) -> Any:
     if isinstance(value, (list, tuple, set)):
         return [_sanitize(v, depth=depth + 1) for v in list(value)[:500]]
     if isinstance(value, str):
-        return value[:20_000]
+        return _redact_secret_values(value)
     if value is None or isinstance(value, (bool, int, float)):
         return value
     return str(value)[:20_000]
@@ -251,8 +271,14 @@ def _safe_url(value: str) -> str:
         parts = urlsplit(raw)
         if parts.scheme not in {"http", "https"}:
             return ""
-        # Strip query/fragment because provider URLs often carry sensitive IDs.
-        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))[:2000]
+        # Strip userinfo/query/fragment because provider URLs often carry
+        # credentials or sensitive IDs. Preserve host, optional port and path.
+        host = parts.hostname or ""
+        if not host:
+            return ""
+        display_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
+        port = f":{parts.port}" if parts.port is not None else ""
+        return urlunsplit((parts.scheme, display_host + port, parts.path, "", ""))[:2000]
     except ValueError:
         return ""
 
@@ -850,7 +876,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
                 store.update("conversation_connector_execution", execution_id, {
                     "status": "UNKNOWN_OUTCOME",
                     "response": {},
-                    "error": str(exc)[:4000],
+                    "error": _redact_secret_values(str(exc))[:4000],
                     "updated_at": store.now(),
                 })
                 return store.get("conversation_connector_execution", execution_id) or row

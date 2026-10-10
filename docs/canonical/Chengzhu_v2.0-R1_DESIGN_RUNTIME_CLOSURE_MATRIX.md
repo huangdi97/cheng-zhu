@@ -554,8 +554,9 @@ reviewed output evidence
 | Google Calendar provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `calendar.read` concrete adapter；native sync token + 410 reset；immutable revision audit；latest-revision import；upstream drift 可见；默认关闭；没有真实 Google account replay 前不得声明 account connected |
 | Google Drive / Docs provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `docs.read` concrete adapter；显式 folder FULL_TARGET_REFRESH；Docs/Slides text export、Sheets first-sheet CSV partial truth、binary metadata-only truth；默认关闭；没有真实 Google account replay 前不得声明 account connected |
 | Gmail send-only provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT / OAUTH VERIFICATION EVIDENCE PENDING | 只实现 reviewed `email.send`；OIDC identity = `openid + email`，mailbox scope = `gmail.send`；不实现 mail.read/inbox sync；`gmail.send` 属 Google Sensitive scope，公共/稳定 provider 仍需适用的 OAuth app verification；没有真实 Gmail account replay 前不得声明邮件已发出 |
-| Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
-| External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub `issue.create` 与 Gmail `email.send` 已有 opt-in real adapter，Task / Decision Log provider 仍 fail-closed |
+| Microsoft To Do provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 只实现 reviewed `task.create`；delegated `Tasks.ReadWrite`；opaque env credential；default/显式 task-list target；无 Outlook/Calendar/Files/read sync；没有真实 Microsoft account replay 前不得宣称真实 Task 已创建 |
+| MCP provider | NOT CONFIGURED | capability contract 已定义；没有 concrete adapter/auth/account/runtime evidence 就不能宣称可用 |
+| External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub `issue.create`、Gmail `email.send`、Microsoft To Do `task.create` 已有 opt-in real adapter，Decision Log provider 仍 fail-closed |
 | Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
@@ -865,4 +866,25 @@ REAL_GMAIL_ACCOUNT_EVIDENCE_PENDING = TRUE
 工程证据只证明 adapter / fake transport / OIDC identity contract / RFC message construction / reviewed execution / failure ambiguity / product flow。没有真实 Google OAuth/account replay 时不得声明真实 Gmail 已连接或真实邮件已发出。
 
 另外，`gmail.send` 的 Google Sensitive-scope OAuth verification 是独立 public-release gate；本 PR 不伪造该审批状态。
+
+## Microsoft To Do task-create provider closure · 2026-10-10
+
+当前 branch 新增第五个 concrete Conversation provider，也是第三个真实 write adapter：
+
+```text
+MICROSOFT_TODO_ADAPTER_CODE = TRUE
+TASK_CREATE_ONLY = TRUE
+DELEGATED_PERMISSION = Tasks.ReadWrite
+OUTLOOK_MAIL = FALSE
+OUTLOOK_CALENDAR = FALSE
+ONEDRIVE = FALSE
+TASK_READ_SYNC = FALSE
+REVIEWED_TWO_STEP_EXECUTION = TRUE
+DEFAULT_OR_EXPLICIT_LIST_TARGET = TRUE
+PROVIDER_SIDE_IDEMPOTENCY = FALSE
+AMBIGUOUS_OUTCOME = UNKNOWN_OUTCOME
+REAL_MICROSOFT_ACCOUNT_EVIDENCE_PENDING = TRUE
+```
+
+工程证据只证明 adapter / fake transport / least-privilege scope / list target resolution / reviewed execution / failure ambiguity / product flow。没有真实 Microsoft delegated token/account replay 时不得声明真实 Microsoft To Do 已连接或真实 Task 已创建。
 

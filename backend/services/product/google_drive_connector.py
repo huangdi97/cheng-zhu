@@ -221,6 +221,22 @@ class GoogleDriveRestAdapter:
                 return decoded
         raise RuntimeError(f"Google Drive {label} returned malformed payload")
 
+    def _validate_folder(self, *, connection: dict[str, Any], folder_id: str) -> dict[str, Any]:
+        token = self._resolve_token(connection)
+        status, _headers, raw = self._request(
+            f"/files/{quote(folder_id, safe='')}",
+            token=token,
+            params={"fields": "id,name,mimeType,trashed"},
+        )
+        if status != 200:
+            raise RuntimeError(f"Google Drive folder probe returned ambiguous HTTP {status}")
+        payload = self._json_payload(raw, "files.get folder")
+        if str(payload.get("mimeType") or "") != "application/vnd.google-apps.folder":
+            raise ValueError("Google Drive Sync target 不是 folder")
+        if bool(payload.get("trashed")):
+            raise ValueError("Google Drive Sync target 已在回收站")
+        return payload
+
     def _list_folder(self, *, connection: dict[str, Any], folder_id: str) -> list[dict[str, Any]]:
         token = self._resolve_token(connection)
         page_token = ""
@@ -372,6 +388,7 @@ class GoogleDriveRestAdapter:
         if capability != "docs.read":
             raise ValueError("Google Drive adapter 只支持 docs.read")
         folder_id = self._folder_id(query, connection)
+        self._validate_folder(connection=connection, folder_id=folder_id)
         files = self._list_folder(connection=connection, folder_id=folder_id)
         if len(files) > max(1, min(int(limit), _MAX_FILES_PER_SYNC)):
             raise ValueError(

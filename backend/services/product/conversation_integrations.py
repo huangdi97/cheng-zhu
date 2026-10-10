@@ -294,9 +294,9 @@ def register_adapter(adapter: ConnectorAdapter) -> None:
             "Adapter 声明了 provider catalog 不允许的 capability: "
             + ", ".join(sorted(capabilities - supported))
         )
-    health = dict(adapter.health(None) or {})
+    health = _sanitize(dict(adapter.health(None) or {}))
     if not bool(health.get("ok", False)):
-        raise ValueError(str(health.get("error") or "Connector adapter health check failed"))
+        raise ValueError(_redact_secret_values(str(health.get("error") or "Connector adapter health check failed")))
     _ADAPTERS[provider] = adapter
     conversation_connectors.register_provider(
         provider,
@@ -373,13 +373,13 @@ def create_connection(
     row = {
         "id": store.new_id("ccn_"),
         "provider_id": provider,
-        "display_name": str(display_name or PROVIDER_CATALOG[provider]["label"])[:200],
+        "display_name": _redact_secret_values(str(display_name or PROVIDER_CATALOG[provider]["label"]))[:200],
         "status": "DISCONNECTED",
         "auth_mode": "OPAQUE_REFERENCE" if credential_ref else "NONE",
         "credential_ref": credential_ref,
         "granted_capabilities": sorted(granted),
         "provider_scopes": validated_scopes,
-        "account_hint": str(account_hint or "")[:300],
+        "account_hint": _redact_secret_values(str(account_hint or ""))[:300],
         "sync_cursor": "",
         "sync_cursors": {},
         "last_sync_at": None,
@@ -929,6 +929,8 @@ def reconcile_unknown_outcome(
     note = str(note or "").strip()
     if not note:
         raise ValueError("reconciliation 必须记录 provider-side 核对说明")
+    note = _redact_secret_values(note)[:4000]
+    provider_reference = _redact_secret_values(str(provider_reference or ""))[:1000]
 
     with _EXECUTION_LOCK:
         row = store.get("conversation_connector_execution", execution_id)
@@ -940,8 +942,8 @@ def reconcile_unknown_outcome(
         previous = dict(row.get("response") or {})
         audit = {
             "outcome": outcome,
-            "provider_reference": str(provider_reference or "")[:1000],
-            "note": note[:4000],
+            "provider_reference": provider_reference,
+            "note": note,
             "recorded_at": store.now(),
             "source": "USER_REPORTED_PROVIDER_CHECK",
         }

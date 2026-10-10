@@ -400,6 +400,8 @@ def test_real_github_adapter_runs_through_audited_boundary_with_fake_http(produc
         source_refs=[{"kind": "USER_NOTE", "excerpt": "explicit follow-up"}],
     )
     conversations.review_draft_action(draft["id"], "APPROVE")
+    # Execution Request creation validates the exact write-capable connection.
+    transport.queue(200, {"login": "octocat", "id": 42})
     request = conversation_integrations.request_execution(
         draft["id"],
         connection["id"],
@@ -407,7 +409,7 @@ def test_real_github_adapter_runs_through_audited_boundary_with_fake_http(produc
     )
     assert request["status"] == "PENDING"
 
-    # execute re-checks connection health first, then POST issue
+    # The second explicit Execute re-checks connection health again, then POSTs the issue.
     transport.queue(200, {"login": "octocat", "id": 42})
     transport.queue(201, {
         "number": 24,

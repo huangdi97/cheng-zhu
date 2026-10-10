@@ -485,7 +485,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try {
       const nextDraft = await conversationApi.followupDraft(targetSessionId)
-      setDraft(nextDraft); setExecution(null); setExecutionConnectionId(''); setExecutionTarget(''); setExecutionTarget('')
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId(''); setExecutionTarget('')
     }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -495,7 +495,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try {
       const nextDraft = await conversationApi.derivedDraft(targetSessionId, kind)
-      setDraft(nextDraft); setExecution(null); setExecutionConnectionId(''); setExecutionTarget(''); setExecutionTarget('')
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId(''); setExecutionTarget('')
     }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }

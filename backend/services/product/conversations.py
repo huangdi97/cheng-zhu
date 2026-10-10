@@ -1037,6 +1037,11 @@ def schedule_from_calendar_snapshot(space_id: str, snapshot_id: str) -> dict[str
     metadata = dict(snapshot.get("metadata") or {})
     if bool(metadata.get("cancelled")) or str(metadata.get("status") or "") == "cancelled":
         raise ValueError("已取消的 Calendar event 不能导入为下一场")
+    if bool(metadata.get("all_day")):
+        raise ValueError("All-day Calendar event 没有明确开始时刻；不能直接导入为 Conversation Session")
+    event_type = str(metadata.get("event_type") or "default")
+    if event_type in {"focusTime", "outOfOffice", "workingLocation"}:
+        raise ValueError(f"Calendar {event_type} 状态事件不是 Conversation Session")
     scheduled_at = snapshot.get("occurred_at")
     if scheduled_at is None:
         raise ValueError("Calendar event 缺少可解析的开始时间")

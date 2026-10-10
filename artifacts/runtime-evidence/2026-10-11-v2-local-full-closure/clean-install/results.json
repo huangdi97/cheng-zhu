@@ -1,32 +1,32 @@
 {
-  "started": "2026-10-11T05:51:10.4227726+08:00",
+  "started": "2026-10-11T06:35:23.7734077+08:00",
   "checks": {
     "os": "Microsoft Windows 11 专业版 10.0.26200",
     "python_on_path": false,
     "node_on_path": false,
     "repo_checkout_present": false,
     "sha256_Chengzhu-Setup-x64.exe": {
-      "actual": "93dd5ed02b454aea9fb0be4938862b430715a2afaa908cae622fa11e30bd73a6",
       "match": true,
-      "expected": "93dd5ed02b454aea9fb0be4938862b430715a2afaa908cae622fa11e30bd73a6"
+      "actual": "d9c86fb0d4718faef213ee980d3c6390d050de99ff759f4f9bb90166aa0793bb",
+      "expected": "d9c86fb0d4718faef213ee980d3c6390d050de99ff759f4f9bb90166aa0793bb"
     },
     "sha256_Chengzhu-Portable-x64.zip": {
-      "actual": "b0075b7db54780cc11bdd11a56e428c5b5e62be5878ee079992af65f38fb9f08",
       "match": true,
-      "expected": "b0075b7db54780cc11bdd11a56e428c5b5e62be5878ee079992af65f38fb9f08"
+      "actual": "ae86074bd6042fdac9c32cd1f99a134404f4b3ae32d8c88e6c146836da41e762",
+      "expected": "ae86074bd6042fdac9c32cd1f99a134404f4b3ae32d8c88e6c146836da41e762"
     },
     "sha256_all_match": true,
-    "install_seconds": 13.0,
+    "install_seconds": 20.2,
     "install_dir": "C:\\Users\\Kaiser\\AppData\\Local\\Programs\\Chengzhu",
     "installed_exe": true,
     "bundled_license": true,
     "bundled_notices": true,
     "fake_provider_reachable": true,
-    "first_launch_backend_ready_seconds": 6.1,
+    "first_launch_backend_ready_seconds": 7.1,
     "instance": {
       "app": "chengzhu",
-      "nonce": "ae786f5e5055d9b4619a2c2475569f4e",
-      "pid": 37508
+      "nonce": "94cf52617637328a5eb6b121c119851d",
+      "pid": 45904
     },
     "share_privacy_default": "OFF",
     "onboarding_completed_initially": false,
@@ -37,11 +37,11 @@
     "resume_upload_status": 200,
     "job_goal_created": true,
     "pack_frozen": true,
-    "pack_id": "pack-3a298e9aa8c84924",
+    "pack_id": "pack-06ae24d644d24bea",
     "live_event_types": "init,answer_start,guidance_fast,answer_chunk,answer_done",
     "fast_cue_before_deep": true,
     "answer_done": true,
-    "restart_backend_ready_seconds": 2.8,
+    "restart_backend_ready_seconds": 3.2,
     "pack_persisted_after_restart": true,
     "onboarding_persisted": true,
     "resume_persisted": true,
@@ -52,7 +52,7 @@
     "portable_backend_ready_seconds": 3.3,
     "portable_sees_same_user_data": true
   },
-  "finished": "2026-10-11T05:54:42.7812468+08:00",
+  "finished": "2026-10-11T06:39:09.1375388+08:00",
   "required_checks": [
     "python_on_path",
     "node_on_path",

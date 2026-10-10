@@ -31,6 +31,7 @@ Each was root-caused, fixed minimally, and given a regression test.
 | 1 | **The shipped Windows app never started.** Launching the packaged build opened a blocking Electron main-process error dialog: no window, no backend, no user data, forever. | `desktop/main.js` requires `./overlayLayout` at module scope (added with the v1.3 overlay work) but `desktop/package.json` `build.files` — which *replaces* electron-builder's default `**/*` set — was never updated, so `overlayLayout.js` was absent from `app.asar`. | Added `overlayLayout.js` to `build.files`. | `desktop/packagingFiles.test.js` (3 tests): every local module and `__dirname` resource a packaged entry point loads must be listed in `build.files`. Negative control against the pre-fix manifest reports exactly `main.js requires ./overlayLayout`. |
 | 2 | **A question about a different number was wrongly grounded.** With a frozen source containing `30 days`, the question `3 days` returned `grounded=True`. | `_text_match_score` derived its factual-identity tokens from a `len(x) >= 2` segmented set, so the single-digit token `3` vanished and the generic words (`migration`, `window`, `days`) alone satisfied the match. | `backend/services/product/conversations.py`: collect digit-bearing tokens without the length filter and require each to occur as its own alphanumeric token (`(?<![0-9a-z])token(?![0-9a-z])`). | `test_manual_ask_does_not_ground_changed_duration_token` (both directions) plus new `v2`/`v3`, `2026`/`2025`, `$10k`/`$100k` tests. Proved by stashing only the product fix: 1 failed / 3 passed. |
 | 3 | **Load-dependent false red** in `JobTracker` unit test 668. | The test synchronised on `'Acme'` list text and then synchronously queried a detail-pane button that mounts later; under CPU contention the second query ran too early. | Wait for the element itself (`findByRole`); the assertion is unchanged. | Repeated full runs, including under deliberate parallel CPU load: 428/428 twice. |
+| 4 | **Calendar event instants were silently dropped wherever the IANA time zone database was missing** (any Windows machine or CI runner without it) — found because the Release workflow was red on this PR while CI was green. | A naive Google `dateTime` plus a named `timeZone` is resolved through `zoneinfo.ZoneInfo`, whose `ZoneInfoNotFoundError` subclasses `KeyError`; the connector's `_timestamp` catches `KeyError` and returns no instant. Windows ships no tz database and `tzdata` was never declared in `backend/requirements.txt`, so it failed only on the hosted Windows runner (the Ubuntu CI job has the OS database). | Declared `tzdata` as an explicit runtime dependency of the backend; PyInstaller's zoneinfo hook then collects it into the packaged sidecar (verified: `_internal/tzdata` inside the built bundle). | `test_timezone_database_is_declared_and_resolvable_for_calendar_timestamps`, which fails loudly wherever the database is absent instead of letting one calendar assertion rot in a different environment. |
 
 Why these escaped earlier gates: the release workflow tries the packaged-GUI evidence step and, when
 it fails on a hosted runner, falls back to a headless “packaged sidecar + packaged frontend-dist”
@@ -84,7 +85,7 @@ classified as documented fixtures (`allowlisted_fixtures`), and anything else wo
 
 | Gate | Result |
 | --- | --- |
-| full suite `python -m pytest -q` | **1336 passed, 0 failed, 0 error**, 274.63 s |
+| full suite `python -m pytest -q` | **1337 passed, 0 failed, 0 error**, 340.72 s |
 | strict intelligence eval | `route_accuracy_exact = 1.0` (≥0.9), seven-turn exact `= 1.0` (≥0.85), `unsupported_claim_rate = 1.0` (≥0.95), exit 0 |
 | `python -m evals.r2_eval --check` | exit 0 |
 | `python scripts/v14_validation_evidence.py --out-dir artifacts/validation` | exit 0, `{"ok": true, "thirty_session": true, "hundred_session": true, "real_user_evidence": "REAL_USER_EVIDENCE_PENDING"}` |
@@ -440,7 +441,7 @@ PATH** and a clean `%APPDATA%\Chengzhu`, from the freshly built installer/portab
 
 `python_on_path false` · `node_on_path false` · `repo_checkout_present false` · SHA256 match for both
 artifacts · silent install `installed_exe true`, LICENSE + notices bundled · first launch backend
-ready **6.1 s** · `share_privacy_mode` default `OFF` · onboarding `false → true` · resume upload 200 ·
+ready **7.1 s** · `share_privacy_mode` default `OFF` · onboarding `false → true` · resume upload 200 ·
 job goal created · `pack_frozen true` · live events `init, answer_start, guidance_fast, answer_chunk,
 answer_done` with **Fast Cue before the deep chunk** · restart backend ready 3.0 s with pack,
 onboarding and resume persisted · install dir byte-unchanged after use · uninstall removes the install
@@ -466,9 +467,9 @@ locally and upload-ready.
 
 | Artifact | SHA256 |
 | --- | --- |
-| `Chengzhu-Setup-x64.exe` | `93dd5ed02b454aea9fb0be4938862b430715a2afaa908cae622fa11e30bd73a6` |
-| `Chengzhu-Portable-x64.zip` | `b0075b7db54780cc11bdd11a56e428c5b5e62be5878ee079992af65f38fb9f08` |
-| `chengzhu-backend.exe` (sidecar) | `8e2f2d5fef91855680280714ff7058fd4bdccecc7a34603e68c04e844e4a1839` |
+| `Chengzhu-Setup-x64.exe` | `d9c86fb0d4718faef213ee980d3c6390d050de99ff759f4f9bb90166aa0793bb` |
+| `Chengzhu-Portable-x64.zip` | `ae86074bd6042fdac9c32cd1f99a134404f4b3ae32d8c88e6c146836da41e762` |
+| `chengzhu-backend.exe` (sidecar) | `22ed600ae95137745fea7222b9eee1e4e4ddcdcb9edbe317c61d48e6f9959907` |
 
 Also recorded: `dist/desktop/SHA256SUMS.txt` and
 `artifacts/runtime-evidence/2026-10-11-v2-local-full-closure/SHA256SUMS.txt`. The Electron binary
@@ -513,14 +514,20 @@ before use.
    authorised to push a branch and open a PR only, so no tag or GitHub Release was created. The
    installers are staged with checksums and a ready-to-run download-back command
    (`scripts/sandbox/verify-clean-install.ps1` against the release asset URLs).
-7. `BLOCKED_HUMAN_EVIDENCE` — **real-user evidence**: Opportunity Precision, Interruption Regret,
+7. `BLOCKED_EXTERNAL_PERMISSION` — **deleting the throwaway GitHub test repository**: the locally
+   authenticated token carries `repo` but not `delete_repo`, so the private replay repository
+   `huangdi97/chengzhu-connector-replay-2026-10-11` could not be removed (its created draft issue was
+   deleted; only the two seed issues remain). Remove it with
+   `gh repo delete huangdi97/chengzhu-connector-replay-2026-10-11 --yes` after
+   `gh auth refresh -h github.com -s delete_repo`, or from the repository settings page.
+8. `BLOCKED_HUMAN_EVIDENCE` — **real-user evidence**: Opportunity Precision, Interruption Regret,
    Useful Silence, Recall Precision, cross-session value, cognitive load, Space-reuse intent.
    `docs/evals/v2_conversation_real_pilot_manifest.template.json` and the label template exist; the
    evaluator run with an empty (honest) report returns
    `PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW: false`, `V2_STABLE_RELEASE: false`,
    `PMF_PROVEN: false` (29 of 37 gate checks fail on sample size). The tooling actively refuses
    placeholder labels (`line 4: reviewer is required`), so fabricated labels cannot pass.
-8. `BLOCKED_HUMAN_EVIDENCE` — real **audio device switching / sleep-wake / real participants**
+9. `BLOCKED_HUMAN_EVIDENCE` — real **audio device switching / sleep-wake / real participants**
    (`soak_sim` marks these `BLOCKED-EXTERNAL`), and a real multi-hour Interview/Project-Sync/Design-Review
    usage session with a human speaker (this run drove real device capture with the repository's own
    corpus and local whisper instead).

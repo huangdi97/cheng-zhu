@@ -209,6 +209,7 @@ content_unavailable_reason = UNSUPPORTED_OR_BINARY
 
 每次 folder refresh：
 - files.list 必须完整分页；
+- 任一页返回 `incompleteSearch=true` 时整次 Sync fail-closed，不保存可能缺项的 folder snapshot；
 - 最大 500 个 direct children；
 - 超过上限整次失败；
 - 不保存“前 500 个”再假装完整；

@@ -640,8 +640,26 @@ def sync_connection(
     connection = _require_connection(connection_id)
     provider = str(connection["provider_id"])
     adapter = _ADAPTERS.get(provider)
-    if adapter is None or not _connection_usable(connection):
+    if adapter is None or connection.get("status") != "CONNECTED":
         raise ValueError("Connector 未连接或 adapter 不可用")
+    try:
+        health = _sanitize(dict(adapter.health(connection) or {}))
+    except Exception as exc:
+        safe_error = _redact_secret_values(str(exc))[:2000] or "Connector health check failed"
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": safe_error,
+            "updated_at": store.now(),
+        })
+        raise ValueError(safe_error) from None
+    if not bool(health.get("ok", False)):
+        safe_error = _redact_secret_values(str(health.get("error") or "health check failed"))[:2000]
+        store.update("conversation_connector_connection", connection_id, {
+            "status": "ERROR",
+            "last_error": safe_error,
+            "updated_at": store.now(),
+        })
+        raise ValueError(safe_error)
 
     requested = _capabilities(capabilities or list(connection.get("granted_capabilities") or []))
     requested = [cap for cap in requested if cap in conversation_connectors.READ_CAPABILITIES]

@@ -24,6 +24,7 @@ import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Callable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -133,13 +134,18 @@ def _urllib_transport(
         raise RuntimeError(f"Google Calendar transport error: {type(exc).__name__}") from None
 
 
-def _timestamp(value: str) -> Optional[float]:
+def _timestamp(value: str, timezone_name: str = "") -> Optional[float]:
     raw = str(value or "").strip()
     if not raw:
         return None
     try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
-    except ValueError:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None and timezone_name:
+            parsed = parsed.replace(tzinfo=ZoneInfo(timezone_name))
+        if parsed.tzinfo is None:
+            return None
+        return parsed.timestamp()
+    except (ValueError, TypeError, KeyError):
         return None
 
 
@@ -147,10 +153,11 @@ def _event_when(raw: dict[str, Any]) -> tuple[str, Optional[float]]:
     start = raw.get("start") if isinstance(raw.get("start"), dict) else {}
     if start.get("dateTime"):
         text = str(start["dateTime"])
-        return text, _timestamp(text)
+        return text, _timestamp(text, str(start.get("timeZone") or ""))
     if start.get("date"):
-        text = str(start["date"])
-        return text, _timestamp(f"{text}T00:00:00+00:00")
+        # All-day Calendar events do not represent a precise Conversation start
+        # time. Preserve the date in metadata but do not fabricate UTC midnight.
+        return str(start["date"]), None
     updated = str(raw.get("updated") or raw.get("created") or "")
     return updated, _timestamp(updated)
 
@@ -373,6 +380,13 @@ class GoogleCalendarRestAdapter:
                     "event_id": event_id,
                     "status": status,
                     "cancelled": cancelled,
+                    "event_type": str(raw.get("eventType") or "default")[:80],
+                    "all_day": bool(
+                        isinstance(raw.get("start"), dict)
+                        and raw.get("start", {}).get("date")
+                        and not raw.get("start", {}).get("dateTime")
+                    ),
+                    "timezone": str((raw.get("start") or {}).get("timeZone") or "")[:100],
                     "when": when_text,
                     "start": raw.get("start") or {},
                     "end": raw.get("end") or {},

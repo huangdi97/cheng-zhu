@@ -802,3 +802,22 @@ PR #19 可以被称为 **v2 Design/Runtime Closure**，仅当：
 - CI 全绿。
 
 这之后的下一阶段已经从“是否有 packaged evidence”推进为 **Conversation Beta public prerelease / dogfood / real-user evidence**。packaged evidence 与 human-eval tooling 已进入 main；剩余成熟度只能由公开 prerelease provenance、真实 dogfood 和真实用户研究继续推进，不能继续靠文档把状态写高。
+
+## Google Calendar read-only provider closure · 2026-10-10
+
+当前 branch 新增第二个 concrete Conversation provider：
+
+```text
+GOOGLE_CALENDAR_ADAPTER_CODE = TRUE
+CALENDAR_READ_ONLY = TRUE
+NATIVE_SYNC_TOKEN = TRUE
+SYNC_TOKEN_410_RESET = TRUE
+CALENDAR_TARGET_BOUND_CURSOR = TRUE
+CALENDAR_EVENT_SNAPSHOT = TRUE
+EXPLICIT_EVENT_TO_NEXT_SESSION = TRUE
+CALENDAR_WRITE = FALSE
+REAL_GOOGLE_ACCOUNT_EVIDENCE_PENDING = TRUE
+```
+
+工程证据允许证明 adapter / fake transport / pagination / cursor / immutable snapshot / product flow；没有真实 Google OAuth/account 时不得声明真实 Calendar 已连接或真实 event 已同步。
+

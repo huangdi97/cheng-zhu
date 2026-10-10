@@ -959,6 +959,85 @@ def create_session(
     return require_session(row["id"])
 
 
+def schedule_from_calendar_snapshot(space_id: str, snapshot_id: str) -> dict[str, Any]:
+    """Explicitly import one immutable Google Calendar snapshot as UPCOMING.
+
+    The imported session is intentionally detached from later provider
+    mutations. source_calendar_event preserves provenance; future Sync does not
+    silently rewrite title/time. Re-importing the exact same snapshot is
+    idempotent.
+    """
+    space = require_space(space_id)
+    snapshot = store.get("conversation_connector_snapshot", str(snapshot_id or ""))
+    if not snapshot or str(snapshot.get("space_id") or "") != space_id:
+        raise ValueError("Calendar snapshot 不存在或不属于当前 Space")
+    if str(snapshot.get("external_kind") or "") != "CALENDAR_EVENT":
+        raise ValueError("只有 CALENDAR_EVENT snapshot 可以导入为下一场")
+    if str(snapshot.get("capability") or "") != "calendar.read":
+        raise ValueError("Calendar snapshot capability 不匹配")
+
+    connection = store.get(
+        "conversation_connector_connection",
+        str(snapshot.get("connection_id") or ""),
+    )
+    if not connection or str(connection.get("provider_id") or "") != "GOOGLE_CALENDAR":
+        raise ValueError("当前 snapshot 不是 Google Calendar provider 产生")
+
+    metadata = dict(snapshot.get("metadata") or {})
+    if bool(metadata.get("cancelled")) or str(metadata.get("status") or "") == "cancelled":
+        raise ValueError("已取消的 Calendar event 不能导入为下一场")
+    scheduled_at = snapshot.get("occurred_at")
+    if scheduled_at is None:
+        raise ValueError("Calendar event 缺少可解析的开始时间")
+    scheduled_at = float(scheduled_at)
+    if scheduled_at <= store.now():
+        raise ValueError("只有未来 Calendar event 可以导入为 UPCOMING Session")
+
+    for existing in list_sessions(space_id):
+        source = dict(existing.get("source_calendar_event") or {})
+        if str(source.get("snapshot_id") or "") == snapshot["id"]:
+            return {
+                "session": existing,
+                "snapshot_selected": snapshot["id"] in set(space.get("selected_connector_snapshot_ids") or []),
+                "created": False,
+            }
+
+    session = create_session(
+        space_id,
+        title=str(snapshot.get("title") or space["title"])[:200],
+        scheduled_at=scheduled_at,
+        assistance_mode=space.get("default_mode") or "",
+    )
+    provenance = {
+        "snapshot_id": snapshot["id"],
+        "provider_id": "GOOGLE_CALENDAR",
+        "connection_id": snapshot.get("connection_id") or "",
+        "external_id": snapshot.get("external_id") or "",
+        "content_hash": snapshot.get("content_hash") or "",
+        "calendar_id": str(metadata.get("calendar_id") or ""),
+        "event_id": str(metadata.get("event_id") or ""),
+        "imported_at": store.now(),
+    }
+    state = dict(session.get("state") or {})
+    state["calendar_imported"] = True
+    store.update("conversation_session", session["id"], {
+        "source_calendar_event": provenance,
+        "state": state,
+        "updated_at": store.now(),
+    })
+
+    selected = list(space.get("selected_connector_snapshot_ids") or [])
+    if snapshot["id"] not in selected:
+        selected.append(snapshot["id"])
+        update_space(space_id, {"selected_connector_snapshot_ids": selected})
+
+    return {
+        "session": require_session(session["id"]),
+        "snapshot_selected": True,
+        "created": True,
+    }
+
+
 def list_sessions(space_id: str) -> list[dict[str, Any]]:
     require_space(space_id)
     return store.select(

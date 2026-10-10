@@ -452,6 +452,8 @@ export interface ConversationConnectorSnapshot {
   visibility: string
   metadata: Record<string, unknown>
   provider_id?: string
+  is_latest_revision?: boolean
+  latest_snapshot_id?: string
   created_at: number
 }
 

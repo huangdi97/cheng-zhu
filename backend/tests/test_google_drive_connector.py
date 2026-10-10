@@ -190,6 +190,60 @@ def test_google_drive_folder_sync_consumes_all_pages_before_returning(monkeypatc
     assert second_list["pageToken"] == ["page-2"]
 
 
+
+
+def test_google_drive_workspace_file_respects_can_download_before_export(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
+    transport = FakeTransport()
+    restricted = _file("doc-restricted", "Restricted Brief")
+    restricted["capabilities"] = {"canDownload": False}
+    transport.queue(200, _folder())
+    transport.queue(200, {"files": [restricted]})
+    adapter = GoogleDriveRestAdapter(transport=transport)
+
+    result = adapter.read_context(
+        connection=_connection(folder="folder-1"),
+        capability="docs.read",
+        query={"folder_id": "folder-1"},
+        cursor="",
+        limit=500,
+    )
+    snap = result["items"][0]
+    assert snap["excerpt"] == ""
+    assert snap["metadata"]["content_available"] is False
+    assert snap["metadata"]["content_scope"] == "METADATA_ONLY"
+    assert snap["metadata"]["content_unavailable_reason"] == "DOWNLOAD_RESTRICTED"
+    assert snap["metadata"]["export_mime"] == "text/plain"
+    assert len(transport.calls) == 2
+    assert not any("/export" in call["url"] for call in transport.calls)
+
+
+def test_google_drive_oversized_workspace_export_becomes_metadata_only_not_partial_sync(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
+    transport = FakeTransport()
+    oversized = _file("doc-large", "Large Brief")
+    transport.queue(200, _folder())
+    transport.queue(200, {"files": [oversized]})
+    transport.queue(200, b"x" * 2_000_001)
+    adapter = GoogleDriveRestAdapter(transport=transport)
+
+    result = adapter.read_context(
+        connection=_connection(folder="folder-1"),
+        capability="docs.read",
+        query={"folder_id": "folder-1"},
+        cursor="",
+        limit=500,
+    )
+    snap = result["items"][0]
+    assert snap["excerpt"] == ""
+    assert snap["metadata"]["content_available"] is False
+    assert snap["metadata"]["content_scope"] == "METADATA_ONLY"
+    assert snap["metadata"]["content_unavailable_reason"] == "TEXT_TOO_LARGE"
+    assert snap["metadata"]["source_text_bytes"] == 0
+    assert snap["metadata"]["full_content_digest_sha256"] == ""
+    assert len(transport.calls) == 3
+
+
 def test_google_drive_sheets_are_explicitly_partial_first_sheet_csv(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
     transport = FakeTransport()

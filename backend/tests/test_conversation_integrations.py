@@ -470,7 +470,8 @@ def test_unknown_outcome_requires_explicit_provider_side_reconciliation(product_
         provider_reference="provider-message-123",
     )
     assert reconciled["status"] == "SUCCEEDED"
-    assert reconciled["response"]["ok"] is True
+    assert "ok" not in reconciled["response"]
+    assert reconciled["executed_at"] is None
     assert reconciled["response"]["reconciliation"]["source"] == "USER_REPORTED_PROVIDER_CHECK"
     assert reconciled["response"]["reconciliation"]["provider_reference"] == "provider-message-123"
     calls = adapter.execute_calls

@@ -279,6 +279,78 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
         conn.close()
 
 
+
+
+def test_v9_snapshot_rebuild_preserves_existing_v8_rows_and_adds_space_scoped_unique_key():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 9):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        # Seed the minimum referenced parent rows required by the v8 snapshot.
+        conn.execute(
+            "INSERT INTO conversation_space "
+            "(id, title, profile, description, default_goal, default_mode, relationship_key, status, "
+            "selected_source_ids_json, selected_quick_note_ids_json, selected_connector_snapshot_ids_json, "
+            "retention_policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("space-v8", "Space", "PROJECT_SYNC", "", "", "BALANCED", "", "ACTIVE", "[]", "[]", "[]", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_connector_connection "
+            "(id, provider_id, display_name, status, auth_mode, credential_ref, granted_capabilities_json, "
+            "provider_scopes_json, account_hint, sync_cursor, sync_cursors_json, last_sync_at, last_error, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("conn-v8", "MCP", "MCP", "CONNECTED", "OPAQUE_REFERENCE", "plugin:mcp/test",
+             '["calendar.read"]', '["server-defined"]', "work", "", "{}", 1.0, "", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_connector_snapshot "
+            "(id, connection_id, space_id, capability, external_kind, external_id, title, excerpt, content_hash, "
+            "source_url, occurred_at, visibility, metadata_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("snap-v8", "conn-v8", "space-v8", "calendar.read", "CALENDAR_EVENT", "event-1",
+             "Review", "10x data scale", "hash-v8", "https://calendar.example/event/1", 1.0, "PRIVATE", '{"safe":"yes"}', 1.0),
+        )
+        conn.commit()
+
+        before = conn.execute(
+            "SELECT id, connection_id, space_id, capability, external_id, content_hash, metadata_json "
+            "FROM conversation_connector_snapshot"
+        ).fetchone()
+
+        apply_v9, _name = product_migrations._MIGRATIONS[9]
+        apply_v9(conn)
+        conn.execute("PRAGMA user_version = 9")
+        conn.commit()
+
+        after = conn.execute(
+            "SELECT id, connection_id, space_id, capability, external_id, content_hash, metadata_json "
+            "FROM conversation_connector_snapshot"
+        ).fetchone()
+        assert after == before
+
+        unique_indexes = [
+            row for row in conn.execute("PRAGMA index_list(conversation_connector_snapshot)").fetchall()
+            if row[2] == 1
+        ]
+        assert unique_indexes, "v9 rebuilt snapshot table must retain a UNIQUE provenance key"
+        unique_columns = {
+            tuple(col[2] for col in conn.execute(f"PRAGMA index_info('{row[1]}')").fetchall())
+            for row in unique_indexes
+        }
+        assert (
+            "space_id", "connection_id", "capability", "external_kind", "external_id", "content_hash"
+        ) in unique_columns
+    finally:
+        conn.close()
+
+
 def test_deleting_product_db_is_a_complete_rollback(v122_env):
     from services.product import goals
     from services.storage import product as product_store

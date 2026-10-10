@@ -28,6 +28,24 @@ This permits:
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 ```
 
+The repository has advanced after this release. As of the 2026-10-10 pure-repo closure audit:
+
+```text
+CURRENT_MAIN_CLOSURE_HEAD = 383978fa480aac35d214dce3fa4e9fa5ebb17118
+CURRENT_MAIN_CI_RUN = 37901753321
+CURRENT_MAIN_CI_GATE = PASS
+```
+
+Therefore:
+
+```text
+current main capabilities
+!=
+v2.0.0-beta.2 packaged capabilities
+```
+
+Post-beta.2 additions such as the connector capability registry, stable-promotion evaluator and privacy-safe local Conversation reminders are source-main facts until a newer prerelease/release is packaged and provenance-pinned. They must not be retroactively claimed as beta.2 contents.
+
 It does **not** permit:
 
 ```text
@@ -98,7 +116,8 @@ The next maturity step is real dogfood / human-labeled evaluation, not another s
 
 The following remain outside beta.2 publication truth:
 
-- Calendar / Docs / Mail / project-tracker connectors;
+- post-beta.2 main-only features unless a newer package is published;
+- Calendar / Docs / Mail / project-tracker real providers/auth/read runtime;
 - actual external email/task/issue/decision-log execution;
 - automatic participant chat notice / watermark;
 - organization/shared team truth registry;

@@ -340,10 +340,12 @@ DRAFT
 → create Execution Request (PENDING/BLOCKED)
 → second explicit Execute
 → EXECUTING
-→ SUCCEEDED / FAILED / BLOCKED
+→ SUCCEEDED / FAILED / UNKNOWN_OUTCOME / BLOCKED
 ```
 
-仅 `SUCCEEDED` 可表示 provider 返回成功。
+仅 provider **显式返回 boolean `ok=true`** 才可表示 `SUCCEEDED`。
+
+`UNKNOWN_OUTCOME` 用于 timeout、transport exception、进程中断或缺少明确 `ok` 的 malformed outcome；它表示“外部副作用可能已经发生，但 Chengzhu 无法确认”，因此禁止直接 retry。
 
 ---
 

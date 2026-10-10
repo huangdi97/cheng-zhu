@@ -189,16 +189,24 @@ class LocalMarkdownDecisionLogAdapter:
         marker = f"<!-- chengzhu-execution:{marker_key} -->"
         marker_bytes = marker.encode("utf-8")
 
+        if target_path.is_symlink():
+            return {
+                "ok": False,
+                "error": "Decision Log target 不能是 symlink；请使用 root 内真实 .md 文件",
+                "retry_safe": True,
+                "phase": "TARGET_VALIDATION_PRE_WRITE",
+            }
         before_exists = target_path.exists()
         before_stat = target_path.stat() if before_exists else None
-        before = target_path.read_bytes() if before_exists else b""
-        if len(before) > _MAX_EXISTING_BYTES:
+        if before_stat is not None and before_stat.st_size > _MAX_EXISTING_BYTES:
             return {
                 "ok": False,
                 "error": "Decision Log 文件超过 10 MiB 安全上限；请选择新的 Markdown target",
                 "retry_safe": True,
                 "phase": "TARGET_VALIDATION_PRE_WRITE",
             }
+        before = target_path.read_bytes() if before_exists else b""
+
         if marker_bytes in before:
             return {
                 "ok": True,

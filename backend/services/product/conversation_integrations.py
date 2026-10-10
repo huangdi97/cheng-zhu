@@ -87,21 +87,21 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
         },
     },
     "MICROSOFT_GRAPH": {
-        "label": "Microsoft Graph",
-        "capabilities": [
-            "calendar.read", "mail.read", "docs.read", "project.read",
-            "email.send", "task.create",
-        ],
-        "external_kinds": ["CALENDAR_EVENT", "MAIL_THREAD", "DOCUMENT", "TASK"],
+        "label": "Microsoft To Do",
+        "capabilities": ["task.create"],
+        "external_kinds": [],
         "provider_scopes": {
-            "calendar.read": "Calendars.Read",
-            "mail.read": "Mail.Read",
-            "docs.read": "Files.Read",
-            "project.read": "Tasks.Read",
-            "email.send": "Mail.Send",
             "task.create": "Tasks.ReadWrite",
         },
-        "sync": "PROVIDER_CURSOR",
+        "sync": "WRITE_ONLY_NO_SYNC",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:microsoft-graph:env:<ENV_VAR>",
+            "write_target": "default or explicit Microsoft To Do task-list id",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "read_support": "NONE",
+            "delegated_permission": "Tasks.ReadWrite",
+        },
     },
     "GITHUB": {
         "label": "GitHub",

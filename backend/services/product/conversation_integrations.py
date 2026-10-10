@@ -65,6 +65,8 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             "secret_storage": "PROCESS_ENV_ONLY",
             "mailbox_read_support": "NONE",
             "oauth_required_scopes": "openid email gmail.send",
+            "oauth_scope_classification": "GMAIL_SEND_SENSITIVE",
+            "public_release_gate": "GOOGLE_OAUTH_APP_VERIFICATION_REQUIRED",
         },
     },
     "GOOGLE_DRIVE": {

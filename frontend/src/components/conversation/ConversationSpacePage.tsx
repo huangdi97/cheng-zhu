@@ -817,7 +817,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <div className="text-xs font-semibold text-text-primary">Google Calendar · read-only discovery</div>
-                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleCalendarProvider.setup.runtime_opt_in_env || 'CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1'} 和一个只读 Calendar access-token 环境变量。当前只实现 calendar.read，不会创建/修改日历事件。</p>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleCalendarProvider.setup?.runtime_opt_in_env || 'CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1'} 和一个只读 Calendar access-token 环境变量。当前只实现 calendar.read，不会创建/修改日历事件。</p>
                     </div>
                     <StatusBadge tone={googleCalendarProvider.adapter_available ? 'ok' : 'muted'}>{googleCalendarProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
                   </div>

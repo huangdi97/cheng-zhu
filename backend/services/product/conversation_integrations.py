@@ -284,6 +284,7 @@ def clear_adapters_for_tests() -> None:
     for provider in list(_ADAPTERS):
         conversation_connectors.unregister_provider(provider)
     _ADAPTERS.clear()
+    _ACTIVE_EXECUTIONS.clear()
 
 
 def catalog() -> list[dict[str, Any]]:
@@ -817,7 +818,6 @@ def execute_request(execution_id: str) -> dict[str, Any]:
         return store.get("conversation_connector_execution", execution_id) or row
 
     if result["ok"] is False:
-        retry_safe = result.get("retry_safe") is True
         store.update("conversation_connector_execution", execution_id, {
             "status": "FAILED",
             "response": result,
@@ -826,8 +826,6 @@ def execute_request(execution_id: str) -> dict[str, Any]:
         })
         failed = store.get("conversation_connector_execution", execution_id) or row
         _ACTIVE_EXECUTIONS.discard(execution_id)
-        if retry_safe:
-            return failed
         return failed
 
     store.update("conversation_connector_execution", execution_id, {

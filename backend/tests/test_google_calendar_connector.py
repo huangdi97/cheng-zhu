@@ -3,6 +3,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from services.product import conversation_integrations, conversations
+from services.storage import product as store
 from services.product.google_calendar_connector import (
     GoogleCalendarFullSyncRequired,
     GoogleCalendarProviderError,
@@ -361,3 +362,118 @@ def test_calendar_auth_failure_during_sync_marks_connection_error(product_env, m
         )
     after = next(x for x in conversation_integrations.list_connections() if x["id"] == connection["id"])
     assert after["status"] == "ERROR"
+
+
+def test_calendar_snapshot_import_creates_one_provenance_linked_upcoming_session(product_env):
+    space = conversations.create_space("Calendar Continuity", "PROJECT_SYNC")
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_CALENDAR",
+        granted_capabilities=["calendar.read"],
+        credential_ref="provider:google-calendar:env:CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN",
+        account_hint="primary",
+    )
+    future = store.now() + 3600
+    snapshot = conversation_integrations._store_snapshot(
+        connection,
+        space["id"],
+        "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT",
+            "external_id": "primary:evt-next",
+            "title": "Architecture Review",
+            "excerpt": "Review rollout and rollback owner.",
+            "occurred_at": future,
+            "visibility": "PRIVATE",
+            "metadata": {
+                "calendar_id": "primary",
+                "event_id": "evt-next",
+                "status": "confirmed",
+                "cancelled": False,
+            },
+        },
+    )
+
+    imported = conversations.schedule_from_calendar_snapshot(space["id"], snapshot["id"])
+    assert imported["created"] is True
+    assert imported["snapshot_selected"] is True
+    session = imported["session"]
+    assert session["status"] == "UPCOMING"
+    assert session["title"] == "Architecture Review"
+    assert session["scheduled_at"] == future
+    assert session["source_calendar_event"]["snapshot_id"] == snapshot["id"]
+    assert session["source_calendar_event"]["content_hash"] == snapshot["content_hash"]
+    assert session["state"]["calendar_imported"] is True
+
+    detail = conversations.space_detail(space["id"])
+    assert snapshot["id"] in detail["selected_connector_snapshot_ids"]
+    assert detail["next_session"]["id"] == session["id"]
+
+    repeated = conversations.schedule_from_calendar_snapshot(space["id"], snapshot["id"])
+    assert repeated["created"] is False
+    assert repeated["session"]["id"] == session["id"]
+    assert len([x for x in conversations.list_sessions(space["id"]) if x["source_calendar_event"].get("snapshot_id") == snapshot["id"]]) == 1
+
+
+def test_calendar_snapshot_import_rejects_cancelled_past_cross_space_and_non_google(product_env):
+    space = conversations.create_space("Calendar Guard", "PROJECT_SYNC")
+    other = conversations.create_space("Other Space", "PROJECT_SYNC")
+    gcal = conversation_integrations.create_connection(
+        "GOOGLE_CALENDAR",
+        granted_capabilities=["calendar.read"],
+        credential_ref="provider:google-calendar:env:CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN",
+        account_hint="primary",
+    )
+    github = conversation_integrations.create_connection(
+        "GITHUB",
+        granted_capabilities=["project.read"],
+        credential_ref="provider:github:env:CHENGZHU_GITHUB_TOKEN",
+    )
+
+    cancelled = conversation_integrations._store_snapshot(
+        gcal, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT", "external_id": "primary:cancelled",
+            "title": "Cancelled", "occurred_at": store.now() + 3600,
+            "metadata": {"cancelled": True, "status": "cancelled"},
+        },
+    )
+    with pytest.raises(ValueError, match="已取消"):
+        conversations.schedule_from_calendar_snapshot(space["id"], cancelled["id"])
+
+    past = conversation_integrations._store_snapshot(
+        gcal, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT", "external_id": "primary:past",
+            "title": "Past", "occurred_at": store.now() - 3600,
+            "metadata": {"cancelled": False, "status": "confirmed"},
+        },
+    )
+    with pytest.raises(ValueError, match="未来"):
+        conversations.schedule_from_calendar_snapshot(space["id"], past["id"])
+
+    cross = conversation_integrations._store_snapshot(
+        gcal, other["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT", "external_id": "primary:cross",
+            "title": "Cross", "occurred_at": store.now() + 3600,
+            "metadata": {"cancelled": False, "status": "confirmed"},
+        },
+    )
+    with pytest.raises(ValueError, match="不属于当前 Space"):
+        conversations.schedule_from_calendar_snapshot(space["id"], cross["id"])
+
+    fake_calendar_from_github = conversation_integrations._store_snapshot(
+        # _store_snapshot validates GitHub external_kind, so create the row
+        # directly to prove the import guard cannot be bypassed by DB-shaped data.
+        gcal, space["id"], "calendar.read",
+        {
+            "external_kind": "CALENDAR_EVENT", "external_id": "primary:not-google",
+            "title": "Wrong Provider", "occurred_at": store.now() + 7200,
+            "metadata": {"cancelled": False, "status": "confirmed"},
+        },
+    )
+    # Re-point only the connection id to a non-Google connection; import must
+    # reject provider provenance even though the snapshot shape is Calendar-like.
+    store.update("conversation_connector_snapshot", fake_calendar_from_github["id"], {"connection_id": github["id"]})
+    with pytest.raises(ValueError, match="不是 Google Calendar"):
+        conversations.schedule_from_calendar_snapshot(space["id"], fake_calendar_from_github["id"])

@@ -240,8 +240,11 @@ class GitHubRestAdapter:
         items: list[dict[str, Any]] = []
         page = 1
         latest_updated = ""
+        # Keep per_page stable across pages. GitHub's issues endpoint also
+        # returns pull requests; shrinking per_page after filtering them would
+        # change page offsets and can duplicate or skip rows.
+        per_page = 100
         while len(items) < requested_limit and page <= 20:
-            per_page = min(100, max(1, requested_limit - len(items)))
             params: dict[str, Any] = {
                 "state": state,
                 "sort": "updated",

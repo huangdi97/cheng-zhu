@@ -38,9 +38,16 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
         "capabilities": ["calendar.read"],
         "external_kinds": ["CALENDAR_EVENT"],
         "provider_scopes": {
-            "calendar.read": "https://www.googleapis.com/auth/calendar.readonly",
+            "calendar.read": "https://www.googleapis.com/auth/calendar.events.readonly",
         },
-        "sync": "INCREMENTAL_CURSOR",
+        "sync": "NATIVE_SYNC_TOKEN",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:google-calendar:env:<ENV_VAR>",
+            "read_target": "calendar_id (default primary)",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "write_support": "NONE",
+        },
     },
     "GOOGLE_MAIL": {
         "label": "Gmail",
@@ -683,6 +690,22 @@ def sync_connection(
                 cursor=cursor,
                 limit=max(1, min(int(limit), 500)),
             ) or {}
+            if bool(result.get("full_sync_required")):
+                # Native provider sync tokens (e.g. Google Calendar) can be
+                # invalidated. Reset only this capability cursor, then perform
+                # one explicit full resync. Immutable historical snapshots are
+                # provenance/audit records rather than a mutable provider
+                # mirror, so they are not erased here.
+                cursors[capability] = ""
+                result = adapter.read_context(
+                    connection=connection,
+                    capability=capability,
+                    query=dict(query or {}),
+                    cursor="",
+                    limit=max(1, min(int(limit), 500)),
+                ) or {}
+                if bool(result.get("full_sync_required")):
+                    raise RuntimeError("Provider full sync reset did not converge")
             for raw in list(result.get("items") or [])[:max(1, min(int(limit), 500))]:
                 snapshots.append(_store_snapshot(connection, space_id, capability, dict(raw or {})))
             if result.get("next_cursor") is not None:

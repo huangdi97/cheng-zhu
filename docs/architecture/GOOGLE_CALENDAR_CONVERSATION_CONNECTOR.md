@@ -19,6 +19,9 @@ Implemented:
 - immutable Conversation connector snapshots
 - explicit snapshot selection into a Space / Session Pack
 - explicit future event → UPCOMING Session import
+- immutable revision history + latest-revision import guard
+- upstream reschedule/cancel drift visibility without silently rewriting imported Sessions
+- explicit Calendar time semantics: timezone preserved; all-day events do not fabricate midnight timestamps
 - native Google Events sync token pagination + 410 reset
 
 Not implemented / not claimed:
@@ -150,10 +153,40 @@ REFERENCE_SOURCE
 A Calendar event is not automatically a Decision, Commitment, Deadline or truth
 claim.
 
+Immutable does **not** mean every historical revision is still current. Chengzhu
+keeps every changed event snapshot for provenance, while the read model annotates:
+
+```text
+is_latest_revision
+latest_snapshot_id
+```
+
+Only the latest revision can be imported as a new Conversation Session. If a
+newer revision cancels or reschedules an event that was already imported, the
+existing Session stays frozen and exposes:
+
+```text
+CURRENT
+SOURCE_DRIFT
+CANCELLED_UPSTREAM
+SOURCE_MISSING
+```
+
+It never silently rewrites the user's already-created local Session.
+
 ## Event → Next Session import
 
-The user may explicitly choose a future, non-cancelled `CALENDAR_EVENT`
-snapshot in the current Space and select **作为下一场**.
+The user may explicitly choose the **latest revision** of a future,
+non-cancelled `CALENDAR_EVENT` snapshot in the current Space and select
+**作为下一场**.
+
+Not every Google Calendar Events resource is a Conversation candidate:
+
+- all-day events preserve their date but have no fabricated `scheduled_at`;
+- `focusTime`, `outOfOffice`, and `workingLocation` stay read-only context
+  and cannot become a Conversation Session;
+- timezone-aware/naive `dateTime` values preserve the provider timezone when
+  one is supplied.
 
 The import:
 
@@ -181,6 +214,9 @@ Repository tests may prove:
 - target-bound cursor
 - immutable snapshots
 - Calendar event → Next Session product flow
+- latest-revision import guards
+- upstream reschedule/cancel drift reporting
+- timezone/all-day/status-event semantics
 
 Repository tests cannot prove:
 

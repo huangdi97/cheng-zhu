@@ -400,6 +400,41 @@ def test_external_execution_unknown_outcome_never_rewrites_conversation_truth(pr
     assert store.get("conversation_draft_action", draft["id"])["status"] == "APPROVED"
 
 
+
+
+def test_orphaned_executing_audit_recovers_to_unknown_outcome_after_restart(product_env):
+    adapter = FakeAdapter({"email.send"})
+    connection = _connected(adapter, ["email.send"])
+    space = conversations.create_space("Crash Recovery", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    draft = conversations.create_draft_action(
+        session["id"], kind="FOLLOWUP_EMAIL_DRAFT", title="Follow-up", content="body",
+    )
+    conversations.review_draft_action(draft["id"], "APPROVE")
+    request = conversation_integrations.request_execution(draft["id"], connection["id"])
+
+    # Simulate a process that died after persisting EXECUTING but before a
+    # definitive provider outcome reached local storage.
+    store.update("conversation_connector_execution", request["id"], {
+        "status": "EXECUTING",
+        "updated_at": store.now() - 30,
+    })
+    conversation_integrations._ACTIVE_EXECUTIONS.clear()
+
+    rows = conversation_integrations.list_executions(draft_action_id=draft["id"])
+    recovered = next(row for row in rows if row["id"] == request["id"])
+    assert recovered["status"] == "UNKNOWN_OUTCOME"
+    assert "interrupted" in recovered["error"]
+
+    with pytest.raises(ValueError, match="outcome 不确定"):
+        conversation_integrations.execute_request(request["id"])
+    assert adapter.execute_calls == 0
+
+    diag = conversation_integrations.diagnostics()
+    assert diag["unknown_outcome_count"] == 1
+
+
 def test_retention_keeps_selected_snapshots_and_execution_audit(product_env):
     adapter = FakeAdapter({"calendar.read", "email.send"})
     connection = _connected(adapter, ["calendar.read", "email.send"])

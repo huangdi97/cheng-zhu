@@ -682,6 +682,16 @@ export interface ConversationSessionExport {
   session_packs: Array<Record<string, unknown>>
 }
 
+export interface ConversationReminder {
+  session_id: string
+  space_id: string
+  title: string
+  space_title: string
+  space_profile: ConversationProfile
+  scheduled_at: number
+  assistance_mode: AssistanceMode
+}
+
 export interface ConversationHistoryItem extends ConversationSession {
   space_title: string
   space_profile: ConversationProfile

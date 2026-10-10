@@ -137,6 +137,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState('root')
   const [googleMailEnvVar, setGoogleMailEnvVar] = useState('CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN')
   const [microsoftTodoEnvVar, setMicrosoftTodoEnvVar] = useState('CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN')
+  const [localMarkdownEnvVar, setLocalMarkdownEnvVar] = useState('CHENGZHU_DECISION_LOG_ROOT')
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -174,6 +175,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const googleDriveProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_DRIVE')
   const googleMailProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_MAIL')
   const microsoftTodoProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'MICROSOFT_GRAPH')
+  const localMarkdownProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'LOCAL_MARKDOWN')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -184,8 +186,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const executionNeedsRepository = selectedExecutionConnection?.provider_id === 'GITHUB' && draftCapability === 'issue.create'
   const executionNeedsEmail = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && draftCapability === 'email.send'
   const executionNeedsTodoList = selectedExecutionConnection?.provider_id === 'MICROSOFT_GRAPH' && draftCapability === 'task.create'
+  const executionNeedsLocalMarkdown = selectedExecutionConnection?.provider_id === 'LOCAL_MARKDOWN' && draftCapability === 'decision_log.write'
   const validExecutionEmail = /^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(executionTarget.trim())
   const validTodoTarget = /^(?:default|[^\r\n\0\/?#]{1,500})$/.test(executionTarget.trim() || 'default')
+  const localMarkdownTarget = executionTarget.trim() || 'decisions.md'
+  const validLocalMarkdownTarget = localMarkdownTarget.length <= 500
+    && !/[\r\n\0\\]/.test(localMarkdownTarget)
+    && !/^(?:\/|[A-Za-z]:)/.test(localMarkdownTarget)
+    && !/(^|\/)\.\.(\/|$)/.test(localMarkdownTarget)
+    && /\.md$/i.test(localMarkdownTarget)
   const executionRetrySafe = execution?.status === 'FAILED'
     && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
   const executionReconciliation = (execution?.response as {
@@ -525,6 +534,26 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const createLocalMarkdownConnection = async () => {
+    const envName = localMarkdownEnvVar.trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Local Markdown root env 只允许环境变量名，例如 CHENGZHU_DECISION_LOG_ROOT。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      await conversationApi.createIntegrationConnection({
+        provider_id: 'LOCAL_MARKDOWN',
+        display_name: 'Local Markdown / Obsidian · Decision Log',
+        granted_capabilities: ['decision_log.write'],
+        credential_ref: `provider:local-markdown:env:${envName}`,
+      })
+      await integrationConnections.reload()
+      setLifecycleMessage('Local Markdown connection 元数据已创建。product.db 只保存 env reference；实际 root path 只在 backend process environment 中解析。下一步点击“验证连接”。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
@@ -576,7 +605,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
             ? 'Google OIDC identity 已验证。当前连接不具备 mailbox read；email.send 只有在 reviewed draft 的第二次显式 Execute 获得 Gmail ok=true 后才算真实证明。'
             : connection?.provider_id === 'MICROSOFT_GRAPH'
               ? 'Microsoft To Do list probe 已通过，连接状态为 CONNECTED。这里只证明 Tasks.ReadWrite 对 To Do lists 可用；真正 task.create 仍由 APPROVED Task Draft 的第二次显式 Execute provider 响应证明。'
-              : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+              : connection?.provider_id === 'LOCAL_MARKDOWN'
+                ? 'Local Markdown root read/write probe 已通过。这里只证明配置的本地 root 当前可用；真正 Decision Log 写入仍需要 APPROVED Draft + relative .md target + 第二次显式 Execute。'
+                : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -666,7 +697,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     if (!draft || draft.status !== 'APPROVED' || !executionConnectionId) return
     const target = executionNeedsTodoList
       ? (executionTarget.trim() || 'default')
-      : (executionTarget.trim() || draft.target || '')
+      : executionNeedsLocalMarkdown
+        ? (executionTarget.trim() || 'decisions.md')
+        : (executionTarget.trim() || draft.target || '')
     if (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(target)) {
       setSessionError('GitHub Issue 写回必须明确指定 owner/repo target。')
       return
@@ -677,6 +710,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     }
     if (executionNeedsTodoList && !/^(?:default|[^\r\n\0\/?#]{1,500})$/.test(target || 'default')) {
       setSessionError('Microsoft To Do target 必须是 default 或明确的 task-list id。')
+      return
+    }
+    if (executionNeedsLocalMarkdown && !validLocalMarkdownTarget) {
+      setSessionError('Local Markdown target 必须是 root 下的相对 .md 路径，例如 decisions.md 或 Projects/Alpha/Decisions.md；不允许绝对路径、\\ 或 ..。')
       return
     }
     setIntegrationBusy(true); setSessionError('')
@@ -987,6 +1024,23 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <p className="mt-2 text-[10px] text-text-muted">Verify 用同一 Tasks.ReadWrite 做 To Do list probe；真正 task.create 只有在 APPROVED Task Draft 选择 exact account + default/明确 list id，并再次显式 Execute 后由 Graph 201 响应证明。</p>
                   <p className="mt-1 text-[10px] text-status-inferred">Provider 没有 Chengzhu 可依赖的幂等 key；timeout / 429 / 5xx 会进入 UNKNOWN_OUTCOME，禁止自动重试，必须先到 Microsoft To Do 核对。</p>
                 </div> : null}
+                {localMarkdownProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="local-markdown-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Local Markdown / Obsidian · reviewed Decision Log</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {localMarkdownProvider.setup?.runtime_opt_in_env || 'CHENGZHU_LOCAL_MARKDOWN_CONNECTOR_ENABLE=1'}，并用单独环境变量指向一个明确可写的本地目录。只实现 decision_log.write，不读取 vault、不索引本地文件。</p>
+                    </div>
+                    <StatusBadge tone={localMarkdownProvider.adapter_available ? 'ok' : 'muted'}>{localMarkdownProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3">
+                    <input aria-label="Local Markdown root 环境变量名" className={inputCls} value={localMarkdownEnvVar} onChange={(e) => setLocalMarkdownEnvVar(e.target.value)} placeholder="CHENGZHU_DECISION_LOG_ROOT" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !localMarkdownProvider.adapter_available} onClick={createLocalMarkdownConnection}>创建 Local Markdown 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">scope · local.filesystem.markdown.write · credential ref = provider:local-markdown:env:{localMarkdownEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Verify 只证明 root 目录当前可读写。真正写文件仍要求 APPROVED Decision Log Draft → relative .md target → Execution Request → 第二次显式 Execute；重复执行通过文件内 execution marker 幂等去重。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -1187,7 +1241,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   {executionNeedsEmail ? <input aria-label="Gmail 收件邮箱" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="recipient@example.com · 单一明确收件人" /> : null}
                   {executionNeedsTodoList ? <input aria-label="Microsoft To Do 目标列表" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="default 或明确 task-list id" /> : null}
                   {executionNeedsTodoList ? <p className="mt-1 text-[10px] text-text-muted">留空或填 default 会在 Execute 时解析 Microsoft built-in Tasks list；也可填明确 list id。成竹不会按列表名称猜目标。</p> : null}
-                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim())) || (executionNeedsEmail && !validExecutionEmail) || (executionNeedsTodoList && !validTodoTarget)} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                  {executionNeedsLocalMarkdown ? <input aria-label="Local Markdown Decision Log 目标文件" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="decisions.md 或 Projects/Alpha/Decisions.md" /> : null}
+                  {executionNeedsLocalMarkdown ? <p className="mt-1 text-[10px] text-text-muted">只允许配置 root 下的相对 .md 文件。root path 不进入 product.db；写入会带 Chengzhu execution marker，用于幂等核对。</p> : null}
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim())) || (executionNeedsEmail && !validExecutionEmail) || (executionNeedsTodoList && !validTodoTarget) || (executionNeedsLocalMarkdown && !validLocalMarkdownTarget)} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
                     {outboundRedactionApplied ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">

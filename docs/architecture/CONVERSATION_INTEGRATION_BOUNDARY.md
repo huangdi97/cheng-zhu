@@ -384,6 +384,8 @@ Outcome semantics are deliberately conservative:
 
 The idempotency key is passed to the adapter, but it is not treated as magic: a concrete provider must actually enforce idempotency before retry safety can be claimed.
 
+Crash/restart recovery follows the same rule. An audit row persisted as `EXECUTING` with no live in-process execution is treated as an interrupted external call and converges to `UNKNOWN_OUTCOME`; it is never silently reset to `PENDING` or `FAILED`.
+
 ---
 
 ## 14. Sensitive-field sanitization

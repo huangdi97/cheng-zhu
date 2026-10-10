@@ -1626,8 +1626,86 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: '执行外部动作' }).click()
     await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
-    await expect(page.getByText(/Provider 已返回成功/)).toBeVisible()
+    await expect(page.getByText(/Provider 已明确返回 ok=true/)).toBeVisible()
     await expect(page.getByText(/decision-log-1/)).toBeVisible()
+  })
+
+
+  test('ambiguous external outcome is visible and cannot be retried from Continue', async ({ context, page }) => {
+    const base = mocks()
+    const connection = {
+      id: 'ccn-ambiguous',
+      provider_id: 'MCP',
+      display_name: 'Work MCP',
+      status: 'CONNECTED',
+      auth_mode: 'OPAQUE_REFERENCE',
+      granted_capabilities: ['decision_log.write'],
+      provider_scopes: ['server-defined'],
+      account_hint: 'work@example.test',
+      sync_cursor: '',
+      last_sync_at: 7,
+      last_error: '',
+      created_at: 1,
+      updated_at: 7,
+      credential_ref_present: true,
+      adapter_available: true,
+    }
+    let execution = null
+    let executeCalls = 0
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{ provider_id: 'MCP', label: 'Model Context Protocol', capabilities: ['decision_log.write'], read_capabilities: [], write_capabilities: ['decision_log.write'], external_kinds: ['DOCUMENT'], provider_scopes: { 'decision_log.write': 'server-defined' }, sync: 'SERVER_DEFINED', adapter_available: true }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections') return { items: [connection] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          execution = {
+            id: 'cce-ambiguous',
+            draft_action_id: 'cda-derived',
+            connection_id: connection.id,
+            capability: 'decision_log.write',
+            operation: 'UPDATE_DECISION_LOG',
+            target: '',
+            idempotency_key: 'ambiguous123456',
+            status: 'PENDING',
+            request: {},
+            response: {},
+            error: '',
+            created_at: 8,
+            updated_at: 8,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-ambiguous/execute' && method === 'POST') {
+          executeCalls += 1
+          execution = {
+            ...execution,
+            status: 'UNKNOWN_OUTCOME',
+            response: {},
+            error: 'transport timed out after provider may have accepted request',
+            updated_at: 9,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption(connection.id)
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('UNKNOWN_OUTCOME', { exact: true })).toBeVisible()
+    await expect(page.getByText(/外部副作用可能已经发生/)).toBeVisible()
+    await expect(page.getByRole('button', { name: '执行外部动作' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '安全重试外部动作' })).toHaveCount(0)
+    expect(executeCalls).toBe(1)
   })
 
 

@@ -918,6 +918,23 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   </div>
                   <p className="mt-2 text-[10px] text-text-muted">Docs / Slides 导出纯文本；Sheets 仅第一 sheet CSV 并明确标 partial；PDF/二进制只保存 metadata，不会假装已读取正文。Sync 完成后仍需逐条选入 Space。</p>
                 </div> : null}
+                {googleMailProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="google-mail-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Gmail · reviewed send-only</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleMailProvider.setup?.runtime_opt_in_env || 'CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1'} 和 Gmail access-token 环境变量。只实现 email.send，不读 inbox、不创建 mail snapshot、不做后台同步。</p>
+                    </div>
+                    <StatusBadge tone={googleMailProvider.adapter_available ? 'ok' : 'muted'}>{googleMailProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3">
+                    <input aria-label="Gmail token 环境变量名" className={inputCls} value={googleMailEnvVar} onChange={(e) => setGoogleMailEnvVar(e.target.value)} placeholder="CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !googleMailProvider.adapter_available} onClick={createGoogleMailConnection}>创建 Gmail send-only 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">scopes · openid · email · gmail.send · credential ref = provider:google-mail:env:{googleMailEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Verify 仅通过 Google UserInfo 确认账号 identity，不读取邮箱；真正 email.send 能力只有在 APPROVED Follow-up Draft 的第二次显式 Execute 返回 Gmail ok=true 后才成立。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -937,7 +954,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' && connection.granted_capabilities.some((capability) => ['project.read', 'calendar.read', 'docs.read'].includes(capability)) ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>
@@ -1115,7 +1132,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     {compatibleExecutionConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.display_name} · {connection.provider_id} · {connection.account_hint || connection.id.slice(0, 8)}</option>)}
                   </select>
                   {executionNeedsRepository ? <input aria-label="GitHub Issue 目标仓库" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="owner/repo · 第二次显式动作的目标" /> : null}
-                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim()))} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                  {executionNeedsEmail ? <input aria-label="Gmail 收件邮箱" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="recipient@example.com · 单一明确收件人" /> : null}
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim())) || (executionNeedsEmail && !validExecutionEmail)} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
                     {outboundRedactionApplied ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">

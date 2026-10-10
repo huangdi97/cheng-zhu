@@ -417,7 +417,7 @@ def create_connection(
         raise ValueError("Connector connection 至少需要一个 capability")
     if not granted <= supported:
         raise ValueError(
-            "Provider 不支持 capability: " + ", ".join(sorted(granted - supported))
+            "provider 不支持 capability: " + ", ".join(sorted(granted - supported))
         )
     credential_ref = _validate_credential_ref(credential_ref)
     validated_scopes = _validated_provider_scopes(provider, granted, provider_scopes)

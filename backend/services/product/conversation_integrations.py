@@ -792,6 +792,22 @@ def request_execution(
     if existing:
         return existing[0]
 
+    raw_request = {
+        "draft_kind": draft["kind"],
+        "title": draft.get("title") or "",
+        "content": draft.get("content") or "",
+        "payload": draft.get("payload") or {},
+        "source_refs": draft.get("source_refs") or [],
+    }
+    outbound_redaction_applied = _contains_secret_value(
+        json.dumps(raw_request, ensure_ascii=False, sort_keys=True, default=str)
+    )
+    safe_request = _sanitize(raw_request)
+    if isinstance(safe_request, dict):
+        # This key intentionally avoids secret/token naming so the sanitizer
+        # does not remove the audit marker itself.
+        safe_request["outbound_redaction_applied"] = outbound_redaction_applied
+
     ts = store.now()
     row = {
         "id": store.new_id("cce_"),
@@ -802,13 +818,7 @@ def request_execution(
         "target": target_value,
         "idempotency_key": idempotency_key,
         "status": status,
-        "request": _sanitize({
-            "draft_kind": draft["kind"],
-            "title": draft.get("title") or "",
-            "content": draft.get("content") or "",
-            "payload": draft.get("payload") or {},
-            "source_refs": draft.get("source_refs") or [],
-        }),
+        "request": safe_request,
         "response": {},
         "error": error,
         "created_at": ts,

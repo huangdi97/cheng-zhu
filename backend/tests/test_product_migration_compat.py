@@ -304,10 +304,10 @@ def test_v9_snapshot_rebuild_preserves_existing_v8_rows_and_adds_space_scoped_un
         conn.execute(
             "INSERT INTO conversation_connector_connection "
             "(id, provider_id, display_name, status, auth_mode, credential_ref, granted_capabilities_json, "
-            "provider_scopes_json, account_hint, sync_cursor, sync_cursors_json, last_sync_at, last_error, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "provider_scopes_json, account_hint, sync_cursor, last_sync_at, last_error, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             ("conn-v8", "MCP", "MCP", "CONNECTED", "OPAQUE_REFERENCE", "plugin:mcp/test",
-             '["calendar.read"]', '["server-defined"]', "work", "", "{}", 1.0, "", 1.0, 1.0),
+             '["calendar.read"]', '["server-defined"]', "work", "", 1.0, "", 1.0, 1.0),
         )
         conn.execute(
             "INSERT INTO conversation_connector_snapshot "

@@ -150,9 +150,12 @@ def test_google_drive_sync_validates_folder_and_exports_workspace_docs(monkeypat
 
     folder_call, list_call, export_call = transport.calls
     assert urlparse(folder_call["url"]).path.endswith("/files/folder-1")
+    assert parse_qs(urlparse(folder_call["url"]).query)["supportsAllDrives"] == ["true"]
     params = parse_qs(urlparse(list_call["url"]).query)
     assert params["q"] == ["'folder-1' in parents and trashed = false"]
     assert params["pageSize"] == ["100"]
+    assert params["supportsAllDrives"] == ["true"]
+    assert params["includeItemsFromAllDrives"] == ["true"]
     export_params = parse_qs(urlparse(export_call["url"]).query)
     assert urlparse(export_call["url"]).path.endswith("/files/doc-1/export")
     assert export_params["mimeType"] == ["text/plain"]

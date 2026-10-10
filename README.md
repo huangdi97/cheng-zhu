@@ -150,8 +150,9 @@ Conversation Home
 - Google Calendar provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1` + opaque env credential ref；native sync token / immutable snapshots / explicit Next Session import 已实现；历史 revision 仅审计、上游改期/取消显式显示 drift；没有真实 Google account/runtime replay 前不得宣称已连接；
 - Google Drive / Docs provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1` + opaque env credential ref；显式 folder full refresh、immutable DOCUMENT snapshots、content availability / partial-content truth 已实现；没有真实 Google account/runtime replay 前不得宣称已连接；
 - Gmail send-only provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 scope = `openid + email + gmail.send`，只支持 reviewed `FOLLOWUP_EMAIL_DRAFT → email.send`，不读 inbox、不实现 `mail.read`；`gmail.send` 属 Google Sensitive scope，公共/稳定 provider 仍需适用的 OAuth consent / app verification；没有真实 Google account/runtime replay 前不得宣称邮件已发出；
-- Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
-- external Task / Decision Log provider execution 仍无真实 provider；当前真实 write adapter 为 GitHub `issue.create` 与 Gmail `email.send`（均要求第二次显式 Execute；Gmail 仍待真实账号证据）；
+- Microsoft To Do provider：真实 `task.create` adapter code 已存在，默认关闭；需 `CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 delegated permission = `Tasks.ReadWrite`，只支持 reviewed `CREATE_TASK_DRAFT → task.create`，不读 Outlook Mail / Calendar / OneDrive、不做 To Do background sync；没有真实 Microsoft account/runtime replay 前不得宣称已连接或已创建真实 Task；
+- MCP provider 仍未配置真实 adapter/auth/account runtime；
+- external Decision Log provider execution 仍无真实 provider；当前真实 write adapter code 为 GitHub `issue.create`、Gmail `email.send` 与 Microsoft To Do `task.create`，均要求第二次显式 Execute；各 provider 的真实账号结果仍需独立 runtime evidence；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 
@@ -166,6 +167,7 @@ Conversation Home
 - [Google Calendar Conversation Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md)
 - [Google Drive Conversation Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
 - [Google Mail Conversation Connector](docs/architecture/GOOGLE_MAIL_CONVERSATION_CONNECTOR.md)
+- [Microsoft To Do Conversation Connector](docs/architecture/MICROSOFT_TODO_CONVERSATION_CONNECTOR.md)
 - [v2 Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)
 
 ### 当前 Live 层级

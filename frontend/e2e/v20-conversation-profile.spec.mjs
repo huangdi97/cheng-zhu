@@ -2255,6 +2255,173 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('Microsoft To Do turns an approved Task Draft into a reviewed second-step task.create', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let requestBody = null
+    let executeCalls = 0
+    let execution = null
+
+    const taskItem = {
+      ...DECISION,
+      id: 'ci-task-ms',
+      type: 'Commitment',
+      state: 'COMMITTED',
+      title: 'Publish rollout plan',
+      owner_id: 'me',
+      review_status: 'USER_CONFIRMED',
+    }
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'MICROSOFT_GRAPH',
+            label: 'Microsoft To Do',
+            capabilities: ['task.create'],
+            read_capabilities: [],
+            write_capabilities: ['task.create'],
+            external_kinds: [],
+            provider_scopes: { 'task.create': 'Tasks.ReadWrite' },
+            identity_scopes: [],
+            sync: 'WRITE_ONLY_NO_SYNC',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:microsoft-graph:env:<ENV_VAR>',
+              write_target: 'default or explicit Microsoft To Do task-list id',
+              secret_storage: 'PROCESS_ENV_ONLY',
+              read_support: 'NONE',
+              delegated_permission: 'Tasks.ReadWrite',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') {
+          return { items: connection ? [connection] : [] }
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-ms-todo',
+            provider_id: 'MICROSOFT_GRAPH',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: ['task.create'],
+            provider_scopes: ['Tasks.ReadWrite'],
+            account_hint: '',
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-ms-todo/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', account_hint: 'Microsoft To Do', updated_at: 2 }
+          return connection
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/continue`) {
+          const current = await base(pathname, method, request)
+          return { ...current, commitments: [taskItem] }
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          requestBody = request.postDataJSON()
+          execution = {
+            id: 'cce-ms-todo',
+            draft_action_id: 'cda-derived',
+            connection_id: 'ccn-ms-todo',
+            capability: 'task.create',
+            operation: 'CREATE_TASK',
+            target: requestBody.target,
+            idempotency_key: 'mstodoabcdef1234',
+            status: 'PENDING',
+            request: {
+              title: 'Architecture Review · Task Draft',
+              content: '- draft item',
+              payload: { execution: 'LOCAL_REVIEW_ONLY' },
+              outbound_redaction_applied: false,
+            },
+            response: {},
+            error: '',
+            created_at: 5,
+            updated_at: 5,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-ms-todo/execute' && method === 'POST') {
+          executeCalls += 1
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: {
+              provider_id: 'MICROSOFT_GRAPH',
+              task_id: 'task-123',
+              task_list_id: 'AQMk-default-list',
+              task_list_name: 'Tasks',
+              target: 'default',
+              provider_idempotency: 'NONE',
+            },
+            updated_at: 6,
+            executed_at: 6,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('microsoft-todo-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/reviewed task-create/)).toBeVisible()
+    await expect(setup.getByText(/delegated permission · Tasks\.ReadWrite/)).toBeVisible()
+    await expect(setup.getByText(/不读 Outlook Mail \/ Calendar \/ OneDrive/)).toBeVisible()
+    await page.getByLabel('Microsoft To Do token 环境变量名').fill('MY_MS_GRAPH_TOKEN')
+    await page.getByRole('button', { name: '创建 Microsoft To Do 连接元数据' }).click()
+
+    expect(createBody.provider_id).toBe('MICROSOFT_GRAPH')
+    expect(createBody.granted_capabilities).toEqual(['task.create'])
+    expect(createBody.credential_ref).toBe('provider:microsoft-graph:env:MY_MS_GRAPH_TOKEN')
+    expect(JSON.stringify(createBody)).not.toContain('Mail.Send')
+    expect(JSON.stringify(createBody)).not.toContain('Calendars.Read')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Microsoft To Do list probe 已通过/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sync read-only snapshot' })).toHaveCount(0)
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Task Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption('ccn-ms-todo')
+
+    const target = page.getByLabel('Microsoft To Do 目标列表')
+    await expect(target).toBeVisible()
+    await expect(target).toHaveValue('')
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+
+    expect(requestBody).toEqual({ connection_id: 'ccn-ms-todo', target: 'default' })
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    expect(executeCalls).toBe(0)
+
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/task-123/)).toBeVisible()
+    await expect(page.getByText(/task_list_name/)).toBeVisible()
+    expect(executeCalls).toBe(1)
+  })
+
+
   test('approved draft requires Execution Request then a second explicit Execute before SUCCEEDED', async ({ context, page }) => {
     const base = mocks()
     const connection = {

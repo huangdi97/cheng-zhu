@@ -947,14 +947,18 @@ def reconcile_unknown_outcome(
         }
         if outcome == "CONFIRMED_SUCCEEDED":
             status = "SUCCEEDED"
-            response = {**previous, "ok": True, "reconciliation": audit}
+            # Do not synthesize provider `ok=true`: this success was established
+            # by an explicit user-reported provider-side check, not by the
+            # original adapter response. The real execution timestamp is
+            # unknown, so executed_at deliberately remains unset.
+            response = {**previous, "reconciliation": audit}
             error = ""
-            executed_at = store.now()
+            executed_at = None
         else:
             status = "FAILED"
             # A provider-side check explicitly confirmed no side effect. This
             # is the only reconciliation path that can make a retry safe.
-            response = {**previous, "ok": False, "retry_safe": True, "reconciliation": audit}
+            response = {**previous, "retry_safe": True, "reconciliation": audit}
             error = "Provider-side reconciliation confirmed the side effect was not applied"
             executed_at = None
 

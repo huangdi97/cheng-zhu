@@ -61,7 +61,7 @@ CHENGZHU_GITHUB_CONNECTOR_ENABLE=1
 
 推荐使用 GitHub fine-grained personal access token 或后续 GitHub App credential。
 
-当前 adapter 只支持 env-backed opaque reference：
+当前 adapter 只支持 env-backed opaque reference。GitHub API base 必须是 HTTPS，adapter 不自动跟随 HTTP redirect，避免 Authorization 被带到其他目标：
 
 ```text
 provider:github:env:CHENGZHU_GITHUB_TOKEN
@@ -101,7 +101,7 @@ issue.create
 → GitHub repository permission: Issues = Write
 ```
 
-连接时 granted capability 必须与 provider scope contract 一致。
+连接时 granted capability 必须与 provider scope contract 一致。GitHub fine-grained permission 是单一等级：只读记录为 `Issues: read`；只要包含 `issue.create`，最小 provider permission 记录为 `Issues: write`，它覆盖 issue read。
 
 ---
 
@@ -123,6 +123,14 @@ resolve env credential reference
 → CONNECTED
 ```
 
+这里的 `CONNECTED` 只证明：
+
+- opaque credential 可以解析；
+- GitHub 身份认证成功；
+- adapter/account health 成功。
+
+它**不声称**某个具体 `owner/repo` 的 Issues read/write 已经被无副作用验证。目标仓库的 read 能力由真实 Sync 请求证明；write 能力只有第二次显式 Execute 的真实 provider 响应才能证明。
+
 不会保存 token。
 
 ---
@@ -140,6 +148,8 @@ owner/repo
 ```text
 GET /repos/{owner}/{repo}/issues
 ```
+
+如果某个目标仓库返回 403/404/422 等 target-specific client rejection，只记录该目标失败；已经通过 `/user` 的账号连接不会因此被整体降成 ERROR。401 / transport / provider-level failure 仍按账号或 provider 错误处理。
 
 规则：
 

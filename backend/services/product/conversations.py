@@ -1560,6 +1560,7 @@ def freeze_pack(
     session_id: str,
     *,
     share_privacy_runtime: Optional[dict[str, Any]] = None,
+    connector_runtime: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     session = require_session(session_id)
     space = require_space(session["space_id"])
@@ -1619,8 +1620,12 @@ def freeze_pack(
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
         "screen_runtime": conversation_screen.vision_runtime_status(session),
-        "connector_runtime": conversation_integrations.resolve_session_permissions(
-            list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
+        "connector_runtime": (
+            dict(connector_runtime)
+            if isinstance(connector_runtime, dict)
+            else conversation_integrations.resolve_session_permissions(
+                list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
+            )
         ),
         "share_privacy_runtime": (
             dict(share_privacy_runtime)
@@ -1670,7 +1675,11 @@ def start_session(
         raise ValueError(
             "PRIVATE_OVERLAY 需要桌面端在开始前确认 Electron content protection 已启用；当前 runtime proof 缺失或无效。"
         )
-    pack = freeze_pack(session_id, share_privacy_runtime=share_runtime)
+    pack = freeze_pack(
+        session_id,
+        share_privacy_runtime=share_runtime,
+        connector_runtime=check["connector_runtime"],
+    )
     ts = store.now()
     state = dict(session.get("state") or {})
     frozen_brief = ((pack.get("payload") or {}).get("session_brief") or {})

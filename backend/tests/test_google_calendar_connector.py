@@ -9,6 +9,8 @@ from services.product.google_calendar_connector import (
     GoogleCalendarProviderError,
     GoogleCalendarRestAdapter,
     GoogleCalendarTargetError,
+    _decode_cursor,
+    _encode_cursor,
     register_google_calendar_adapter_from_env,
 )
 
@@ -176,7 +178,7 @@ def test_google_calendar_incremental_sync_uses_token_without_time_filter(monkeyp
         connection=_connection(),
         capability="calendar.read",
         query={"calendar_id": "primary"},
-        cursor="sync-token-1",
+        cursor=_encode_cursor("primary", "sync-token-1"),
         limit=500,
     )
     assert result["next_cursor"] == "sync-token-2"
@@ -199,7 +201,7 @@ def test_google_calendar_410_requests_full_sync_reset(monkeypatch):
         connection=_connection(),
         capability="calendar.read",
         query={"calendar_id": "primary"},
-        cursor="expired-token",
+        cursor=_encode_cursor("primary", "expired-token"),
         limit=500,
     )
     assert result["items"] == []
@@ -286,7 +288,8 @@ def test_calendar_integration_boundary_resets_expired_token_and_keeps_provenance
         query={"calendar_id": "primary"},
     )
     assert first["snapshots"][0]["external_id"] == "primary:evt-1"
-    assert first["connection"]["sync_cursors"]["calendar.read"] == "token-1"
+    first_cursor = _decode_cursor(first["connection"]["sync_cursors"]["calendar.read"])
+    assert first_cursor == {"calendar_id": "primary", "sync_token": "token-1"}
 
     # Second Sync: health probe + expired incremental token + one full reset.
     transport.queue(200, {"items": []})
@@ -298,7 +301,8 @@ def test_calendar_integration_boundary_resets_expired_token_and_keeps_provenance
         capabilities=["calendar.read"],
         query={"calendar_id": "primary"},
     )
-    assert second["connection"]["sync_cursors"]["calendar.read"] == "token-2"
+    second_cursor = _decode_cursor(second["connection"]["sync_cursors"]["calendar.read"])
+    assert second_cursor == {"calendar_id": "primary", "sync_token": "token-2"}
     assert second["snapshots"][0]["external_id"] == "primary:evt-2"
 
     historical = conversation_integrations.list_snapshots(space["id"], connection_id=connection["id"])
@@ -477,3 +481,28 @@ def test_calendar_snapshot_import_rejects_cancelled_past_cross_space_and_non_goo
     store.update("conversation_connector_snapshot", fake_calendar_from_github["id"], {"connection_id": github["id"]})
     with pytest.raises(ValueError, match="不是 Google Calendar"):
         conversations.schedule_from_calendar_snapshot(space["id"], fake_calendar_from_github["id"])
+
+
+def test_calendar_cursor_never_crosses_explicit_calendar_targets(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN", "ya29.test_calendar_token")
+    transport = FakeTransport()
+    transport.queue(200, {
+        "items": [_event("shared-1", "Shared Calendar Review")],
+        "nextSyncToken": "shared-token",
+    })
+    adapter = GoogleCalendarRestAdapter(transport=transport)
+
+    result = adapter.read_context(
+        connection=_connection(),
+        capability="calendar.read",
+        query={"calendar_id": "shared@example.test"},
+        cursor=_encode_cursor("primary", "primary-token"),
+        limit=500,
+    )
+    decoded = _decode_cursor(result["next_cursor"])
+    assert decoded == {"calendar_id": "shared@example.test", "sync_token": "shared-token"}
+
+    params = parse_qs(urlparse(transport.calls[0]["url"]).query)
+    assert "syncToken" not in params
+    assert "timeMin" in params
+    assert urlparse(transport.calls[0]["url"]).path.endswith("/calendars/shared%40example.test/events")

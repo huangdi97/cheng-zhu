@@ -129,7 +129,13 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
   const [integrationBusy, setIntegrationBusy] = useState(false)
+  const [githubEnvVar, setGithubEnvVar] = useState('CHENGZHU_GITHUB_TOKEN')
+  const [githubRepository, setGithubRepository] = useState('')
+  const [githubReadEnabled, setGithubReadEnabled] = useState(true)
+  const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
+  const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
   const [executionConnectionId, setExecutionConnectionId] = useState('')
+  const [executionTarget, setExecutionTarget] = useState('')
   const [execution, setExecution] = useState<ConversationExternalExecution | null>(null)
   const [lifecycleMessage, setLifecycleMessage] = useState('')
 
@@ -157,12 +163,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   if (detail.loading) return <Page><Loading /></Page>
   if (detail.error || !detail.data) return <Page><ErrorState message={detail.error ?? '对话空间不存在'} onRetry={detail.reload} /></Page>
   const space = detail.data
+  const githubProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GITHUB')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
       && connection.adapter_available
       && connection.granted_capabilities.includes(draftCapability),
   )
+  const selectedExecutionConnection = compatibleExecutionConnections.find((connection) => connection.id === executionConnectionId)
+  const executionNeedsRepository = selectedExecutionConnection?.provider_id === 'GITHUB' && draftCapability === 'issue.create'
   const executionRetrySafe = execution?.status === 'FAILED'
     && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
   const executionReconciliation = (execution?.response as {
@@ -358,10 +367,54 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSourceSaving(false) }
   }
 
-  const syncConnector = async (connectionId: string) => {
+  const createGitHubConnection = async () => {
+    const envName = githubEnvVar.trim()
+    const repository = githubRepository.trim()
+    const capabilities = [
+      ...(githubReadEnabled ? ['project.read'] : []),
+      ...(githubWriteEnabled ? ['issue.create'] : []),
+    ]
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('GitHub credential env 只允许环境变量名，例如 CHENGZHU_GITHUB_TOKEN。')
+      return
+    }
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+      setSessionError('GitHub repository 必须使用 owner/repo。')
+      return
+    }
+    if (!capabilities.length) {
+      setSessionError('GitHub connection 至少选择 project.read 或 issue.create。')
+      return
+    }
     setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
-      const result = await conversationApi.syncIntegrationConnection(connectionId, { space_id: spaceId })
+      const created = await conversationApi.createIntegrationConnection({
+        provider_id: 'GITHUB',
+        display_name: `GitHub · ${repository}`,
+        granted_capabilities: capabilities,
+        credential_ref: `provider:github:env:${envName}`,
+      })
+      setConnectorTargets((current) => ({ ...current, [created.id]: repository }))
+      await integrationConnections.reload()
+      setLifecycleMessage('GitHub connection 元数据已创建。下一步点击“验证连接”；token 本身没有进入 product.db 或前端。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const syncConnector = async (connectionId: string) => {
+    const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
+    const repository = (connectorTargets[connectionId] || githubRepository).trim()
+    if (connection?.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+      setSessionError('GitHub Sync 需要明确填写 owner/repo；不会从其他 Space 或历史连接猜测目标。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.syncIntegrationConnection(connectionId, {
+        space_id: spaceId,
+        capabilities: connection?.provider_id === 'GITHUB' ? ['project.read'] : undefined,
+        query: connection?.provider_id === 'GITHUB' ? { repository } : undefined,
+      })
       setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
       await connectorSnapshots.reload(); await integrationConnections.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
@@ -432,7 +485,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try {
       const nextDraft = await conversationApi.followupDraft(targetSessionId)
-      setDraft(nextDraft); setExecution(null); setExecutionConnectionId('')
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId(''); setExecutionTarget(''); setExecutionTarget('')
     }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -442,7 +495,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try {
       const nextDraft = await conversationApi.derivedDraft(targetSessionId, kind)
-      setDraft(nextDraft); setExecution(null); setExecutionConnectionId('')
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId(''); setExecutionTarget(''); setExecutionTarget('')
     }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -453,7 +506,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     setSessionBusy(true); setSessionError('')
     try {
       setDraft(await conversationApi.reviewDraftAction(draft.id, action))
-      setExecution(null); setExecutionConnectionId('')
+      setExecution(null); setExecutionConnectionId(''); setExecutionTarget('')
     }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -461,9 +514,14 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
 
   const requestExecution = async () => {
     if (!draft || draft.status !== 'APPROVED' || !executionConnectionId) return
+    const target = executionTarget.trim() || draft.target || ''
+    if (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(target)) {
+      setSessionError('GitHub Issue 写回必须明确指定 owner/repo target。')
+      return
+    }
     setIntegrationBusy(true); setSessionError('')
     try {
-      setExecution(await conversationApi.requestExternalExecution(draft.id, executionConnectionId, draft.target || ''))
+      setExecution(await conversationApi.requestExternalExecution(draft.id, executionConnectionId, target))
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -676,6 +734,27 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(integrationCatalog.data?.items ?? []).map((provider) => <StatusBadge key={provider.provider_id} tone={provider.adapter_available ? 'ok' : 'muted'}>{provider.label} · {provider.adapter_available ? 'adapter ready' : 'not configured'}</StatusBadge>)}
                 </div>
+                {githubProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="github-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">GitHub · first real provider</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {githubProvider.setup.runtime_opt_in_env || 'CHENGZHU_GITHUB_CONNECTOR_ENABLE=1'} 与一个 fine-grained PAT 环境变量；这里永远不输入 token 本身。</p>
+                    </div>
+                    <StatusBadge tone={githubProvider.adapter_available ? 'ok' : 'muted'}>{githubProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <input aria-label="GitHub token 环境变量名" className={inputCls} value={githubEnvVar} onChange={(e) => setGithubEnvVar(e.target.value)} placeholder="CHENGZHU_GITHUB_TOKEN" />
+                    <input aria-label="GitHub 默认仓库" className={inputCls} value={githubRepository} onChange={(e) => setGithubRepository(e.target.value)} placeholder="owner/repo" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-text-secondary">
+                    <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={githubReadEnabled} onChange={(e) => setGithubReadEnabled(e.target.checked)} /> Issues read → project.read</label>
+                    <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={githubWriteEnabled} onChange={(e) => setGithubWriteEnabled(e.target.checked)} /> Issues write → issue.create</label>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !githubProvider.adapter_available} onClick={createGitHubConnection}>创建 GitHub 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">credential ref = provider:github:env:{githubEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -684,9 +763,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                         <StatusBadge tone={connection.status === 'CONNECTED' && connection.adapter_available ? 'ok' : connection.status === 'ERROR' ? 'warn' : 'muted'}>{connection.status}</StatusBadge>
                       </div>
                       <div className="mt-1 text-[10px] text-text-muted">{connection.granted_capabilities.join(' · ') || 'no grants'} · credential {connection.credential_ref_present ? 'opaque ref present' : 'not configured'}</div>
+                      {connection.provider_id === 'GITHUB' ? <div className="mt-2">
+                        <input aria-label={`GitHub Sync 仓库 ${connection.display_name}`} className={inputCls} value={connectorTargets[connection.id] ?? githubRepository} onChange={(e) => setConnectorTargets((current) => ({ ...current, [connection.id]: e.target.value }))} placeholder="owner/repo · 每次 Sync 都显式指定" />
+                      </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>
@@ -844,11 +926,12 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 <div className="text-xs font-semibold text-text-secondary">External Execution · 第二次显式动作</div>
                 <p className="mt-1 text-[11px] text-text-muted">APPROVED 只代表本地草稿已审核。下面先创建 Execution Request；只有随后再次点击执行且 provider 返回成功，才可显示 SUCCEEDED。</p>
                 {compatibleExecutionConnections.length ? <>
-                  <select className={inputCls + ' mt-2'} aria-label="外部执行连接" value={executionConnectionId} onChange={(e) => { setExecutionConnectionId(e.target.value); setExecution(null) }}>
+                  <select className={inputCls + ' mt-2'} aria-label="外部执行连接" value={executionConnectionId} onChange={(e) => { setExecutionConnectionId(e.target.value); setExecutionTarget(''); setExecution(null) }}>
                     <option value="">选择兼容的真实连接</option>
                     {compatibleExecutionConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.display_name} · {connection.provider_id} · {connection.account_hint || connection.id.slice(0, 8)}</option>)}
                   </select>
-                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                  {executionNeedsRepository ? <input aria-label="GitHub Issue 目标仓库" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="owner/repo · 第二次显式动作的目标" /> : null}
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim()))} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
                     {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}

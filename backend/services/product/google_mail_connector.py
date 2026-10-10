@@ -231,19 +231,31 @@ class GoogleMailSendAdapter:
         subject = str(payload.get("title") or "").strip()
         if not subject or any(ch in subject for ch in "\r\n\x00"):
             return {"ok": False, "error": "邮件主题不能为空或包含换行", "retry_safe": False}
+        if len(subject) > 998:
+            return {
+                "ok": False,
+                "error": "邮件主题过长；不会静默截断已审核 Subject，请修改 Draft 后重新审核",
+                "retry_safe": False,
+            }
         content = str(payload.get("content") or "")
         if not content.strip():
             return {"ok": False, "error": "邮件正文不能为空", "retry_safe": False}
+        if len(content) > 20_000:
+            return {
+                "ok": False,
+                "error": "邮件正文超过 20000 字符；不会静默截断已审核内容，请缩短 Draft 后重新审核",
+                "retry_safe": False,
+            }
 
         message = EmailMessage(policy=SMTP)
         message["From"] = sender
         message["To"] = recipient
-        message["Subject"] = subject[:998]
+        message["Subject"] = subject
         # Audit marker is intentionally not an idempotency claim. Gmail's
         # messages.send endpoint does not expose a provider-side idempotency
         # key, so ambiguous outcomes remain UNKNOWN_OUTCOME in the shared layer.
         message["X-Chengzhu-Execution-ID"] = str(idempotency_key or "")[:128]
-        message.set_content(content[:20_000], subtype="plain", charset="utf-8")
+        message.set_content(content, subtype="plain", charset="utf-8")
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
         body = json.dumps({"raw": raw}, separators=(",", ":")).encode("utf-8")
         headers = self._headers(self._resolve_token(connection))

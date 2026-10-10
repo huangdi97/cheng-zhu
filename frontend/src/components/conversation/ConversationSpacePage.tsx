@@ -935,6 +935,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     <span className="text-[10px] text-text-muted">scopes · openid · email · gmail.send · credential ref = provider:google-mail:env:{googleMailEnvVar || '<ENV_VAR>'}</span>
                   </div>
                   <p className="mt-2 text-[10px] text-text-muted">Verify 仅通过 Google UserInfo 确认账号 identity，不读取邮箱；真正 email.send 能力只有在 APPROVED Follow-up Draft 的第二次显式 Execute 返回 Gmail ok=true 后才成立。</p>
+                  <p className="mt-1 text-[10px] text-status-inferred">Public release gate · gmail.send 属于 Google Sensitive scope。当前 adapter 工程可用 ≠ 公共 OAuth 已获验证；面向公众稳定发布前仍需完成 Google OAuth consent / app verification。不会为了绕过验证扩大到 mailbox read。</p>
                 </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (

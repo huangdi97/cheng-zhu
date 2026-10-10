@@ -136,7 +136,7 @@ def test_connector_secret_values_are_redacted_even_when_hidden_in_safe_looking_f
     with pytest.raises(ValueError, match="opaque reference"):
         conversation_integrations.create_connection(
             "GOOGLE_MAIL",
-            granted_capabilities=["mail.read"],
+            granted_capabilities=["email.send"],
             credential_ref="provider:google/ya29.this-is-a-real-looking-secret-value",
         )
 
@@ -272,20 +272,28 @@ def test_provider_health_and_sync_errors_are_redacted_before_api_and_storage(pro
 def test_provider_scopes_are_derived_and_exact_least_privilege(product_env):
     google = conversation_integrations.create_connection(
         "GOOGLE_MAIL",
-        granted_capabilities=["mail.read", "email.send"],
-        credential_ref="provider:google/work",
+        granted_capabilities=["email.send"],
+        credential_ref="provider:google-mail:env:GMAIL_TOKEN",
     )
     assert google["provider_scopes"] == [
-        "https://www.googleapis.com/auth/gmail.readonly",
+        "email",
         "https://www.googleapis.com/auth/gmail.send",
+        "openid",
     ]
+
+    with pytest.raises(ValueError, match="provider 不支持 capability"):
+        conversation_integrations.create_connection(
+            "GOOGLE_MAIL",
+            granted_capabilities=["mail.read"],
+            credential_ref="provider:google-mail:env:GMAIL_TOKEN",
+        )
 
     with pytest.raises(ValueError, match="最小权限集合"):
         conversation_integrations.create_connection(
             "GOOGLE_MAIL",
-            granted_capabilities=["mail.read"],
+            granted_capabilities=["email.send"],
             provider_scopes=["https://mail.google.com/"],
-            credential_ref="provider:google/broad",
+            credential_ref="provider:google-mail:env:GMAIL_TOKEN",
         )
 
     mcp = conversation_integrations.create_connection(

@@ -16,6 +16,8 @@ Goal → Next Focus → Prepare → Practice → Preflight → Live → Reflecti
 
 v2 方向已经正式收敛为 **Personal Conversation Intelligence**：一个 Core 下保留 Interview Profile，并新增 Conversation Profile。Project Sync / Design Review 是首发验证楔子，Presentation / Q&A、1:1、Client Call、Negotiation 作为共享 runtime 的 Profile Template；它们不会变成六个一级导航。v2 的核心差异不是“会议纪要”或“有一张实时提示卡”，而是 **Contribution Opportunity + Provenance-aware Continuity + Stakeholder-aware Expression + Silence / Interruption Control**。Conversation Beta 已从源码 runtime 推进到公开 packaged prerelease；`v2.0.0-beta.2` 已于 2026-10-09 发布为 GitHub Prerelease，tag/source SHA 为 `cac605edf413ec248babf02ea9f73da708d156f8`。它表示可安装、可审计、可回滚的公开测试通道，不等于 stable v2，也不等于真实用户价值已验证。 六个模板也已经不只是 label/default mode 不同：它们具有各自的 frozen Profile Playbook，并贯穿 Template Picker → Prepare → Pack → Live → Continue；但这仍不等于 profile-specific real-user validation。
 
+> **Source / package truth**：当前 `main` 已前进到 pure-repo closure baseline `383978fa480aac35d214dce3fa4e9fa5ebb17118`（CI run `37901753321` = PASS），因此**当前源码能力多于公开 beta.2 安装包**。beta.2 只代表 tag `cac605ed...` 当时的 packaged 能力；其后的 connector capability registry、stable promotion evaluator、privacy-safe local Conversation reminders 等属于 post-beta.2 main，不能反向写成“beta.2 已包含”。
+
 > v1.4 已完成 **Product Validation Hardening** 的工程闭环：Goal 复用、Reflection→Next Focus、Fast Cue 有效性、Practice transfer、Fact Inbox burden、Quick Notes / Pin Moment 价值都进入 local-first 可验证链路；7-day / 30-session / 100-session synthetic continuity 与 packaged release gate 已落地。自动化和 synthetic dogfood 仍然只是工程证据，`REAL_USER_EVIDENCE_PENDING` 不变。
 
 这是 `huangdi97` 维护和发布的独立项目。产品路线、默认配置、界面文案和后续版本均以成竹为准；项目来源与许可边界见 [NOTICE.md](NOTICE.md)。
@@ -122,7 +124,7 @@ Conversation Home
 - Participant consent status + transparency plan（均为用户报告，不声称系统自动通知）；
 - Session Pack 冻结来源、Quick Notes、confirmed items、Goals、participants、我的表达、policy 与 resolved processing data path；
 - Conversation-owned TRANSCRIPT capture；
-- opt-in 本地桌面提醒：只读取成竹内已排期 Session，默认提前 10 分钟，通知不显示会话标题，不等于 Calendar connector；
+
 - grounded global Decision / Commitment / Open Question search + Ctrl+K entry；
 - categorized current Session / Space local export；
 - schema v6 temporal provenance：original text / normalized datetime / timezone / ambiguity；
@@ -131,13 +133,19 @@ Conversation Home
 - retention / export / deletion provenance；
 - reviewed local DraftActions。
 
+**post-beta.2 current main 新增（尚未回溯进入 beta.2 安装包）**：
+- fail-closed Connector Capability Registry 与 frozen connector grants contract；
+- stable promotion evidence evaluator / policy / real-pilot manifest template；
+- opt-in 本地桌面提醒：只读取成竹内已排期 Session，默认提前 10 分钟，通知不显示会话标题，不等于 Calendar connector。
+
 当前能力边界：
 - Conversation MANUAL + explicit-start AUTO Screen Context 已实现；AUTO 不随 Session 静默启动，并要求用户报告 consent/allowance + transparency plan；
 - Conversation `PRIVATE_OVERLAY` 已有桌面 runtime：Start 时验证 Electron content protection，Live 可见，End 恢复会话前默认；Web fallback fail-closed；best-effort only，不承诺“不可检测”；
 - Conversation Human Coach 已有真实 runtime：仅在 frozen policy = `HUMAN_ALLOWED` 且记录 transparency plan 时允许；Live 中显式生成一次性、session-scoped 教练链接，逐项授权 transcript / AI Guidance / frozen Session Context；helper 不读取 Interview Resume/JD；建议标记为 `HUMAN_COACH` 且 `is_evidence=false`，Session 结束/删除自动 revoke；runtime 可用且已进入 beta.2 public prerelease，仍不等于 stable v2 或真实用户验证；
 - beta.2 public prerelease 已包含 frozen Profile Playbooks、auditable Expression Plan、explicit-start AUTO Screen Context、verified desktop Share Privacy 与 Conversation Human Coach；release tag 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`，且 Stable Latest 仍为 v1.4.2；
-- Calendar / Docs / Mail / project tracker connector runtime；
-- actual external email/task/issue write-back；
+- Connector Capability Registry 已存在，但 Calendar / Docs / Mail / project tracker **真实 provider/auth/read runtime 仍未接线**；
+- actual external email/task/issue/decision-log write-back execution；
+- post-beta.2 main 尚未发布新的 Conversation prerelease 安装包；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 

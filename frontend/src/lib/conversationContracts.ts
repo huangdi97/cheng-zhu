@@ -411,6 +411,7 @@ export interface ConversationConnectorConnection {
   provider_scopes: string[]
   account_hint: string
   sync_cursor: string
+  sync_cursors: Record<string, string>
   last_sync_at: number | null
   last_error: string
   created_at: number

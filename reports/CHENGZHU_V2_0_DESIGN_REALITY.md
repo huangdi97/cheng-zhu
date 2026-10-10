@@ -1,6 +1,6 @@
 # Chengzhu v2.0-R1 — Design / Runtime Reality Report
 
-> **Updated:** 2026-10-09
+> **Updated:** 2026-10-10
 >
 > **Status:** DESIGN_COMPLETE / CONTRACT_COMPLETE / CONVERSATION_BETA_RUNTIME_AVAILABLE / BETA_2_PRERELEASE_PUBLISHED
 >
@@ -25,11 +25,17 @@ merged PR #18
 design/runtime closure:
 merged PR #19
 
-post-merge object semantics:
-main through f91f6dfe63a8d51c7355001bf7d9c805e150ddf6
+current pure-repo closure baseline:
+main @ 383978fa480aac35d214dce3fa4e9fa5ebb17118
 
-final pure-repo design audit:
-feat/chengzhu-v2-final-design-audit
+current baseline CI:
+GitHub Actions run 37901753321 = PASS
+
+public beta line:
+v2.0.0-beta.2 @ cac605edf413ec248babf02ea9f73da708d156f8
+
+post-beta.2 main additions:
+connector capability registry + stable promotion evidence gate + privacy-safe local Conversation reminders
 ```
 
 The authoritative current sources are:
@@ -103,9 +109,9 @@ Current capability / fail-closed boundaries:
 
 These are external or separately governed runtime gates, not features to fake with placeholders.
 
-## 4. Final pure-repo closure added after PR #19
+## 4. Final pure-repo closure now present on main
 
-The final audit closes canonical items that were still implementable without external dependencies:
+The final audit closes canonical items that were still implementable without external dependencies, Windows new stable-release evidence, or real users:
 
 - global grounded Conversation Item search;
 - Ctrl+K find Decision / Commitment / Open Question;
@@ -116,6 +122,10 @@ The final audit closes canonical items that were still implementable without ext
 - subsystem-level Conversation Diagnostics with user-facing 可用 / 受限 / 需要处理 states;
 - Manual + explicit-start AUTO Screen Context with session-scoped observation truth, frozen vision fingerprint, retention/export integration and no raw screenshot persistence;
 - desktop Conversation Share Privacy with verify-at-start runtime proof and baseline restoration;
+- session-scoped Conversation Human Coach with policy/transparency gates and non-evidence boundary;
+- fail-closed connector capability registry with frozen grants;
+- machine-readable stable promotion evidence evaluator;
+- opt-in privacy-safe local reminders for Chengzhu-internal scheduled Sessions;
 - stale public-truth documents aligned with current runtime.
 
 ## 5. What may be claimed after final audit CI is green
@@ -128,6 +138,9 @@ V2_BETA_PRERELEASE_PUBLISHED = TRUE
 BETA_TAG = v2.0.0-beta.2
 BETA_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
 PURE_REPO_DESIGN_RUNTIME_GAPS = CLOSED
+CURRENT_MAIN_CLOSURE_HEAD = 383978fa480aac35d214dce3fa4e9fa5ebb17118
+CURRENT_MAIN_CI_RUN = 37901753321
+CURRENT_MAIN_CI_GATE = PASS
 INTERVIEW_STABLE_RELEASE_BASELINE = v1.4.2
 ```
 
@@ -141,7 +154,7 @@ PMF_PROVEN = TRUE
 ALL_EXTERNAL_CONNECTORS_AVAILABLE = TRUE
 ```
 
-A stable v2 productized release still requires its own Windows packaged runtime evidence, clean-install replay, release artifacts/hashes/download-back/provenance and no critical runtime blocker.
+A stable v2 productized release still requires the independent stable-review path: real pilot + human-label gate first, then current Windows packaged evidence, clean-install replay, artifacts/hashes/download-back/provenance, public-truth review and no critical runtime blocker. beta.2 engineering evidence alone cannot promote stable.
 
 Real-user validation still requires real Project Sync / Design Review sessions and human-labeled evaluation for Recall Precision, Opportunity Precision, Interruption Regret, Useful Silence, cross-session value and cognitive load.
 
@@ -149,4 +162,6 @@ Real-user validation still requires real Project Sync / Design Review sessions a
 
 Repository state is authoritative over historical planning prose.
 
-When a future agent continues this project, it must first verify current `main`, canonical closure matrix, latest CI and release evidence. It must not infer that a Stage is unfinished merely because the historical from-zero implementation goal still describes that Stage.
+When a future agent continues this project, it must first verify current `main`, canonical closure matrix, latest CI, beta/stable release channels and product-evidence gates. Historical PRs and implementation branches are provenance only; they must not be treated as the current work queue.
+
+At the 2026-10-10 truth-sync baseline, the next legitimate maturity work is **external provider integration or real-user evidence**, not another synthetic declaration that Conversation design/runtime is incomplete.

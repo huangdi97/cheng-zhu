@@ -220,6 +220,56 @@ def test_github_auth_failure_during_sync_marks_connection_error(product_env, mon
     assert after["status"] == "ERROR"
 
 
+
+
+def test_github_issue_pagination_keeps_constant_page_size_when_pull_requests_are_filtered(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GITHUB_TOKEN", "github_pat_test_only_secret")
+    transport = FakeTransport()
+    first_page = [
+        {
+            "number": i,
+            "node_id": f"PR_{i}",
+            "title": f"PR {i}",
+            "body": "",
+            "state": "open",
+            "pull_request": {"url": f"https://api.github.com/repos/acme/project/pulls/{i}"},
+            "created_at": "2026-10-10T01:00:00Z",
+            "updated_at": "2026-10-10T02:00:00Z",
+            "html_url": f"https://github.com/acme/project/pull/{i}",
+        }
+        for i in range(1, 101)
+    ]
+    transport.queue(200, first_page)
+    transport.queue(200, [{
+        "number": 101,
+        "node_id": "I_101",
+        "title": "Real issue after many PRs",
+        "body": "must not be skipped",
+        "state": "open",
+        "labels": [],
+        "assignees": [],
+        "created_at": "2026-10-10T03:00:00Z",
+        "updated_at": "2026-10-10T03:00:00Z",
+        "html_url": "https://github.com/acme/project/issues/101",
+    }])
+    adapter = GitHubRestAdapter(transport=transport)
+
+    result = adapter.read_context(
+        connection=_connection(),
+        capability="project.read",
+        query={"repository": "acme/project"},
+        cursor="",
+        limit=1,
+    )
+    assert [item["external_id"] for item in result["items"]] == ["acme/project#101"]
+    first = parse_qs(urlparse(transport.calls[0]["url"]).query)
+    second = parse_qs(urlparse(transport.calls[1]["url"]).query)
+    assert first["per_page"] == ["100"]
+    assert second["per_page"] == ["100"]
+    assert first["page"] == ["1"]
+    assert second["page"] == ["2"]
+
+
 def test_github_issue_create_returns_explicit_provider_success(monkeypatch):
     monkeypatch.setenv("CHENGZHU_GITHUB_TOKEN", "github_pat_test_only_secret")
     transport = FakeTransport()

@@ -296,6 +296,20 @@ def test_provider_scopes_are_derived_and_exact_least_privilege(product_env):
             credential_ref="provider:google-mail:env:GMAIL_TOKEN",
         )
 
+    microsoft = conversation_integrations.create_connection(
+        "MICROSOFT_GRAPH",
+        granted_capabilities=["task.create"],
+        credential_ref="provider:microsoft-graph:env:MS_TOKEN",
+    )
+    assert microsoft["provider_scopes"] == ["Tasks.ReadWrite"]
+
+    with pytest.raises(ValueError, match="provider 不支持 capability"):
+        conversation_integrations.create_connection(
+            "MICROSOFT_GRAPH",
+            granted_capabilities=["mail.read"],
+            credential_ref="provider:microsoft-graph:env:MS_TOKEN",
+        )
+
     mcp = conversation_integrations.create_connection(
         "MCP",
         granted_capabilities=["calendar.read"],

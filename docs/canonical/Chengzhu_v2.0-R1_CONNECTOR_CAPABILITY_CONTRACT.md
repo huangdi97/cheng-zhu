@@ -1,214 +1,525 @@
 # Chengzhu v2 Conversation Connector Capability Contract
-## Post-beta.2 external integration boundary
+## Post-beta.2 Capability Registry + Audited Integration Boundary
 
-**Status**: DESIGN COMPLETE / EXECUTABLE REGISTRY AVAILABLE / NO PROVIDER CLAIMED  
-**Applies to**: Calendar, Docs, Mail, project tracker, external write-back
+**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY CANDIDATE  
+**适用**：Calendar / Docs / Mail / project tracker / MCP / reviewed external write-back  
+**实现 PR**：#61（current-main rebuild；合并前不声明 stable runtime）
 
 ---
 
-## 1. Why this exists
+## 1. 三层真相
 
-beta.2 correctly fails closed when `connector_permissions` is non-empty, but a permanent blanket blocker is not a scalable integration model.
-
-The connector boundary is now:
+连接器必须拆成三层：
 
 ```text
-Session Policy asks for capability
-→ runtime capability registry resolves exact provider
-→ Preflight either grants exact capability or blocks
-→ grant is frozen into Session Pack
-→ read data enters provenance as a source
+Capability Registry
+→ Connected Account
+→ External Execution Result
 ```
 
-No provider registration means no permission grant.
+三层不能互相替代。
 
-This does **not** mean Calendar / Mail / Docs / project-tracker integrations already exist.
+### Capability Registry
+
+回答：
+
+> 当前进程是否注册了一个真实 adapter，可满足 capability X？
+
+默认空 registry / fail-closed。
+
+### Connected Account
+
+回答：
+
+> 哪个用户批准的 provider account，在当前时刻通过了 credential + health + exact capability 校验？
+
+仅 catalog 存在不算 connected。
+
+### External Execution Result
+
+回答：
+
+> 某条已经过本地 review 的 DraftAction，是否经过第二次显式执行，并得到 provider 成功返回？
+
+`APPROVED` 与 `PENDING` 都不等于 external success。
 
 ---
 
-## 2. Capability vocabulary
+## 2. Canonical capability vocabulary
 
-Read-only Session capabilities:
+Session read capabilities：
 
 - `calendar.read`
 - `docs.read`
 - `mail.read`
 - `project.read`
 
-Reviewed execution capabilities:
+Reviewed execution capabilities：
 
 - `email.send`
 - `task.create`
 - `issue.create`
 - `decision_log.write`
 
-Unknown strings are rejected.
+未知 capability 必须拒绝。
 
 ---
 
-## 3. Hard separation: read vs write
+## 3. Read / write 必须分离
 
-Session Policy `connector_permissions` is read-only.
+Session Policy `connector_permissions` 只允许 read capability。
 
-It may never grant:
+若 Session permission 请求 write capability：
 
 ```text
-email.send
-task.create
-issue.create
-decision_log.write
+WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW
 ```
 
-A provider advertising write capabilities is still insufficient. Write execution must use a separate flow:
+写回必须走：
 
 ```text
-Conversation Item / Continue
+Conversation truth
 → DraftAction
-→ explicit user review
-→ explicit target/provider
-→ capability re-check
-→ explicit execute
+→ explicit review
+→ APPROVED
+→ exact provider/account selection
+→ Execution Request
+→ second explicit Execute
 → provider result/failure
-→ immutable audit event
+→ audit
 ```
 
-No “approved draft means external write succeeded”.
-
 ---
 
-## 4. Provider registration truth
+## 4. Provider catalog
 
-A real integration registers:
+内置 catalog 只是 adapter contract metadata，不是连接状态。
 
-- provider_id;
-- exact capabilities;
-- runtime health;
-- optional user-facing account label.
+当前 catalog：
 
-Registry rules:
+| Provider | Capabilities |
+| --- | --- |
+| Google Calendar | calendar.read |
+| Gmail | mail.read / email.send |
+| Google Drive / Docs | docs.read |
+| Microsoft Graph | calendar.read / mail.read / docs.read / project.read / email.send / task.create |
+| GitHub | project.read / issue.create |
+| MCP | server-defined subset of canonical capability vocabulary |
 
-- process-local capability truth;
-- default empty registry;
-- health must be `AVAILABLE` to grant;
-- no token, OAuth secret, refresh token or external message body is stored in the registry;
-- multiple providers may advertise the same capability;
-- deterministic provider resolution is required;
-- provider-specific auth/session state stays in that provider's integration layer.
-
----
-
-## 5. Preflight
-
-For every requested read capability Preflight must expose:
-
-- requested capability;
-- selected provider if available;
-- blocked reason if unavailable;
-- provider health;
-- account label if explicitly safe to display.
-
-Blocked reasons include:
-
-- `UNKNOWN_CAPABILITY`;
-- `NO_AVAILABLE_PROVIDER`;
-- `WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW`.
-
-Any blocked requested capability blocks Session start.
-
-No placeholder provider can satisfy Preflight.
-
----
-
-## 6. Session Pack
-
-The frozen Pack must contain the connector resolution used at start:
-
-- requested permissions;
-- exact grants;
-- provider ids;
-- safe account labels;
-- blocked list (normally empty for a started Session);
-- registry health snapshot.
-
-Changing provider/account/config after start does not silently rewrite the running Session Pack.
-
-A future connector-sourced observation must point back to:
-
-- capability;
-- provider;
-- external object id / immutable version where available;
-- retrieval timestamp;
-- visibility;
-- content hash/version if supported.
-
----
-
-## 7. Read data truth
-
-Connector content is a **source**, not organizational truth.
-
-Examples:
+默认：
 
 ```text
-Calendar event title
-!= confirmed Decision
-
-Mail sentence
-!= confirmed Commitment
-
-Project issue due date
-!= reviewed Chengzhu Deadline
+adapter_available = false
+connected account = 0
 ```
 
-Promotion still follows Conversation review rules.
+---
+
+## 5. Provider scope / least privilege
+
+Catalog provider 的 scope 必须由 granted capability 推导，并保存为最小权限集合。
+
+示例：
+
+```text
+calendar.read → Google calendar.readonly
+mail.read     → Gmail readonly
+email.send    → Gmail send
+
+calendar.read → Microsoft Calendars.Read
+mail.read     → Microsoft Mail.Read
+email.send    → Microsoft Mail.Send
+
+project.read  → GitHub Issues: read
+issue.create  → GitHub Issues: write
+```
+
+对于 catalog provider：
+
+> supplied provider scopes 必须与 capability 推导出的最小集合一致。
+
+MCP 使用：
+
+```text
+server-defined
+```
+
+Chengzhu 不伪造 MCP scope。
 
 ---
 
-## 8. Failure and revocation
+## 6. Credential boundary
 
-If a provider becomes unhealthy or authorization is revoked:
+`product.db` 只能保存 opaque credential reference：
 
-- new Preflight fails closed;
-- running Session keeps its frozen Pack;
-- new remote reads fail explicitly;
-- no cached provider state is silently treated as fresh;
-- external execution is not retried without explicit semantics;
-- diagnostics must show the provider/capability degradation.
+- `keyring:...`
+- `oskeychain:...`
+- `provider:...`
+- `plugin:...`
+
+禁止保存：
+
+- access token；
+- refresh token；
+- API key；
+- cookie；
+- Authorization header；
+- password；
+- private key；
+- client secret。
+
+Public API / export 只显示：
+
+```text
+credential_ref_present = true / false
+```
 
 ---
 
-## 9. Privacy
+## 7. Connection lifecycle
 
-Provider registry must never include:
+```text
+create connection metadata
+→ DISCONNECTED
+→ verify adapter + credential + scope + capability + health
+→ CONNECTED
+→ DISCONNECTED / ERROR / REVOKED
+```
 
-- access tokens;
-- refresh tokens;
-- API keys;
-- message bodies;
-- document bodies;
-- hidden personal identifiers not already intentionally exposed as account labels.
+不提供“UI 直接把 status 改成 CONNECTED”的接口。
 
-Connector raw data retention follows source-specific retention policy and user authorization.
+Revoke：
+
+- 清除 opaque credential reference；
+- 清除 sync cursor；
+- 禁止未来 read/write；
+- 不修改历史 Pack / snapshot / execution audit。
 
 ---
 
-## 10. Current repo truth
+## 8. Preflight
 
-Allowed claim:
+请求 read capability 时，必须同时存在：
+
+```text
+registered adapter
++ CONNECTED account
++ exact capability grant
++ current adapter health
+```
+
+否则 fail-closed。
+
+Preflight 冻结：
+
+- requested capabilities；
+- provider id；
+- connection id；
+- safe account hint；
+- blocked reasons；
+- explicit selected connector snapshot ids。
+
+No placeholder provider.
+
+---
+
+## 9. Immutable external snapshot
+
+外部 read 不是“每次 Live 重新查最新远程状态”。
+
+路径：
+
+```text
+CONNECTED account
+→ explicit Sync
+→ adapter.read_context
+→ immutable normalized snapshot
+→ user selects snapshot in Space
+→ Preflight
+→ Session Pack freeze
+```
+
+snapshot provenance：
+
+- provider；
+- connection；
+- capability；
+- external kind；
+- external id；
+- content hash；
+- occurred_at；
+- visibility。
+
+同一个 external object 内容变化后生成新 snapshot，不覆盖旧 snapshot。
+
+---
+
+## 9.1 Snapshot provenance hardening
+
+schema v9 冻结以下规则：
+
+```text
+snapshot identity =
+space_id
++ connection_id
++ capability
++ external_kind
++ external_id
++ Chengzhu canonical content_hash
+```
+
+- 相同外部对象同步到不同 Space 时必须形成各自 Space-scoped snapshot row；
+- provider 自报 content hash 仅作为 provenance metadata 保存，不控制 Chengzhu identity；
+- Space 不能持久化别的 Space 的 snapshot id；
+- 每个 read capability 独立维护 sync cursor，禁止 Calendar / Docs / Mail / Project cursor 串流；
+- 已开始 Session 继续使用 frozen snapshot，不被后续 Sync 改写。
+
+---
+
+## 10. External source authority
+
+所有 connector snapshot 默认：
+
+```text
+authority = REFERENCE_SOURCE
+```
+
+即：
+
+```text
+Calendar event != Decision
+Mail sentence != Commitment
+GitHub issue != reviewed Deadline
+```
+
+必须继续走 Conversation review 才能升级长期 truth。
+
+---
+
+## 11. Session Pack
+
+Pack 冻结：
+
+- selected snapshot；
+- snapshot content/provenance；
+- exact connection grant；
+- provider id；
+- account hint；
+- capability；
+- content hash。
+
+开始后：
+
+- 新 Sync 不修改 Pack；
+- account disconnect/revoke 不修改 Pack；
+- provider health 变化不修改 Pack。
+
+---
+
+## 12. Manual Ask
+
+Manual Ask 可以查询 frozen connector snapshot。
+
+排序仍尊重 truth authority：
+
+```text
+CONFIRMED_TRUTH
+> frozen personal evidence
+> frozen reference source
+> connector REFERENCE_SOURCE
+> Quick Note
+> screen/transcript observations
+```
+
+Connector 不因 provider 品牌而提高 truth authority。
+
+---
+
+## 13. Reviewed external execution
+
+DraftAction mapping：
+
+```text
+FOLLOWUP_EMAIL_DRAFT
+→ email.send
+
+CREATE_TASK_DRAFT
+→ task.create
+
+CREATE_ISSUE_DRAFT
+→ issue.create
+
+UPDATE_DECISION_LOG_DRAFT
+→ decision_log.write
+```
+
+流程：
+
+```text
+DRAFT
+→ APPROVED
+→ select CONNECTED account with exact write grant
+→ create Execution Request (PENDING/BLOCKED)
+→ second explicit Execute
+→ EXECUTING
+→ SUCCEEDED / FAILED / UNKNOWN_OUTCOME / BLOCKED
+```
+
+仅 provider **显式返回 boolean `ok=true`** 才可表示 `SUCCEEDED`。
+
+`UNKNOWN_OUTCOME` 用于 timeout、transport exception、进程中断或缺少明确 `ok` 的 malformed outcome；它表示“外部副作用可能已经发生，但 Chengzhu 无法确认”，因此禁止直接 retry。
+
+---
+
+## 14. Idempotency
+
+Execution Request 生成稳定 idempotency key，至少绑定：
+
+- DraftAction；
+- DraftAction version/update time；
+- connection；
+- capability；
+- operation；
+- target。
+
+已经 `SUCCEEDED` 的 audit row 再次 Execute 不重复外部调用。
+
+Idempotency key 只是 contract input，不等于所有 provider 天生幂等。Concrete adapter 必须真实把该 key 映射到 provider 的幂等机制，才能声明 provider-level retry safety。
+
+明确失败的结果 envelope：
+
+```json
+{"ok": false, "error": "...", "retry_safe": false}
+```
+
+只有 `retry_safe=true` 时，Chengzhu 才允许对同一 audit row 再次 Execute。
+
+---
+
+## 15. Failure / revocation
+
+Provider unhealthy、credential 被撤销或 capability 不再存在时：
+
+- 新 Preflight fail-closed；
+- 新 Sync 明确失败；
+- external execution 在执行前重新校验；
+- 已开始 Session 继续保留 frozen Pack；
+- 不把 stale provider state 当 fresh；
+- provider 明确 `ok=false` 记录 `FAILED`；
+- transport exception / timeout / malformed outcome 记录 `UNKNOWN_OUTCOME`；
+- `UNKNOWN_OUTCOME` 不改成 FAILED，也不能直接重试；
+- 必须先在 provider 侧核对并记录 reconciliation；
+- `CONFIRMED_SUCCEEDED` 保留为 USER_REPORTED_PROVIDER_CHECK，不伪造原 adapter 的 `ok=true`；
+- `CONFIRMED_NOT_APPLIED` 才能把同一 audit row 标为 `retry_safe=true`；
+- 任何失败/不确定结果都不改写 Conversation truth 或 DraftAction approval。
+
+---
+
+## 16. Privacy / sanitization
+
+Connector snapshot metadata 与 execution response 必须递归清洗敏感 key。
+
+Provider URL 只保留：
+
+```text
+scheme + host + path
+```
+
+userinfo / query / fragment 删除。除了按 key 删除 token/secret/auth 字段外，还要对普通字符串中的明显 credential-shaped value 做 redaction；opaque credential reference 也不能用 `provider:/plugin:` 外壳夹带真实 token。
+
+---
+
+## 17. Retention
+
+普通 retention 可以清理：
+
+- 未被 Space 选中；
+- 超过 connector snapshot retention；
+- 未冻结成 active source 的 snapshot row。
+
+必须保留：
+
+- Space 当前 selected snapshot；
+- Session Pack 内 frozen copy；
+- external execution audit；
+- 被 execution audit 引用的 DraftAction。
+
+---
+
+## 18. Export
+
+允许导出：
+
+- public connection metadata；
+- snapshot provenance；
+- external execution audit。
+
+禁止导出：
+
+- credential_ref；
+- token；
+- secret；
+- authorization material。
+
+Manifest：
+
+```text
+contains_external_secrets = false
+credential_refs_exported = false
+```
+
+---
+
+## 19. Diagnostics
+
+状态语义：
+
+```text
+NOT_CONFIGURED
+ADAPTER_AVAILABLE_NOT_CONNECTED
+CONNECTED
+```
+
+另报告：
+
+- catalog；
+- registered adapters；
+- connections；
+- connected count；
+- snapshot count；
+- execution count。
+
+---
+
+## 20. 当前 repo truth
+
+PR #61 合并后允许声明：
 
 ```text
 CONNECTOR_CAPABILITY_CONTRACT = IMPLEMENTED
 CONNECTOR_REGISTRY_DEFAULT = FAIL_CLOSED
+EXTERNAL_INTEGRATION_BOUNDARY = IMPLEMENTED
+IMMUTABLE_EXTERNAL_SNAPSHOT_PATH = IMPLEMENTED
+REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
+AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 ```
 
-Not allowed yet:
+仍禁止在缺少真实 adapter/account/runtime evidence 时声明：
 
 ```text
 CALENDAR_CONNECTOR_AVAILABLE = TRUE
 MAIL_CONNECTOR_AVAILABLE = TRUE
 DOCS_CONNECTOR_AVAILABLE = TRUE
 PROJECT_TRACKER_CONNECTOR_AVAILABLE = TRUE
-EXTERNAL_WRITEBACK_AVAILABLE = TRUE
+GOOGLE_ACCOUNT_CONNECTED = TRUE
+MICROSOFT_ACCOUNT_CONNECTED = TRUE
+GITHUB_ACCOUNT_CONNECTED = TRUE
+MCP_SERVER_CONNECTED = TRUE
+REAL_EXTERNAL_ACTION_EVIDENCE = TRUE
 ```
 
-Those require a real provider, authorization, runtime tests and external result evidence.
+进一步实现细节见：
+
+- [Conversation Integration Boundary](../architecture/CONVERSATION_INTEGRATION_BOUNDARY.md)
+
+外部 provider 真正接线后，仍需独立 adapter tests、授权 evidence、runtime replay 与 external result evidence。

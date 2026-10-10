@@ -530,6 +530,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
             </div>
             <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] text-text-muted">
               <span>Sources {liveContext.data.sources.length}</span>
+              <span>External {liveContext.data.connector_snapshots?.length ?? 0}</span>
               <span>Quick Notes {liveContext.data.quick_notes.length}</span>
               <span>Participants {liveContext.data.participants.length}</span>
               <span>Open {liveContext.data.brief.unresolved_count ?? 0}</span>
@@ -549,6 +550,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <span>Capture · {liveContext.data.processing_runtime.data_path?.capture ?? '—'}</span>
                 <span>STT · {liveContext.data.processing_runtime.data_path?.stt ?? '—'} / {liveContext.data.processing_runtime.configured_stt_provider ?? '—'}</span>
                 <span>Connectors · {liveContext.data.connector_runtime.grants?.length ?? 0}/{liveContext.data.connector_runtime.requested?.length ?? 0} granted</span>
+                <span>Frozen external snapshots · {liveContext.data.connector_snapshots?.length ?? 0}</span>
                 <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
                 <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
                 <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>

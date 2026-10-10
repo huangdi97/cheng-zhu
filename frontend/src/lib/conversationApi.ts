@@ -4,8 +4,12 @@ import type {
   CaptureMode,
   ConversationAskResult,
   ConversationCaptureStatus,
+  ConversationConnectorCatalogItem,
+  ConversationConnectorConnection,
+  ConversationConnectorSnapshot,
   ConversationContinue,
   ConversationDraftAction,
+  ConversationExternalExecution,
   ConversationGuidance,
   ConversationHistoryItem,
   ConversationReminder,
@@ -48,6 +52,51 @@ export const conversationApi = {
     `${B}/search?query=${encodeURIComponent(query)}&item_type=${encodeURIComponent(itemType)}&limit=${limit}`,
   ),
   diagnostics: () => request<Record<string, unknown>>(`${B}/diagnostics`),
+  integrationCatalog: () => request<unknown>(`${B}/integrations/catalog`).then((p) => list<ConversationConnectorCatalogItem>(p)),
+  integrationConnections: () => request<unknown>(`${B}/integrations/connections`).then((p) => list<ConversationConnectorConnection>(p)),
+  createIntegrationConnection: (body: {
+    provider_id: string
+    display_name?: string
+    granted_capabilities: string[]
+    provider_scopes?: string[]
+    credential_ref?: string
+    account_hint?: string
+  }) => request<ConversationConnectorConnection>(`${B}/integrations/connections`, json('POST', body)),
+  verifyIntegrationConnection: (id: string) =>
+    request<ConversationConnectorConnection>(`${B}/integrations/connections/${encodeURIComponent(id)}/verify`, json('POST')),
+  disconnectIntegrationConnection: (id: string) =>
+    request<ConversationConnectorConnection>(`${B}/integrations/connections/${encodeURIComponent(id)}/disconnect`, json('POST')),
+  revokeIntegrationConnection: (id: string) =>
+    request<ConversationConnectorConnection>(`${B}/integrations/connections/${encodeURIComponent(id)}/revoke`, json('POST')),
+  syncIntegrationConnection: (id: string, body: { space_id: string; capabilities?: string[]; query?: Record<string, unknown>; limit?: number }) =>
+    request<{ connection: ConversationConnectorConnection; snapshots: ConversationConnectorSnapshot[] }>(
+      `${B}/integrations/connections/${encodeURIComponent(id)}/sync`,
+      json('POST', body),
+    ),
+  connectorSnapshots: (spaceId: string, connectionId = '', limit = 200) =>
+    request<unknown>(
+      `${B}/spaces/${encodeURIComponent(spaceId)}/connector-snapshots?connection_id=${encodeURIComponent(connectionId)}&limit=${limit}`,
+    ).then((p) => list<ConversationConnectorSnapshot>(p)),
+  requestExternalExecution: (draftId: string, connection_id: string, target = '') =>
+    request<ConversationExternalExecution>(
+      `${B}/draft-actions/${encodeURIComponent(draftId)}/execution`,
+      json('POST', { connection_id, target }),
+    ),
+  externalExecutions: (draftId = '', limit = 200) =>
+    request<unknown>(
+      `${B}/integrations/executions?draft_action_id=${encodeURIComponent(draftId)}&limit=${limit}`,
+    ).then((p) => list<ConversationExternalExecution>(p)),
+  executeExternalRequest: (id: string) =>
+    request<ConversationExternalExecution>(`${B}/integrations/executions/${encodeURIComponent(id)}/execute`, json('POST')),
+  reconcileExternalRequest: (
+    id: string,
+    outcome: 'CONFIRMED_SUCCEEDED' | 'CONFIRMED_NOT_APPLIED',
+    note: string,
+    provider_reference = '',
+  ) => request<ConversationExternalExecution>(
+    `${B}/integrations/executions/${encodeURIComponent(id)}/reconcile`,
+    json('POST', { outcome, note, provider_reference }),
+  ),
   demo: () => request<{
     evidence: 'SYNTHETIC_DEMO'
     scenario: string
@@ -65,6 +114,7 @@ export const conversationApi = {
     description?: string
     default_goal?: string
     default_mode?: AssistanceMode | ''
+    selected_connector_snapshot_ids?: string[]
   }) => request<ConversationSpace>(`${B}/spaces`, json('POST', body)),
   space: (id: string) => request<ConversationSpaceDetail>(`${B}/spaces/${encodeURIComponent(id)}`),
   patchSpace: (id: string, body: Partial<ConversationSpace>) =>
@@ -75,7 +125,7 @@ export const conversationApi = {
   retentionPreview: (id: string) => request<{
     space_id: string
     policy: Record<string, unknown>
-    would_delete: { transcript_segments: number; guidance_events: number; draft_actions: number; screen_context_observations: number }
+    would_delete: { transcript_segments: number; guidance_events: number; draft_actions: number; screen_context_observations: number; connector_snapshots: number }
     kept: Record<string, string>
     destructive: boolean
   }>(`${B}/spaces/${encodeURIComponent(id)}/retention`),

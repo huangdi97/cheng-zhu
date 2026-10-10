@@ -90,6 +90,12 @@ export interface SourceRef {
   image_hash?: string
   vision_model?: string
   vision_route?: string
+  provider_id?: string
+  connection_id?: string
+  capability?: string
+  external_kind?: string
+  external_id?: string
+  occurred_at?: number | null
 }
 
 export interface ConversationTemplate {
@@ -118,6 +124,7 @@ export interface ConversationSpace {
   default_mode: AssistanceMode
   selected_source_ids: string[]
   selected_quick_note_ids: string[]
+  selected_connector_snapshot_ids: string[]
   retention_policy: Record<string, unknown>
   created_at: number
   updated_at: number
@@ -382,9 +389,75 @@ export interface ConversationResolvedAiBehavior {
   engine: string
 }
 
+export interface ConversationConnectorCatalogItem {
+  provider_id: string
+  label: string
+  capabilities: string[]
+  read_capabilities: string[]
+  write_capabilities: string[]
+  external_kinds: string[]
+  provider_scopes: Record<string, string>
+  sync: string
+  adapter_available: boolean
+}
+
+export interface ConversationConnectorConnection {
+  id: string
+  provider_id: string
+  display_name: string
+  status: 'DISCONNECTED' | 'CONNECTED' | 'ERROR' | 'REVOKED' | string
+  auth_mode: string
+  granted_capabilities: string[]
+  provider_scopes: string[]
+  account_hint: string
+  sync_cursor: string
+  sync_cursors: Record<string, string>
+  last_sync_at: number | null
+  last_error: string
+  created_at: number
+  updated_at: number
+  credential_ref_present: boolean
+  adapter_available: boolean
+}
+
+export interface ConversationConnectorSnapshot {
+  id: string
+  connection_id: string
+  space_id: string
+  capability: string
+  external_kind: string
+  external_id: string
+  title: string
+  excerpt: string
+  content_hash: string
+  source_url: string
+  occurred_at: number | null
+  visibility: string
+  metadata: Record<string, unknown>
+  provider_id?: string
+  created_at: number
+}
+
+export interface ConversationExternalExecution {
+  id: string
+  draft_action_id: string
+  connection_id: string
+  capability: string
+  operation: string
+  target: string
+  idempotency_key: string
+  status: 'PENDING' | 'EXECUTING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN_OUTCOME' | 'BLOCKED' | 'CANCELLED' | string
+  request: Record<string, unknown>
+  response: Record<string, unknown>
+  error: string
+  created_at: number
+  updated_at: number
+  executed_at: number | null
+}
+
 export interface ConversationConnectorRuntime {
   requested: string[]
-  grants: Array<{ capability: string; provider_id: string; account_label: string }>
+  grants: Array<{ capability: string; provider_id: string; connection_id: string; account_hint: string }>
   blocked: Array<{ capability: string; reason: string }>
   ok: boolean
   providers: Array<{ provider_id: string; capabilities: string[]; health: string; account_label: string }>
@@ -418,6 +491,9 @@ export interface ConversationPreflight {
     goal_ids: string[]
     selected_source_ids: string[]
     selected_quick_note_ids: string[]
+    selected_connector_snapshot_ids: string[]
+    connector_snapshots: Array<Pick<ConversationConnectorSnapshot, 'id' | 'connection_id' | 'capability' | 'external_kind' | 'external_id' | 'title' | 'content_hash' | 'visibility'>>
+    missing_connector_snapshot_ids: string[]
     sources: Array<{
       material_id: string
       version_id: string
@@ -485,7 +561,7 @@ export interface ConversationTranscriptSegment {
 
 export interface ConversationAskMatch {
   id: string
-  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
+  kind: 'CONFIRMED_ITEM' | 'FROZEN_SOURCE' | 'CONNECTOR_SNAPSHOT' | 'QUICK_NOTE' | 'SCREEN_CONTEXT' | 'TRANSCRIPT_SEGMENT'
   authority: 'CONFIRMED_TRUTH' | 'PERSONAL_EVIDENCE' | 'REFERENCE_SOURCE' | 'USER_NOTE_NOT_EVIDENCE' | 'OBSERVED_NOT_CONFIRMED'
   title: string
   excerpt: string
@@ -546,6 +622,7 @@ export interface ConversationSessionContext {
     is_personal_evidence: boolean
   }>
   quick_notes: Array<{ id: string; title: string }>
+  connector_snapshots: Array<Pick<ConversationConnectorSnapshot, 'id' | 'connection_id' | 'capability' | 'external_kind' | 'external_id' | 'title' | 'content_hash' | 'visibility'>>
   participants: Array<{
     id: string
     display_name: string
@@ -588,6 +665,7 @@ export interface ConversationSessionExport {
     categories: string[]
     privacy: string
     contains_external_secrets: boolean
+    credential_refs_exported?: boolean
   }
   space: { id: string; title: string; profile: ConversationProfile }
   session: ConversationSession
@@ -599,6 +677,9 @@ export interface ConversationSessionExport {
   guidance: ConversationGuidance[]
   draft_actions: ConversationDraftAction[]
   source_manifest: Array<Record<string, unknown>>
+  connector_snapshots: Array<Record<string, unknown>>
+  connector_connections: ConversationConnectorConnection[]
+  external_execution_audit: ConversationExternalExecution[]
   session_packs: Array<Record<string, unknown>>
 }
 

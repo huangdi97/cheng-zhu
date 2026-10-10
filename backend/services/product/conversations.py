@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
-from services.product import conversation_connectors, conversation_screen, materials
+from services.product import conversation_connectors, conversation_integrations, conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
     ConversationItemState,
@@ -548,10 +548,13 @@ def create_space(
     relationship_key: str = "",
     selected_source_ids: Optional[list[str]] = None,
     selected_quick_note_ids: Optional[list[str]] = None,
+    selected_connector_snapshot_ids: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     title = str(title or "").strip()
     if not title:
         raise ValueError("对话空间名称不能为空")
+    if selected_connector_snapshot_ids:
+        raise ValueError("新建 Space 不能直接引用既有 Connector Snapshot；请先创建 Space、同步连接器，再显式选择属于该 Space 的 snapshot")
     profile = str(profile or "").upper()
     if profile not in SPACE_PROFILES:
         raise ValueError(f"对话模板不支持：{profile}")
@@ -570,7 +573,11 @@ def create_space(
         "default_mode": mode,
         "selected_source_ids": list(selected_source_ids or []),
         "selected_quick_note_ids": list(selected_quick_note_ids or []),
-        "retention_policy": dict(RETENTION_PRESETS["STANDARD"]),
+        "selected_connector_snapshot_ids": list(selected_connector_snapshot_ids or []),
+        "retention_policy": {
+            **dict(RETENTION_PRESETS["STANDARD"]),
+            "connector_snapshot_days": 30,
+        },
         "created_at": ts,
         "updated_at": ts,
     }
@@ -635,7 +642,8 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     requested_default_goal = patch.get("default_goal") if "default_goal" in patch else None
     allowed = {
         "title", "description", "status", "project_id", "relationship_key",
-        "default_mode", "selected_source_ids", "selected_quick_note_ids", "retention_policy",
+        "default_mode", "selected_source_ids", "selected_quick_note_ids",
+        "selected_connector_snapshot_ids", "retention_policy",
     }
     clean = {k: v for k, v in patch.items() if k in allowed}
     if "title" in clean:
@@ -648,6 +656,11 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         clean["status"] = str(clean["status"]).upper()
         if clean["status"] not in {"ACTIVE", "ARCHIVED"}:
             raise ValueError("对话空间状态不支持")
+    if "selected_connector_snapshot_ids" in clean:
+        clean["selected_connector_snapshot_ids"] = conversation_integrations.validate_snapshot_selection(
+            space_id,
+            list(clean.get("selected_connector_snapshot_ids") or []),
+        )
     if "retention_policy" in clean:
         raw_policy = clean["retention_policy"] if isinstance(clean["retention_policy"], dict) else {}
         preset = str(raw_policy.get("preset") or "CUSTOM").upper()
@@ -664,6 +677,7 @@ def update_space(space_id: str, patch: dict[str, Any]) -> dict[str, Any]:
                 "transcript_days": _days("transcript_days", 30),
                 "guidance_days": _days("guidance_days", 30),
                 "draft_days": _days("draft_days", 30),
+                "connector_snapshot_days": _days("connector_snapshot_days", 30),
                 "confirmed_items": "KEEP",
                 "audio_retention": "OFF",
             }
@@ -1016,11 +1030,25 @@ def _pack_inputs(space: dict[str, Any]) -> dict[str, Any]:
             })
         else:
             missing_note_ids.append(str(note_id))
+    selected_connector_snapshots: list[dict[str, Any]] = []
+    missing_connector_snapshot_ids: list[str] = []
+    for snapshot_id in space.get("selected_connector_snapshot_ids") or []:
+        snapshot = store.get("conversation_connector_snapshot", str(snapshot_id))
+        if snapshot and snapshot.get("space_id") == space["id"]:
+            frozen_snapshot = dict(snapshot)
+            connection = store.get("conversation_connector_connection", str(snapshot.get("connection_id") or ""))
+            frozen_snapshot["provider_id"] = str((connection or {}).get("provider_id") or "")
+            selected_connector_snapshots.append(frozen_snapshot)
+        else:
+            missing_connector_snapshot_ids.append(str(snapshot_id))
+
     return {
         "sources": selected_sources,
         "skipped_sources": skipped_sources,
         "quick_notes": selected_notes,
         "missing_quick_note_ids": missing_note_ids,
+        "connector_snapshots": selected_connector_snapshots,
+        "missing_connector_snapshot_ids": missing_connector_snapshot_ids,
     }
 
 
@@ -1072,6 +1100,7 @@ def _preflight_context_fingerprint(
             "title": space.get("title"),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "selected_connector_snapshot_ids": list(space.get("selected_connector_snapshot_ids") or []),
             "retention_policy": dict(space.get("retention_policy") or {}),
         },
         "goals": [
@@ -1097,6 +1126,19 @@ def _preflight_context_fingerprint(
         "skipped_sources": list(pack_inputs.get("skipped_sources") or []),
         "quick_notes": list(pack_inputs.get("quick_notes") or []),
         "missing_quick_note_ids": list(pack_inputs.get("missing_quick_note_ids") or []),
+        "connector_snapshots": [
+            {
+                "id": s.get("id"),
+                "connection_id": s.get("connection_id"),
+                "capability": s.get("capability"),
+                "external_kind": s.get("external_kind"),
+                "external_id": s.get("external_id"),
+                "content_hash": s.get("content_hash"),
+                "visibility": s.get("visibility"),
+            }
+            for s in pack_inputs.get("connector_snapshots") or []
+        ],
+        "missing_connector_snapshot_ids": list(pack_inputs.get("missing_connector_snapshot_ids") or []),
         "participants": participants,
         "confirmed_items": confirmed,
         "open_threads": threads,
@@ -1142,7 +1184,9 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "message": message,
         })
 
-    connector_runtime = conversation_connectors.resolve_read_permissions(policy.get("connector_permissions") or [])
+    connector_runtime = conversation_integrations.resolve_session_permissions(
+        list(policy.get("connector_permissions") or [])
+    )
     connector_ok = bool(connector_runtime["ok"])
     if not connector_ok:
         blocked_names = ", ".join(
@@ -1152,8 +1196,8 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "key": "connector_runtime",
             "label": "连接器权限",
             "message": (
-                "本场请求的 connector capability 没有真实可用 provider；"
-                f"{blocked_names or 'NO_AVAILABLE_PROVIDER'}。不会用 placeholder 放行。"
+                "本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；"
+                f"{blocked_names or 'NO_CONNECTED_ACCOUNT'}。不会用 provider catalog 或 placeholder 放行。"
             ),
         })
 
@@ -1206,6 +1250,12 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "label": "Quick Note",
             "message": f"Quick Note {note_id} 已不存在，本场不会冻结它。",
         })
+    for snapshot_id in pack_inputs["missing_connector_snapshot_ids"]:
+        warnings.append({
+            "key": "connector_snapshot_missing",
+            "label": "Connector Snapshot",
+            "message": f"Connector Snapshot {snapshot_id} 已不存在或不属于当前 Space，本场不会冻结它。",
+        })
     if session["capture_mode"] == "TRANSCRIPT" and policy["participant_consent_status"] == "NOT_RECORDED":
         warnings.append({
             "key": "participant_consent_not_recorded",
@@ -1235,6 +1285,8 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
     ready_source_count = len(pack_inputs["sources"])
     selected_note_count = len(space.get("selected_quick_note_ids") or [])
     ready_note_count = len(pack_inputs["quick_notes"])
+    selected_connector_count = len(space.get("selected_connector_snapshot_ids") or [])
+    ready_connector_count = len(pack_inputs["connector_snapshots"])
     participant_consent_ok = (
         session["capture_mode"] != "TRANSCRIPT"
         or policy["participant_consent_status"] != "NOT_RECORDED"
@@ -1260,7 +1312,11 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
         {"key": "retention", "label": "转写保留", "value": f"{retention.get('preset', 'STANDARD')} · {retention.get('transcript_days', 30)}d", "ok": True},
         {"key": "sources", "label": "带入来源", "value": f"{ready_source_count}/{selected_source_count} Ready", "ok": ready_source_count == selected_source_count},
         {"key": "quick_notes", "label": "Quick Notes", "value": f"{ready_note_count}/{selected_note_count} available", "ok": ready_note_count == selected_note_count},
-        {"key": "connectors", "label": "连接器权限", "value": len(policy.get("connector_permissions") or []), "ok": connector_ok},
+        {"key": "connector_snapshots", "label": "外部来源快照", "value": f"{ready_connector_count}/{selected_connector_count} frozen", "ok": ready_connector_count == selected_connector_count},
+        {"key": "connectors", "label": "连接器权限", "value": (
+            "0" if not policy.get("connector_permissions")
+            else f"{len(connector_runtime.get('grants') or [])}/{len(policy.get('connector_permissions') or [])} connected"
+        ), "ok": connector_ok},
         {"key": "participant_consent", "label": "参与者同意状态（用户报告）", "value": policy["participant_consent_status"], "ok": participant_consent_ok},
         {"key": "participant_transparency", "label": "参与者透明告知（用户计划）", "value": policy["participant_transparency_plan"], "ok": participant_transparency_ok},
         {"key": "screen", "label": "屏幕上下文", "value": (
@@ -1300,6 +1356,21 @@ def preflight(session_id: str, *, record_fingerprint: bool = True) -> dict[str, 
             "goal_ids": list(session.get("goal_ids") or []),
             "selected_source_ids": list(space.get("selected_source_ids") or []),
             "selected_quick_note_ids": list(space.get("selected_quick_note_ids") or []),
+            "selected_connector_snapshot_ids": list(space.get("selected_connector_snapshot_ids") or []),
+            "connector_snapshots": [
+                {
+                    "id": s.get("id") or "",
+                    "connection_id": s.get("connection_id") or "",
+                    "capability": s.get("capability") or "",
+                    "external_kind": s.get("external_kind") or "",
+                    "external_id": s.get("external_id") or "",
+                    "title": s.get("title") or "",
+                    "content_hash": s.get("content_hash") or "",
+                    "visibility": s.get("visibility") or "PRIVATE",
+                }
+                for s in pack_inputs["connector_snapshots"]
+            ],
+            "missing_connector_snapshot_ids": list(pack_inputs["missing_connector_snapshot_ids"]),
             "sources": [
                 {
                     "material_id": source.get("material_id") or "",
@@ -1370,10 +1441,13 @@ def freeze_pack(
         "space": {"id": space["id"], "profile": space["profile"], "title": space["title"]},
         "goal_ids": session.get("goal_ids") or [],
         "selected_source_ids": space.get("selected_source_ids") or [],
+        "selected_connector_snapshot_ids": space.get("selected_connector_snapshot_ids") or [],
         "sources": pack_inputs["sources"],
         "skipped_sources": pack_inputs["skipped_sources"],
         "quick_notes": pack_inputs["quick_notes"],
         "missing_quick_note_ids": pack_inputs["missing_quick_note_ids"],
+        "connector_snapshots": pack_inputs["connector_snapshots"],
+        "missing_connector_snapshot_ids": pack_inputs["missing_connector_snapshot_ids"],
         "confirmed_items": _confirmed_context_items(space["id"]),
         "participants": participants,
         "profile_playbook": profile_playbook(space["profile"]),
@@ -1410,8 +1484,8 @@ def freeze_pack(
         "resolved_ai_behavior": resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": processing_runtime_status(session),
         "screen_runtime": conversation_screen.vision_runtime_status(session),
-        "connector_runtime": conversation_connectors.resolve_read_permissions(
-            _normalize_session_policy(session.get("policy")).get("connector_permissions") or []
+        "connector_runtime": conversation_integrations.resolve_session_permissions(
+            list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
         ),
         "share_privacy_runtime": (
             dict(share_privacy_runtime)
@@ -1583,6 +1657,19 @@ def session_context(session_id: str) -> dict[str, Any]:
         {"id": note.get("id") or "", "title": note.get("title") or ""}
         for note in payload.get("quick_notes") or []
     ]
+    connector_snapshots = [
+        {
+            "id": snapshot.get("id") or "",
+            "connection_id": snapshot.get("connection_id") or "",
+            "capability": snapshot.get("capability") or "",
+            "external_kind": snapshot.get("external_kind") or "",
+            "external_id": snapshot.get("external_id") or "",
+            "title": snapshot.get("title") or "",
+            "content_hash": snapshot.get("content_hash") or "",
+            "visibility": snapshot.get("visibility") or "PRIVATE",
+        }
+        for snapshot in payload.get("connector_snapshots") or []
+    ]
     participants = []
     for p in payload.get("participants") or []:
         counterparty = p.get("counterparty_state") or {}
@@ -1609,13 +1696,14 @@ def session_context(session_id: str) -> dict[str, Any]:
         "profile_playbook": payload.get("profile_playbook") or profile_playbook((payload.get("space") or {}).get("profile") or ""),
         "sources": sources,
         "quick_notes": notes,
+        "connector_snapshots": connector_snapshots,
         "participants": participants,
         "expression_profile": payload.get("expression_profile") or {},
         "resolved_ai_behavior": payload.get("resolved_ai_behavior") or resolved_ai_behavior(_normalize_session_policy(session.get("policy"))),
         "processing_runtime": payload.get("processing_runtime") or {},
         "screen_runtime": payload.get("screen_runtime") or {},
-        "connector_runtime": payload.get("connector_runtime") or conversation_connectors.resolve_read_permissions(
-            _normalize_session_policy(session.get("policy")).get("connector_permissions") or []
+        "connector_runtime": payload.get("connector_runtime") or conversation_integrations.resolve_session_permissions(
+            list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
         ),
         "share_privacy_runtime": payload.get("share_privacy_runtime") or share_privacy_runtime_status(session),
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
@@ -1732,8 +1820,8 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     """Deterministic, source-aware Manual Ask over this session's frozen context.
 
     Ranking intentionally distinguishes authority:
-    confirmed cross-session state > frozen Ready sources > frozen Quick Notes >
-    current-session transcript.  Source-backed context is not automatically
+    confirmed cross-session state > frozen Ready sources > explicitly selected
+    connector snapshots > frozen Quick Notes > screen/transcript observations.  Source-backed context is not automatically
     upgraded into confirmed truth.
     """
     session = require_session(session_id)
@@ -1796,7 +1884,40 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 3) User-authored frozen notes are usable context, but explicitly not evidence.
+    # 3) Explicitly selected external connector snapshots are frozen references.
+    # They remain REFERENCE_SOURCE regardless of provider; external systems do
+    # not bypass Conversation review/truth promotion.
+    for snapshot in pack.get("connector_snapshots") or []:
+        haystack = " ".join([
+            str(snapshot.get("title") or ""),
+            str(snapshot.get("excerpt") or ""),
+        ])
+        lexical = _text_match_score(question, haystack)
+        if lexical:
+            ranked.append((lexical + 4, float(snapshot.get("occurred_at") or snapshot.get("created_at") or 0), {
+                "id": str(snapshot.get("id") or ""),
+                "kind": "CONNECTOR_SNAPSHOT",
+                "authority": "REFERENCE_SOURCE",
+                "title": str(snapshot.get("title") or "External Context")[:300],
+                "excerpt": str(snapshot.get("excerpt") or "")[:500],
+                "item_type": "",
+                "state": "",
+                "review_status": "",
+                "source_refs": [{
+                    "kind": "CONNECTOR_SNAPSHOT",
+                    "id": str(snapshot.get("id") or ""),
+                    "provider_id": str(snapshot.get("provider_id") or ""),
+                    "connection_id": str(snapshot.get("connection_id") or ""),
+                    "capability": str(snapshot.get("capability") or ""),
+                    "external_kind": str(snapshot.get("external_kind") or ""),
+                    "external_id": str(snapshot.get("external_id") or ""),
+                    "content_hash": str(snapshot.get("content_hash") or ""),
+                    "occurred_at": snapshot.get("occurred_at"),
+                    "visibility": str(snapshot.get("visibility") or "PRIVATE"),
+                }],
+            }))
+
+    # 4) User-authored frozen notes are usable context, but explicitly not evidence.
     for note in pack.get("quick_notes") or []:
         haystack = " ".join([str(note.get("title") or ""), str(note.get("content") or "")])
         lexical = _text_match_score(question, haystack)
@@ -1813,7 +1934,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "source_refs": [{"kind": "QUICK_NOTE", "id": str(note.get("id") or ""), "visibility": "PRIVATE"}],
             }))
 
-    # 4) Manual screen observations are source-aware but never confirmed truth.
+    # 5) Manual screen observations are source-aware but never confirmed truth.
     for observation in conversation_screen.list_context(session_id, limit=40):
         lexical = _text_match_score(question, str(observation.get("text") or ""))
         if lexical:
@@ -1838,7 +1959,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 }],
             }))
 
-    # 5) The current-session transcript supports catch-up, but remains observation.
+    # 6) The current-session transcript supports catch-up, but remains observation.
     transcript = store.select(
         "conversation_transcript_segment",
         where="session_id = ?",
@@ -1871,7 +1992,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
     matches = [match for _, _, match in ranked[:6]]
     if not matches:
         return {
-            "answer": "没有在本场冻结来源、已确认历史、屏幕观察或当前转写中找到足够直接的可追溯内容。",
+            "answer": "没有在本场冻结来源、外部快照、已确认历史、屏幕观察或当前转写中找到足够直接的可追溯内容。",
             "matches": [],
             "grounded": False,
             "truth_confirmed": False,
@@ -3172,6 +3293,58 @@ def search_items(
     return rows
 
 
+def _public_connections_for_ids(connection_ids: set[str]) -> list[dict[str, Any]]:
+    return [
+        row for row in conversation_integrations.list_connections()
+        if row["id"] in connection_ids
+    ]
+
+
+def _space_integration_export(space_id: str) -> dict[str, Any]:
+    snapshots = conversation_integrations.list_snapshots(space_id, limit=1000)
+    drafts = list_draft_actions(space_id)
+    draft_ids = {row["id"] for row in drafts}
+    executions = [
+        row for row in conversation_integrations.list_executions(limit=1000)
+        if row.get("draft_action_id") in draft_ids
+    ]
+    connection_ids = {
+        str(row.get("connection_id") or "")
+        for row in [*snapshots, *executions]
+        if row.get("connection_id")
+    }
+    return {
+        "connections": _public_connections_for_ids(connection_ids),
+        "connector_snapshots": snapshots,
+        "external_execution_audit": executions,
+    }
+
+
+def _session_integration_export(
+    packs: list[dict[str, Any]],
+    drafts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    frozen_snapshots: list[dict[str, Any]] = []
+    for pack in packs:
+        payload = dict(pack.get("payload") or {})
+        frozen_snapshots.extend(list(payload.get("connector_snapshots") or []))
+    draft_ids = {row["id"] for row in drafts}
+    executions = [
+        row for row in conversation_integrations.list_executions(limit=1000)
+        if row.get("draft_action_id") in draft_ids
+    ]
+    connection_ids = {
+        str(row.get("connection_id") or "")
+        for row in [*frozen_snapshots, *executions]
+        if row.get("connection_id")
+    }
+    return {
+        "connections": _public_connections_for_ids(connection_ids),
+        "connector_snapshots": frozen_snapshots,
+        "external_execution_audit": executions,
+    }
+
+
 def export_session(session_id: str) -> dict[str, Any]:
     session = require_session(session_id)
     space = require_space(session["space_id"])
@@ -3237,18 +3410,19 @@ def export_session(session_id: str) -> dict[str, Any]:
                 "content": note.get("content") or "",
                 "kind": "USER_NOTE",
             })
-
+    integration = _session_integration_export(packs, drafts)
     return {
         "kind": "CONVERSATION_SESSION",
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
                 "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
-                "unconfirmed_candidates", "guidance", "draft_actions",
-                "source_manifest", "session_packs",
+                "unconfirmed_candidates", "guidance", "draft_actions", "source_manifest",
+                "connector_snapshots", "connector_connections", "external_execution_audit", "session_packs",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
+            "credential_refs_exported": False,
         },
         "space": {
             "id": space["id"],
@@ -3264,9 +3438,11 @@ def export_session(session_id: str) -> dict[str, Any]:
         "guidance": guidance,
         "draft_actions": drafts,
         "source_manifest": source_manifest,
+        "connector_snapshots": integration["connector_snapshots"],
+        "connector_connections": integration["connections"],
+        "external_execution_audit": integration["external_execution_audit"],
         "session_packs": packs,
     }
-
 
 def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
     rows = store.rows(
@@ -3380,46 +3556,88 @@ def _retention_cutoff(days: int, now: float) -> float:
     return now if days <= 0 else now - days * 86400.0
 
 
+def _retention_candidates(space_id: str, policy: dict[str, Any], now_value: float) -> dict[str, list[dict[str, Any]]]:
+    space = require_space(space_id)
+    transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
+    guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
+    draft_cutoff = _retention_cutoff(int(policy.get("draft_days", 30) or 0), now_value)
+    connector_cutoff = _retention_cutoff(int(policy.get("connector_snapshot_days", 30) or 0), now_value)
+
+    transcript_rows = store.select(
+        "conversation_transcript_segment",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    )
+    screen_rows = store.select(
+        "conversation_screen_context",
+        where="space_id = ? AND created_at <= ?",
+        params=(space_id, transcript_cutoff),
+    )
+    guidance_rows = store.rows(
+        "SELECT g.* FROM conversation_guidance_event g "
+        "JOIN conversation_session s ON s.id = g.session_id "
+        "WHERE s.space_id = ? AND g.created_at <= ?",
+        (space_id, guidance_cutoff),
+    )
+
+    # Drafts that already have an external execution audit are retained.  The
+    # audit row is evidence of an attempted real-world side effect and must not
+    # disappear under ordinary cleanup.
+    audited_draft_ids = {
+        str(row.get("draft_action_id") or "")
+        for row in store.select("conversation_connector_execution")
+        if row.get("draft_action_id")
+    }
+    draft_rows = [
+        row for row in store.select(
+            "conversation_draft_action",
+            where="space_id = ? AND created_at <= ?",
+            params=(space_id, draft_cutoff),
+        )
+        if row["id"] not in audited_draft_ids
+    ]
+
+    selected_snapshot_ids = {
+        str(value)
+        for value in (space.get("selected_connector_snapshot_ids") or [])
+        if str(value)
+    }
+    connector_rows = [
+        row for row in store.select(
+            "conversation_connector_snapshot",
+            where="space_id = ? AND created_at <= ?",
+            params=(space_id, connector_cutoff),
+        )
+        if row["id"] not in selected_snapshot_ids
+    ]
+    return {
+        "transcript_segments": transcript_rows,
+        "guidance_events": guidance_rows,
+        "draft_actions": draft_rows,
+        "screen_context_observations": screen_rows,
+        "connector_snapshots": connector_rows,
+    }
+
+
 def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, Any]:
     space = require_space(space_id)
     policy = dict(space.get("retention_policy") or RETENTION_PRESETS["STANDARD"])
     now_value = float(now if now is not None else store.now())
-    transcript_days = int(policy.get("transcript_days", 30) or 0)
-    guidance_days = int(policy.get("guidance_days", 30) or 0)
-    draft_days = int(policy.get("draft_days", 30) or 0)
-    transcript_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_transcript_segment WHERE space_id = ? AND created_at <= ?",
-        (space_id, _retention_cutoff(transcript_days, now_value)),
-    ) or 0)
-    guidance_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_guidance_event g "
-        "JOIN conversation_session s ON s.id = g.session_id "
-        "WHERE s.space_id = ? AND g.created_at <= ?",
-        (space_id, _retention_cutoff(guidance_days, now_value)),
-    ) or 0)
-    draft_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_draft_action WHERE space_id = ? AND created_at <= ?",
-        (space_id, _retention_cutoff(draft_days, now_value)),
-    ) or 0)
-    screen_count = int(store.scalar(
-        "SELECT COUNT(*) FROM conversation_screen_context WHERE space_id = ? AND created_at <= ?",
-        (space_id, _retention_cutoff(transcript_days, now_value)),
-    ) or 0)
+    candidates = _retention_candidates(space_id, policy, now_value)
+    counts = {key: len(rows) for key, rows in candidates.items()}
     return {
         "space_id": space_id,
         "policy": policy,
-        "would_delete": {
-            "transcript_segments": transcript_count,
-            "guidance_events": guidance_count,
-            "draft_actions": draft_count,
-            "screen_context_observations": screen_count,
-        },
+        "would_delete": counts,
         "kept": {
             "confirmed_items": "KEEP",
             "session_packs": "KEEP",
             "provenance_tombstones": "KEEP",
+            "selected_connector_snapshots": "KEEP",
+            "external_execution_audit": "KEEP",
+            "drafts_with_external_execution_audit": "KEEP",
         },
-        "destructive": any((transcript_count, guidance_count, draft_count, screen_count)),
+        "destructive": any(counts.values()),
     }
 
 
@@ -3428,43 +3646,21 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
     if preview["destructive"] and not confirm:
         raise ValueError("Retention 会删除本地数据；请先预览并明确确认")
     policy = preview["policy"]
-    now_value = store.now()
-    deleted = {"transcript_segments": 0, "guidance_events": 0, "draft_actions": 0, "screen_context_observations": 0}
+    candidates = _retention_candidates(space_id, policy, store.now())
+    deleted = {key: 0 for key in candidates}
 
-    transcript_cutoff = _retention_cutoff(int(policy.get("transcript_days", 30) or 0), now_value)
-    for row in store.select(
-        "conversation_transcript_segment",
-        where="space_id = ? AND created_at <= ?",
-        params=(space_id, transcript_cutoff),
-    ):
-        deleted["transcript_segments"] += int(store.delete("conversation_transcript_segment", row["id"]))
-
-    for row in store.select(
-        "conversation_screen_context",
-        where="space_id = ? AND created_at <= ?",
-        params=(space_id, transcript_cutoff),
-    ):
-        deleted["screen_context_observations"] += int(store.delete("conversation_screen_context", row["id"]))
-
-    guidance_cutoff = _retention_cutoff(int(policy.get("guidance_days", 30) or 0), now_value)
-    guidance_rows = store.rows(
-        "SELECT g.* FROM conversation_guidance_event g "
-        "JOIN conversation_session s ON s.id = g.session_id "
-        "WHERE s.space_id = ? AND g.created_at <= ?",
-        (space_id, guidance_cutoff),
-    )
-    for row in guidance_rows:
-        deleted["guidance_events"] += int(store.delete("conversation_guidance_event", row["id"]))
-
-    draft_cutoff = _retention_cutoff(int(policy.get("draft_days", 30) or 0), now_value)
-    for row in store.select(
-        "conversation_draft_action",
-        where="space_id = ? AND created_at <= ?",
-        params=(space_id, draft_cutoff),
-    ):
-        deleted["draft_actions"] += int(store.delete("conversation_draft_action", row["id"]))
+    table_by_category = {
+        "transcript_segments": "conversation_transcript_segment",
+        "guidance_events": "conversation_guidance_event",
+        "draft_actions": "conversation_draft_action",
+        "screen_context_observations": "conversation_screen_context",
+        "connector_snapshots": "conversation_connector_snapshot",
+    }
+    for category, rows in candidates.items():
+        table = table_by_category[category]
+        for row in rows:
+            deleted[category] += int(store.delete(table, row["id"]))
     return {"space_id": space_id, "deleted": deleted, "policy": policy}
-
 
 def delete_session(session_id: str, *, confirmed_policy: str = "BLOCK") -> dict[str, Any]:
     session = require_session(session_id)
@@ -3779,6 +3975,7 @@ def diagnostics() -> dict[str, Any]:
         "AND reason IN ('POLICY_AI_FORBIDDEN','SOURCE_VISIBILITY_BLOCKED','SOCIAL_RISK','STALE_CONTEXT','SUGGESTION_BUDGET')"
     ) or 0)
     capture = conversation_capture.status()
+    integration = conversation_integrations.diagnostics()
     return {
         "contract": "v2.0-R1",
         "schema_version": store.schema_version(),
@@ -3840,14 +4037,16 @@ def diagnostics() -> dict[str, Any]:
             "processing_policy": "AVAILABLE",
             "speaker_diarization": "LIMITED_CHANNEL_ONLY",
             "external_connectors": (
-                "AVAILABLE"
-                if conversation_connectors.diagnostics()["available_capabilities"]
+                "CONNECTED"
+                if integration["connected_count"] > 0
+                else "ADAPTER_AVAILABLE_NOT_CONNECTED"
+                if integration["registered_adapters"]
                 else "NOT_CONFIGURED"
             ),
             "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
             "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
             "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
-            "external_writeback_execution": "DRAFT_ONLY_NO_CONNECTOR_EXECUTION",
+            "external_writeback_execution": "REVIEWED_SECOND_EXPLICIT_EXECUTION_BOUNDARY",
         },
         "evidence": {
             "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
@@ -3869,6 +4068,7 @@ def diagnostics() -> dict[str, Any]:
             "human_coach_public_relay": "BLOCKED_UNLESS_CONFIGURED",
         },
         "connectors": conversation_connectors.diagnostics(),
+        "integrations": integration,
     }
 
 
@@ -3915,18 +4115,21 @@ def export_space(space_id: str) -> dict[str, Any]:
         params=(space_id,),
         order="deleted_at ASC",
     )
-    # Explicit categories are primary. Legacy aggregate keys stay for tooling
-    # compatibility but point to the same local data, not a second truth store.
+    integration = _space_integration_export(space_id)
+    packs = store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC")
     return {
         "kind": "CONVERSATION_SPACE",
         "contract": "v2.0-R1",
         "export_manifest": {
             "categories": [
                 "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
-                "guidance", "source_manifest", "open_threads", "draft_actions", "session_packs", "provenance_tombstones",
+                "guidance", "source_manifest", "connector_snapshots", "connector_connections",
+                "external_execution_audit", "open_threads", "draft_actions", "session_packs",
+                "provenance_tombstones",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
+            "credential_refs_exported": False,
         },
         "space": {k: v for k, v in detail.items() if k not in {"goals", "sessions", "participants", "decisions", "commitments", "open_questions", "threads"}},
         "goals": detail["goals"],
@@ -3939,11 +4142,14 @@ def export_space(space_id: str) -> dict[str, Any]:
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
         "source_manifest": source_manifest,
+        "connector_snapshots": integration["connector_snapshots"],
+        "connector_connections": integration["connections"],
+        "external_execution_audit": integration["external_execution_audit"],
         "draft_actions": list_draft_actions(space_id),
         "provenance_tombstones": tombstones,
         "items": items,
         "open_threads": detail["threads"],
-        "threads": detail["threads"],  # compatibility alias
-        "session_packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
-        "packs": store.select("conversation_session_pack", where="space_id = ?", params=(space_id,), order="created_at ASC"),
+        "threads": detail["threads"],
+        "session_packs": packs,
+        "packs": packs,
     }

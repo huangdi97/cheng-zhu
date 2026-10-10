@@ -5,12 +5,43 @@ import threading
 
 import pytest
 
-from services.product import conversation_capture, conversation_connectors, conversation_screen, conversations, materials
+from services.product import conversation_capture, conversation_connectors, conversation_integrations, conversation_screen, conversations, materials
 from services.storage import product as store
 
 
+class _CalendarReadAdapter:
+    provider_id = "MCP"
+
+    def __init__(self, label: str = "Work Calendar"):
+        self.capabilities = {"calendar.read"}
+        self.label = label
+
+    def health(self, connection=None):
+        return {"ok": True, "label": self.label}
+
+    def read_context(self, *, connection, capability, query, cursor, limit):
+        return {"items": [], "next_cursor": ""}
+
+    def execute(self, **kwargs):
+        raise AssertionError("read-only test adapter must never execute writes")
+
+
+def _connect_calendar_read_adapter(label: str = "Work Calendar"):
+    conversation_integrations.clear_adapters_for_tests()
+    conversation_integrations.register_adapter(_CalendarReadAdapter(label))
+    connection = conversation_integrations.create_connection(
+        "MCP",
+        display_name=label,
+        granted_capabilities=["calendar.read"],
+        provider_scopes=["server-defined"],
+        credential_ref="plugin:mcp/calendar-test",
+        account_hint=label,
+    )
+    return conversation_integrations.verify_and_connect(connection["id"])
+
+
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 7
+    assert store.schema_version() == 9
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -28,17 +59,22 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
         "conversation_transcript_segment",
         "conversation_provenance_tombstone",
         "conversation_screen_context",
+        "conversation_connector_connection",
+        "conversation_connector_snapshot",
+        "conversation_connector_execution",
     } <= tables
     conn = sqlite3.connect(store.DB_PATH)
     try:
         session_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_session)")}
         participant_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_participant)")}
         item_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_item)")}
+        space_cols = {r[1] for r in conn.execute("PRAGMA table_info(conversation_space)")}
     finally:
         conn.close()
     assert "policy_json" in session_cols
     assert "counterparty_state_json" in participant_cols
     assert "time_semantics_json" in item_cols
+    assert "selected_connector_snapshot_ids_json" in space_cols
 
 
 
@@ -1144,13 +1180,8 @@ def test_connector_permission_remains_a_real_preflight_blocker(product_env):
 
 
 def test_registered_read_connector_is_granted_frozen_and_visible_in_live_context(product_env):
-    conversation_connectors.clear_registry()
+    connection = _connect_calendar_read_adapter("Work Calendar")
     try:
-        conversation_connectors.register_provider(
-            "calendar-local",
-            ["calendar.read"],
-            account_label="Work Calendar",
-        )
         space = conversations.create_space("Connector Grant", "PROJECT_SYNC")
         session = conversations.create_session(
             space["id"],
@@ -1162,23 +1193,24 @@ def test_registered_read_connector_is_granted_frozen_and_visible_in_live_context
         assert check["connector_runtime"]["ok"] is True
         assert check["connector_runtime"]["grants"] == [{
             "capability": "calendar.read",
-            "provider_id": "calendar-local",
-            "account_label": "Work Calendar",
+            "provider_id": "MCP",
+            "connection_id": connection["id"],
+            "account_hint": "Work Calendar",
         }]
 
         started = conversations.start_session(session["id"])
         frozen = started["pack"]["payload"]["connector_runtime"]
-        assert frozen["grants"][0]["provider_id"] == "calendar-local"
+        assert frozen["grants"][0]["provider_id"] == "MCP"
+        assert frozen["grants"][0]["connection_id"] == connection["id"]
         live = conversations.session_context(session["id"])
         assert live["connector_runtime"]["grants"][0]["capability"] == "calendar.read"
     finally:
-        conversation_connectors.clear_registry()
+        conversation_integrations.clear_adapters_for_tests()
 
 
-def test_connector_registry_change_after_preflight_invalidates_context_fingerprint(product_env):
-    conversation_connectors.clear_registry()
+def test_connector_connection_change_after_preflight_invalidates_context_fingerprint(product_env):
+    connection = _connect_calendar_read_adapter("Calendar A")
     try:
-        conversation_connectors.register_provider("calendar-a", ["calendar.read"])
         space = conversations.create_space("Connector Drift", "PROJECT_SYNC")
         session = conversations.create_session(
             space["id"],
@@ -1188,12 +1220,15 @@ def test_connector_registry_change_after_preflight_invalidates_context_fingerpri
         first = conversations.preflight(session["id"])
         assert first["blockers"] == []
 
-        conversation_connectors.clear_registry()
-        conversation_connectors.register_provider("calendar-b", ["calendar.read"])
+        store.update(
+            "conversation_connector_connection",
+            connection["id"],
+            {"account_hint": "Calendar B", "updated_at": store.now()},
+        )
         with pytest.raises(ValueError, match="上下文自上次 Preflight 后已变化"):
             conversations.start_session(session["id"])
     finally:
-        conversation_connectors.clear_registry()
+        conversation_integrations.clear_adapters_for_tests()
 
 
 def test_session_connector_permissions_cannot_grant_write_execution(product_env):
@@ -3232,7 +3267,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 7
+    assert diag["schema_version"] == 9
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1
@@ -3280,8 +3315,6 @@ def test_diagnostics_separates_observed_proxies_from_human_label_metrics(product
     assert diag["privacy"]["human_coach_public_relay"] == "BLOCKED_UNLESS_CONFIGURED"
     assert diag["privacy"]["emotion_sentiment_profiling"] == "OFF"
     assert diag["privacy"]["hidden_intent_claims"] == "OFF"
-
-
 
 
 def test_local_upcoming_reminders_only_return_active_future_scheduled_sessions(product_env):
@@ -3496,6 +3529,7 @@ def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(p
         "guidance_events": 1,
         "draft_actions": 1,
         "screen_context_observations": 0,
+        "connector_snapshots": 0,
     }
     assert store.get("conversation_item", item["id"]) is not None
     assert store.get("conversation_draft_action", draft["id"]) is None

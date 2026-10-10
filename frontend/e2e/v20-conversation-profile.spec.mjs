@@ -13,7 +13,8 @@ const SPACE = {
   default_mode: 'BALANCED',
   selected_source_ids: ['benchmark-note'],
   selected_quick_note_ids: [],
-  retention_policy: { preset: 'STANDARD' },
+  selected_connector_snapshot_ids: [],
+  retention_policy: { preset: 'STANDARD', connector_snapshot_days: 30 },
   created_at: 1,
   updated_at: 2,
 }
@@ -172,6 +173,14 @@ function mocks() {
     resolved_at: null,
   }
   return async (pathname, method, request) => {
+    if (pathname === '/api/product/conversation/integrations/catalog') return {
+      items: [
+        { provider_id: 'GOOGLE_CALENDAR', label: 'Google Calendar', capabilities: ['calendar.read'], read_capabilities: ['calendar.read'], write_capabilities: [], external_kinds: ['CALENDAR_EVENT'], provider_scopes: { 'calendar.read': 'https://www.googleapis.com/auth/calendar.readonly' }, sync: 'INCREMENTAL_CURSOR', adapter_available: false },
+        { provider_id: 'MCP', label: 'Model Context Protocol', capabilities: ['calendar.read', 'email.send', 'decision_log.write'], read_capabilities: ['calendar.read'], write_capabilities: ['email.send', 'decision_log.write'], external_kinds: ['CALENDAR_EVENT'], provider_scopes: { 'calendar.read': 'server-defined', 'email.send': 'server-defined', 'decision_log.write': 'server-defined' }, sync: 'SERVER_DEFINED', adapter_available: false },
+      ],
+    }
+    if (pathname === '/api/product/conversation/integrations/connections') return { items: [] }
+    if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
     if (pathname === '/api/product/conversation/demo') return {
       evidence: 'SYNTHETIC_DEMO',
       scenario: 'DESIGN_REVIEW',
@@ -274,9 +283,9 @@ function mocks() {
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/retention`) return {
       space_id: SPACE.id,
-      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30 },
-      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0 },
-      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP' },
+      policy: { preset: 'STANDARD', transcript_days: 30, guidance_days: 30, draft_days: 30, connector_snapshot_days: 30 },
+      would_delete: { transcript_segments: 0, guidance_events: 0, draft_actions: 0, screen_context_observations: 0, connector_snapshots: 0 },
+      kept: { confirmed_items: 'KEEP', session_packs: 'KEEP', provenance_tombstones: 'KEEP', selected_connector_snapshots: 'KEEP', external_execution_audit: 'KEEP', drafts_with_external_execution_audit: 'KEEP' },
       destructive: false,
     }
     if (pathname === `/api/product/conversation/spaces/${SPACE.id}/sessions` && method === 'POST') return { ...SESSION, status: 'UPCOMING', started_at: null, pack_id: '' }
@@ -339,6 +348,9 @@ function mocks() {
         goal_ids: [],
         selected_source_ids: ['benchmark-note'],
         selected_quick_note_ids: [],
+        selected_connector_snapshot_ids: [],
+        connector_snapshots: [],
+        missing_connector_snapshot_ids: [],
         sources: [{
           material_id: 'benchmark-note',
           version_id: 'mv-benchmark-v1',
@@ -449,6 +461,7 @@ function mocks() {
         is_personal_evidence: true,
       }],
       quick_notes: [],
+      connector_snapshots: [],
       participants: [{
         id: 'cp-1',
         display_name: 'Alex',
@@ -1323,9 +1336,10 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: 'Decision Log Draft' }).click()
     await expect(page.getByText('Architecture Review · Decision Log Draft')).toBeVisible()
     await expect(page.getByText('- offline migration 采用 v2 · state=AGREED')).toBeVisible()
-    await expect(page.getByText(/不代表已发送邮件、创建 task \/ issue 或写入 decision log/)).toBeVisible()
+    await expect(page.getByText(/确认草稿 ≠ 外部执行/)).toBeVisible()
     await page.getByRole('button', { name: '确认草稿' }).click()
-    await expect(page.getByText('APPROVED')).toBeVisible()
+    await expect(page.getByText('APPROVED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/当前没有同时满足 adapter available \+ CONNECTED \+ decision_log.write grant/)).toBeVisible()
   })
 
 
@@ -1520,6 +1534,209 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('NOT STARTED', { exact: true })).toBeVisible()
     await expect(page.getByText(/raw image NOT STORED/)).toBeVisible()
     await expect(page.locator('body')).not.toContainText('data:image/')
+  })
+
+
+  test('External Context stays fail-closed when catalog exists but no real adapter/account exists', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: mocks(),
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const external = page.getByTestId('conversation-external-context')
+    await expect(external).toBeVisible()
+    await expect(external.getByText('0 CONNECTED')).toBeVisible()
+    await expect(external.getByText('Google Calendar · not configured')).toBeVisible()
+    await expect(external.getByText('Model Context Protocol · not configured')).toBeVisible()
+    await expect(external.getByText(/当前没有 connector account/)).toBeVisible()
+    await page.getByRole('button', { name: '生成本场并检查' }).click()
+    await expect(page.getByText('External Snapshots 0/0')).toBeVisible()
+    await expect(page.getByText('Connectors 0/0')).toBeVisible()
+  })
+
+
+  test('approved draft requires Execution Request then a second explicit Execute before SUCCEEDED', async ({ context, page }) => {
+    const base = mocks()
+    const connection = {
+      id: 'ccn-e2e',
+      provider_id: 'MCP',
+      display_name: 'Work MCP',
+      status: 'CONNECTED',
+      auth_mode: 'OPAQUE_REFERENCE',
+      granted_capabilities: ['decision_log.write'],
+      provider_scopes: ['server-defined'],
+      account_hint: 'work@example.test',
+      sync_cursor: '',
+      last_sync_at: 7,
+      last_error: '',
+      created_at: 1,
+      updated_at: 7,
+      credential_ref_present: true,
+      adapter_available: true,
+    }
+    let execution = null
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{ provider_id: 'MCP', label: 'Model Context Protocol', capabilities: ['decision_log.write'], read_capabilities: [], write_capabilities: ['decision_log.write'], external_kinds: ['DOCUMENT'], provider_scopes: { 'decision_log.write': 'server-defined' }, sync: 'SERVER_DEFINED', adapter_available: true }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections') return { items: [connection] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          execution = {
+            id: 'cce-e2e',
+            draft_action_id: 'cda-derived',
+            connection_id: connection.id,
+            capability: 'decision_log.write',
+            operation: 'UPDATE_DECISION_LOG',
+            target: '',
+            idempotency_key: 'abcdef1234567890',
+            status: 'PENDING',
+            request: { title: 'Architecture Review · Decision Log Draft' },
+            response: {},
+            error: '',
+            created_at: 8,
+            updated_at: 8,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-e2e/execute' && method === 'POST') {
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: { external_id: 'decision-log-1' },
+            updated_at: 9,
+            executed_at: 9,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption(connection.id)
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Provider 已明确返回 ok=true/)).toBeVisible()
+    await expect(page.getByText(/decision-log-1/)).toBeVisible()
+  })
+
+
+  test('ambiguous external outcome is visible and cannot be retried from Continue', async ({ context, page }) => {
+    const base = mocks()
+    const connection = {
+      id: 'ccn-ambiguous',
+      provider_id: 'MCP',
+      display_name: 'Work MCP',
+      status: 'CONNECTED',
+      auth_mode: 'OPAQUE_REFERENCE',
+      granted_capabilities: ['decision_log.write'],
+      provider_scopes: ['server-defined'],
+      account_hint: 'work@example.test',
+      sync_cursor: '',
+      last_sync_at: 7,
+      last_error: '',
+      created_at: 1,
+      updated_at: 7,
+      credential_ref_present: true,
+      adapter_available: true,
+    }
+    let execution = null
+    let executeCalls = 0
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{ provider_id: 'MCP', label: 'Model Context Protocol', capabilities: ['decision_log.write'], read_capabilities: [], write_capabilities: ['decision_log.write'], external_kinds: ['DOCUMENT'], provider_scopes: { 'decision_log.write': 'server-defined' }, sync: 'SERVER_DEFINED', adapter_available: true }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections') return { items: [connection] }
+        if (pathname === `/api/product/conversation/spaces/${SPACE.id}/connector-snapshots`) return { items: [] }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          execution = {
+            id: 'cce-ambiguous',
+            draft_action_id: 'cda-derived',
+            connection_id: connection.id,
+            capability: 'decision_log.write',
+            operation: 'UPDATE_DECISION_LOG',
+            target: '',
+            idempotency_key: 'ambiguous123456',
+            status: 'PENDING',
+            request: {},
+            response: {},
+            error: '',
+            created_at: 8,
+            updated_at: 8,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-ambiguous/execute' && method === 'POST') {
+          executeCalls += 1
+          execution = executeCalls === 1 ? {
+            ...execution,
+            status: 'UNKNOWN_OUTCOME',
+            response: {},
+            error: 'transport timed out after provider may have accepted request',
+            updated_at: 9,
+          } : {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: { ok: true, external_id: 'replayed-after-confirmed-not-applied' },
+            error: '',
+            updated_at: 11,
+            executed_at: 11,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-ambiguous/reconcile' && method === 'POST') {
+          const body = request.postDataJSON()
+          execution = {
+            ...execution,
+            status: body.outcome === 'CONFIRMED_NOT_APPLIED' ? 'FAILED' : 'SUCCEEDED',
+            response: body.outcome === 'CONFIRMED_NOT_APPLIED'
+              ? { retry_safe: true, reconciliation: { outcome: body.outcome, note: body.note, source: 'USER_REPORTED_PROVIDER_CHECK' } }
+              : { reconciliation: { outcome: body.outcome, note: body.note, provider_reference: body.provider_reference, source: 'USER_REPORTED_PROVIDER_CHECK' } },
+            error: body.outcome === 'CONFIRMED_NOT_APPLIED' ? 'Provider-side reconciliation confirmed the side effect was not applied' : '',
+            updated_at: 10,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption(connection.id)
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('UNKNOWN_OUTCOME', { exact: true })).toBeVisible()
+    await expect(page.getByText(/外部副作用可能已经发生/)).toBeVisible()
+    await expect(page.getByRole('button', { name: '执行外部动作' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '安全重试外部动作' })).toHaveCount(0)
+    expect(executeCalls).toBe(1)
+
+    page.once('dialog', async (dialog) => {
+      expect(dialog.type()).toBe('prompt')
+      await dialog.accept('Checked provider activity log: no external action exists.')
+    })
+    await page.getByRole('button', { name: '已核对：未执行，可安全重试' }).click()
+    await expect(page.getByText('FAILED', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '安全重试外部动作' })).toBeVisible()
+    await page.getByRole('button', { name: '安全重试外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    expect(executeCalls).toBe(2)
   })
 
 

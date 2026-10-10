@@ -3,7 +3,7 @@ import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash
 import { conversationApi } from '@/lib/conversationApi'
 import { activateConversationSharePrivacy, restoreConversationSharePrivacy } from '@/lib/conversationSharePrivacy'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationExternalExecution, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -80,11 +80,21 @@ function ItemRow({ item, onChanged, supersedeOptions = [] }: { item: Conversatio
   )
 }
 
+const DRAFT_EXECUTION_CAPABILITY: Record<ConversationDraftAction['kind'], string> = {
+  FOLLOWUP_EMAIL_DRAFT: 'email.send',
+  CREATE_TASK_DRAFT: 'task.create',
+  CREATE_ISSUE_DRAFT: 'issue.create',
+  UPDATE_DECISION_LOG_DRAFT: 'decision_log.write',
+}
+
 export default function ConversationSpacePage({ spaceId, tab }: { spaceId: string; tab: ConversationTab }) {
   const detail = useAsync(() => conversationApi.space(spaceId), [spaceId])
   const prepare = useAsync(() => conversationApi.prepare(spaceId), [spaceId])
   const materials = useAsync(() => productApi.materials(), [])
   const quickNotes = useAsync(() => productApi.quickNotes(), [])
+  const integrationCatalog = useAsync(() => conversationApi.integrationCatalog(), [])
+  const integrationConnections = useAsync(() => conversationApi.integrationConnections(), [])
+  const connectorSnapshots = useAsync(() => conversationApi.connectorSnapshots(spaceId), [spaceId])
   const retention = useAsync(() => conversationApi.retentionPreview(spaceId), [spaceId])
   const [sessionTitle, setSessionTitle] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
@@ -118,6 +128,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [editingGoalId, setEditingGoalId] = useState('')
   const [sourceSaving, setSourceSaving] = useState(false)
   const [draft, setDraft] = useState<ConversationDraftAction | null>(null)
+  const [integrationBusy, setIntegrationBusy] = useState(false)
+  const [executionConnectionId, setExecutionConnectionId] = useState('')
+  const [execution, setExecution] = useState<ConversationExternalExecution | null>(null)
   const [lifecycleMessage, setLifecycleMessage] = useState('')
 
   const resolveThread = async (threadId: string) => {
@@ -144,6 +157,18 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   if (detail.loading) return <Page><Loading /></Page>
   if (detail.error || !detail.data) return <Page><ErrorState message={detail.error ?? '对话空间不存在'} onRetry={detail.reload} /></Page>
   const space = detail.data
+  const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
+  const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
+    (connection) => connection.status === 'CONNECTED'
+      && connection.adapter_available
+      && connection.granted_capabilities.includes(draftCapability),
+  )
+  const executionRetrySafe = execution?.status === 'FAILED'
+    && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
+  const executionReconciliation = (execution?.response as {
+    reconciliation?: { source?: string; outcome?: string; note?: string; provider_reference?: string; recorded_at?: number }
+  } | undefined)?.reconciliation
+  const executionCanExecute = execution?.status === 'PENDING' || executionRetrySafe
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -276,11 +301,11 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const applyRetention = async () => {
     if (!retention.data) return
     const counts = retention.data.would_delete
-    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}；已确认事项与 provenance 不删除。`)) return
+    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}、未选 external snapshot ${counts.connector_snapshots ?? 0}；已确认事项、已选 snapshot、execution audit 与 provenance 不删除。`)) return
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.applyRetention(spaceId, true)
-      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0}`)
+      setLifecycleMessage(`已清理：transcript ${result.deleted.transcript_segments ?? 0} · guidance ${result.deleted.guidance_events ?? 0} · draft ${result.deleted.draft_actions ?? 0} · external snapshot ${result.deleted.connector_snapshots ?? 0}`)
       await retention.reload()
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
@@ -322,6 +347,56 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setSourceSaving(false) }
   }
 
+  const toggleConnectorSnapshot = async (id: string) => {
+    const selected = new Set(space.selected_connector_snapshot_ids ?? [])
+    if (selected.has(id)) selected.delete(id); else selected.add(id)
+    setSourceSaving(true); setSessionError('')
+    try {
+      await conversationApi.patchSpace(spaceId, { selected_connector_snapshot_ids: Array.from(selected) })
+      await detail.reload(); await prepare.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setSourceSaving(false) }
+  }
+
+  const syncConnector = async (connectionId: string) => {
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const result = await conversationApi.syncIntegrationConnection(connectionId, { space_id: spaceId })
+      setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
+      await connectorSnapshots.reload(); await integrationConnections.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const verifyConnector = async (connectionId: string) => {
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      await conversationApi.verifyIntegrationConnection(connectionId)
+      await integrationConnections.reload()
+      setLifecycleMessage('Connector adapter + opaque credential reference 已通过 health check，连接状态为 CONNECTED。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const disconnectConnector = async (connectionId: string) => {
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      await conversationApi.disconnectIntegrationConnection(connectionId)
+      await integrationConnections.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const revokeConnector = async (connectionId: string) => {
+    if (!window.confirm('撤销这个 connector connection？会清除本地 opaque credential reference；已经冻结进 Session Pack 的 snapshot provenance 不会被改写。')) return
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      await conversationApi.revokeIntegrationConnection(connectionId)
+      await integrationConnections.reload()
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const exportSpace = async () => {
     setSessionBusy(true); setSessionError('')
     try {
@@ -355,14 +430,20 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
 
   const makeFollowupDraft = async (targetSessionId: string) => {
     setSessionBusy(true); setSessionError('')
-    try { setDraft(await conversationApi.followupDraft(targetSessionId)) }
+    try {
+      const nextDraft = await conversationApi.followupDraft(targetSessionId)
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId('')
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
 
   const makeDerivedDraft = async (targetSessionId: string, kind: 'CREATE_TASK_DRAFT' | 'CREATE_ISSUE_DRAFT' | 'UPDATE_DECISION_LOG_DRAFT') => {
     setSessionBusy(true); setSessionError('')
-    try { setDraft(await conversationApi.derivedDraft(targetSessionId, kind)) }
+    try {
+      const nextDraft = await conversationApi.derivedDraft(targetSessionId, kind)
+      setDraft(nextDraft); setExecution(null); setExecutionConnectionId('')
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
   }
@@ -370,9 +451,48 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const reviewDraft = async (action: 'APPROVE' | 'DISMISS') => {
     if (!draft) return
     setSessionBusy(true); setSessionError('')
-    try { setDraft(await conversationApi.reviewDraftAction(draft.id, action)) }
+    try {
+      setDraft(await conversationApi.reviewDraftAction(draft.id, action))
+      setExecution(null); setExecutionConnectionId('')
+    }
     catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setSessionBusy(false) }
+  }
+
+  const requestExecution = async () => {
+    if (!draft || draft.status !== 'APPROVED' || !executionConnectionId) return
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      setExecution(await conversationApi.requestExternalExecution(draft.id, executionConnectionId, draft.target || ''))
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const executeExternal = async () => {
+    if (!execution || !executionCanExecute) return
+    setIntegrationBusy(true); setSessionError('')
+    try { setExecution(await conversationApi.executeExternalRequest(execution.id)) }
+    catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
+  const reconcileExternal = async (outcome: 'CONFIRMED_SUCCEEDED' | 'CONFIRMED_NOT_APPLIED') => {
+    if (!execution || execution.status !== 'UNKNOWN_OUTCOME') return
+    const note = window.prompt(
+      outcome === 'CONFIRMED_SUCCEEDED'
+        ? '请记录你在 provider 侧核对到的成功证据/说明。不会自动读取 provider。'
+        : '请记录你在 provider 侧核对“没有发生外部副作用”的证据/说明。只有这种结果才允许安全重试。',
+      '',
+    )?.trim()
+    if (!note) return
+    const providerReference = outcome === 'CONFIRMED_SUCCEEDED'
+      ? (window.prompt('可选：provider message/task/issue/reference id', '') ?? '').trim()
+      : ''
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      setExecution(await conversationApi.reconcileExternalRequest(execution.id, outcome, note, providerReference))
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
   }
 
   const start = async () => {
@@ -542,7 +662,51 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 {quickNotes.loading ? <Loading /> : quickNotes.data?.items.length ? <div className="space-y-1.5">{quickNotes.data.items.map((n) => <label key={n.id} className="flex items-start gap-2 rounded-xl px-2 py-1.5 text-xs hover:bg-bg-hover/40"><input type="checkbox" checked={(space.selected_quick_note_ids ?? []).includes(n.id)} disabled={sourceSaving} onChange={() => void toggleQuickNote(n.id)} className="mt-0.5" /><span><span className="text-text-primary">{n.title || n.content.slice(0, 50)}</span><span className="ml-1 text-text-muted">用户速记 · 非证据</span></span></label>)}</div> : <p className="text-xs text-text-muted">没有 Quick Notes。</p>}
               </div>
             </div>
-            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本与所选 Quick Notes；后续替换资料不会静默改写这场的 Pack。</p>
+            <div className="mt-4 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/20 p-3" data-testid="conversation-external-context">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold text-text-secondary">External Context · 真实连接边界</div>
+                  <p className="mt-1 text-[11px] text-text-muted">Catalog 只描述支持方向，不代表账户已连接。只有 adapter + verified connection 才能 Sync；Sync 后还要逐条选择 snapshot 才进入本场。</p>
+                </div>
+                <StatusBadge tone={(integrationConnections.data?.items.some((item) => item.status === 'CONNECTED' && item.adapter_available)) ? 'ok' : 'muted'}>
+                  {integrationConnections.data?.items.filter((item) => item.status === 'CONNECTED' && item.adapter_available).length ?? 0} CONNECTED
+                </StatusBadge>
+              </div>
+              {integrationCatalog.loading || integrationConnections.loading || connectorSnapshots.loading ? <div className="mt-3"><Loading /></div> : <>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(integrationCatalog.data?.items ?? []).map((provider) => <StatusBadge key={provider.provider_id} tone={provider.adapter_available ? 'ok' : 'muted'}>{provider.label} · {provider.adapter_available ? 'adapter ready' : 'not configured'}</StatusBadge>)}
+                </div>
+                <div className="mt-3 space-y-2">
+                  {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
+                    <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div><span className="text-xs font-medium text-text-primary">{connection.display_name}</span><span className="ml-2 text-[10px] text-text-muted">{connection.provider_id} · {connection.account_hint || 'account hidden'}</span></div>
+                        <StatusBadge tone={connection.status === 'CONNECTED' && connection.adapter_available ? 'ok' : connection.status === 'ERROR' ? 'warn' : 'muted'}>{connection.status}</StatusBadge>
+                      </div>
+                      <div className="mt-1 text-[10px] text-text-muted">{connection.granted_capabilities.join(' · ') || 'no grants'} · credential {connection.credential_ref_present ? 'opaque ref present' : 'not configured'}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
+                        {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
+                      </div>
+                      {connection.last_error ? <div className="mt-2 text-[10px] text-status-risk">{connection.last_error}</div> : null}
+                    </div>
+                  )) : <p className="text-[11px] text-text-muted">当前没有 connector account。仓库不会因为 catalog 里有 Google / Microsoft / GitHub / MCP 就假装已连接；账户授权由真实 provider/plugin 流程创建。</p>}
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Immutable snapshots · 显式选入 Space</div>
+                  {(connectorSnapshots.data?.items ?? []).length ? <div className="space-y-1.5">{connectorSnapshots.data!.items.map((snapshot) => {
+                    const checked = (space.selected_connector_snapshot_ids ?? []).includes(snapshot.id)
+                    return <label key={snapshot.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-bg-hover/40">
+                      <input type="checkbox" checked={checked} disabled={sourceSaving} onChange={() => void toggleConnectorSnapshot(snapshot.id)} className="mt-0.5" />
+                      <span><span className="text-text-primary">{snapshot.title || snapshot.external_id}</span><span className="ml-1 text-text-muted">{snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</span>{snapshot.excerpt ? <span className="mt-0.5 block line-clamp-2 text-[10px] text-text-muted">{snapshot.excerpt}</span> : null}</span>
+                    </label>
+                  })}</div> : <p className="text-[11px] text-text-muted">还没有外部 snapshot。真实连接 Sync 后才会出现；本场仍可完全离线使用。</p>}
+                </div>
+              </>}
+            </div>
+            <p className="mt-3 text-[11px] text-text-muted">Session 开始时会冻结 Ready 版本、所选 Quick Notes 与显式选择的 external snapshots；后续资料替换或再次 Sync 都不会静默改写这场的 Pack。</p>
           </Section>
           <Section title="Preflight">
             <div className="mb-3 grid gap-3 md:grid-cols-2">
@@ -601,6 +765,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>Goals {preflight.pack_preview.goal_ids.length}</span>
                   <span>Ready Sources {preflight.pack_preview.sources.length}/{preflight.pack_preview.selected_source_ids.length}</span>
                   <span>Quick Notes {preflight.pack_preview.quick_notes.length}/{preflight.pack_preview.selected_quick_note_ids.length}</span>
+                  <span>External Snapshots {preflight.pack_preview.connector_snapshots.length}/{preflight.pack_preview.selected_connector_snapshot_ids.length}</span>
                   <span>Participants {preflight.pack_preview.participants_count}</span>
                   <span>Confirmed items {preflight.pack_preview.confirmed_items_count}</span>
                   <span>Expression {Object.keys(preflight.pack_preview.expression_profile ?? {}).length ? '已冻结' : '默认'}</span>
@@ -615,8 +780,13 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                 </div>
                 {preflight.pack_preview.connector_runtime.grants.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen connector grants</div>
-                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_runtime.grants.map((grant) => <div key={grant.capability} className="text-[11px] text-text-secondary">• {grant.capability} · {grant.provider_id}{grant.account_label ? ` · ${grant.account_label}` : ''}</div>)}</div>
-                  <p className="mt-1 text-[10px] text-text-muted">这里只是 read capability grant；不会顺带允许 email/task/issue write execution。</p>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_runtime.grants.map((grant) => <div key={`${grant.connection_id}:${grant.capability}`} className="text-[11px] text-text-secondary">• {grant.capability} · {grant.provider_id}{grant.account_hint ? ` · ${grant.account_hint}` : ''} · connection {grant.connection_id.slice(0, 8)}</div>)}</div>
+                  <p className="mt-1 text-[10px] text-text-muted">这是 exact read grant + exact connection；不会顺带允许 email/task/issue write execution。</p>
+                </div> : null}
+                {preflight.pack_preview.connector_snapshots.length ? <div className="mt-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen external snapshots · reference only</div>
+                  <div className="mt-1 space-y-1">{preflight.pack_preview.connector_snapshots.map((snapshot) => <div key={snapshot.id} className="text-[11px] text-text-secondary">• {snapshot.title || snapshot.external_id} · {snapshot.external_kind} · {snapshot.capability} · hash {snapshot.content_hash.slice(0, 8)}</div>)}</div>
+                  <p className="mt-1 text-[10px] text-text-muted">External snapshot 永远是 REFERENCE_SOURCE，不会因为来自 Google / Microsoft / GitHub 就自动升级成 Decision / Commitment truth。</p>
                 </div> : null}
                 {preflight.pack_preview.sources.length ? <div className="mt-3">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Frozen sources</div>
@@ -627,7 +797,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <div className="mt-1 space-y-1">{preflight.pack_preview.quick_notes.map((note) => <div key={note.id} className="text-[11px] text-text-secondary">• {note.title || note.id}</div>)}</div>
                 </div> : null}
                 {preflight.pack_preview.skipped_sources.length ? <div className="mt-3 text-[11px] text-status-inferred">Skipped Sources · {preflight.pack_preview.skipped_sources.map((x) => x.title || x.id).join(' · ')}</div> : null}
-                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、我的表达与 policy 会被冻结进 Session Pack；后续资料或表达偏好变化不会静默改写本场。</p>
+                <p className="mt-2 text-[11px] text-text-muted">点击开始后，这一组上下文、external snapshot、exact connector grant、我的表达与 policy 会被冻结进 Session Pack；后续资料、再次 Sync、账户状态或表达偏好变化不会静默改写本场。</p>
               </div>
               <p className="mt-3 text-[11px] text-text-muted">{preflight.privacy_note}</p>
             </div> : null}
@@ -666,7 +836,41 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <SecondaryButton disabled={sessionBusy || continueData.session.policy?.external_writeback === 'OFF' || !continueData.decisions.length} onClick={() => makeDerivedDraft(continueData.session.id, 'UPDATE_DECISION_LOG_DRAFT')}>Decision Log Draft</SecondaryButton>
             </div>
             {continueData.session.policy?.external_writeback === 'OFF' ? <p className="mt-2 text-[11px] text-text-muted">本场 External Write-back = OFF，因此不会生成 follow-up / task / issue 草稿。</p> : null}
-            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3"><div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span></div><pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>{draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}<p className="mt-2 text-[11px] text-text-muted">确认只代表你审核了本地草稿，不代表已发送邮件、创建 task / issue 或写入 decision log。真正的 connector execution 尚未接线。</p></div> : null}
+            {draft ? <div className="mt-3 rounded-xl border border-bg-tertiary bg-bg-primary/60 p-3" data-testid="conversation-draft-action">
+              <div className="flex items-center gap-2"><StatusBadge tone={draft.status === 'APPROVED' ? 'ok' : draft.status === 'DISMISSED' ? 'muted' : 'warn'}>{draft.status}</StatusBadge><span className="text-xs font-semibold text-text-primary">{draft.title}</span><span className="text-[10px] text-text-muted">{DRAFT_EXECUTION_CAPABILITY[draft.kind]}</span></div>
+              <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-text-secondary">{draft.content}</pre>
+              {draft.status === 'DRAFT' ? <div className="mt-3 flex gap-2"><SecondaryButton onClick={() => reviewDraft('APPROVE')}>确认草稿</SecondaryButton><SecondaryButton onClick={() => reviewDraft('DISMISS')}>丢弃</SecondaryButton></div> : null}
+              {draft.status === 'APPROVED' ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-secondary/30 p-3">
+                <div className="text-xs font-semibold text-text-secondary">External Execution · 第二次显式动作</div>
+                <p className="mt-1 text-[11px] text-text-muted">APPROVED 只代表本地草稿已审核。下面先创建 Execution Request；只有随后再次点击执行且 provider 返回成功，才可显示 SUCCEEDED。</p>
+                {compatibleExecutionConnections.length ? <>
+                  <select className={inputCls + ' mt-2'} aria-label="外部执行连接" value={executionConnectionId} onChange={(e) => { setExecutionConnectionId(e.target.value); setExecution(null) }}>
+                    <option value="">选择兼容的真实连接</option>
+                    {compatibleExecutionConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.display_name} · {connection.provider_id} · {connection.account_hint || connection.id.slice(0, 8)}</option>)}
+                  </select>
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
+                    {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
+                    {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
+                    {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
+                    {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
+                      <div>结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <SecondaryButton disabled={integrationBusy} onClick={() => reconcileExternal('CONFIRMED_SUCCEEDED')}>已核对：确实执行</SecondaryButton>
+                        <SecondaryButton disabled={integrationBusy} onClick={() => reconcileExternal('CONFIRMED_NOT_APPLIED')}>已核对：未执行，可安全重试</SecondaryButton>
+                      </div>
+                      <div className="mt-2 text-[10px] text-text-muted">这两个动作只记录你在 provider 侧的核对结果，不会自动假设或重放外部动作。</div>
+                    </div> : null}
+                    {execution.status === 'SUCCEEDED' ? <div className="mt-2">
+                      <div className="text-[11px] font-semibold text-status-direct">{executionReconciliation?.source === 'USER_REPORTED_PROVIDER_CHECK' ? '你已记录 provider-side reconciliation：确认外部动作已发生。实际执行时间未知；这不是原 adapter 的 ok=true 响应。' : 'Provider 已明确返回 ok=true；这条 execution audit 会保留，并与用户事后 reconciliation 明确区分。'}</div>
+                      {executionReconciliation?.note ? <div className="mt-1 text-[10px] text-text-muted">核对说明 · {executionReconciliation.note}</div> : null}
+                      {Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}
+                    </div> : null}
+                  </div>}
+                </> : <p className="mt-2 text-[11px] text-status-inferred">当前没有同时满足 adapter available + CONNECTED + {draftCapability} grant 的账户。本地 APPROVED 草稿会保留，但不会伪装成已发送/已创建。</p>}
+              </div> : null}
+              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。直接成功必须来自 provider adapter 明确 ok=true；UNKNOWN_OUTCOME 只能通过 provider-side reconciliation 记录“已确认发生”或“已确认未发生”。两类成功证据在 audit 中保持可区分，只有“确认未发生”才会把该 row 变成 retry_safe。</p>
+            </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

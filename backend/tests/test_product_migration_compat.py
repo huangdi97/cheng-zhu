@@ -186,11 +186,11 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
     product_store.init_db()
     goal_id = goals.create_goal("MindRank", "AIDD Agent Engineer")["id"]
     assert goal_id
-    assert product_store.schema_version() == 7
+    assert product_store.schema_version() == 9
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 8)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 10)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -224,22 +224,129 @@ def test_v7_screen_context_migration_preserves_v6_temporal_provenance():
         assert "time_semantics_json" in item_cols_before
         assert "conversation_screen_context" not in tables_before
 
-        before = product_migrations.ensure_schema(conn)
-        assert before == 6
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        apply_v7, _name = product_migrations._MIGRATIONS[7]
+        apply_v7(conn)
+        conn.execute("PRAGMA user_version = 7")
+        conn.commit()
 
         item_cols_after = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         tables_after = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "time_semantics_json" in item_cols_after
         assert "conversation_screen_context" in tables_after
-
         indexes = {row[1] for row in conn.execute("PRAGMA index_list(conversation_screen_context)")}
         assert "idx_conversation_screen_session" in indexes
         assert "idx_conversation_screen_space" in indexes
+    finally:
+        conn.close()
 
-        # Idempotent at v7: no duplicate schema work and no regression of v6.
-        assert product_migrations.ensure_schema(conn) == 7
+
+def test_v8_integration_migration_is_additive_over_v7_screen_context():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 8):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        before_tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        before_item_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
+        before_screen_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
+        assert "conversation_screen_context" in before_tables
+        assert "time_semantics_json" in before_item_cols
+        assert "text" in before_screen_cols
+        assert "conversation_connector_connection" not in before_tables
+
+        before = product_migrations.ensure_schema(conn)
+        assert before == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert {
+            "conversation_connector_connection",
+            "conversation_connector_snapshot",
+            "conversation_connector_execution",
+        } <= tables
+        space_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_space)")}
+        assert "selected_connector_snapshot_ids_json" in space_cols
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
+        assert "text" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
+
+        assert product_migrations.ensure_schema(conn) == 9
+    finally:
+        conn.close()
+
+
+
+
+def test_v9_snapshot_rebuild_preserves_existing_v8_rows_and_adds_space_scoped_unique_key():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 9):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        # Seed the minimum referenced parent rows required by the v8 snapshot.
+        conn.execute(
+            "INSERT INTO conversation_space "
+            "(id, title, profile, description, default_goal, default_mode, relationship_key, status, "
+            "selected_source_ids_json, selected_quick_note_ids_json, selected_connector_snapshot_ids_json, "
+            "retention_policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("space-v8", "Space", "PROJECT_SYNC", "", "", "BALANCED", "", "ACTIVE", "[]", "[]", "[]", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_connector_connection "
+            "(id, provider_id, display_name, status, auth_mode, credential_ref, granted_capabilities_json, "
+            "provider_scopes_json, account_hint, sync_cursor, last_sync_at, last_error, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("conn-v8", "MCP", "MCP", "CONNECTED", "OPAQUE_REFERENCE", "plugin:mcp/test",
+             '["calendar.read"]', '["server-defined"]', "work", "", 1.0, "", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_connector_snapshot "
+            "(id, connection_id, space_id, capability, external_kind, external_id, title, excerpt, content_hash, "
+            "source_url, occurred_at, visibility, metadata_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("snap-v8", "conn-v8", "space-v8", "calendar.read", "CALENDAR_EVENT", "event-1",
+             "Review", "10x data scale", "hash-v8", "https://calendar.example/event/1", 1.0, "PRIVATE", '{"safe":"yes"}', 1.0),
+        )
+        conn.commit()
+
+        before = conn.execute(
+            "SELECT id, connection_id, space_id, capability, external_id, content_hash, metadata_json "
+            "FROM conversation_connector_snapshot"
+        ).fetchone()
+
+        apply_v9, _name = product_migrations._MIGRATIONS[9]
+        apply_v9(conn)
+        conn.execute("PRAGMA user_version = 9")
+        conn.commit()
+
+        after = conn.execute(
+            "SELECT id, connection_id, space_id, capability, external_id, content_hash, metadata_json "
+            "FROM conversation_connector_snapshot"
+        ).fetchone()
+        assert after == before
+
+        unique_indexes = [
+            row for row in conn.execute("PRAGMA index_list(conversation_connector_snapshot)").fetchall()
+            if row[2] == 1
+        ]
+        assert unique_indexes, "v9 rebuilt snapshot table must retain a UNIQUE provenance key"
+        unique_columns = {
+            tuple(col[2] for col in conn.execute(f"PRAGMA index_info('{row[1]}')").fetchall())
+            for row in unique_indexes
+        }
+        assert (
+            "space_id", "connection_id", "capability", "external_kind", "external_id", "content_hash"
+        ) in unique_columns
     finally:
         conn.close()
 
@@ -250,7 +357,7 @@ def test_deleting_product_db_is_a_complete_rollback(v122_env):
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 7
+    assert product_store.schema_version() == 9
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

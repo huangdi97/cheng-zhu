@@ -151,6 +151,7 @@ class ConnectorAdapter(Protocol):
 
 
 _ADAPTERS: dict[str, ConnectorAdapter] = {}
+_ACTIVE_EXECUTIONS: set[str] = set()
 _CREDENTIAL_REF_RE = re.compile(r"^(?:keyring|oskeychain|provider|plugin):[A-Za-z0-9._:/-]{1,240}$")
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:^|[_-])(token|secret|authorization|credential|cookie|api[_-]?key|"
@@ -701,10 +702,46 @@ def request_execution(
     return store.get("conversation_connector_execution", row["id"]) or row
 
 
+def _recover_orphaned_executions() -> int:
+    """Convert persisted EXECUTING rows with no live in-process call to UNKNOWN.
+
+    Chengzhu Desktop runs one backend process. After process restart the
+    in-memory active set is empty, so a persisted EXECUTING row means the
+    process was interrupted after outbound execution began. The side effect may
+    already exist remotely and therefore cannot be retried safely.
+    """
+    recovered = 0
+    for row in store.select(
+        "conversation_connector_execution",
+        where="status = 'EXECUTING'",
+        order="updated_at ASC",
+        limit=1000,
+    ):
+        execution_id = str(row.get("id") or "")
+        if not execution_id or execution_id in _ACTIVE_EXECUTIONS:
+            continue
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "UNKNOWN_OUTCOME",
+            "error": "Backend execution was interrupted; provider outcome must be reconciled before retry",
+            "updated_at": store.now(),
+        })
+        recovered += 1
+    return recovered
+
+
 def execute_request(execution_id: str) -> dict[str, Any]:
     row = store.get("conversation_connector_execution", execution_id)
     if not row:
         raise ValueError("External execution request 不存在")
+    if row["status"] == "EXECUTING":
+        if execution_id in _ACTIVE_EXECUTIONS:
+            raise ValueError("External execution request 正在当前进程执行")
+        store.update("conversation_connector_execution", execution_id, {
+            "status": "UNKNOWN_OUTCOME",
+            "error": "Backend execution was interrupted; provider outcome must be reconciled before retry",
+            "updated_at": store.now(),
+        })
+        row = store.get("conversation_connector_execution", execution_id) or row
     if row["status"] == "SUCCEEDED":
         return row
     if row["status"] == "BLOCKED":
@@ -740,6 +777,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
         raise ValueError(f"Connection 不再具备 {capability}")
 
     adapter = _ADAPTERS[str(connection["provider_id"])]
+    _ACTIVE_EXECUTIONS.add(execution_id)
     store.update("conversation_connector_execution", execution_id, {
         "status": "EXECUTING",
         "error": "",
@@ -766,6 +804,8 @@ def execute_request(execution_id: str) -> dict[str, Any]:
             "updated_at": store.now(),
         })
         return store.get("conversation_connector_execution", execution_id) or row
+    finally:
+        _ACTIVE_EXECUTIONS.discard(execution_id)
 
     if not isinstance(result.get("ok"), bool):
         store.update("conversation_connector_execution", execution_id, {
@@ -800,6 +840,7 @@ def execute_request(execution_id: str) -> dict[str, Any]:
 
 
 def list_executions(*, draft_action_id: str = "", limit: int = 200) -> list[dict[str, Any]]:
+    _recover_orphaned_executions()
     if draft_action_id:
         return store.select(
             "conversation_connector_execution",
@@ -816,6 +857,7 @@ def list_executions(*, draft_action_id: str = "", limit: int = 200) -> list[dict
 
 
 def diagnostics() -> dict[str, Any]:
+    recovered_orphans = _recover_orphaned_executions()
     connections = list_connections()
     connected = [row for row in connections if row["status"] == "CONNECTED" and row["adapter_available"]]
     return {
@@ -829,6 +871,7 @@ def diagnostics() -> dict[str, Any]:
         "unknown_outcome_count": int(store.scalar(
             "SELECT COUNT(*) FROM conversation_connector_execution WHERE status = 'UNKNOWN_OUTCOME'"
         ) or 0),
+        "orphaned_executions_recovered": recovered_orphans,
         "secret_storage": "OPAQUE_REFERENCE_ONLY",
         "default": "NO_PROVIDER_ADAPTERS_CONFIGURED",
     }

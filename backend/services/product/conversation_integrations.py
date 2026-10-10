@@ -349,6 +349,7 @@ def create_connection(
         "provider_scopes": validated_scopes,
         "account_hint": str(account_hint or "")[:300],
         "sync_cursor": "",
+        "sync_cursors": {},
         "last_sync_at": None,
         "last_error": "",
         "created_at": ts,
@@ -422,6 +423,7 @@ def revoke(connection_id: str) -> dict[str, Any]:
         "auth_mode": "NONE",
         "credential_ref": "",
         "sync_cursor": "",
+        "sync_cursors": {},
         "last_error": "",
         "updated_at": store.now(),
     })
@@ -516,10 +518,7 @@ def _store_snapshot(
     external_id = str(raw.get("external_id") or raw.get("id") or "").strip()
     if not external_id:
         raise ValueError("Connector snapshot 缺少 external_id")
-    metadata = _sanitize(dict(raw.get("metadata") or {}))
-    provider_content_hash = str(raw.get("content_hash") or "").strip()
-    if provider_content_hash:
-        metadata = {**metadata, "provider_content_hash": provider_content_hash[:500]}
+    canonical_metadata = _sanitize(dict(raw.get("metadata") or {}))
     normalized = {
         "capability": capability,
         "external_kind": kind,
@@ -529,9 +528,15 @@ def _store_snapshot(
         "source_url": _safe_url(str(raw.get("source_url") or "")),
         "occurred_at": raw.get("occurred_at"),
         "visibility": str(raw.get("visibility") or "PRIVATE").upper()[:80],
-        "metadata": metadata,
+        "metadata": canonical_metadata,
     }
+    # Provider hashes are retained only as provenance metadata. They do not
+    # control Chengzhu's immutable identity and therefore are not hash inputs.
     content_hash = _snapshot_hash(normalized)
+    stored_metadata = dict(canonical_metadata)
+    provider_content_hash = str(raw.get("content_hash") or "").strip()
+    if provider_content_hash:
+        stored_metadata["provider_content_hash"] = provider_content_hash[:500]
     existing = store.rows(
         "SELECT * FROM conversation_connector_snapshot "
         "WHERE space_id = ? AND connection_id = ? AND capability = ? AND external_kind = ? "
@@ -545,6 +550,7 @@ def _store_snapshot(
         "connection_id": connection["id"],
         "space_id": space_id,
         **normalized,
+        "metadata": stored_metadata,
         "content_hash": content_hash,
         "source_url": normalized["source_url"],
         "visibility": normalized["visibility"],
@@ -579,11 +585,14 @@ def sync_connection(
     if not requested:
         raise ValueError("Connector 没有可同步的 read capability")
 
-    cursor = str(connection.get("sync_cursor") or "")
+    cursors = dict(connection.get("sync_cursors") or {})
+    # v8 compatibility: if exactly one capability is requested and no
+    # capability cursor exists yet, seed it from the legacy scalar cursor.
+    legacy_cursor = str(connection.get("sync_cursor") or "")
     snapshots: list[dict[str, Any]] = []
     try:
-        next_cursor = cursor
         for capability in requested:
+            cursor = str(cursors.get(capability) or (legacy_cursor if len(requested) == 1 else ""))
             result = adapter.read_context(
                 connection=connection,
                 capability=capability,
@@ -593,10 +602,13 @@ def sync_connection(
             ) or {}
             for raw in list(result.get("items") or [])[:max(1, min(int(limit), 500))]:
                 snapshots.append(_store_snapshot(connection, space_id, capability, dict(raw or {})))
-            if result.get("next_cursor"):
-                next_cursor = str(result["next_cursor"])[:4000]
+            if result.get("next_cursor") is not None:
+                cursors[capability] = str(result.get("next_cursor") or "")[:4000]
         store.update("conversation_connector_connection", connection_id, {
-            "sync_cursor": next_cursor,
+            "sync_cursors": cursors,
+            # Keep the scalar field readable for old beta tooling only when
+            # the sync is unambiguously a single capability.
+            "sync_cursor": str(cursors.get(requested[0]) or "") if len(requested) == 1 else "",
             "last_sync_at": store.now(),
             "last_error": "",
             "updated_at": store.now(),

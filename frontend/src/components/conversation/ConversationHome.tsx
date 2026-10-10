@@ -1,4 +1,4 @@
-import { ArrowRight, MessageSquareText, Plus, Clock3, CircleHelp, CheckCircle2, Play } from 'lucide-react'
+import { ArrowRight, MessageSquareText, Plus, Clock3, CircleHelp, CheckCircle2, Play, Bell, BellOff } from 'lucide-react'
 import { conversationApi } from '@/lib/conversationApi'
 import { navigate, paths } from '@/lib/router'
 import { EmptyState, ErrorState, Loading, Page, PageHeader, PrimaryButton, Section, SecondaryButton, StatusBadge, formatWhen, useAsync } from '@/components/os/ui'
@@ -8,6 +8,18 @@ export default function ConversationHome() {
   const { data, error, loading, reload } = useAsync(() => conversationApi.home(), [])
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState('')
+  const reminderSupported = Boolean(window.electronAPI?.syncConversationReminders)
+  const [remindersEnabled, setRemindersEnabled] = useState(() => {
+    try { return window.localStorage.getItem('chengzhu-conversation-reminders') === '1' }
+    catch { return false }
+  })
+  const toggleReminders = () => {
+    if (!reminderSupported) return
+    const next = !remindersEnabled
+    setRemindersEnabled(next)
+    try { window.localStorage.setItem('chengzhu-conversation-reminders', next ? '1' : '0') } catch { /* storage unavailable */ }
+    window.dispatchEvent(new Event('chengzhu-conversation-reminders-changed'))
+  }
   const startAdhoc = async () => {
     setStarting(true); setStartError('')
     try {
@@ -25,7 +37,13 @@ export default function ConversationHome() {
         eyebrow="Personal Conversation Intelligence · Beta"
         title="对话"
         subtitle="不是会议纪要。把过去真正发生过的事带进下一场对话，并在值得开口时提醒你。"
-        actions={<div className="flex gap-2"><SecondaryButton disabled={starting} onClick={startAdhoc} icon={<Play className="h-3.5 w-3.5" />}>{starting ? '启动中…' : '开始临时会话'}</SecondaryButton><PrimaryButton onClick={() => navigate(paths.conversationSpaces(undefined, { new: '1' }))} icon={<Plus className="h-3.5 w-3.5" />}>新建对话空间</PrimaryButton></div>}
+        actions={<div className="flex flex-wrap gap-2">
+          <SecondaryButton disabled={!reminderSupported} onClick={toggleReminders} icon={remindersEnabled ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}>
+            {reminderSupported ? (remindersEnabled ? '桌面提醒已开' : '开启桌面提醒') : '桌面提醒仅桌面端'}
+          </SecondaryButton>
+          <SecondaryButton disabled={starting} onClick={startAdhoc} icon={<Play className="h-3.5 w-3.5" />}>{starting ? '启动中…' : '开始临时会话'}</SecondaryButton>
+          <PrimaryButton onClick={() => navigate(paths.conversationSpaces(undefined, { new: '1' }))} icon={<Plus className="h-3.5 w-3.5" />}>新建对话空间</PrimaryButton>
+        </div>}
       />
 
       {startError ? <div className="mb-4"><ErrorState message={startError} /></div> : null}
@@ -38,6 +56,7 @@ export default function ConversationHome() {
       ) : (
         <>
           <Section title="下一场">
+            {reminderSupported ? <p className="mb-2 text-[11px] text-text-muted">{remindersEnabled ? '本地桌面提醒已开启：默认提前 10 分钟；系统通知不显示会话标题。' : '桌面提醒默认关闭；开启后只使用成竹内已排期 Session，不读取外部 Calendar。'}</p> : null}
             {data.next_session ? (
               <button type="button" onClick={() => navigate(paths.conversationSpace(data.next_session!.space_id, 'prepare'))}
                 className="w-full text-left rounded-2xl border border-bg-tertiary bg-bg-secondary/40 p-4 hover:bg-bg-hover/40 transition-colors">

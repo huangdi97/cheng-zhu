@@ -191,6 +191,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const outboundRedactionApplied = Boolean(
     (execution?.request as { outbound_redaction_applied?: boolean } | undefined)?.outbound_redaction_applied,
   )
+  const gmailRedactionBlocked = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && outboundRedactionApplied
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -1139,7 +1140,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     {outboundRedactionApplied ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
                       检测到 secret/token 形态的敏感值。Execution Request 中保存并实际发送给 provider 的内容已经脱敏，因此可能与刚才审核的本地 Draft 不完全一致；请在第二次 Execute 前按脱敏后的外发语义重新确认。
                     </div> : null}
-                    {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
+                    {gmailRedactionBlocked ? <div className="mt-2 text-[11px] text-status-risk">Gmail send-only provider 不会发送被安全层改写过、但尚未重新审核的内容。请回到 Draft 移除敏感值并重新确认，再创建新的 Execution Request。</div> : null}
+                    {executionCanExecute && !gmailRedactionBlocked ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
                     {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
                     {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
                       <div>结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div>

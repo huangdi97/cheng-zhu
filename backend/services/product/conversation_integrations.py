@@ -444,8 +444,10 @@ def verify_and_connect(connection_id: str) -> dict[str, Any]:
             "updated_at": store.now(),
         })
         raise ValueError(safe_error)
+    safe_account_hint = _redact_secret_values(str(health.get("account_hint") or row.get("account_hint") or ""))[:300]
     store.update("conversation_connector_connection", connection_id, {
         "status": "CONNECTED",
+        "account_hint": safe_account_hint,
         "last_error": "",
         "updated_at": store.now(),
     })

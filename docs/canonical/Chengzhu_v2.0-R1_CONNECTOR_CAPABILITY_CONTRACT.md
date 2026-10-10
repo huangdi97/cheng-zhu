@@ -208,8 +208,10 @@ docs.read
 - folder direct children 必须完整分页后才能向 integration boundary 返回结果；
 - direct children 超过 500 时整次失败，不保存“前 500 个”再假装完整；
 - v1 provider 采用 user-triggered `FULL_TARGET_REFRESH`，不做 account-wide background mirror；
-- Google Docs / Slides → `text/plain`；
-- Google Sheets → `text/csv`，并冻结 `partial_content=true / FIRST_SHEET_CSV`；
+- Google Docs / Slides → `text/plain`，完整读取用于本地 full-content digest，但 snapshot retrieval 仅冻结前 20k 字符（`TEXT_EXPORT_EXCERPT_20K`）；
+- Google Sheets → `text/csv`，并冻结 `partial_content=true / FIRST_SHEET_CSV_EXCERPT_20K`；
+- 可文本化 blob 同样以完整读取内容计算 revision digest，但当前 retrieval scope = `FIRST_20000_CHARS`；
+- full-content digest 进入 canonical snapshot hash metadata，使“前 20k 相同、尾部变化”的文档仍形成新 revision；
 - 常见小型文本 blob → `files.get?alt=media`；
 - PDF / image / binary / unsupported → metadata-only DOCUMENT，`content_available=false`；
 - 超过 2MB 的文本不做静默截断后冒充完整正文；

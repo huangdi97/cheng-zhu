@@ -735,22 +735,52 @@ def sync_connection(
         raise ValueError(safe_error) from None
 
 
+def _snapshot_revision_view(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Annotate immutable provenance with current-provider revision truth.
+
+    Historical snapshots remain readable/exportable. is_latest_revision
+    answers whether this is the newest observed version of the same external
+    object inside this Space/connection/capability.
+    """
+    rows = store.rows(
+        "SELECT id FROM conversation_connector_snapshot "
+        "WHERE space_id = ? AND connection_id = ? AND capability = ? "
+        "AND external_kind = ? AND external_id = ? "
+        "ORDER BY created_at DESC, id DESC LIMIT 1",
+        (
+            snapshot.get("space_id"),
+            snapshot.get("connection_id"),
+            snapshot.get("capability"),
+            snapshot.get("external_kind"),
+            snapshot.get("external_id"),
+        ),
+    )
+    latest_id = str(rows[0]["id"]) if rows else str(snapshot.get("id") or "")
+    return {
+        **snapshot,
+        "is_latest_revision": str(snapshot.get("id") or "") == latest_id,
+        "latest_snapshot_id": latest_id,
+    }
+
+
 def list_snapshots(space_id: str, *, connection_id: str = "", limit: int = 200) -> list[dict[str, Any]]:
     if connection_id:
-        return store.select(
+        rows = store.select(
             "conversation_connector_snapshot",
             where="space_id = ? AND connection_id = ?",
             params=(space_id, connection_id),
             order="COALESCE(occurred_at, created_at) DESC",
             limit=max(1, min(int(limit), 1000)),
         )
-    return store.select(
-        "conversation_connector_snapshot",
-        where="space_id = ?",
-        params=(space_id,),
-        order="COALESCE(occurred_at, created_at) DESC",
-        limit=max(1, min(int(limit), 1000)),
-    )
+    else:
+        rows = store.select(
+            "conversation_connector_snapshot",
+            where="space_id = ?",
+            params=(space_id,),
+            order="COALESCE(occurred_at, created_at) DESC",
+            limit=max(1, min(int(limit), 1000)),
+        )
+    return [_snapshot_revision_view(row) for row in rows]
 
 
 def validate_snapshot_selection(space_id: str, snapshot_ids: list[str]) -> list[str]:

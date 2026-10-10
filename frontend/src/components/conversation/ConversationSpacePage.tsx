@@ -131,6 +131,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [integrationBusy, setIntegrationBusy] = useState(false)
   const [githubEnvVar, setGithubEnvVar] = useState('CHENGZHU_GITHUB_TOKEN')
   const [githubRepository, setGithubRepository] = useState('')
+  const [googleCalendarEnvVar, setGoogleCalendarEnvVar] = useState('CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN')
+  const [googleCalendarId, setGoogleCalendarId] = useState('primary')
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -164,6 +166,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   if (detail.error || !detail.data) return <Page><ErrorState message={detail.error ?? '对话空间不存在'} onRetry={detail.reload} /></Page>
   const space = detail.data
   const githubProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GITHUB')
+  const googleCalendarProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_CALENDAR')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -404,19 +407,56 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const createGoogleCalendarConnection = async () => {
+    const envName = googleCalendarEnvVar.trim()
+    const calendarId = googleCalendarId.trim() || 'primary'
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Google Calendar credential env 只允许环境变量名，例如 CHENGZHU_GOOGLE_CALENDAR_ACCESS_TOKEN。')
+      return
+    }
+    if (calendarId.length > 500 || /[\r\n\0]/.test(calendarId)) {
+      setSessionError('Google Calendar calendar id 非法。可使用 primary 或显式 calendar id。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      const created = await conversationApi.createIntegrationConnection({
+        provider_id: 'GOOGLE_CALENDAR',
+        display_name: `Google Calendar · ${calendarId}`,
+        granted_capabilities: ['calendar.read'],
+        credential_ref: `provider:google-calendar:env:${envName}`,
+        account_hint: calendarId,
+      })
+      setConnectorTargets((current) => ({ ...current, [created.id]: calendarId }))
+      await integrationConnections.reload()
+      setLifecycleMessage('Google Calendar connection 元数据已创建。下一步点击“验证连接”；这里只记录 opaque env reference，不保存 access token。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
+    const calendarId = (connectorTargets[connectionId] || connection?.account_hint || googleCalendarId || 'primary').trim()
     if (connection?.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
       setSessionError('GitHub Sync 需要明确填写 owner/repo；不会从其他 Space 或历史连接猜测目标。')
+      return
+    }
+    if (connection?.provider_id === 'GOOGLE_CALENDAR' && (!calendarId || calendarId.length > 500 || /[\r\n\0]/.test(calendarId))) {
+      setSessionError('Google Calendar Sync 需要 primary 或明确 calendar id。')
       return
     }
     setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.syncIntegrationConnection(connectionId, {
         space_id: spaceId,
-        capabilities: connection?.provider_id === 'GITHUB' ? ['project.read'] : undefined,
-        query: connection?.provider_id === 'GITHUB' ? { repository } : undefined,
+        capabilities: connection?.provider_id === 'GITHUB'
+          ? ['project.read']
+          : connection?.provider_id === 'GOOGLE_CALENDAR' ? ['calendar.read'] : undefined,
+        query: connection?.provider_id === 'GITHUB'
+          ? { repository }
+          : connection?.provider_id === 'GOOGLE_CALENDAR' ? { calendar_id: calendarId } : undefined,
+        limit: connection?.provider_id === 'GOOGLE_CALENDAR' ? 500 : undefined,
       })
       setLifecycleMessage(`Connector sync 完成：新增/复用 ${result.snapshots.length} 个 immutable snapshot；仍需逐条勾选才会进入 Session Pack。`)
       await connectorSnapshots.reload(); await integrationConnections.reload()

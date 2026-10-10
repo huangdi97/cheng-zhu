@@ -749,7 +749,8 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- real Google / Microsoft / GitHub / MCP adapter + account authorization；
+- real Google / Microsoft / MCP adapter + account authorization；
+- GitHub real-account authorization / real repository replay / real external Issue evidence（adapter code 已存在，真实账户证据仍是 external gate）；
 - external Calendar/meeting discovery；
 - Human Coach real-session evidence；
 - real external action evidence（边界/runtime 可在 repo 内实现；provider success 必须来自真实 adapter/account）；

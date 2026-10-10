@@ -120,6 +120,23 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             "secret_storage": "PROCESS_ENV_ONLY",
         },
     },
+    "LOCAL_MARKDOWN": {
+        "label": "Local Markdown / Obsidian",
+        "capabilities": ["decision_log.write"],
+        "external_kinds": [],
+        "provider_scopes": {
+            "decision_log.write": "local.filesystem.markdown.write",
+        },
+        "sync": "WRITE_ONLY_NO_SYNC",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_LOCAL_MARKDOWN_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:local-markdown:env:<ENV_VAR>",
+            "write_target": "relative .md path under configured root (default decisions.md)",
+            "secret_storage": "NONE_ROOT_PATH_FROM_PROCESS_ENV",
+            "read_support": "NONE",
+            "local_only": True,
+        },
+    },
     "MCP": {
         "label": "Model Context Protocol",
         "capabilities": sorted(conversation_connectors.KNOWN_CAPABILITIES),

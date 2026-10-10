@@ -135,6 +135,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [googleCalendarId, setGoogleCalendarId] = useState('primary')
   const [googleDriveEnvVar, setGoogleDriveEnvVar] = useState('CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN')
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState('root')
+  const [googleMailEnvVar, setGoogleMailEnvVar] = useState('CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN')
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -170,6 +171,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const githubProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GITHUB')
   const googleCalendarProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_CALENDAR')
   const googleDriveProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_DRIVE')
+  const googleMailProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_MAIL')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -178,6 +180,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   )
   const selectedExecutionConnection = compatibleExecutionConnections.find((connection) => connection.id === executionConnectionId)
   const executionNeedsRepository = selectedExecutionConnection?.provider_id === 'GITHUB' && draftCapability === 'issue.create'
+  const executionNeedsEmail = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && draftCapability === 'email.send'
+  const validExecutionEmail = /^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(executionTarget.trim())
   const executionRetrySafe = execution?.status === 'FAILED'
     && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
   const executionReconciliation = (execution?.response as {
@@ -476,6 +480,26 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const createGoogleMailConnection = async () => {
+    const envName = googleMailEnvVar.trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Gmail credential env 只允许环境变量名，例如 CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      await conversationApi.createIntegrationConnection({
+        provider_id: 'GOOGLE_MAIL',
+        display_name: 'Gmail · send-only',
+        granted_capabilities: ['email.send'],
+        credential_ref: `provider:google-mail:env:${envName}`,
+      })
+      await integrationConnections.reload()
+      setLifecycleMessage('Gmail send-only connection 元数据已创建。Verify 只确认 Google identity；真正 email.send 能力由第二次显式 Execute 的 Gmail provider 响应证明。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
@@ -523,7 +547,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
         ? 'Google Calendar read probe 已通过，连接状态为 CONNECTED。实际 calendar target 的完整读取仍由显式 Sync provider 响应证明。'
         : connection?.provider_id === 'GOOGLE_DRIVE'
           ? 'Google Drive account read probe 已通过，连接状态为 CONNECTED。具体 folder 是否可读仍由显式 Sync 的 folder probe + 完整分页证明。'
-          : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+          : connection?.provider_id === 'GOOGLE_MAIL'
+            ? 'Google OIDC identity 已验证。当前连接不具备 mailbox read；email.send 只有在 reviewed draft 的第二次显式 Execute 获得 Gmail ok=true 后才算真实证明。'
+            : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -614,6 +640,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     const target = executionTarget.trim() || draft.target || ''
     if (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(target)) {
       setSessionError('GitHub Issue 写回必须明确指定 owner/repo target。')
+      return
+    }
+    if (executionNeedsEmail && !/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(target)) {
+      setSessionError('Gmail 外发必须明确填写一个收件邮箱；不接受多个收件人或显示名。')
       return
     }
     setIntegrationBusy(true); setSessionError('')

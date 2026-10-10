@@ -196,6 +196,12 @@ def connector_snapshots(space_id: str, connection_id: str = "", limit: int = 200
         }
 
 
+@router.post("/spaces/{space_id}/calendar-snapshots/{snapshot_id}/schedule")
+def schedule_calendar_snapshot(space_id: str, snapshot_id: str):
+    with domain_errors():
+        return conversations.schedule_from_calendar_snapshot(space_id, snapshot_id)
+
+
 @router.post("/draft-actions/{action_id}/execution")
 def request_external_execution(action_id: str, body: IntegrationExecutionRequest):
     with domain_errors():

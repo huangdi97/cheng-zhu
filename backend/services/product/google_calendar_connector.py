@@ -41,6 +41,12 @@ class GoogleCalendarProviderError(RuntimeError):
         self.status = int(status)
 
 
+class GoogleCalendarTargetError(GoogleCalendarProviderError):
+    """A calendar-target rejection; the verified account may still be healthy."""
+
+    connection_fatal = False
+
+
 class GoogleCalendarFullSyncRequired(GoogleCalendarProviderError):
     """The provider invalidated the stored sync token (HTTP 410)."""
 
@@ -297,6 +303,10 @@ class GoogleCalendarRestAdapter:
                 "full_sync_required": True,
                 "calendar_id": calendar_id,
             }
+        except GoogleCalendarProviderError as exc:
+            if exc.status != 401 and 400 <= exc.status < 500:
+                raise GoogleCalendarTargetError(exc.status, str(exc)) from None
+            raise
 
         snapshots: list[dict[str, Any]] = []
         for raw in synced["items"]:

@@ -1697,7 +1697,12 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '作为下一场' }).click()
     await expect(page.getByText(/Calendar event 已显式导入/)).toBeVisible()
 
-    await page.getByRole('button', { name: '概览' }).click()
+    // Importing from Prepare is a write to Space/session state, not a tab-control
+    // contract. Re-enter Overview through the product route and verify the
+    // user-visible Next Session truth instead of coupling this provider test
+    // to the Tabs component's internal role.
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/overview`)
+    await expect(page.getByTestId('conversation-space')).toBeVisible()
     await expect(page.getByText('Next Session')).toBeVisible()
     await expect(page.getByText('Calendar Architecture Review')).toBeVisible()
   })

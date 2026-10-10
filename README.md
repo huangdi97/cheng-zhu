@@ -54,6 +54,15 @@ v2 方向已经正式收敛为 **Personal Conversation Intelligence**：一个 C
   </tr>
 </table>
 
+### Conversation External Context · 当前 provider truth
+
+Conversation Beta 已有两个 concrete opt-in provider：
+
+- **GitHub**：`project.read` + reviewed `issue.create`；
+- **Google Calendar**：只读 `calendar.read`，支持 native sync token、immutable event snapshots，以及用户显式把 future event 导入为 Space 的 UPCOMING Session。
+
+两者默认都不自动连接账户；credential 只保存 opaque env reference。Google Calendar 当前**没有 event.write，也没有仓库内真实 Google account evidence**。详见 [Google Calendar Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md) 与 [Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)。
+
 ## 为什么值得试
 
 > 不是“回答生成器”，而是把一个具体求职目标从准备一直带到下一次行动。

@@ -178,6 +178,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     reconciliation?: { source?: string; outcome?: string; note?: string; provider_reference?: string; recorded_at?: number }
   } | undefined)?.reconciliation
   const executionCanExecute = execution?.status === 'PENDING' || executionRetrySafe
+  const outboundRedactionApplied = Boolean(
+    (execution?.request as { outbound_redaction_applied?: boolean } | undefined)?.outbound_redaction_applied,
+  )
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -934,6 +937,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim()))} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
+                    {outboundRedactionApplied ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
+                      检测到 secret/token 形态的敏感值。Execution Request 中保存并实际发送给 provider 的内容已经脱敏，因此可能与刚才审核的本地 Draft 不完全一致；请在第二次 Execute 前按脱敏后的外发语义重新确认。
+                    </div> : null}
                     {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
                     {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
                     {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">

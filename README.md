@@ -151,8 +151,8 @@ Conversation Home
 - Google Drive / Docs provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1` + opaque env credential ref；显式 folder full refresh、immutable DOCUMENT snapshots、content availability / partial-content truth 已实现；没有真实 Google account/runtime replay 前不得宣称已连接；
 - Gmail send-only provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 scope = `openid + email + gmail.send`，只支持 reviewed `FOLLOWUP_EMAIL_DRAFT → email.send`，不读 inbox、不实现 `mail.read`；`gmail.send` 属 Google Sensitive scope，公共/稳定 provider 仍需适用的 OAuth consent / app verification；没有真实 Google account/runtime replay 前不得宣称邮件已发出；
 - Microsoft To Do provider：真实 `task.create` adapter code 已存在，默认关闭；需 `CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 delegated permission = `Tasks.ReadWrite`，只支持 reviewed `CREATE_TASK_DRAFT → task.create`，不读 Outlook Mail / Calendar / OneDrive、不做 To Do background sync；没有真实 Microsoft account/runtime replay 前不得宣称已连接或已创建真实 Task；
-- MCP provider 仍未配置真实 adapter/auth/account runtime；
-- external Decision Log provider execution 仍无真实 provider；当前真实 write adapter code 为 GitHub `issue.create`、Gmail `email.send` 与 Microsoft To Do `task.create`，均要求第二次显式 Execute；各 provider 的真实账号结果仍需独立 runtime evidence；
+- MCP Decision Log provider：真实 `decision_log.write` adapter code 已存在，默认关闭；需 `CHENGZHU_MCP_DECISION_LOG_CONNECTOR_ENABLE=1` + opaque config env ref；只支持 modern MCP `2026-07-28` Streamable HTTP、固定 tool mapping、`server/discover + tools/list` schema verify 与 reviewed Decision Log Draft 第二次显式 Execute；不把 MCP 暴露成任意 tool runner；没有真实 MCP server/runtime replay 前不得宣称已连接或已写入真实 Decision Log；
+- 当前 reviewed write adapter code 已覆盖 GitHub `issue.create`、Gmail `email.send`、Microsoft To Do `task.create` 与 MCP `decision_log.write`；各 provider 的真实账号/server 结果仍需独立 runtime evidence；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 
@@ -168,6 +168,7 @@ Conversation Home
 - [Google Drive Conversation Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
 - [Google Mail Conversation Connector](docs/architecture/GOOGLE_MAIL_CONVERSATION_CONNECTOR.md)
 - [Microsoft To Do Conversation Connector](docs/architecture/MICROSOFT_TODO_CONVERSATION_CONNECTOR.md)
+- [MCP Decision Log Conversation Connector](docs/architecture/MCP_DECISION_LOG_CONVERSATION_CONNECTOR.md)
 - [v2 Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)
 
 ### 当前 Live 层级

@@ -1704,8 +1704,8 @@ test.describe('v2.0 Conversation Profile', () => {
             ...execution,
             status: body.outcome === 'CONFIRMED_NOT_APPLIED' ? 'FAILED' : 'SUCCEEDED',
             response: body.outcome === 'CONFIRMED_NOT_APPLIED'
-              ? { ok: false, retry_safe: true, reconciliation: { outcome: body.outcome, note: body.note } }
-              : { ok: true, reconciliation: { outcome: body.outcome, note: body.note, provider_reference: body.provider_reference } },
+              ? { retry_safe: true, reconciliation: { outcome: body.outcome, note: body.note, source: 'USER_REPORTED_PROVIDER_CHECK' } }
+              : { reconciliation: { outcome: body.outcome, note: body.note, provider_reference: body.provider_reference, source: 'USER_REPORTED_PROVIDER_CHECK' } },
             error: body.outcome === 'CONFIRMED_NOT_APPLIED' ? 'Provider-side reconciliation confirmed the side effect was not applied' : '',
             updated_at: 10,
           }

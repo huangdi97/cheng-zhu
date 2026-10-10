@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -200,6 +200,14 @@ class GoogleCalendarRestAdapter:
         }
         if cursor:
             base_params["syncToken"] = cursor
+        else:
+            # Bound the initial collection while still using Google's native
+            # sync-token model. The official sync guide explicitly demonstrates
+            # an initial timeMin filter followed by token-only incremental sync.
+            # This keeps personal calendars tractable without pretending an
+            # arbitrarily truncated result is complete.
+            one_year_ago = datetime.now(timezone.utc) - timedelta(days=365)
+            base_params["timeMin"] = one_year_ago.isoformat().replace("+00:00", "Z")
 
         page_token = ""
         next_sync_token = ""
@@ -338,8 +346,13 @@ class GoogleCalendarRestAdapter:
         # only affects what the generic boundary may return to the UI; the
         # adapter refuses unsafe partial full syncs above the hard cap.
         requested = max(1, min(int(limit), _MAX_EVENTS_PER_SYNC))
+        if len(snapshots) > requested:
+            raise ValueError(
+                f"Google Calendar 本次完整变更集包含 {len(snapshots)} 条，超过 Chengzhu 当前安全写入上限 {requested}；"
+                "拒绝推进 sync token，避免半同步。"
+            )
         return {
-            "items": snapshots[:requested],
+            "items": snapshots,
             "next_cursor": str(synced["next_cursor"]),
             "calendar_id": calendar_id,
             "full_sync_required": False,

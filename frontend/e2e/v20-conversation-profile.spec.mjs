@@ -161,6 +161,7 @@ const COMMITMENT_CANDIDATE = {
 function mocks() {
   let session = { ...SESSION }
   let threadOpen = true
+  let draftAction = null
   let goal = {
     id: 'cg-1',
     space_id: SPACE.id,
@@ -637,7 +638,7 @@ function mocks() {
       const title = kind === 'UPDATE_DECISION_LOG_DRAFT' ? 'Architecture Review · Decision Log Draft'
         : kind === 'CREATE_ISSUE_DRAFT' ? 'Architecture Review · Issue Draft'
           : 'Architecture Review · Task Draft'
-      return {
+      draftAction = {
         id: 'cda-derived',
         space_id: SPACE.id,
         session_id: SESSION.id,
@@ -651,22 +652,16 @@ function mocks() {
         created_at: 3,
         updated_at: 3,
       }
+      return draftAction
     }
     if (pathname === '/api/product/conversation/draft-actions/cda-derived/review' && method === 'POST') {
-      return {
-        id: 'cda-derived',
-        space_id: SPACE.id,
-        session_id: SESSION.id,
-        kind: 'UPDATE_DECISION_LOG_DRAFT',
-        title: 'Architecture Review · Decision Log Draft',
-        content: '- offline migration 采用 v2 · state=AGREED',
-        target: '',
-        payload: { derived_item_ids: [DECISION.id], execution: 'LOCAL_REVIEW_ONLY', external_execution: false },
-        source_refs: DECISION.source_refs,
+      if (!draftAction) throw new Error('review called before derived draft exists')
+      draftAction = {
+        ...draftAction,
         status: request.postDataJSON().action === 'APPROVE' ? 'APPROVED' : 'DISMISSED',
-        created_at: 3,
         updated_at: 4,
       }
+      return draftAction
     }
     if (pathname.startsWith('/api/product/conversation/items/') && pathname.endsWith('/review')) return { ...OPEN, review_status: 'USER_CONFIRMED' }
     if (pathname.startsWith('/api/product/conversation/guidance/')) return { id: 'ge-1', user_action: request.postDataJSON().action }

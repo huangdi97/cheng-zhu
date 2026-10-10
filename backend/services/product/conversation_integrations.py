@@ -641,6 +641,26 @@ def list_snapshots(space_id: str, *, connection_id: str = "", limit: int = 200) 
     )
 
 
+def validate_snapshot_selection(space_id: str, snapshot_ids: list[str]) -> list[str]:
+    """Return a stable deduplicated selection or fail on cross-Space provenance."""
+    if not store.get("conversation_space", space_id):
+        raise ValueError("对话空间不存在")
+    selected: list[str] = []
+    seen: set[str] = set()
+    for raw_id in snapshot_ids:
+        snapshot_id = str(raw_id or "").strip()
+        if not snapshot_id or snapshot_id in seen:
+            continue
+        snapshot = store.get("conversation_connector_snapshot", snapshot_id)
+        if not snapshot:
+            raise ValueError(f"Connector Snapshot 不存在：{snapshot_id}")
+        if str(snapshot.get("space_id") or "") != space_id:
+            raise ValueError(f"Connector Snapshot 不属于当前 Space：{snapshot_id}")
+        seen.add(snapshot_id)
+        selected.append(snapshot_id)
+    return selected
+
+
 def snapshot_source_ref(snapshot: dict[str, Any]) -> dict[str, Any]:
     connection = _require_connection(snapshot["connection_id"])
     return {

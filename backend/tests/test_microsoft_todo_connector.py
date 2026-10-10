@@ -343,6 +343,30 @@ def test_create_task_uses_reviewed_title_body_without_silent_truncation(monkeypa
     assert "静默截断" in too_long["error"]
 
 
+
+
+def test_review_changed_by_secret_redaction_is_blocked_before_provider_call(monkeypatch):
+    monkeypatch.setenv("CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN", "ms-secret-token")
+    transport = FakeTransport()
+    adapter = MicrosoftTodoGraphAdapter(transport=transport)
+
+    result = adapter.execute(
+        connection=_connection(),
+        capability="task.create",
+        operation="CREATE_TASK",
+        target="list-1",
+        payload={
+            "title": "Ship rollout plan",
+            "content": "[REDACTED_SECRET]",
+            "outbound_redaction_applied": True,
+        },
+        idempotency_key="audit-only",
+    )
+    assert result["ok"] is False
+    assert "重新审核" in result["error"]
+    assert transport.calls == []
+
+
 def test_definitive_4xx_is_failed_but_server_error_is_ambiguous(monkeypatch):
     monkeypatch.setenv("CHENGZHU_MICROSOFT_GRAPH_ACCESS_TOKEN", "ms-secret-token")
 

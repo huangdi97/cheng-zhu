@@ -25,6 +25,7 @@ class FakeAdapter:
         self.retry_safe_failure = False
         self.missing_ok = False
         self.execute_calls = 0
+        self.read_calls = []
         self.items = {
             "calendar.read": [{
                 "external_kind": "CALENDAR_EVENT",
@@ -49,6 +50,7 @@ class FakeAdapter:
         return {"ok": self.healthy, "label": "Fake MCP"} if self.healthy else {"ok": False, "error": "adapter down"}
 
     def read_context(self, *, connection, capability, query, cursor, limit):
+        self.read_calls.append({"capability": capability, "cursor": cursor, "query": dict(query)})
         return {"items": list(self.items.get(capability, []))[:limit], "next_cursor": f"{capability}:cursor-1"}
 
     def execute(self, *, connection, capability, operation, target, payload, idempotency_key):
@@ -202,6 +204,112 @@ def test_sync_creates_immutable_idempotent_snapshots_and_sanitizes_metadata(prod
     third = conversation_integrations.sync_connection(connection["id"], space["id"], capabilities=["calendar.read"])
     assert third["snapshots"][0]["id"] != snapshot["id"]
     assert len(conversation_integrations.list_snapshots(space["id"])) == 2
+
+
+
+
+def test_same_external_content_is_isolated_per_space_and_selection_cannot_cross_space(product_env):
+    adapter = FakeAdapter({"calendar.read"})
+    connection = _connected(adapter, ["calendar.read"])
+    space_a = conversations.create_space("Space A", "PROJECT_SYNC")
+    space_b = conversations.create_space("Space B", "PROJECT_SYNC")
+
+    snap_a = conversation_integrations.sync_connection(
+        connection["id"], space_a["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+    snap_b = conversation_integrations.sync_connection(
+        connection["id"], space_b["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+
+    assert snap_a["id"] != snap_b["id"]
+    assert snap_a["content_hash"] == snap_b["content_hash"]
+    assert [x["id"] for x in conversation_integrations.list_snapshots(space_a["id"])] == [snap_a["id"]]
+    assert [x["id"] for x in conversation_integrations.list_snapshots(space_b["id"])] == [snap_b["id"]]
+
+    with pytest.raises(ValueError, match="不属于当前 Space"):
+        conversations.update_space(
+            space_b["id"],
+            {"selected_connector_snapshot_ids": [snap_a["id"]]},
+        )
+    selected = conversations.update_space(
+        space_b["id"],
+        {"selected_connector_snapshot_ids": [snap_b["id"], snap_b["id"]]},
+    )
+    assert selected["selected_connector_snapshot_ids"] == [snap_b["id"]]
+
+
+def test_provider_content_hash_cannot_override_chengzhu_canonical_snapshot_identity(product_env):
+    adapter = FakeAdapter({"calendar.read"})
+    adapter.items["calendar.read"][0]["content_hash"] = "provider-fixed-hash"
+    connection = _connected(adapter, ["calendar.read"])
+    space = conversations.create_space("Canonical Hash", "PROJECT_SYNC")
+
+    first = conversation_integrations.sync_connection(
+        connection["id"], space["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+    assert first["metadata"]["provider_content_hash"] == "provider-fixed-hash"
+    assert first["content_hash"] != "provider-fixed-hash"
+
+    adapter.items["calendar.read"][0] = {
+        **adapter.items["calendar.read"][0],
+        "excerpt": "Provider changed the content but incorrectly reused the same provider hash.",
+        "content_hash": "provider-fixed-hash",
+    }
+    second = conversation_integrations.sync_connection(
+        connection["id"], space["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+    assert second["id"] != first["id"]
+    assert second["content_hash"] != first["content_hash"]
+    assert second["metadata"]["provider_content_hash"] == "provider-fixed-hash"
+
+
+def test_sync_cursors_are_isolated_per_capability(product_env):
+    adapter = FakeAdapter({"calendar.read", "docs.read"})
+    connection = _connected(adapter, ["calendar.read", "docs.read"])
+    space = conversations.create_space("Cursor Isolation", "PROJECT_SYNC")
+
+    conversation_integrations.sync_connection(
+        connection["id"],
+        space["id"],
+        capabilities=["calendar.read", "docs.read"],
+    )
+    first_calls = adapter.read_calls[-2:]
+    assert {call["capability"]: call["cursor"] for call in first_calls} == {
+        "calendar.read": "",
+        "docs.read": "",
+    }
+    saved = next(x for x in conversation_integrations.list_connections() if x["id"] == connection["id"])
+    assert saved["sync_cursors"] == {
+        "calendar.read": "calendar.read:cursor-1",
+        "docs.read": "docs.read:cursor-1",
+    }
+    assert saved["sync_cursor"] == ""
+
+    conversation_integrations.sync_connection(
+        connection["id"], space["id"], capabilities=["calendar.read"]
+    )
+    assert adapter.read_calls[-1]["cursor"] == "calendar.read:cursor-1"
+
+    conversation_integrations.sync_connection(
+        connection["id"], space["id"], capabilities=["docs.read"]
+    )
+    assert adapter.read_calls[-1]["cursor"] == "docs.read:cursor-1"
+
+
+def test_new_space_cannot_import_existing_connector_snapshot_by_id(product_env):
+    adapter = FakeAdapter({"calendar.read"})
+    connection = _connected(adapter, ["calendar.read"])
+    existing = conversations.create_space("Existing", "PROJECT_SYNC")
+    snapshot = conversation_integrations.sync_connection(
+        connection["id"], existing["id"], capabilities=["calendar.read"]
+    )["snapshots"][0]
+
+    with pytest.raises(ValueError, match="新建 Space 不能直接引用"):
+        conversations.create_space(
+            "New",
+            "PROJECT_SYNC",
+            selected_connector_snapshot_ids=[snapshot["id"]],
+        )
 
 
 def test_selected_snapshot_is_frozen_into_pack_and_manual_ask_keeps_reference_authority(product_env):

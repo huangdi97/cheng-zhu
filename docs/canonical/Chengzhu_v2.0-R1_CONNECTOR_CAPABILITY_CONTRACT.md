@@ -176,7 +176,11 @@ calendar.read
 - complete change set 超过 Chengzhu 当前 500 snapshot 安全上限时整次失败，不推进 token；
 - cancelled event 保留为 immutable external observation；
 - event snapshot 仍是 `REFERENCE_SOURCE`，不自动升级 Decision / Commitment / Deadline；
-- future、non-cancelled event 只有用户显式点击“作为下一场”后才创建本地 UPCOMING Session；
+- 同一 external event 的历史 revision 继续保留审计，但只有 latest revision 可被新导入；
+- 已导入 Session 遇到后续 reschedule/cancel 时保持本地冻结值，同时显式标记 `SOURCE_DRIFT / CANCELLED_UPSTREAM`；
+- all-day event 不伪造 UTC midnight；`focusTime / outOfOffice / workingLocation` 不能导入为 Conversation Session；
+- provider timezone 会进入 time semantics；
+- future、non-cancelled、latest-revision meeting-like event 只有用户显式点击“作为下一场”后才创建本地 UPCOMING Session；
 - 导入后 provider 后续变化不静默改写已创建 Session。
 
 实现说明：
@@ -582,7 +586,7 @@ CREATE_ISSUE_DRAFT
 
 ## 20. 当前 repo truth
 
-PR #61 合并后允许声明：
+PR #61 + GitHub provider + Calendar provider 合并后，repo engineering truth 允许声明：
 
 ```text
 CONNECTOR_CAPABILITY_CONTRACT = IMPLEMENTED
@@ -596,7 +600,6 @@ AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 仍禁止在缺少真实 adapter/account/runtime evidence 时声明：
 
 ```text
-CALENDAR_CONNECTOR_AVAILABLE = TRUE
 MAIL_CONNECTOR_AVAILABLE = TRUE
 DOCS_CONNECTOR_AVAILABLE = TRUE
 PROJECT_TRACKER_CONNECTOR_AVAILABLE = TRUE

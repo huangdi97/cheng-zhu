@@ -145,8 +145,11 @@ def test_google_drive_sync_validates_folder_and_exports_workspace_docs(monkeypat
     assert "rollback owner is Alex" in doc["excerpt"]
     assert doc["metadata"]["content_available"] is True
     assert doc["metadata"]["export_mime"] == "text/plain"
-    assert doc["metadata"]["content_scope"] == "FULL_TEXT_EXPORT"
+    assert doc["metadata"]["content_scope"] == "TEXT_EXPORT_EXCERPT_20K"
     assert doc["metadata"]["partial_content"] is False
+    assert doc["metadata"]["retrieval_scope"] == "FIRST_20000_CHARS"
+    assert doc["metadata"]["source_text_bytes"] > 0
+    assert len(doc["metadata"]["full_content_digest_sha256"]) == 64
 
     folder_call, list_call, export_call = transport.calls
     assert urlparse(folder_call["url"]).path.endswith("/files/folder-1")
@@ -206,8 +209,52 @@ def test_google_drive_sheets_are_explicitly_partial_first_sheet_csv(monkeypatch)
     snap = result["items"][0]
     assert snap["metadata"]["export_mime"] == "text/csv"
     assert snap["metadata"]["partial_content"] is True
-    assert snap["metadata"]["content_scope"] == "FIRST_SHEET_CSV"
+    assert snap["metadata"]["content_scope"] == "FIRST_SHEET_CSV_EXCERPT_20K"
+    assert snap["metadata"]["retrieval_scope"] == "FIRST_20000_CHARS"
+    assert len(snap["metadata"]["full_content_digest_sha256"]) == 64
     assert "Option,Score" in snap["excerpt"]
+
+
+
+
+def test_google_drive_full_content_digest_changes_revision_even_when_first_20k_is_identical(product_env, monkeypatch):
+    monkeypatch.setenv("CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN", "ya29.drive_test_secret")
+    prefix = "A" * 20_000
+    first_body = (prefix + " tail-one").encode()
+    second_body = (prefix + " tail-two").encode()
+    transport = FakeTransport()
+    adapter = GoogleDriveRestAdapter(transport=transport)
+    conversation_integrations.register_adapter(adapter)
+
+    transport.queue(200, {"user": {"emailAddress": "lei@example.test"}})
+    connection = conversation_integrations.create_connection(
+        "GOOGLE_DRIVE",
+        granted_capabilities=["docs.read"],
+        credential_ref="provider:google-drive:env:CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN",
+        account_hint="folder-1",
+    )
+    conversation_integrations.verify_and_connect(connection["id"])
+    space = conversations.create_space("Revision Truth", "DESIGN_REVIEW")
+
+    for body in (first_body, second_body):
+        transport.queue(200, {"user": {"emailAddress": "lei@example.test"}})
+        transport.queue(200, _folder())
+        transport.queue(200, {"files": [_file()]})
+        transport.queue(200, body)
+        result = conversation_integrations.sync_connection(
+            connection["id"],
+            space["id"],
+            capabilities=["docs.read"],
+            query={"folder_id": "folder-1"},
+            limit=500,
+        )
+        assert result["snapshots"][0]["excerpt"] == prefix
+
+    rows = conversation_integrations.list_snapshots(space["id"], connection_id=connection["id"])
+    assert len(rows) == 2
+    assert rows[0]["excerpt"] == rows[1]["excerpt"] == prefix
+    assert rows[0]["metadata"]["full_content_digest_sha256"] != rows[1]["metadata"]["full_content_digest_sha256"]
+    assert rows[0]["content_hash"] != rows[1]["content_hash"]
 
 
 def test_google_drive_binary_file_is_metadata_only_not_fake_read(monkeypatch):
@@ -249,7 +296,7 @@ def test_google_drive_text_blob_uses_alt_media(monkeypatch):
         cursor="",
         limit=500,
     )
-    assert result["items"][0]["metadata"]["content_scope"] == "FULL_TEXT_BLOB"
+    assert result["items"][0]["metadata"]["content_scope"] == "TEXT_BLOB_EXCERPT_20K"
     params = parse_qs(urlparse(transport.calls[2]["url"]).query)
     assert params["alt"] == ["media"]
 

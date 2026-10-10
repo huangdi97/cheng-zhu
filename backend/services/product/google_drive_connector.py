@@ -226,7 +226,7 @@ class GoogleDriveRestAdapter:
         status, _headers, raw = self._request(
             f"/files/{quote(folder_id, safe='')}",
             token=token,
-            params={"fields": "id,name,mimeType,trashed"},
+            params={"fields": "id,name,mimeType,trashed", "supportsAllDrives": "true"},
         )
         if status != 200:
             raise RuntimeError(f"Google Drive folder probe returned ambiguous HTTP {status}")
@@ -245,6 +245,8 @@ class GoogleDriveRestAdapter:
             params: dict[str, Any] = {
                 "q": f"'{folder_id}' in parents and trashed = false",
                 "spaces": "drive",
+                "supportsAllDrives": "true",
+                "includeItemsFromAllDrives": "true",
                 "pageSize": _PAGE_SIZE,
                 "orderBy": "modifiedTime desc",
                 "fields": (
@@ -327,7 +329,7 @@ class GoogleDriveRestAdapter:
             status, _headers, raw = self._request(
                 f"/files/{quote(file_id, safe='')}",
                 token=token,
-                params={"alt": "media"},
+                params={"alt": "media", "supportsAllDrives": "true"},
             )
             if status != 200 or not isinstance(raw, (bytes, bytearray)):
                 raise RuntimeError(f"Google Drive files.get media returned ambiguous HTTP {status}")

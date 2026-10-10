@@ -29,12 +29,15 @@ def init_product_layer() -> dict:
     # can ship without silently creating or connecting any external account.
     from services.product.github_connector import register_github_adapter_from_env
     from services.product.google_calendar_connector import register_google_calendar_adapter_from_env
+    from services.product.google_drive_connector import register_google_drive_adapter_from_env
 
     github_connector = register_github_adapter_from_env()
     google_calendar_connector = register_google_calendar_adapter_from_env()
+    google_drive_connector = register_google_drive_adapter_from_env()
     provider_state = {
         "github_connector": github_connector,
         "google_calendar_connector": google_calendar_connector,
+        "google_drive_connector": google_drive_connector,
     }
     if isinstance(backfill, dict):
         return {**backfill, **provider_state}

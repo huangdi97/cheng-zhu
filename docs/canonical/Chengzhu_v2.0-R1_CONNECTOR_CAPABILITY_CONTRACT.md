@@ -102,7 +102,7 @@ Conversation truth
 | Google Calendar | calendar.read |
 | Gmail | email.send（send-only；mail.read 未实现） |
 | Google Drive / Docs | docs.read |
-| Microsoft Graph | calendar.read / mail.read / docs.read / project.read / email.send / task.create |
+| Microsoft To Do (Graph) | task.create only |
 | GitHub | project.read / issue.create |
 | MCP | server-defined subset of canonical capability vocabulary |
 
@@ -119,9 +119,10 @@ CHENGZHU_GITHUB_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1
+CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1
 ```
 
-才注册为 `adapter_available=true`。Google Mail 当前只注册 `email.send`，不注册 `mail.read`。Microsoft / MCP 当前仍不能仅凭 catalog 条目冒充真实 adapter。
+才注册为 `adapter_available=true`。Google Mail 当前只注册 `email.send`，不注册 `mail.read`；Microsoft To Do 当前只注册 `task.create`，不注册 Outlook/Calendar/Files read/write。MCP 仍不能仅凭 catalog 条目冒充真实 adapter。
 
 ---
 
@@ -136,9 +137,7 @@ calendar.read → Google calendar.events.readonly
 email.send    → openid + email + Gmail send
 mail.read     → 未实现；不因 email.send 偷加 Gmail readonly
 
-calendar.read → Microsoft Calendars.Read
-mail.read     → Microsoft Mail.Read
-email.send    → Microsoft Mail.Send
+task.create   → Microsoft Tasks.ReadWrite
 
 project.read  → GitHub Issues: read
 issue.create  → GitHub Issues: write
@@ -679,6 +678,45 @@ CREATE_ISSUE_DRAFT
 
 ---
 
+## 19.9 Microsoft To Do reviewed task-create provider
+
+当前 `MICROSOFT_GRAPH` catalog 已从泛 Graph placeholder 收窄为唯一真实实现：
+
+```text
+CREATE_TASK_DRAFT
+→ APPROVED
+→ exact Microsoft To Do connection
+→ target = default / explicit task-list id
+→ Execution Request
+→ second Execute
+→ POST /me/todo/lists/{listId}/tasks
+→ provider ok=true / FAILED / UNKNOWN_OUTCOME
+```
+
+最小 delegated permission：
+
+```text
+Tasks.ReadWrite
+```
+
+边界：
+
+- adapter 默认不注册；只有 `CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1` 才 available；
+- token 只通过 `provider:microsoft-graph:env:<ENV_VAR>` opaque ref 解析；
+- Verify 使用 To Do list probe，只证明 Tasks.ReadWrite 当前可用于 To Do lists；
+- 不实现 Outlook Mail / Calendar / OneDrive / Planner；
+- 不实现 task read sync / background mirror；
+- `default` target 在 Execute 时解析 built-in `defaultList`；
+- 也允许用户显式填写 task-list id；
+- provider 没有 Chengzhu 可依赖的 create-task idempotency primitive，因此 ambiguous outcome 必须进入 `UNKNOWN_OUTCOME`；
+- 没有真实 Microsoft OAuth/account/runtime replay 前，不得声明真实 Task 已创建。
+
+实现说明：
+
+- [Microsoft To Do Conversation Connector](../architecture/MICROSOFT_TODO_CONVERSATION_CONNECTOR.md)
+
+---
+
 ## 20. 当前 repo truth
 
 PR #61 + GitHub provider + Calendar provider 合并后，repo engineering truth 允许声明：
@@ -693,6 +731,8 @@ AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 GITHUB_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_CALENDAR_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_DRIVE_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+GOOGLE_MAIL_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+MICROSOFT_TODO_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 ```
 
 仍禁止在缺少真实 adapter/account/runtime evidence 时声明：
@@ -705,6 +745,7 @@ CALENDAR_ACCOUNT_CONNECTED = TRUE
 PROJECT_TRACKER_ACCOUNT_CONNECTED = TRUE
 GOOGLE_ACCOUNT_CONNECTED = TRUE
 MICROSOFT_ACCOUNT_CONNECTED = TRUE
+REAL_MICROSOFT_TASK_CREATE_PROVEN = TRUE
 GITHUB_ACCOUNT_CONNECTED = TRUE
 MCP_SERVER_CONNECTED = TRUE
 REAL_EXTERNAL_ACTION_EVIDENCE = TRUE

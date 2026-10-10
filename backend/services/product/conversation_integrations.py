@@ -122,6 +122,11 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
     },
     "MCP": {
         "label": "Model Context Protocol",
+        # MCP remains a generic contract surface, but the concrete adapter
+        # shipped in v2 exposes only decision_log.write. verify_and_connect()
+        # additionally requires the connection grant to be a subset of the
+        # registered adapter capabilities, so catalog metadata can never
+        # manufacture a real read/write runtime.
         "capabilities": sorted(conversation_connectors.KNOWN_CAPABILITIES),
         "external_kinds": ["DOCUMENT", "TASK", "ISSUE", "CALENDAR_EVENT", "MAIL_THREAD"],
         "provider_scopes": {
@@ -129,6 +134,16 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             for capability in sorted(conversation_connectors.KNOWN_CAPABILITIES)
         },
         "sync": "SERVER_DEFINED",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_MCP_DECISION_LOG_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:mcp:env:<CONFIG_ENV>",
+            "concrete_adapter_capabilities": "decision_log.write",
+            "protocol": "2026-07-28 Streamable HTTP",
+            "write_target": "explicit decision-log target",
+            "tool_mapping": "fixed in config env; frontend cannot choose arbitrary tool",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "read_support": "NONE_IN_CONCRETE_ADAPTER",
+        },
     },
 }
 

@@ -664,7 +664,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
 
   const requestExecution = async () => {
     if (!draft || draft.status !== 'APPROVED' || !executionConnectionId) return
-    const target = executionTarget.trim() || draft.target || ''
+    const target = executionNeedsTodoList
+      ? (executionTarget.trim() || 'default')
+      : (executionTarget.trim() || draft.target || '')
     if (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(target)) {
       setSessionError('GitHub Issue 写回必须明确指定 owner/repo target。')
       return

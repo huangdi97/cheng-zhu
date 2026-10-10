@@ -300,7 +300,7 @@ two seed issues, using the locally authenticated account's token as `CHENGZHU_GI
 production repository was touched. No external model provider was called (local stub).
 
 Read path: flag-off run proves fail-closed; flag-on run proves catalog/capability/scope contract,
-`DISCONNECTED → CONNECTED` verify with `account_hint = huangdi97`, a real issue sync producing 2
+`DISCONNECTED → CONNECTED` verify with `account_hint = huangdi97`, a real issue sync producing
 immutable snapshots with content hashes and a real sync cursor, Space selection, preflight, ACTIVE
 session, and a frozen pack containing the snapshot **and** a connector grant with the account hint.
 
@@ -507,8 +507,8 @@ before use.
 4. `BLOCKED_EXTERNAL` — **MCP provider**: no real adapter/auth/account runtime exists upstream; only
    catalog fail-closed + unregistered-capability blocking + Preflight/diagnostics truth can be
    verified locally. No fake MCP connector was implemented.
-5. `BLOCKED_EXTERNAL_PROVIDER` — **External Decision Log provider**: no real provider exists; only the
-   local reviewed draft/approve/audit/export path can be exercised.
+5. `BLOCKED_EXTERNAL` — **External Decision Log provider**: no real provider exists upstream, so only the
+   local reviewed draft/approve/audit/export path can be exercised. No external execution is claimed.
 6. `BLOCKED_EXTERNAL_PERMISSION` — **download-back verification of a release**: this run was
    authorised to push a branch and open a PR only, so no tag or GitHub Release was created. The
    installers are staged with checksums and a ready-to-run download-back command

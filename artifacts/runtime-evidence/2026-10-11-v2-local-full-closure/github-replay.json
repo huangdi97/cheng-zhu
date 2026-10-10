@@ -68,7 +68,7 @@
       "adapter_available": true
     },
     "connection": {
-      "id": "ccn_aea80c1b32444239",
+      "id": "ccn_9b991abddc464a0d",
       "provider_id": "GITHUB",
       "display_name": "Closure replay GitHub",
       "status": "DISCONNECTED",
@@ -84,14 +84,14 @@
       "sync_cursor": "",
       "last_sync_at": null,
       "last_error": "",
-      "created_at": 1791666182.0152955,
-      "updated_at": 1791666182.0152955,
+      "created_at": 1791670848.380529,
+      "updated_at": 1791670848.380529,
       "sync_cursors": {},
       "credential_ref_present": true,
       "adapter_available": true
     },
     "verify": {
-      "id": "ccn_aea80c1b32444239",
+      "id": "ccn_9b991abddc464a0d",
       "provider_id": "GITHUB",
       "display_name": "Closure replay GitHub",
       "status": "CONNECTED",
@@ -107,16 +107,16 @@
       "sync_cursor": "",
       "last_sync_at": null,
       "last_error": "",
-      "created_at": 1791666182.0152955,
-      "updated_at": 1791666183.6632721,
+      "created_at": 1791670848.380529,
+      "updated_at": 1791670849.4000623,
       "sync_cursors": {},
       "credential_ref_present": true,
       "adapter_available": true
     },
-    "space_id": "cs_cdc4c0d8252e4467",
+    "space_id": "cs_46d6260a76ea437d",
     "sync": {
       "connection": {
-        "id": "ccn_aea80c1b32444239",
+        "id": "ccn_9b991abddc464a0d",
         "provider_id": "GITHUB",
         "display_name": "Closure replay GitHub",
         "status": "CONNECTED",
@@ -129,22 +129,22 @@
           "Issues: write"
         ],
         "account_hint": "huangdi97",
-        "sync_cursor": "2026-10-10T20:58:30Z",
-        "last_sync_at": 1791666187.7927437,
+        "sync_cursor": "2026-10-10T20:26:50Z",
+        "last_sync_at": 1791670851.579346,
         "last_error": "",
-        "created_at": 1791666182.0152955,
-        "updated_at": 1791666187.7927442,
+        "created_at": 1791670848.380529,
+        "updated_at": 1791670851.5793467,
         "sync_cursors": {
-          "project.read": "2026-10-10T20:58:30Z"
+          "project.read": "2026-10-10T20:26:50Z"
         },
         "credential_ref_present": true,
         "adapter_available": true
       },
       "snapshots": [
         {
-          "id": "ccs_c6e175d844894af2",
-          "connection_id": "ccn_aea80c1b32444239",
-          "space_id": "cs_cdc4c0d8252e4467",
+          "id": "ccs_65bb29113592470a",
+          "connection_id": "ccn_9b991abddc464a0d",
+          "space_id": "cs_46d6260a76ea437d",
           "capability": "project.read",
           "external_kind": "ISSUE",
           "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#1",
@@ -164,12 +164,12 @@
             "updated_at": "2026-10-10T20:26:49Z",
             "provider_node_id": "I_kwDOVEJaTs8AAAABWWiWbQ"
           },
-          "created_at": 1791666187.7153962
+          "created_at": 1791670851.5376635
         },
         {
-          "id": "ccs_15451893483c4ed3",
-          "connection_id": "ccn_aea80c1b32444239",
-          "space_id": "cs_cdc4c0d8252e4467",
+          "id": "ccs_eb5dedc2d0a9409e",
+          "connection_id": "ccn_9b991abddc464a0d",
+          "space_id": "cs_46d6260a76ea437d",
           "capability": "project.read",
           "external_kind": "ISSUE",
           "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#2",
@@ -189,83 +189,33 @@
             "updated_at": "2026-10-10T20:26:51Z",
             "provider_node_id": "I_kwDOVEJaTs8AAAABWWiXgg"
           },
-          "created_at": 1791666187.7336047
-        },
-        {
-          "id": "ccs_fe671375937e43d1",
-          "connection_id": "ccn_aea80c1b32444239",
-          "space_id": "cs_cdc4c0d8252e4467",
-          "capability": "project.read",
-          "external_kind": "ISSUE",
-          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#3",
-          "title": "Chengzhu v2 closure replay: reviewed issue draft",
-          "excerpt": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:7903f0c75c7ce443d3b6e9136421262d762b3fee5d4b66f04970294687fc201c -->",
-          "content_hash": "422837aa9aa246973d90568e21164c9853685e0000f62a1ce3af415ce41b2f44",
-          "source_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/3",
-          "occurred_at": 1791665506.0,
-          "visibility": "PRIVATE",
-          "metadata": {
-            "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
-            "number": 3,
-            "state": "open",
-            "labels": [],
-            "assignees": [],
-            "created_at": "2026-10-10T20:51:46Z",
-            "updated_at": "2026-10-10T20:51:46Z",
-            "provider_node_id": "I_kwDOVEJaTs8AAAABWWtQxA"
-          },
-          "created_at": 1791666187.7538662
-        },
-        {
-          "id": "ccs_e104a697005743af",
-          "connection_id": "ccn_aea80c1b32444239",
-          "space_id": "cs_cdc4c0d8252e4467",
-          "capability": "project.read",
-          "external_kind": "ISSUE",
-          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
-          "title": "Chengzhu v2 closure replay: reviewed issue draft 20261010T205800Z",
-          "excerpt": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:24f96e553c4d1524c582cc885856035e383f9d3865f2a094541e17d2bd56b3d0 -->",
-          "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
-          "source_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/4",
-          "occurred_at": 1791665911.0,
-          "visibility": "PRIVATE",
-          "metadata": {
-            "repository": "huangdi97/chengzhu-connector-replay-2026-10-11",
-            "number": 4,
-            "state": "open",
-            "labels": [],
-            "assignees": [],
-            "created_at": "2026-10-10T20:58:31Z",
-            "updated_at": "2026-10-10T20:58:31Z",
-            "provider_node_id": "I_kwDOVEJaTs8AAAABWWwNxA"
-          },
-          "created_at": 1791666187.7747955
+          "created_at": 1791670851.5592499
         }
       ]
     },
-    "snapshot_count": 4,
+    "snapshot_count": 2,
     "snapshot_sample": {
-      "id": "ccs_e104a697005743af",
-      "connection_id": "ccn_aea80c1b32444239",
+      "id": "ccs_eb5dedc2d0a9409e",
+      "connection_id": "ccn_9b991abddc464a0d",
       "capability": "project.read",
       "external_kind": "ISSUE",
-      "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
-      "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
+      "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#2",
+      "content_hash": "7afd511c078b4e3470d42d40d833492d60c22531e28b8c4f938e35b5d6956a83",
       "provider_id": null,
       "is_latest_revision": true,
-      "occurred_at": 1791665911.0
+      "occurred_at": 1791664011.0
     },
     "space_selection": [
-      "ccs_e104a697005743af",
-      "ccs_fe671375937e43d1"
+      "ccs_eb5dedc2d0a9409e",
+      "ccs_65bb29113592470a"
     ],
-    "session_id": "cv_76b37d61fcbb4a07",
+    "session_id": "cv_9c5d17806a274a5f",
     "preflight": {
       "blockers": [],
       "warnings": [],
       "pack_preview_snapshot_ids": [
-        "ccs_e104a697005743af",
-        "ccs_fe671375937e43d1"
+        "ccs_eb5dedc2d0a9409e",
+        "ccs_65bb29113592470a"
       ],
       "pack_preview_snapshots": 2,
       "connector_runtime": {
@@ -276,7 +226,7 @@
           {
             "capability": "project.read",
             "provider_id": "GITHUB",
-            "connection_id": "ccn_aea80c1b32444239",
+            "connection_id": "ccn_9b991abddc464a0d",
             "account_hint": "huangdi97"
           }
         ],
@@ -304,13 +254,13 @@
       "session_status": "ACTIVE"
     },
     "frozen": {
-      "pack_digest": "f63c9b75b8702197b2e9f4f75982dac10c3bbbd8d7a2c69200ac17d0e487d92f",
+      "pack_digest": "b2ba73ea58f476dee7b781339d90cd3e0b263248249947632da575f5c67be953",
       "connector_snapshots": 2,
       "connector_grants": [
         {
           "capability": "project.read",
           "provider_id": "GITHUB",
-          "connection_id": "ccn_aea80c1b32444239",
+          "connection_id": "ccn_9b991abddc464a0d",
           "account_hint": "huangdi97"
         }
       ],
@@ -325,25 +275,25 @@
         "last_guidance_id": ""
       }
     },
-    "write_grant_gate": "POST /api/product/conversation/sessions/cv_72d96af28d9346a5/start -> 400: {\"detail\":\"本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；issue.create:WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW。不会用 provider catalog 或 placeholder 放行。\"}",
+    "write_grant_gate": "POST /api/product/conversation/sessions/cv_63544918e34d4b2e/start -> 400: {\"detail\":\"本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；issue.create:WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW。不会用 provider catalog 或 placeholder 放行。\"}",
     "ask": {
-      "question": "20261010T205800Z Chengzhu closure",
+      "question": "Replay retry budget",
       "grounded": true,
       "truth_confirmed": false,
       "top_kind": "CONNECTOR_SNAPSHOT",
       "top_authority": "REFERENCE_SOURCE",
-      "top_title": "Chengzhu v2 closure replay: reviewed issue draft 20261010T205800Z",
+      "top_title": "Replay seed 2: retry budget",
       "top_source_refs": [
         {
           "kind": "CONNECTOR_SNAPSHOT",
-          "id": "ccs_e104a697005743af",
+          "id": "ccs_eb5dedc2d0a9409e",
           "provider_id": "GITHUB",
-          "connection_id": "ccn_aea80c1b32444239",
+          "connection_id": "ccn_9b991abddc464a0d",
           "capability": "project.read",
           "external_kind": "ISSUE",
-          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
-          "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
-          "occurred_at": 1791665911.0,
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#2",
+          "content_hash": "7afd511c078b4e3470d42d40d833492d60c22531e28b8c4f938e35b5d6956a83",
+          "occurred_at": 1791664011.0,
           "visibility": "PRIVATE"
         }
       ]
@@ -352,7 +302,7 @@
       "grounded": false
     },
     "draft": {
-      "id": "cda_775840c79bbd4ac0",
+      "id": "cda_f51bda4e0fa44c13",
       "status": "DRAFT",
       "kind": "CREATE_ISSUE_DRAFT"
     },
@@ -364,7 +314,7 @@
       "result_error": "GitHub repository 必须使用 owner/repo"
     },
     "execution_request": {
-      "id": "cce_b98d7942ca41433c",
+      "id": "cce_696821f787d64322",
       "status": "PENDING",
       "target": "huangdi97/chengzhu-connector-replay-2026-10-11"
     },
@@ -375,25 +325,25 @@
     },
     "execution_replay_status": "SUCCEEDED",
     "audit_row": {
-      "id": "cce_b98d7942ca41433c",
-      "draft_action_id": "cda_775840c79bbd4ac0",
-      "connection_id": "ccn_aea80c1b32444239",
+      "id": "cce_696821f787d64322",
+      "draft_action_id": "cda_f51bda4e0fa44c13",
+      "connection_id": "ccn_9b991abddc464a0d",
       "capability": "issue.create",
       "operation": "CREATE_ISSUE",
       "target": "huangdi97/chengzhu-connector-replay-2026-10-11",
       "status": "SUCCEEDED",
-      "idempotency_key": "65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37"
+      "idempotency_key": "39a3c55557408e41047985fcb67e4e01511ba6708e03f44cefe007fd47d5544e"
     },
     "github_issues": {
-      "total": 5,
+      "total": 3,
       "matching_title": 1,
       "matching_numbers": [
-        5
+        7
       ],
       "body_starts_with_reviewed_content": true,
       "audit_idempotency_marker_present": true,
-      "created_body": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37 -->",
-      "created_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/5"
+      "created_body": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:39a3c55557408e41047985fcb67e4e01511ba6708e03f44cefe007fd47d5544e -->",
+      "created_url": "https://github.com/huangdi97/chengzhu-connector-replay-2026-10-11/issues/7"
     }
   },
   "checks": {
@@ -490,7 +440,7 @@
     "connection_credential_ref_present": {
       "ok": true,
       "detail": {
-        "id": "ccn_aea80c1b32444239",
+        "id": "ccn_9b991abddc464a0d",
         "provider_id": "GITHUB",
         "display_name": "Closure replay GitHub",
         "status": "DISCONNECTED",
@@ -506,8 +456,8 @@
         "sync_cursor": "",
         "last_sync_at": null,
         "last_error": "",
-        "created_at": 1791666182.0152955,
-        "updated_at": 1791666182.0152955,
+        "created_at": 1791670848.380529,
+        "updated_at": 1791670848.380529,
         "sync_cursors": {},
         "credential_ref_present": true,
         "adapter_available": true
@@ -550,11 +500,11 @@
     },
     "sync_returned_snapshots": {
       "ok": true,
-      "detail": 4
+      "detail": 2
     },
     "snapshot_has_content_hash": {
       "ok": true,
-      "detail": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12"
+      "detail": "7afd511c078b4e3470d42d40d833492d60c22531e28b8c4f938e35b5d6956a83"
     },
     "snapshot_revision_view_present": {
       "ok": true,
@@ -584,8 +534,8 @@
     "space_selected_snapshots": {
       "ok": true,
       "detail": [
-        "ccs_e104a697005743af",
-        "ccs_fe671375937e43d1"
+        "ccs_eb5dedc2d0a9409e",
+        "ccs_65bb29113592470a"
       ]
     },
     "preflight_has_no_blockers": {
@@ -595,8 +545,8 @@
     "preflight_pack_preview_has_snapshot": {
       "ok": true,
       "detail": [
-        "ccs_e104a697005743af",
-        "ccs_fe671375937e43d1"
+        "ccs_eb5dedc2d0a9409e",
+        "ccs_65bb29113592470a"
       ]
     },
     "session_started_active": {
@@ -613,7 +563,7 @@
         {
           "capability": "project.read",
           "provider_id": "GITHUB",
-          "connection_id": "ccn_aea80c1b32444239",
+          "connection_id": "ccn_9b991abddc464a0d",
           "account_hint": "huangdi97"
         }
       ]
@@ -624,14 +574,14 @@
         {
           "capability": "project.read",
           "provider_id": "GITHUB",
-          "connection_id": "ccn_aea80c1b32444239",
+          "connection_id": "ccn_9b991abddc464a0d",
           "account_hint": "huangdi97"
         }
       ]
     },
     "session_pack_write_grant_blocked": {
       "ok": true,
-      "detail": "POST /api/product/conversation/sessions/cv_72d96af28d9346a5/start -> 400: {\"detail\":\"本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；issue.create:WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW。不会用 provider catalog 或 placeholder 放行。\"}"
+      "detail": "POST /api/product/conversation/sessions/cv_63544918e34d4b2e/start -> 400: {\"detail\":\"本场请求的 connector capability 没有真实 adapter + 已连接账户 + exact grant；issue.create:WRITE_REQUIRES_EXPLICIT_EXECUTION_FLOW。不会用 provider catalog 或 placeholder 放行。\"}"
     },
     "ask_grounded_on_snapshot": {
       "ok": true,
@@ -654,14 +604,14 @@
       "detail": [
         {
           "kind": "CONNECTOR_SNAPSHOT",
-          "id": "ccs_e104a697005743af",
+          "id": "ccs_eb5dedc2d0a9409e",
           "provider_id": "GITHUB",
-          "connection_id": "ccn_aea80c1b32444239",
+          "connection_id": "ccn_9b991abddc464a0d",
           "capability": "project.read",
           "external_kind": "ISSUE",
-          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#4",
-          "content_hash": "86a89ab5b763b4a976ddda812dccaee94b155e9f9b3039b3bc3ce15dec76ac12",
-          "occurred_at": 1791665911.0,
+          "external_id": "huangdi97/chengzhu-connector-replay-2026-10-11#2",
+          "content_hash": "7afd511c078b4e3470d42d40d833492d60c22531e28b8c4f938e35b5d6956a83",
+          "occurred_at": 1791664011.0,
           "visibility": "PRIVATE"
         }
       ]
@@ -735,16 +685,16 @@
     "github_exactly_one_issue": {
       "ok": true,
       "detail": [
-        5
+        7
       ]
     },
     "github_issue_body_matches_reviewed_content": {
       "ok": true,
-      "detail": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37 -->"
+      "detail": "Created by the reviewed CREATE_ISSUE_DRAFT flow during the v2 local closure replay.\n\n<!-- chengzhu-execution:39a3c55557408e41047985fcb67e4e01511ba6708e03f44cefe007fd47d5544e -->"
     },
     "github_issue_carries_audit_idempotency_marker": {
       "ok": true,
-      "detail": "65841270190d3c6bc82dd582a8bcf79ef9aebf1079be9d00fc9b7b577c3c5d37"
+      "detail": "39a3c55557408e41047985fcb67e4e01511ba6708e03f44cefe007fd47d5544e"
     },
     "token_absent_from_product_db": {
       "ok": true,
@@ -950,5 +900,5 @@
     }
   ],
   "passed": true,
-  "backend_log_tail": "INFO:     Started server process [22564]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:53138 (Press CTRL+C to quit)\nINFO:     127.0.0.1:53147 - \"GET /api/options HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53148 - \"GET /api/product/conversation/integrations/catalog HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53149 - \"POST /api/product/conversation/integrations/connections HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53150 - \"POST /api/product/conversation/integrations/connections/ccn_aea80c1b32444239/verify HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53157 - \"POST /api/product/conversation/spaces HTTP/1.1\" 200 OK\n2026-10-11 05:03:05 | WARNING | stt.engines | Whisper CUDA warmup failed; falling back to CPU: Library cublas64_12.dll is not found or cannot be loaded\nINFO:     127.0.0.1:53158 - \"POST /api/product/conversation/integrations/connections/ccn_aea80c1b32444239/sync HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53166 - \"GET /api/product/conversation/spaces/cs_cdc4c0d8252e4467/connector-snapshots HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53167 - \"PATCH /api/product/conversation/spaces/cs_cdc4c0d8252e4467 HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53168 - \"POST /api/product/conversation/spaces/cs_cdc4c0d8252e4467/sessions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53169 - \"GET /api/product/conversation/sessions/cv_76b37d61fcbb4a07/preflight HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53174 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53177 - \"GET /api/product/conversation/sessions/cv_76b37d61fcbb4a07 HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53178 - \"GET /api/product/conversation/sessions/cv_76b37d61fcbb4a07/context HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53179 - \"POST /api/product/conversation/spaces/cs_cdc4c0d8252e4467/sessions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53180 - \"POST /api/product/conversation/sessions/cv_72d96af28d9346a5/start HTTP/1.1\" 400 Bad Request\nINFO:     127.0.0.1:53192 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/ask HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53193 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/ask HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53194 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/draft-actions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53195 - \"POST /api/product/conversation/draft-actions/cda_775840c79bbd4ac0/review HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53196 - \"POST /api/product/conversation/sessions/cv_76b37d61fcbb4a07/draft-actions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53197 - \"POST /api/product/conversation/draft-actions/cda_b6a5bfe61f84408f/review HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53198 - \"POST /api/product/conversation/draft-actions/cda_b6a5bfe61f84408f/execution HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53207 - \"POST /api/product/conversation/integrations/executions/cce_d91d0391824e4ba6/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53212 - \"POST /api/product/conversation/draft-actions/cda_775840c79bbd4ac0/execution HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53215 - \"POST /api/product/conversation/integrations/executions/cce_b98d7942ca41433c/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53225 - \"POST /api/product/conversation/integrations/executions/cce_b98d7942ca41433c/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53226 - \"GET /api/product/conversation/integrations/executions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:53243 - \"GET /api/product/conversation/spaces/cs_cdc4c0d8252e4467/export HTTP/1.1\" 200 OK\n"
+  "backend_log_tail": "INFO:     Started server process [9764]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:55908 (Press CTRL+C to quit)\nINFO:     127.0.0.1:55976 - \"GET /api/options HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55983 - \"GET /api/product/conversation/integrations/catalog HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55984 - \"POST /api/product/conversation/integrations/connections HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55985 - \"POST /api/product/conversation/integrations/connections/ccn_9b991abddc464a0d/verify HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55997 - \"POST /api/product/conversation/spaces HTTP/1.1\" 200 OK\n2026-10-11 06:20:51 | WARNING | stt.engines | Whisper CUDA warmup failed; falling back to CPU: Library cublas64_12.dll is not found or cannot be loaded\nINFO:     127.0.0.1:56001 - \"POST /api/product/conversation/integrations/connections/ccn_9b991abddc464a0d/sync HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56047 - \"GET /api/product/conversation/spaces/cs_46d6260a76ea437d/connector-snapshots HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56048 - \"PATCH /api/product/conversation/spaces/cs_46d6260a76ea437d HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56049 - \"POST /api/product/conversation/spaces/cs_46d6260a76ea437d/sessions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56050 - \"GET /api/product/conversation/sessions/cv_9c5d17806a274a5f/preflight HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56075 - \"POST /api/product/conversation/sessions/cv_9c5d17806a274a5f/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56087 - \"GET /api/product/conversation/sessions/cv_9c5d17806a274a5f HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56088 - \"GET /api/product/conversation/sessions/cv_9c5d17806a274a5f/context HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56089 - \"POST /api/product/conversation/spaces/cs_46d6260a76ea437d/sessions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56090 - \"POST /api/product/conversation/sessions/cv_63544918e34d4b2e/start HTTP/1.1\" 400 Bad Request\nINFO:     127.0.0.1:56105 - \"POST /api/product/conversation/sessions/cv_9c5d17806a274a5f/ask HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56106 - \"POST /api/product/conversation/sessions/cv_9c5d17806a274a5f/ask HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56107 - \"POST /api/product/conversation/sessions/cv_9c5d17806a274a5f/draft-actions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56108 - \"POST /api/product/conversation/draft-actions/cda_f51bda4e0fa44c13/review HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56112 - \"POST /api/product/conversation/sessions/cv_9c5d17806a274a5f/draft-actions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56113 - \"POST /api/product/conversation/draft-actions/cda_32b2f3ddf6074068/review HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56114 - \"POST /api/product/conversation/draft-actions/cda_32b2f3ddf6074068/execution HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56130 - \"POST /api/product/conversation/integrations/executions/cce_ca75598afa13474e/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56143 - \"POST /api/product/conversation/draft-actions/cda_f51bda4e0fa44c13/execution HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56166 - \"POST /api/product/conversation/integrations/executions/cce_696821f787d64322/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56200 - \"POST /api/product/conversation/integrations/executions/cce_696821f787d64322/execute HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:56201 - \"GET /api/product/conversation/integrations/executions HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:62964 - \"GET /api/product/conversation/spaces/cs_46d6260a76ea437d/export HTTP/1.1\" 200 OK\n"
 }

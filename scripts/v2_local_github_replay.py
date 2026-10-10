@@ -457,9 +457,11 @@ def main() -> int:
                 )
 
                 # 8. manual ask grounded on the frozen connector snapshot
-                ask_tokens = sorted(
-                    {token_word for row in frozen_snapshots for token_word in str(row.get("title", "")).split() if len(token_word) > 4}
-                )[:3]
+                # Ask about ONE frozen snapshot, using only words taken from that same
+                # title, so the question is a coherent query about one frozen source
+                # (mixing tokens from two different snapshots is legitimately not grounded).
+                first_title = str((frozen_snapshots[0] if frozen_snapshots else {}).get("title") or "")
+                ask_tokens = [word for word in first_title.replace(":", " ").split() if len(word) > 4][:3]
                 question = " ".join(ask_tokens) if ask_tokens else "cache invalidation"
                 answered = http(base, "POST", f"{API}/sessions/{session_id}/ask", {"question": question})
                 matches = answered.get("matches") or []

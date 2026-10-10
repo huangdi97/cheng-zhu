@@ -1842,9 +1842,13 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(/rollback owner is Alex/)).toBeVisible()
 
     const checkbox = page.locator('label').filter({ hasText: 'Architecture Brief' }).locator('input[type="checkbox"]')
-    await checkbox.check()
+    // This checkbox is intentionally controlled by persisted Space truth. The
+    // click starts an async PATCH + reload, so Playwright .check() can treat
+    // the transient controlled re-render as failure even though persistence is
+    // working. Assert the persisted write first, then the reloaded UI state.
+    await checkbox.click()
+    await expect.poll(() => selectedBody?.selected_connector_snapshot_ids ?? []).toContain(snapshot.id)
     await expect(checkbox).toBeChecked()
-    expect(selectedBody.selected_connector_snapshot_ids).toContain(snapshot.id)
   })
 
 
@@ -2065,6 +2069,189 @@ test.describe('v2.0 Conversation Profile', () => {
     await page.getByRole('button', { name: '执行外部动作' }).click()
     await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
     await expect(page.getByText(/acme\/project#24/)).toBeVisible()
+  })
+
+
+  test('Gmail send-only uses OIDC identity then reviewed second-step email execution', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let requestBody = null
+    let executeCalls = 0
+    let draftAction = null
+    let execution = null
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'GOOGLE_MAIL',
+            label: 'Gmail',
+            capabilities: ['email.send'],
+            read_capabilities: [],
+            write_capabilities: ['email.send'],
+            external_kinds: [],
+            provider_scopes: { 'email.send': 'https://www.googleapis.com/auth/gmail.send' },
+            identity_scopes: ['openid', 'email'],
+            sync: 'WRITE_ONLY_NO_SYNC',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:google-mail:env:<ENV_VAR>',
+              write_target: 'single recipient email address',
+              secret_storage: 'PROCESS_ENV_ONLY',
+              mailbox_read_support: 'NONE',
+              oauth_required_scopes: 'openid email gmail.send',
+              oauth_scope_classification: 'GMAIL_SEND_SENSITIVE',
+              public_release_gate: 'GOOGLE_OAUTH_APP_VERIFICATION_REQUIRED',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') {
+          return { items: connection ? [connection] : [] }
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-gmail',
+            provider_id: 'GOOGLE_MAIL',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: ['email.send'],
+            provider_scopes: ['email', 'https://www.googleapis.com/auth/gmail.send', 'openid'],
+            account_hint: '',
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-gmail/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', account_hint: 'sender@example.com', updated_at: 2 }
+          return connection
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/followup-draft` && method === 'POST') {
+          draftAction = {
+            id: 'cda-gmail',
+            space_id: SPACE.id,
+            session_id: SESSION.id,
+            kind: 'FOLLOWUP_EMAIL_DRAFT',
+            title: 'Architecture Review · Follow-up',
+            content: '这场之后：\\nDecisions：offline migration 采用 v2',
+            target: '',
+            payload: { execution: 'LOCAL_REVIEW_ONLY', external_execution: false },
+            source_refs: DECISION.source_refs,
+            status: 'DRAFT',
+            created_at: 3,
+            updated_at: 3,
+          }
+          return draftAction
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-gmail/review' && method === 'POST') {
+          draftAction = {
+            ...draftAction,
+            status: request.postDataJSON().action === 'APPROVE' ? 'APPROVED' : 'DISMISSED',
+            updated_at: 4,
+          }
+          return draftAction
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-gmail/execution' && method === 'POST') {
+          requestBody = request.postDataJSON()
+          execution = {
+            id: 'cce-gmail',
+            draft_action_id: 'cda-gmail',
+            connection_id: connection.id,
+            capability: 'email.send',
+            operation: 'SEND_EMAIL',
+            target: requestBody.target,
+            idempotency_key: 'gmailabcdef123456',
+            status: 'PENDING',
+            request: {
+              title: draftAction.title,
+              content: draftAction.content,
+              payload: draftAction.payload,
+              outbound_redaction_applied: false,
+            },
+            response: {},
+            error: '',
+            created_at: 5,
+            updated_at: 5,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-gmail/execute' && method === 'POST') {
+          executeCalls += 1
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: {
+              provider_id: 'GOOGLE_MAIL',
+              message_id: 'msg-123',
+              thread_id: 'thread-456',
+              sender: 'sender@example.com',
+              recipient: 'recipient@example.com',
+              provider_idempotency: 'NONE',
+            },
+            updated_at: 6,
+            executed_at: 6,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('google-mail-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/reviewed send-only/)).toBeVisible()
+    await expect(setup.getByText(/不读 inbox、不创建 mail snapshot/)).toBeVisible()
+    await expect(setup.getByText(/Sensitive scope/)).toBeVisible()
+    await expect(setup.getByText(/OAuth consent \/ app verification/)).toBeVisible()
+    await page.getByLabel('Gmail token 环境变量名').fill('MY_GMAIL_TOKEN')
+    await page.getByRole('button', { name: '创建 Gmail send-only 连接元数据' }).click()
+
+    expect(createBody.provider_id).toBe('GOOGLE_MAIL')
+    expect(createBody.granted_capabilities).toEqual(['email.send'])
+    expect(createBody.credential_ref).toBe('provider:google-mail:env:MY_GMAIL_TOKEN')
+    expect(JSON.stringify(createBody)).not.toContain('gmail.readonly')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Google OIDC identity 已验证/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sync read-only snapshot' })).toHaveCount(0)
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Follow-up Draft' }).click()
+    await expect(page.getByText('Architecture Review · Follow-up')).toBeVisible()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption('ccn-gmail')
+
+    const recipient = page.getByLabel('Gmail 收件邮箱')
+    await expect(recipient).toBeVisible()
+    await expect(page.getByRole('button', { name: '创建 Execution Request' })).toBeDisabled()
+    await recipient.fill('recipient@example.com')
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+
+    expect(requestBody).toEqual({ connection_id: 'ccn-gmail', target: 'recipient@example.com' })
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    expect(executeCalls).toBe(0)
+
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/msg-123/)).toBeVisible()
+    await expect(page.getByText(/provider_idempotency/)).toBeVisible()
+    expect(executeCalls).toBe(1)
   })
 
 

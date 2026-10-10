@@ -51,13 +51,23 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
     },
     "GOOGLE_MAIL": {
         "label": "Gmail",
-        "capabilities": ["mail.read", "email.send"],
-        "external_kinds": ["MAIL_THREAD"],
+        "capabilities": ["email.send"],
+        "external_kinds": [],
         "provider_scopes": {
-            "mail.read": "https://www.googleapis.com/auth/gmail.readonly",
             "email.send": "https://www.googleapis.com/auth/gmail.send",
         },
-        "sync": "PROVIDER_CURSOR",
+        "identity_scopes": ["openid", "email"],
+        "sync": "WRITE_ONLY_NO_SYNC",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:google-mail:env:<ENV_VAR>",
+            "write_target": "single recipient email address",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "mailbox_read_support": "NONE",
+            "oauth_required_scopes": "openid email gmail.send",
+            "oauth_scope_classification": "GMAIL_SEND_SENSITIVE",
+            "public_release_gate": "GOOGLE_OAUTH_APP_VERIFICATION_REQUIRED",
+        },
     },
     "GOOGLE_DRIVE": {
         "label": "Google Drive / Docs",
@@ -224,6 +234,15 @@ def _capabilities(values: list[str] | tuple[str, ...] | set[str]) -> list[str]:
 
 
 def _expected_provider_scopes(provider: str, granted: set[str]) -> list[str]:
+    # Gmail send-only needs no mailbox read scope. The two identity scopes are
+    # standard OIDC scopes used solely to verify which Google account the
+    # access token represents; they do not grant inbox/message read access.
+    if provider == "GOOGLE_MAIL" and "email.send" in granted:
+        return sorted([
+            "openid",
+            "email",
+            "https://www.googleapis.com/auth/gmail.send",
+        ])
     # GitHub fine-grained repository permissions are one level per permission,
     # not independent read+write scopes. Issues: write subsumes read.
     if provider == "GITHUB":
@@ -369,6 +388,7 @@ def catalog() -> list[dict[str, Any]]:
             ],
             "external_kinds": list(spec["external_kinds"]),
             "provider_scopes": dict(spec["provider_scopes"]),
+            "identity_scopes": list(spec.get("identity_scopes") or []),
             "sync": spec["sync"],
             "setup": dict(spec.get("setup") or {}),
             "adapter_available": provider in _ADAPTERS,
@@ -399,7 +419,7 @@ def create_connection(
         raise ValueError("Connector connection 至少需要一个 capability")
     if not granted <= supported:
         raise ValueError(
-            "Provider 不支持 capability: " + ", ".join(sorted(granted - supported))
+            "provider 不支持 capability: " + ", ".join(sorted(granted - supported))
         )
     credential_ref = _validate_credential_ref(credential_ref)
     validated_scopes = _validated_provider_scopes(provider, granted, provider_scopes)
@@ -1157,5 +1177,5 @@ def diagnostics() -> dict[str, Any]:
         ) or 0),
         "orphaned_executions_recovered": recovered_orphans,
         "secret_storage": "OPAQUE_REFERENCE_ONLY",
-        "default": "NO_PROVIDER_ADAPTERS_CONFIGURED",
+        "default": "PROVIDERS_REQUIRE_EXPLICIT_CONNECTION" if _ADAPTERS else "NO_PROVIDER_ADAPTERS_CONFIGURED",
     }

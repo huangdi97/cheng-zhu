@@ -553,8 +553,9 @@ reviewed output evidence
 | GitHub project tracker / issue provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 首个真实 REST adapter：project.read + issue.create；默认不注册，需 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1；token 仅经 env credential reference 解析；没有真实账户连接/外部 action evidence 前不得宣称 GITHUB_ACCOUNT_CONNECTED |
 | Google Calendar provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `calendar.read` concrete adapter；native sync token + 410 reset；immutable revision audit；latest-revision import；upstream drift 可见；默认关闭；没有真实 Google account replay 前不得声明 account connected |
 | Google Drive / Docs provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `docs.read` concrete adapter；显式 folder FULL_TARGET_REFRESH；Docs/Slides text export、Sheets first-sheet CSV partial truth、binary metadata-only truth；默认关闭；没有真实 Google account replay 前不得声明 account connected |
-| Mail / Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
-| External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub issue.create 已有 opt-in real adapter，其他 provider 仍 fail-closed |
+| Gmail send-only provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT / OAUTH VERIFICATION EVIDENCE PENDING | 只实现 reviewed `email.send`；OIDC identity = `openid + email`，mailbox scope = `gmail.send`；不实现 mail.read/inbox sync；`gmail.send` 属 Google Sensitive scope，公共/稳定 provider 仍需适用的 OAuth app verification；没有真实 Gmail account replay 前不得声明邮件已发出 |
+| Microsoft / MCP provider | NOT CONFIGURED | catalog/contract 已定义；没有真实 adapter/auth/account/runtime evidence 就不能宣称可用 |
+| External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub `issue.create` 与 Gmail `email.send` 已有 opt-in real adapter，Task / Decision Log provider 仍 fail-closed |
 | Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
@@ -751,8 +752,8 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- real Google / Microsoft / MCP adapter + account authorization；
-- GitHub real-account authorization / real repository replay / real external Issue evidence（adapter code 已存在，真实账户证据仍是 external gate）；
+- Microsoft / MCP adapter + account authorization；
+- GitHub / Google Calendar / Google Drive / Gmail 的真实账户 authorization / real provider replay（adapter code 已存在，真实账户证据仍是 external gate）；
 - external Calendar/meeting discovery；
 - Human Coach real-session evidence；
 - real external action evidence（边界/runtime 可在 repo 内实现；provider success 必须来自真实 adapter/account）；
@@ -842,4 +843,26 @@ REAL_GOOGLE_DRIVE_ACCOUNT_EVIDENCE_PENDING = TRUE
 ```
 
 工程证据只证明 adapter / fake transport / folder target / pagination / export semantics / immutable snapshot / product flow；没有真实 Google OAuth/account replay 时不得声明真实 Drive 已连接或真实文档已同步。
+
+## Gmail send-only provider closure · 2026-10-10
+
+当前 branch 新增第四个 concrete Conversation provider，也是第二个真实 write adapter：
+
+```text
+GOOGLE_MAIL_ADAPTER_CODE = TRUE
+EMAIL_SEND_ONLY = TRUE
+OIDC_IDENTITY_SCOPES = openid + email
+GMAIL_SCOPE = gmail.send
+MAIL_READ = FALSE
+INBOX_SYNC = FALSE
+SINGLE_EXPLICIT_RECIPIENT = TRUE
+REVIEWED_TWO_STEP_EXECUTION = TRUE
+PROVIDER_SIDE_IDEMPOTENCY = FALSE
+AMBIGUOUS_OUTCOME = UNKNOWN_OUTCOME
+REAL_GMAIL_ACCOUNT_EVIDENCE_PENDING = TRUE
+```
+
+工程证据只证明 adapter / fake transport / OIDC identity contract / RFC message construction / reviewed execution / failure ambiguity / product flow。没有真实 Google OAuth/account replay 时不得声明真实 Gmail 已连接或真实邮件已发出。
+
+另外，`gmail.send` 的 Google Sensitive-scope OAuth verification 是独立 public-release gate；本 PR 不伪造该审批状态。
 

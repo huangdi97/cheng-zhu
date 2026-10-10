@@ -135,6 +135,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const [googleCalendarId, setGoogleCalendarId] = useState('primary')
   const [googleDriveEnvVar, setGoogleDriveEnvVar] = useState('CHENGZHU_GOOGLE_DRIVE_ACCESS_TOKEN')
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState('root')
+  const [googleMailEnvVar, setGoogleMailEnvVar] = useState('CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN')
   const [githubReadEnabled, setGithubReadEnabled] = useState(true)
   const [githubWriteEnabled, setGithubWriteEnabled] = useState(true)
   const [connectorTargets, setConnectorTargets] = useState<Record<string, string>>({})
@@ -170,6 +171,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const githubProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GITHUB')
   const googleCalendarProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_CALENDAR')
   const googleDriveProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_DRIVE')
+  const googleMailProvider = (integrationCatalog.data?.items ?? []).find((provider) => provider.provider_id === 'GOOGLE_MAIL')
   const draftCapability = draft ? DRAFT_EXECUTION_CAPABILITY[draft.kind] : ''
   const compatibleExecutionConnections = (integrationConnections.data?.items ?? []).filter(
     (connection) => connection.status === 'CONNECTED'
@@ -178,6 +180,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   )
   const selectedExecutionConnection = compatibleExecutionConnections.find((connection) => connection.id === executionConnectionId)
   const executionNeedsRepository = selectedExecutionConnection?.provider_id === 'GITHUB' && draftCapability === 'issue.create'
+  const executionNeedsEmail = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && draftCapability === 'email.send'
+  const validExecutionEmail = /^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(executionTarget.trim())
   const executionRetrySafe = execution?.status === 'FAILED'
     && (execution.response as { retry_safe?: boolean } | undefined)?.retry_safe === true
   const executionReconciliation = (execution?.response as {
@@ -187,6 +191,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const outboundRedactionApplied = Boolean(
     (execution?.request as { outbound_redaction_applied?: boolean } | undefined)?.outbound_redaction_applied,
   )
+  const gmailRedactionBlocked = selectedExecutionConnection?.provider_id === 'GOOGLE_MAIL' && outboundRedactionApplied
 
   const makePreflight = async () => {
     setSessionBusy(true); setSessionError('')
@@ -476,6 +481,26 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const createGoogleMailConnection = async () => {
+    const envName = googleMailEnvVar.trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(envName)) {
+      setSessionError('Gmail credential env 只允许环境变量名，例如 CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN。')
+      return
+    }
+    setIntegrationBusy(true); setSessionError(''); setLifecycleMessage('')
+    try {
+      await conversationApi.createIntegrationConnection({
+        provider_id: 'GOOGLE_MAIL',
+        display_name: 'Gmail · send-only',
+        granted_capabilities: ['email.send'],
+        credential_ref: `provider:google-mail:env:${envName}`,
+      })
+      await integrationConnections.reload()
+      setLifecycleMessage('Gmail send-only connection 元数据已创建。Verify 只确认 Google identity；真正 email.send 能力由第二次显式 Execute 的 Gmail provider 响应证明。')
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const syncConnector = async (connectionId: string) => {
     const connection = (integrationConnections.data?.items ?? []).find((item) => item.id === connectionId)
     const repository = (connectorTargets[connectionId] || githubRepository).trim()
@@ -523,7 +548,9 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
         ? 'Google Calendar read probe 已通过，连接状态为 CONNECTED。实际 calendar target 的完整读取仍由显式 Sync provider 响应证明。'
         : connection?.provider_id === 'GOOGLE_DRIVE'
           ? 'Google Drive account read probe 已通过，连接状态为 CONNECTED。具体 folder 是否可读仍由显式 Sync 的 folder probe + 完整分页证明。'
-          : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
+          : connection?.provider_id === 'GOOGLE_MAIL'
+            ? 'Google OIDC identity 已验证。当前连接不具备 mailbox read；email.send 只有在 reviewed draft 的第二次显式 Execute 获得 Gmail ok=true 后才算真实证明。'
+            : 'Connector 身份认证已通过，连接状态为 CONNECTED。目标 owner/repo 的实际 read/write 能力仍分别由 Sync / 第二次显式 Execute 的 provider 响应证明。')
     } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
     finally { setIntegrationBusy(false) }
   }
@@ -614,6 +641,10 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     const target = executionTarget.trim() || draft.target || ''
     if (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(target)) {
       setSessionError('GitHub Issue 写回必须明确指定 owner/repo target。')
+      return
+    }
+    if (executionNeedsEmail && !/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(target)) {
+      setSessionError('Gmail 外发必须明确填写一个收件邮箱；不接受多个收件人或显示名。')
       return
     }
     setIntegrationBusy(true); setSessionError('')
@@ -888,6 +919,24 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   </div>
                   <p className="mt-2 text-[10px] text-text-muted">Docs / Slides 导出纯文本；Sheets 仅第一 sheet CSV 并明确标 partial；PDF/二进制只保存 metadata，不会假装已读取正文。Sync 完成后仍需逐条选入 Space。</p>
                 </div> : null}
+                {googleMailProvider ? <div className="mt-3 rounded-xl border border-bg-tertiary/70 bg-bg-primary/55 p-3" data-testid="google-mail-connector-setup">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-text-primary">Gmail · reviewed send-only</div>
+                      <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {googleMailProvider.setup?.runtime_opt_in_env || 'CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1'} 和 Gmail access-token 环境变量。只实现 email.send，不读 inbox、不创建 mail snapshot、不做后台同步。</p>
+                    </div>
+                    <StatusBadge tone={googleMailProvider.adapter_available ? 'ok' : 'muted'}>{googleMailProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
+                  </div>
+                  <div className="mt-3">
+                    <input aria-label="Gmail token 环境变量名" className={inputCls} value={googleMailEnvVar} onChange={(e) => setGoogleMailEnvVar(e.target.value)} placeholder="CHENGZHU_GOOGLE_MAIL_ACCESS_TOKEN" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SecondaryButton disabled={integrationBusy || !googleMailProvider.adapter_available} onClick={createGoogleMailConnection}>创建 Gmail send-only 连接元数据</SecondaryButton>
+                    <span className="text-[10px] text-text-muted">scopes · openid · email · gmail.send · credential ref = provider:google-mail:env:{googleMailEnvVar || '<ENV_VAR>'}</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-text-muted">Verify 仅通过 Google UserInfo 确认账号 identity，不读取邮箱；真正 email.send 能力只有在 APPROVED Follow-up Draft 的第二次显式 Execute 返回 Gmail ok=true 后才成立。</p>
+                  <p className="mt-1 text-[10px] text-status-inferred">Public release gate · gmail.send 属于 Google Sensitive scope。当前 adapter 工程可用 ≠ 公共 OAuth 已获验证；面向公众稳定发布前仍需完成 Google OAuth consent / app verification。不会为了绕过验证扩大到 mailbox read。</p>
+                </div> : null}
                 <div className="mt-3 space-y-2">
                   {(integrationConnections.data?.items ?? []).length ? integrationConnections.data!.items.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-bg-tertiary/70 bg-bg-primary/55 px-3 py-2">
@@ -907,7 +956,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                       </div> : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {connection.status !== 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || !connection.credential_ref_present} onClick={() => verifyConnector(connection.id)}>验证连接</SecondaryButton> : null}
-                        {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
+                        {connection.status === 'CONNECTED' && connection.granted_capabilities.some((capability) => ['project.read', 'calendar.read', 'docs.read'].includes(capability)) ? <SecondaryButton disabled={integrationBusy || !connection.adapter_available || (connection.provider_id === 'GITHUB' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test((connectorTargets[connection.id] ?? githubRepository).trim())) || (connection.provider_id === 'GOOGLE_CALENDAR' && !(connectorTargets[connection.id] ?? connection.account_hint ?? googleCalendarId).trim()) || (connection.provider_id === 'GOOGLE_DRIVE' && !/^(?:root|[A-Za-z0-9_-]{1,256})$/.test((connectorTargets[connection.id] ?? connection.account_hint ?? googleDriveFolderId).trim()))} onClick={() => syncConnector(connection.id)}>Sync read-only snapshot</SecondaryButton> : null}
                         {connection.status === 'CONNECTED' ? <SecondaryButton disabled={integrationBusy} onClick={() => disconnectConnector(connection.id)}>断开</SecondaryButton> : null}
                         {connection.status !== 'REVOKED' ? <SecondaryButton disabled={integrationBusy} onClick={() => revokeConnector(connection.id)}>撤销</SecondaryButton> : null}
                       </div>
@@ -1085,13 +1134,15 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     {compatibleExecutionConnections.map((connection) => <option key={connection.id} value={connection.id}>{connection.display_name} · {connection.provider_id} · {connection.account_hint || connection.id.slice(0, 8)}</option>)}
                   </select>
                   {executionNeedsRepository ? <input aria-label="GitHub Issue 目标仓库" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="owner/repo · 第二次显式动作的目标" /> : null}
-                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim()))} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
+                  {executionNeedsEmail ? <input aria-label="Gmail 收件邮箱" className={inputCls + ' mt-2'} value={executionTarget} onChange={(e) => { setExecutionTarget(e.target.value); setExecution(null) }} placeholder="recipient@example.com · 单一明确收件人" /> : null}
+                  {!execution ? <div className="mt-2"><SecondaryButton disabled={integrationBusy || !executionConnectionId || (executionNeedsRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(executionTarget.trim())) || (executionNeedsEmail && !validExecutionEmail)} onClick={requestExecution}>创建 Execution Request</SecondaryButton></div> : <div className="mt-3 rounded-lg bg-bg-primary/60 px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={execution.status === 'SUCCEEDED' ? 'ok' : ['FAILED', 'UNKNOWN_OUTCOME', 'BLOCKED'].includes(execution.status) ? 'warn' : 'muted'}>{execution.status}</StatusBadge><span className="text-[10px] text-text-muted">{execution.operation} · {execution.capability} · idempotency {execution.idempotency_key.slice(0, 8)}</span></div>
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
                     {outboundRedactionApplied ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
                       检测到 secret/token 形态的敏感值。Execution Request 中保存并实际发送给 provider 的内容已经脱敏，因此可能与刚才审核的本地 Draft 不完全一致；请在第二次 Execute 前按脱敏后的外发语义重新确认。
                     </div> : null}
-                    {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
+                    {gmailRedactionBlocked ? <div className="mt-2 text-[11px] text-status-risk">Gmail send-only provider 不会发送被安全层改写过、但尚未重新审核的内容。请回到 Draft 移除敏感值并重新确认，再创建新的 Execution Request。</div> : null}
+                    {executionCanExecute && !gmailRedactionBlocked ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
                     {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
                     {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
                       <div>结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div>

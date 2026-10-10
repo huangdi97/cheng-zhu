@@ -100,7 +100,7 @@ Conversation truth
 | Provider | Capabilities |
 | --- | --- |
 | Google Calendar | calendar.read |
-| Gmail | mail.read / email.send |
+| Gmail | email.send（send-only；mail.read 未实现） |
 | Google Drive / Docs | docs.read |
 | Microsoft Graph | calendar.read / mail.read / docs.read / project.read / email.send / task.create |
 | GitHub | project.read / issue.create |
@@ -118,9 +118,10 @@ GitHub、Google Calendar 与 Google Drive adapter 代码可随应用发布，但
 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1
+CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1
 ```
 
-才注册为 `adapter_available=true`。Gmail / Microsoft / MCP 当前仍不能仅凭 catalog 条目冒充真实 adapter。
+才注册为 `adapter_available=true`。Google Mail 当前只注册 `email.send`，不注册 `mail.read`。Microsoft / MCP 当前仍不能仅凭 catalog 条目冒充真实 adapter。
 
 ---
 
@@ -132,8 +133,8 @@ Catalog provider 的 scope 必须由 granted capability 推导，并保存为最
 
 ```text
 calendar.read → Google calendar.events.readonly
-mail.read     → Gmail readonly
-email.send    → Gmail send
+email.send    → openid + email + Gmail send
+mail.read     → 未实现；不因 email.send 偷加 Gmail readonly
 
 calendar.read → Microsoft Calendars.Read
 mail.read     → Microsoft Mail.Read
@@ -222,6 +223,59 @@ docs.read
 
 实现说明：
 [Google Drive Conversation Connector](../architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
+
+---
+
+## 5.3 Gmail reviewed send-only contract
+
+当前 `GOOGLE_MAIL` concrete adapter 只实现：
+
+```text
+APPROVED FOLLOWUP_EMAIL_DRAFT
+→ exact Gmail account
+→ exact single recipient
+→ Execution Request
+→ second explicit Execute
+→ users.messages.send
+→ provider result / UNKNOWN_OUTCOME audit
+```
+
+最小权限冻结为：
+
+```text
+openid
+email
+https://www.googleapis.com/auth/gmail.send
+```
+
+其中 `openid + email` 只用于 OIDC UserInfo 身份校验，不授予 mailbox/message read。当前 provider **不实现**：
+
+- `gmail.readonly`；
+- `mail.read`；
+- inbox/thread/message sync；
+- Gmail snapshot；
+- background polling；
+- mailbox search。
+
+关键约束：
+
+- adapter 只有在 `CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1` 时注册；
+- access token 只通过 `provider:google-mail:env:<ENV_VAR>` 解析；
+- Verify 调 Google OIDC UserInfo，确认 `email_verified=true` 的账号 identity；
+- Verify 不调用 Gmail `users.getProfile`，因为 send-only scope 不应为了展示账号而扩大到 mailbox read；
+- Verify 只证明账号 identity / credential health，不证明 send 成功；
+- 真正 `email.send` 只有第二次显式 Execute 得到 Gmail `messages.send` 成功返回后才成立；
+- v1 一次 execution 只允许一个明确裸邮箱地址作为 recipient；
+- MIME 由标准库构造，拒绝 CR/LF header injection 与多收件人字符串；
+- provider 没有可依赖的 server-side idempotency key；审计 header 不是幂等保证；
+- 4xx 明确拒绝可记录 FAILED；timeout / 5xx / 其他不确定传输进入 `UNKNOWN_OUTCOME`，禁止自动重试；
+- 如果外发安全层检测到 secret 并改写 reviewed Draft，Gmail adapter 拒绝发送，要求用户回到 Draft 重新审核；
+- Gmail provider 不会静默截断已审核 Subject/Body；超过 provider v1 安全上限时拒绝执行并要求修改/重新审核；
+- 当前没有真实 Google account/runtime replay，因此不得声明真实邮件已成功发出。
+- Google 官方将 `gmail.send` 归类为 **Sensitive scope**；公共/稳定 provider 还需要适用的 OAuth consent / app verification。CI/adapter 存在不能替代该外部发布门槛。
+
+实现说明：
+[Google Mail Conversation Connector](../architecture/GOOGLE_MAIL_CONVERSATION_CONNECTOR.md)
 
 ---
 

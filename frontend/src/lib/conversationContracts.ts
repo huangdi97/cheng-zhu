@@ -413,6 +413,7 @@ export interface ConversationConnectorCatalogItem {
   write_capabilities: string[]
   external_kinds: string[]
   provider_scopes: Record<string, string>
+  identity_scopes: string[]
   sync: string
   setup: Record<string, string>
   adapter_available: boolean

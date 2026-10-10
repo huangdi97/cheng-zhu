@@ -473,6 +473,25 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
     finally { setIntegrationBusy(false) }
   }
 
+  const reconcileExternal = async (outcome: 'CONFIRMED_SUCCEEDED' | 'CONFIRMED_NOT_APPLIED') => {
+    if (!execution || execution.status !== 'UNKNOWN_OUTCOME') return
+    const note = window.prompt(
+      outcome === 'CONFIRMED_SUCCEEDED'
+        ? '请记录你在 provider 侧核对到的成功证据/说明。不会自动读取 provider。'
+        : '请记录你在 provider 侧核对“没有发生外部副作用”的证据/说明。只有这种结果才允许安全重试。',
+      '',
+    )?.trim()
+    if (!note) return
+    const providerReference = outcome === 'CONFIRMED_SUCCEEDED'
+      ? (window.prompt('可选：provider message/task/issue/reference id', '') ?? '').trim()
+      : ''
+    setIntegrationBusy(true); setSessionError('')
+    try {
+      setExecution(await conversationApi.reconcileExternalRequest(execution.id, outcome, note, providerReference))
+    } catch (e) { setSessionError(e instanceof Error ? e.message : String(e)) }
+    finally { setIntegrationBusy(false) }
+  }
+
   const start = async () => {
     if (!sessionId || !preflight) return
     setSessionBusy(true); setSessionError('')
@@ -831,12 +850,19 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     {execution.error ? <div className="mt-2 text-[11px] text-status-risk">{execution.error}</div> : null}
                     {executionCanExecute ? <div className="mt-2"><PrimaryButton disabled={integrationBusy} onClick={executeExternal}>{execution.status === 'FAILED' ? '安全重试外部动作' : '执行外部动作'}</PrimaryButton></div> : null}
                     {execution.status === 'FAILED' && !executionRetrySafe ? <div className="mt-2 text-[11px] text-status-inferred">Provider 明确返回失败，但没有声明 retry_safe；成竹不会直接重试。</div> : null}
-                    {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div> : null}
+                    {execution.status === 'UNKNOWN_OUTCOME' ? <div className="mt-2 rounded-lg border border-status-risk/30 bg-status-risk/5 px-2.5 py-2 text-[11px] text-status-risk">
+                      <div>结果不确定：外部副作用可能已经发生。请先到 provider 侧核对；此 audit row 禁止直接重试。</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <SecondaryButton disabled={integrationBusy} onClick={() => reconcileExternal('CONFIRMED_SUCCEEDED')}>已核对：确实执行</SecondaryButton>
+                        <SecondaryButton disabled={integrationBusy} onClick={() => reconcileExternal('CONFIRMED_NOT_APPLIED')}>已核对：未执行，可安全重试</SecondaryButton>
+                      </div>
+                      <div className="mt-2 text-[10px] text-text-muted">这两个动作只记录你在 provider 侧的核对结果，不会自动假设或重放外部动作。</div>
+                    </div> : null}
                     {execution.status === 'SUCCEEDED' ? <div className="mt-2"><div className="text-[11px] font-semibold text-status-direct">Provider 已明确返回 ok=true；这条 execution audit 会保留。</div>{Object.keys(execution.response ?? {}).length ? <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-text-muted">{JSON.stringify(execution.response, null, 2)}</pre> : null}</div> : null}
                   </div>}
                 </> : <p className="mt-2 text-[11px] text-status-inferred">当前没有同时满足 adapter available + CONNECTED + {draftCapability} grant 的账户。本地 APPROVED 草稿会保留，但不会伪装成已发送/已创建。</p>}
               </div> : null}
-              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。只有 provider 明确返回 ok=true 才是 SUCCEEDED；网络异常/超时/缺少明确结果进入 UNKNOWN_OUTCOME，必须先人工核对，不能直接重试。</p>
+              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。只有 provider 明确返回 ok=true 才是 SUCCEEDED；网络异常/超时/缺少明确结果进入 UNKNOWN_OUTCOME，必须先在 provider 侧核对并记录 reconciliation。只有“确认未执行”才会把该 audit row 变成 retry_safe。</p>
             </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}

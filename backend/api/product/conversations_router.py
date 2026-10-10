@@ -132,6 +132,12 @@ class IntegrationExecutionRequest(BaseModel):
     target: str = Field(default="", max_length=1000)
 
 
+class IntegrationReconcileRequest(BaseModel):
+    outcome: str = Field(max_length=80)
+    note: str = Field(min_length=1, max_length=4000)
+    provider_reference: str = Field(default="", max_length=1000)
+
+
 @router.get("/integrations/catalog")
 def integration_catalog():
     return {"items": conversation_integrations.catalog()}
@@ -215,6 +221,17 @@ def integration_executions(draft_action_id: str = "", limit: int = 200):
 def execute_integration_request(execution_id: str):
     with domain_errors():
         return conversation_integrations.execute_request(execution_id)
+
+
+@router.post("/integrations/executions/{execution_id}/reconcile")
+def reconcile_integration_request(execution_id: str, body: IntegrationReconcileRequest):
+    with domain_errors():
+        return conversation_integrations.reconcile_unknown_outcome(
+            execution_id,
+            body.outcome,
+            note=body.note,
+            provider_reference=body.provider_reference,
+        )
 
 
 @router.get("/demo")

@@ -178,6 +178,7 @@ def test_github_target_sync_failure_does_not_invalidate_authenticated_account(pr
     assert connected["status"] == "CONNECTED"
 
     space = conversations.create_space("Target Error", "PROJECT_SYNC")
+    transport.queue(200, {"login": "octocat", "id": 42})
     transport.queue(404, GitHubProviderError(404, "GitHub HTTP 404: Not Found"))
     with pytest.raises(ValueError, match="404"):
         conversation_integrations.sync_connection(
@@ -364,7 +365,8 @@ def test_real_github_adapter_runs_through_audited_boundary_with_fake_http(produc
     assert connected["credential_ref_present"] is True
     assert "credential_ref" not in connected
 
-    # sync -> immutable ISSUE snapshot
+    # sync re-checks account health, then reads immutable ISSUE snapshots
+    transport.queue(200, {"login": "octocat", "id": 42})
     transport.queue(200, [{
         "number": 7,
         "node_id": "I_7",

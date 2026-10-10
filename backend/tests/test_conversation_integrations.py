@@ -210,6 +210,55 @@ def test_public_connection_metadata_redacts_accidentally_pasted_secret_values(pr
     assert "[REDACTED_SECRET]" in connection["account_hint"]
 
 
+
+
+def test_provider_health_and_sync_errors_are_redacted_before_api_and_storage(product_env):
+    bad_registration = FakeAdapter({"calendar.read"})
+
+    def bad_health(_connection=None):
+        raise RuntimeError("health failed Bearer abcdefghijklmnopqrstuvwxyz")
+
+    bad_registration.health = bad_health
+    with pytest.raises(ValueError) as reg_exc:
+        conversation_integrations.register_adapter(bad_registration)
+    assert "abcdefghijklmnopqrstuvwxyz" not in str(reg_exc.value)
+    assert "[REDACTED_SECRET]" in str(reg_exc.value)
+
+    adapter = FakeAdapter({"calendar.read"})
+    conversation_integrations.register_adapter(adapter)
+    connection = conversation_integrations.create_connection(
+        "MCP",
+        granted_capabilities=["calendar.read"],
+        provider_scopes=["server-defined"],
+        credential_ref="plugin:mcp/work",
+    )
+
+    adapter.health = bad_health
+    with pytest.raises(ValueError) as verify_exc:
+        conversation_integrations.verify_and_connect(connection["id"])
+    assert "abcdefghijklmnopqrstuvwxyz" not in str(verify_exc.value)
+    saved = next(row for row in conversation_integrations.list_connections() if row["id"] == connection["id"])
+    assert "[REDACTED_SECRET]" in saved["last_error"]
+
+    # Restore health, connect, then make read_context fail with a secret-like
+    # value. Both the persisted diagnostic and surfaced error must be safe.
+    adapter.health = lambda _connection=None: {"ok": True, "label": "safe"}
+    conversation_integrations.verify_and_connect(connection["id"])
+
+    def bad_read(**kwargs):
+        raise RuntimeError("sync failed ya29.abcdefghijklmnopqrstuvwxyz123456")
+
+    adapter.read_context = bad_read
+    space = conversations.create_space("Secret Sync", "PROJECT_SYNC")
+    with pytest.raises(ValueError) as sync_exc:
+        conversation_integrations.sync_connection(
+            connection["id"], space["id"], capabilities=["calendar.read"]
+        )
+    assert "abcdefghijklmnopqrstuvwxyz123456" not in str(sync_exc.value)
+    after = next(row for row in conversation_integrations.list_connections() if row["id"] == connection["id"])
+    assert "[REDACTED_SECRET]" in after["last_error"]
+
+
 def test_provider_scopes_are_derived_and_exact_least_privilege(product_env):
     google = conversation_integrations.create_connection(
         "GOOGLE_MAIL",

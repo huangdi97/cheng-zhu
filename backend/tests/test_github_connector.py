@@ -42,7 +42,7 @@ def _connection(ref="provider:github:env:CHENGZHU_GITHUB_TOKEN"):
         "provider_id": "GITHUB",
         "credential_ref": ref,
         "granted_capabilities": ["project.read", "issue.create"],
-        "provider_scopes": ["Issues: read", "Issues: write"],
+        "provider_scopes": ["Issues: write"],
         "status": "CONNECTED",
     }
 

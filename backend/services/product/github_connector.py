@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 GITHUB_API_VERSION = "2026-03-10"
@@ -38,6 +38,19 @@ class GitHubProviderError(RuntimeError):
     def __init__(self, status: int, message: str):
         super().__init__(message)
         self.status = int(status)
+
+
+class GitHubTargetError(GitHubProviderError):
+    """A repository/capability-specific rejection; account auth may still be healthy."""
+
+    connection_fatal = False
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Never forward Authorization through an automatic redirect."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        return None
 
 
 Transport = Callable[
@@ -62,8 +75,9 @@ def _urllib_transport(
     timeout: float,
 ) -> tuple[int, dict[str, str], Any]:
     request = Request(url=url, data=body, method=method, headers=headers)
+    opener = build_opener(_NoRedirectHandler())
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
             raw = response.read()
             payload: Any = None
             if raw:
@@ -122,8 +136,8 @@ class GitHubRestAdapter:
     ):
         configured = str(api_base or os.environ.get("CHENGZHU_GITHUB_API_BASE") or _DEFAULT_API_BASE).strip()
         self.api_base = configured.rstrip("/")
-        if not self.api_base.startswith(("https://", "http://")):
-            raise ValueError("GitHub API base 必须是 http/https URL")
+        if not self.api_base.startswith("https://"):
+            raise ValueError("GitHub API base 必须使用 HTTPS；Bearer token 不允许明文 HTTP 出站")
         self._transport = transport or _urllib_transport
 
     @staticmethod
@@ -239,14 +253,19 @@ class GitHubRestAdapter:
                 params["since"] = cursor
             if labels_value:
                 params["labels"] = labels_value
-            status, _headers, payload = self._request(
-                "GET",
-                f"/repos/{owner}/{repo}/issues",
-                token=token,
-                params=params,
-            )
+            try:
+                status, _headers, payload = self._request(
+                    "GET",
+                    f"/repos/{owner}/{repo}/issues",
+                    token=token,
+                    params=params,
+                )
+            except GitHubProviderError as exc:
+                if exc.status != 401 and 400 <= exc.status < 500:
+                    raise GitHubTargetError(exc.status, str(exc)) from None
+                raise
             if status != 200 or not isinstance(payload, list):
-                raise RuntimeError(f"GitHub issue sync returned HTTP {status}")
+                raise RuntimeError(f"GitHub issue sync returned ambiguous HTTP {status}")
             if not payload:
                 break
 

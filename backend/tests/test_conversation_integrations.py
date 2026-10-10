@@ -626,6 +626,10 @@ def test_unknown_outcome_requires_explicit_provider_side_reconciliation(product_
     adapter.fail_execute = False
     retried = conversation_integrations.execute_request(reconciled_retry["id"])
     assert retried["status"] == "SUCCEEDED"
+    assert retried["response"]["retry_history"]
+    prior = retried["response"]["retry_history"][-1]
+    assert prior["response"]["reconciliation"]["outcome"] == "CONFIRMED_NOT_APPLIED"
+    assert prior["response"]["retry_safe"] is True
 
     with pytest.raises(ValueError, match="只有 UNKNOWN_OUTCOME"):
         conversation_integrations.reconcile_unknown_outcome(

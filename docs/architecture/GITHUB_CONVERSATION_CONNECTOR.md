@@ -191,6 +191,13 @@ owner/repo
 
 自动猜目标。
 
+Execution Request 还会在进入 provider adapter 前执行通用 outbound secret sanitization。若本地已审核 Draft 含 token/secret-shaped value：
+
+- audit/request 只保存脱敏后的 provider payload；
+- GitHub adapter 只收到脱敏后的 payload；
+- `outbound_redaction_applied=true`；
+- Continue UI 在第二次 Execute 前显式提示用户实际外发内容已被脱敏。
+
 成功条件：
 
 ```text

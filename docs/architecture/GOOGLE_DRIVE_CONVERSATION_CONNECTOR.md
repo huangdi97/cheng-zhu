@@ -125,6 +125,8 @@ Sync 先执行 folder metadata probe，要求：
 - MIME type = Google Drive folder；
 - target 不在 trash。
 
+显式 Shared Drive folder 也支持：folder probe / list / text-blob media read 带 Google Drive 的 all-drives compatibility 参数，但 query 仍严格限定到这个 parent folder，不会因此扩大成 shared drive 全盘扫描。
+
 目标 folder 的 403/404 等失败属于 target failure，不应把已验证 account token 误标成认证失效。
 
 ---

@@ -149,8 +149,9 @@ Conversation Home
 - GitHub project tracker / issue provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GITHUB_CONNECTOR_ENABLE=1` + opaque env credential ref；`project.read` 可 Sync immutable issue snapshots，reviewed `CREATE_ISSUE_DRAFT` 可进入两阶段 `issue.create`；没有真实账号/runtime replay 前不得宣称已连接或已创建真实 Issue；
 - Google Calendar provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1` + opaque env credential ref；native sync token / immutable snapshots / explicit Next Session import 已实现；历史 revision 仅审计、上游改期/取消显式显示 drift；没有真实 Google account/runtime replay 前不得宣称已连接；
 - Google Drive / Docs provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1` + opaque env credential ref；显式 folder full refresh、immutable DOCUMENT snapshots、content availability / partial-content truth 已实现；没有真实 Google account/runtime replay 前不得宣称已连接；
-- Gmail / Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
-- external email/task/decision-log provider execution 仍无真实 provider；GitHub issue.create 是当前唯一真实 provider write adapter；
+- Gmail send-only provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 scope = `openid + email + gmail.send`，只支持 reviewed `FOLLOWUP_EMAIL_DRAFT → email.send`，不读 inbox、不实现 `mail.read`；没有真实 Google account/runtime replay 前不得宣称邮件已发出；
+- Microsoft Graph / MCP provider 仍未配置真实 adapter/auth/account runtime；
+- external Task / Decision Log provider execution 仍无真实 provider；当前真实 write adapter 为 GitHub `issue.create` 与 Gmail `email.send`（均要求第二次显式 Execute；Gmail 仍待真实账号证据）；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 
@@ -164,6 +165,7 @@ Conversation Home
 - [GitHub Conversation Connector](docs/architecture/GITHUB_CONVERSATION_CONNECTOR.md)
 - [Google Calendar Conversation Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md)
 - [Google Drive Conversation Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
+- [Google Mail Conversation Connector](docs/architecture/GOOGLE_MAIL_CONVERSATION_CONNECTOR.md)
 - [v2 Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)
 
 ### 当前 Live 层级

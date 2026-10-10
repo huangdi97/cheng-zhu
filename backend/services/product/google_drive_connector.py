@@ -251,7 +251,7 @@ class GoogleDriveRestAdapter:
                 "pageSize": _PAGE_SIZE,
                 "orderBy": "modifiedTime desc",
                 "fields": (
-                    "nextPageToken,files("
+                    "nextPageToken,incompleteSearch,files("
                     "id,name,mimeType,modifiedTime,webViewLink,parents,trashed,"
                     "size,md5Checksum,capabilities(canDownload))"
                 ),
@@ -262,6 +262,11 @@ class GoogleDriveRestAdapter:
             if status != 200:
                 raise RuntimeError(f"Google Drive files.list returned ambiguous HTTP {status}")
             payload = self._json_payload(raw, "files.list")
+            if bool(payload.get("incompleteSearch")):
+                raise GoogleDriveTargetError(
+                    409,
+                    "Google Drive files.list 标记 incompleteSearch=true；拒绝把可能缺项的 folder 结果保存为完整 snapshot",
+                )
             rows = payload.get("files") or []
             if not isinstance(rows, list):
                 raise RuntimeError("Google Drive files.list returned malformed files")

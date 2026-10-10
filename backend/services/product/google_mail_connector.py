@@ -247,7 +247,12 @@ class GoogleMailSendAdapter:
                 "retry_safe": False,
             }
 
-        message = EmailMessage(policy=SMTP)
+        # Keep the reviewed execution audit id on one RFC header line.
+        # SMTP's default 78-char fold point can turn a 64-char digest into a
+        # continuation line whose parsed unstructured value begins with a
+        # semantic space. 998 is the RFC line-length ceiling and keeps this
+        # bounded custom header intact without changing the reviewed body.
+        message = EmailMessage(policy=SMTP.clone(max_line_length=998))
         message["From"] = sender
         message["To"] = recipient
         message["Subject"] = subject

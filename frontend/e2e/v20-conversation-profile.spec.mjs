@@ -2422,6 +2422,164 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('Local Markdown turns an approved Decision Log Draft into an audited relative-path write', async ({ context, page }) => {
+    const base = mocks()
+    let connection = null
+    let createBody = null
+    let requestBody = null
+    let executeCalls = 0
+    let execution = null
+
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === '/api/product/conversation/integrations/catalog') return {
+          items: [{
+            provider_id: 'LOCAL_MARKDOWN',
+            label: 'Local Markdown / Obsidian',
+            capabilities: ['decision_log.write'],
+            read_capabilities: [],
+            write_capabilities: ['decision_log.write'],
+            external_kinds: [],
+            provider_scopes: { 'decision_log.write': 'local.filesystem.markdown.write' },
+            identity_scopes: [],
+            sync: 'WRITE_ONLY_NO_SYNC',
+            setup: {
+              runtime_opt_in_env: 'CHENGZHU_LOCAL_MARKDOWN_CONNECTOR_ENABLE=1',
+              credential_ref_format: 'provider:local-markdown:env:<ENV_VAR>',
+              write_target: 'relative .md path under configured root (default decisions.md)',
+              secret_storage: 'NONE_ROOT_PATH_FROM_PROCESS_ENV',
+              read_support: 'NONE',
+              local_only: 'true',
+            },
+            adapter_available: true,
+          }],
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'GET') {
+          return { items: connection ? [connection] : [] }
+        }
+        if (pathname === '/api/product/conversation/integrations/connections' && method === 'POST') {
+          createBody = request.postDataJSON()
+          connection = {
+            id: 'ccn-local-md',
+            provider_id: 'LOCAL_MARKDOWN',
+            display_name: createBody.display_name,
+            status: 'DISCONNECTED',
+            auth_mode: 'OPAQUE_REFERENCE',
+            granted_capabilities: ['decision_log.write'],
+            provider_scopes: ['local.filesystem.markdown.write'],
+            account_hint: '',
+            sync_cursor: '',
+            sync_cursors: {},
+            last_sync_at: null,
+            last_error: '',
+            created_at: 1,
+            updated_at: 1,
+            credential_ref_present: true,
+            adapter_available: true,
+          }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/integrations/connections/ccn-local-md/verify' && method === 'POST') {
+          connection = { ...connection, status: 'CONNECTED', account_hint: 'vault', updated_at: 2 }
+          return connection
+        }
+        if (pathname === '/api/product/conversation/draft-actions/cda-derived/execution' && method === 'POST') {
+          requestBody = request.postDataJSON()
+          execution = {
+            id: 'cce-local-md',
+            draft_action_id: 'cda-derived',
+            connection_id: connection.id,
+            capability: 'decision_log.write',
+            operation: 'UPDATE_DECISION_LOG',
+            target: requestBody.target,
+            idempotency_key: 'localmarkdownabcdef',
+            status: 'PENDING',
+            request: {
+              title: 'Architecture Review · Decision Log Draft',
+              content: '- offline migration 采用 v2 · state=AGREED',
+              payload: { execution: 'LOCAL_REVIEW_ONLY' },
+              outbound_redaction_applied: false,
+            },
+            response: {},
+            error: '',
+            created_at: 5,
+            updated_at: 5,
+            executed_at: null,
+          }
+          return execution
+        }
+        if (pathname === '/api/product/conversation/integrations/executions/cce-local-md/execute' && method === 'POST') {
+          executeCalls += 1
+          execution = {
+            ...execution,
+            status: 'SUCCEEDED',
+            response: {
+              provider_id: 'LOCAL_MARKDOWN',
+              external_id: 'local-markdown:abc123',
+              target: 'Projects/Alpha/Decisions.md',
+              deduplicated: false,
+              provider_idempotency: 'MARKER_IN_FILE',
+              reviewed_payload_unchanged: true,
+              content_sha256: 'fixture-sha256',
+            },
+            updated_at: 6,
+            executed_at: 6,
+          }
+          return execution
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/prepare`)
+    const setup = page.getByTestId('local-markdown-connector-setup')
+    await expect(setup).toBeVisible()
+    await expect(setup.getByText(/reviewed Decision Log/)).toBeVisible()
+    await expect(setup.getByText(/不读取 vault、不索引本地文件/)).toBeVisible()
+    await expect(setup.getByText(/root path 不进入 product\.db/)).toBeVisible()
+    await page.getByLabel('Local Markdown root 环境变量名').fill('MY_DECISION_ROOT')
+    await page.getByRole('button', { name: '创建 Local Markdown 连接元数据' }).click()
+
+    expect(createBody.provider_id).toBe('LOCAL_MARKDOWN')
+    expect(createBody.granted_capabilities).toEqual(['decision_log.write'])
+    expect(createBody.credential_ref).toBe('provider:local-markdown:env:MY_DECISION_ROOT')
+    expect(JSON.stringify(createBody)).not.toContain('C:\\')
+    expect(JSON.stringify(createBody)).not.toContain('/Users/')
+
+    await page.getByRole('button', { name: '验证连接' }).click()
+    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Local Markdown root read\/write probe 已通过/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sync read-only snapshot' })).toHaveCount(0)
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Decision Log Draft' }).click()
+    await expect(page.getByText('Architecture Review · Decision Log Draft')).toBeVisible()
+    await page.getByRole('button', { name: '确认草稿' }).click()
+    await page.getByLabel('外部执行连接').selectOption('ccn-local-md')
+
+    const target = page.getByLabel('Local Markdown Decision Log 目标文件')
+    await expect(target).toBeVisible()
+    await target.fill('../escape.md')
+    await expect(page.getByRole('button', { name: '创建 Execution Request' })).toBeDisabled()
+    await target.fill('Projects/Alpha/Decisions.md')
+    await expect(page.getByRole('button', { name: '创建 Execution Request' })).toBeEnabled()
+    await page.getByRole('button', { name: '创建 Execution Request' }).click()
+
+    expect(requestBody).toEqual({ connection_id: 'ccn-local-md', target: 'Projects/Alpha/Decisions.md' })
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible()
+    expect(executeCalls).toBe(0)
+
+    await page.getByRole('button', { name: '执行外部动作' }).click()
+    await expect(page.getByText('SUCCEEDED', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Projects\/Alpha\/Decisions\.md/)).toBeVisible()
+    await expect(page.getByText(/MARKER_IN_FILE/)).toBeVisible()
+    expect(executeCalls).toBe(1)
+  })
+
+
   test('approved draft requires Execution Request then a second explicit Execute before SUCCEEDED', async ({ context, page }) => {
     const base = mocks()
     const connection = {

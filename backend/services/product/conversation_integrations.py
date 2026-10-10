@@ -683,12 +683,13 @@ def sync_connection(
     try:
         for capability in requested:
             cursor = str(cursors.get(capability) or (legacy_cursor if len(requested) == 1 else ""))
+            effective_limit = 500 if provider == "GOOGLE_CALENDAR" and capability == "calendar.read" else max(1, min(int(limit), 500))
             result = adapter.read_context(
                 connection=connection,
                 capability=capability,
                 query=dict(query or {}),
                 cursor=cursor,
-                limit=max(1, min(int(limit), 500)),
+                limit=effective_limit,
             ) or {}
             if bool(result.get("full_sync_required")):
                 # Native provider sync tokens (e.g. Google Calendar) can be
@@ -702,11 +703,11 @@ def sync_connection(
                     capability=capability,
                     query=dict(query or {}),
                     cursor="",
-                    limit=max(1, min(int(limit), 500)),
+                    limit=effective_limit,
                 ) or {}
                 if bool(result.get("full_sync_required")):
                     raise RuntimeError("Provider full sync reset did not converge")
-            for raw in list(result.get("items") or [])[:max(1, min(int(limit), 500))]:
+            for raw in list(result.get("items") or [])[:effective_limit]:
                 snapshots.append(_store_snapshot(connection, space_id, capability, dict(raw or {})))
             if result.get("next_cursor") is not None:
                 cursors[capability] = str(result.get("next_cursor") or "")[:4000]

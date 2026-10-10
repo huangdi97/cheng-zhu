@@ -880,7 +880,9 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 5. 根据真实使用再决定六类 Profile 的专属行为优化优先级；
 6. 外部依赖按独立能力推进：
    - Calendar / Docs / Mail / project-tracker read connectors：必须遵循 [Connector Capability Contract](Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)，默认空 registry / fail-closed；
-   - actual external email/task/issue/decision-log execution：必须走 reviewed DraftAction → explicit target/provider → capability re-check → execute → audit；
+   - actual external execution：GitHub `issue.create`、Gmail `email.send`、Microsoft To Do `task.create` 已有 opt-in real adapter code；仍必须走 reviewed DraftAction → exact account/target → capability re-check → second explicit Execute → audit，且真实账号结果需要 provider-specific runtime evidence；
+   - Decision Log execution 仍没有 concrete provider；
+   - MCP 仍只有 capability contract，没有 concrete adapter/auth/account runtime；
    - participant automatic chat notice / watermark；
    - Organization / shared team truth registry；
    - code signing、macOS signing/notarization 等发布治理。

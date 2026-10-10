@@ -869,7 +869,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   </div>}
                 </> : <p className="mt-2 text-[11px] text-status-inferred">当前没有同时满足 adapter available + CONNECTED + {draftCapability} grant 的账户。本地 APPROVED 草稿会保留，但不会伪装成已发送/已创建。</p>}
               </div> : null}
-              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。只有 provider 明确返回 ok=true 才是 SUCCEEDED；网络异常/超时/缺少明确结果进入 UNKNOWN_OUTCOME，必须先在 provider 侧核对并记录 reconciliation。只有“确认未执行”才会把该 audit row 变成 retry_safe。</p>
+              <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。直接成功必须来自 provider adapter 明确 ok=true；UNKNOWN_OUTCOME 只能通过 provider-side reconciliation 记录“已确认发生”或“已确认未发生”。两类成功证据在 audit 中保持可区分，只有“确认未发生”才会把该 row 变成 retry_safe。</p>
             </div> : null}
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}

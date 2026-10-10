@@ -738,6 +738,7 @@ def sync_connection(
             effective_limit = 500 if (
                 (provider == "GOOGLE_CALENDAR" and capability == "calendar.read")
                 or (provider == "GOOGLE_DRIVE" and capability == "docs.read")
+                or (provider == "MICROSOFT_GRAPH" and capability == "project.read")
             ) else max(1, min(int(limit), 500))
             result = adapter.read_context(
                 connection=connection,

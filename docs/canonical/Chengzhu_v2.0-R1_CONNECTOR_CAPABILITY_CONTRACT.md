@@ -1,9 +1,9 @@
 # Chengzhu v2 Conversation Connector Capability Contract
 ## Post-beta.2 Capability Registry + Audited Integration Boundary
 
-**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY IMPLEMENTED / GITHUB ADAPTER OPT-IN CANDIDATE  
+**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY IMPLEMENTED / SIX CONCRETE OPT-IN PROVIDERS  
 **适用**：Calendar / Docs / Mail / project tracker / MCP / reviewed external write-back  
-**主线边界**：PR #61 已合入 main（merge commit `72e810c1`）；当前 GitHub real adapter 在 `feat/chengzhu-v2-github-provider`，合并前不声明真实账户可用
+**主线边界**：PR #61 的 audited integration boundary 及 GitHub / Google Calendar / Google Drive / Gmail / Microsoft To Do adapters 已进入 main；2026-10-11 GitHub 专用私有测试仓库 real-account replay PASS；本 contract 继续纳入 Local Markdown reviewed `decision_log.write` provider。
 
 ---
 
@@ -673,7 +673,7 @@ CREATE_ISSUE_DRAFT
 - GitHub issues endpoint 返回的 Pull Request 必须过滤；
 - provider 5xx / transport failure 继续走 UNKNOWN_OUTCOME，不自动 retry；
 - issue body 带 Chengzhu execution marker，便于 provider-side reconciliation；
-- 没有真实 token/account/runtime evidence 时，禁止声明 `GITHUB_ACCOUNT_CONNECTED = TRUE`。
+- 2026-10-11 已有专用私有测试仓库真实 token/account/runtime replay，允许声明 `GITHUB_REAL_TEST_ACCOUNT_REPLAY = PASS` 与 `GITHUB_REAL_ISSUE_CREATE_EVIDENCE = PASS`；这不等于任意用户的 GitHub account 已连接。
 
 实现与使用说明见：
 
@@ -757,7 +757,7 @@ UPDATE_DECISION_LOG_DRAFT
 
 ## 20. 当前 repo truth
 
-PR #61 + GitHub provider + Calendar provider 合并后，repo engineering truth 允许声明：
+截至 2026-10-11，repo engineering truth 允许声明：
 
 ```text
 CONNECTOR_CAPABILITY_CONTRACT = IMPLEMENTED
@@ -767,6 +767,8 @@ IMMUTABLE_EXTERNAL_SNAPSHOT_PATH = IMPLEMENTED
 REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
 AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 GITHUB_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+GITHUB_REAL_TEST_ACCOUNT_REPLAY = PASS
+GITHUB_REAL_ISSUE_CREATE_EVIDENCE = PASS
 GOOGLE_CALENDAR_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_DRIVE_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_MAIL_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
@@ -785,9 +787,9 @@ PROJECT_TRACKER_ACCOUNT_CONNECTED = TRUE
 GOOGLE_ACCOUNT_CONNECTED = TRUE
 MICROSOFT_ACCOUNT_CONNECTED = TRUE
 REAL_MICROSOFT_TASK_CREATE_PROVEN = TRUE
-GITHUB_ACCOUNT_CONNECTED = TRUE
+ARBITRARY_USER_GITHUB_ACCOUNT_CONNECTED = TRUE
 MCP_SERVER_CONNECTED = TRUE
-REAL_EXTERNAL_ACTION_EVIDENCE = TRUE
+ALL_PROVIDER_REAL_EXTERNAL_ACTION_EVIDENCE = TRUE
 ```
 
 进一步实现细节见：

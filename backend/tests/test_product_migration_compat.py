@@ -424,7 +424,7 @@ def test_deleting_product_db_is_a_complete_rollback(v122_env):
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 9
+    assert product_store.schema_version() == 10
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

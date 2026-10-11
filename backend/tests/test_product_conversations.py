@@ -41,7 +41,7 @@ def _connect_calendar_read_adapter(label: str = "Work Calendar"):
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 10
+    assert store.schema_version() == 11
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -2331,6 +2331,43 @@ def test_transcript_direct_question_is_first_class_even_in_quiet_and_self_mic_ne
     assert self_mic is None
 
 
+def test_transcript_guidance_consumes_frozen_direct_question_decision_without_reclassification(product_env, monkeypatch):
+    space = conversations.create_space("Frozen DQ Runtime", "PROJECT_SYNC")
+    live = conversations.create_session(space["id"], consent_ack=True, assistance_mode="QUIET")
+    conversations.start_session(live["id"])
+
+    frozen = {
+        "eligible": True,
+        "predicted": True,
+        "detector_version": "heuristic-v1",
+        "channel": "PRIMARY_AUDIO",
+        "ai_assistance": "AI_ALLOWED",
+    }
+
+    def must_not_reclassify(_text):
+        raise AssertionError("capture-time frozen prediction must be reused")
+
+    monkeypatch.setattr(conversations, "_looks_like_direct_question", must_not_reclassify)
+    cue = conversations.guidance_from_transcript(
+        live["id"],
+        "这段文本即使 detector 实现后来变化，也必须使用冻结结果",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question=frozen,
+    )
+    assert cue is not None
+    assert cue["kind"] == "ANSWER_CUE"
+    assert cue["reason"] == "TRANSCRIPT_DIRECT_QUESTION"
+
+    # A malformed/mismatched snapshot fails closed instead of being
+    # reclassified with whatever detector happens to ship now.
+    assert conversations.guidance_from_transcript(
+        live["id"],
+        "为什么？",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question={**frozen, "channel": "SELF_MIC"},
+    ) is None
+
+
 def test_transcript_can_surface_frozen_source_as_contribution_opportunity_without_promoting_notes(product_env):
     material = materials.create_material(
         "Q4 Benchmark",
@@ -3347,7 +3384,36 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
         source="SYSTEM_LOOPBACK",
     )
     assert row and row["session_id"] == session["id"] and row["channel"] == "PRIMARY_AUDIO"
-    assert conversation_capture.transcript(session["id"])[0]["text"] == "offline migration 继续使用 v2"
+    assert row["analysis"]["direct_question"] == {
+        "eligible": True,
+        "predicted": False,
+        "detector_version": "heuristic-v1",
+        "channel": "PRIMARY_AUDIO",
+        "ai_assistance": "AI_ALLOWED",
+    }
+
+    question = conversation_capture.record_transcription(
+        "为什么之前选择 offline migration v2？",
+        channel="PRIMARY_AUDIO",
+        provider="whisper",
+        source="SYSTEM_LOOPBACK",
+    )
+    assert question and question["analysis"]["direct_question"]["predicted"] is True
+    assert question["analysis"]["direct_question"]["detector_version"] == "heuristic-v1"
+    blocked_prediction = conversations.direct_question_prediction(
+        "为什么之前选择 offline migration v2？",
+        channel="PRIMARY_AUDIO",
+        ai_assistance="AI_FORBIDDEN",
+    )
+    assert blocked_prediction["eligible"] is False
+    assert blocked_prediction["predicted"] is False
+    assert blocked_prediction["ai_assistance"] == "AI_FORBIDDEN"
+
+    transcript = conversation_capture.transcript(session["id"])
+    assert [segment["text"] for segment in transcript] == [
+        "offline migration 继续使用 v2",
+        "为什么之前选择 offline migration v2？",
+    ]
 
     conversation_capture.pause(session["id"])
     assert conversation_capture.status(session["id"])["paused"] is True
@@ -3565,11 +3631,69 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         session["id"], item_type="OpenQuestion", title="owner?",
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-diag-frozen",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "为什么采用 v2？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": True,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+            },
+        },
+        "created_at": 1.0,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-diag-disabled",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "AI assistance disabled for this session row",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": False,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_FORBIDDEN",
+            },
+        },
+        "created_at": 2.0,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-diag-legacy",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "历史 transcript 无冻结 prediction",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {},
+        "created_at": 3.0,
+    })
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 10
+    assert diag["schema_version"] == 11
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1
+    dq = diag["evaluation"]["direct_question_prediction_provenance"]
+    assert dq["detector_version"] == "heuristic-v1"
+    assert dq["final_non_self_transcript_rows"] == 3
+    assert dq["evaluation_eligible"] == 1
+    assert dq["explicitly_ineligible"] == 1
+    assert dq["prediction_unavailable"] == 1
+    assert dq["historical_reclassification"] == "FORBIDDEN"
     assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
     assert diag["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
     assert diag["privacy"]["auto_external_writeback"] == "OFF"

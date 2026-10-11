@@ -142,6 +142,32 @@ human-report == authorized real pilot manifest
 
 Stable review 仍必须同时有 authorized pilot manifest、足够的独立 human labels、零 critical incident，并满足 frozen policy thresholds。
 
+## 5.2 Direct Question provenance gate
+
+schema v11 closes the remaining Direct Question evaluation-replay gap.
+
+```text
+final transcript
+→ freeze detector decision + detector_version + AI-assistance eligibility at capture time
+→ only eligible=true rows enter the review population
+→ label seed preserves predicted=true / false
+→ independent reviewer supplies actual=true / false
+→ human eval computes precision + recall
+```
+
+Stable review accepts Direct Question Precision / Recall only from `INDEPENDENT_HUMAN_REVIEW`. A versioned snapshot with `eligible=false` is explicitly outside the metric population (for example automatic transcript guidance was disabled by AI_LIMITED / AI_FORBIDDEN); it is not an evaluation failure. A transcript without a capture-time versioned prediction is `prediction_unavailable` and contributes to neither metric.
+
+The following are explicitly forbidden:
+
+```text
+re-run current detector on old transcript
+infer all negative predictions from absence of a Guidance event
+replace missing predicted with reviewer actual
+silently mix detector versions without preserving row-level provenance
+```
+
+This makes historical metrics reproducible when the detector evolves; it does not make the detector scientifically validated and does not change the real-user / PMF boundary.
+
 ## 6. Tooling
 
 1. Export local label seed.

@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 10
+LATEST_SCHEMA_VERSION = 11
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -811,6 +811,21 @@ def _apply_v10(conn: sqlite3.Connection) -> None:
     _apply_statements(conn, _V10_TABLES + _V10_INDEXES)
 
 
+# --- v2.0 evaluation provenance: immutable direct-question prediction ---
+# Final transcript rows need to preserve the detector decision that existed at
+# capture time. Re-running a newer detector over old transcript text would make
+# historical precision/recall non-reproducible.
+def _apply_v11(conn: sqlite3.Connection) -> None:
+    transcript_cols = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_transcript_segment)").fetchall()
+    }
+    if "analysis_json" not in transcript_cols:
+        conn.execute(
+            "ALTER TABLE conversation_transcript_segment "
+            "ADD COLUMN analysis_json TEXT NOT NULL DEFAULT '{}'"
+        )
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -827,6 +842,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     8: (_apply_v8, "v2.0 external connector snapshots and reviewed execution audit"),
     9: (_apply_v9, "v2.0 Space-scoped immutable connector snapshot provenance"),
     10: (_apply_v10, "v2.0 immutable AI prediction snapshots and local pilot human feedback"),
+    11: (_apply_v11, "v2.0 immutable direct-question transcript prediction provenance"),
 }
 
 

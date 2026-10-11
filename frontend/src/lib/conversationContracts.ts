@@ -625,6 +625,15 @@ export interface ConversationTranscriptSegment {
   provider: string
   source: string
   is_final: boolean
+  analysis?: {
+    direct_question?: {
+      eligible: boolean
+      predicted: boolean
+      detector_version: string
+      channel: string
+      ai_assistance?: string
+    }
+  }
   created_at: number
 }
 

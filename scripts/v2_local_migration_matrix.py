@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from services.storage.product_migrations import LATEST_SCHEMA_VERSION, _MIGRATIONS, ensure_schema  # noqa: E402
 
-CASES = ("fresh", "v1", "v2", "v4", "v7", "v8", "v9", "v10")
+CASES = ("fresh", "v1", "v2", "v4", "v7", "v8", "v9", "v10", "v11")
 
 
 def _build_at(conn: sqlite3.Connection, upto: int) -> None:
@@ -118,7 +118,7 @@ def _row_survives(conn: sqlite3.Connection, table: str, marker: str) -> bool:
 
 
 def run_case(name: str, workdir: Path) -> dict:
-    upto = {"fresh": 0, "v1": 1, "v2": 2, "v4": 4, "v7": 7, "v8": 8, "v9": 9, "v10": 10}[name]
+    upto = {"fresh": 0, "v1": 1, "v2": 2, "v4": 4, "v7": 7, "v8": 8, "v9": 9, "v10": 10, "v11": 11}[name]
     db_path = workdir / f"{name}.db"
     result: dict = {"case": name, "built_at_version": upto}
 

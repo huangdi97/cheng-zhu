@@ -226,20 +226,33 @@ def record_transcription(
     session = conversations.require_session(session_id)
     if session["status"] != "ACTIVE":
         return None
+    normalized_channel = str(channel or "PRIMARY_AUDIO")[:80]
     row = {
         "id": store.new_id("cts_"),
         "space_id": session["space_id"],
         "session_id": session_id,
-        "channel": str(channel or "PRIMARY_AUDIO")[:80],
+        "channel": normalized_channel,
         "text": cleaned[:20_000],
         "provider": str(provider or "")[:80],
         "source": str(source or "")[:120],
         "is_final": True,
+        "analysis": {
+            "direct_question": conversations.direct_question_prediction(
+                cleaned,
+                channel=normalized_channel,
+                ai_assistance=str((session.get("policy") or {}).get("ai_assistance") or ""),
+            ),
+        },
         "created_at": store.now(),
     }
     store.insert("conversation_transcript_segment", row)
 
-    guidance = conversations.guidance_from_transcript(session_id, cleaned, channel=str(channel or "PRIMARY_AUDIO"))
+    guidance = conversations.guidance_from_transcript(
+        session_id,
+        cleaned,
+        channel=normalized_channel,
+        frozen_direct_question=row["analysis"]["direct_question"],
+    )
     try:
         from api.realtime.ws import broadcast
         broadcast({"type": "conversation_transcription", "session_id": session_id, "segment": row})

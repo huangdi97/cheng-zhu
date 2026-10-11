@@ -418,3 +418,119 @@ def test_human_eval_global_dedup_spans_multiple_label_files(tmp_path):
     assert len(human_eval.load_rows(first, seen=seen)) == 1
     with pytest.raises(ValueError, match="duplicate label"):
         human_eval.load_rows(second, seen=seen)
+
+
+def test_label_seed_uses_frozen_direct_question_prediction_and_marks_legacy_unavailable(product_env):
+    seed = _load("v2_label_seed_direct_question_snapshot", "scripts/v2_conversation_label_seed.py")
+    space = conversations.create_space("DQ Eval", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-dq-true",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "为什么采用 v2？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": True,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+            },
+        },
+        "created_at": 1.0,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-dq-false",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我们继续讨论 v2",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+            },
+        },
+        "created_at": 2.0,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-dq-disabled",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "为什么这个 session 没启用 AI？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": False,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_FORBIDDEN",
+            },
+        },
+        "created_at": 2.5,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-dq-legacy",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "这个历史句子看起来像问题吗？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {},
+        "created_at": 3.0,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-self-mic",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "SELF_MIC",
+        "text": "我自己说的话不进入 direct-question reviewer queue？",
+        "provider": "whisper",
+        "source": "SELF_MIC",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": False,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "SELF_MIC",
+            },
+        },
+        "created_at": 4.0,
+    })
+    conversations.end_session(session["id"])
+
+    rows = [
+        row for row in seed.export_rows(Path(store.DB_PATH))
+        if row["kind"] == "direct_question"
+    ]
+    by_id = {row["event_id"]: row for row in rows}
+    assert by_id["cts-dq-true"]["predicted"] is True
+    assert by_id["cts-dq-true"]["prediction_unavailable"] is False
+    assert by_id["cts-dq-false"]["predicted"] is False
+    assert by_id["cts-dq-false"]["prediction_unavailable"] is False
+    assert by_id["cts-dq-legacy"]["predicted"] is None
+    assert by_id["cts-dq-legacy"]["prediction_unavailable"] is True
+    assert "cts-dq-disabled" not in by_id
+    assert "cts-self-mic" not in by_id
+    assert by_id["cts-dq-true"]["actual"] is None
+    assert by_id["cts-dq-true"]["reviewer"] == ""
+    assert by_id["cts-dq-true"]["label_source"] == ""
+    assert by_id["cts-dq-true"]["system"]["direct_question_prediction"]["detector_version"] == "heuristic-v1"

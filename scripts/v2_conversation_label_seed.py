@@ -4,6 +4,15 @@
 The output deliberately contains null label fields. It is a review queue, not
 evaluation evidence. Humans must fill labels before running
 v2_conversation_human_eval.py.
+
+Prediction provenance is never reconstructed from newer logic:
+- Conversation Item predictions come from immutable v10 prediction snapshots
+  (or a still-unreviewed legacy candidate);
+- Direct Question predictions come only from v11 capture-time transcript
+  analysis snapshots;
+- versioned rows where the detector was explicitly ineligible (for example
+  AI_FORBIDDEN or SELF_MIC) are outside the metric population;
+- historical reviewed/unversioned rows are marked prediction_unavailable.
 """
 from __future__ import annotations
 
@@ -60,6 +69,11 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
             f"SELECT * FROM conversation_item WHERE session_id IN ({placeholders}) ORDER BY created_at ASC",
             ids,
         ).fetchall()
+        transcript = conn.execute(
+            f"SELECT * FROM conversation_transcript_segment WHERE session_id IN ({placeholders}) "
+            "AND is_final = 1 ORDER BY created_at ASC",
+            ids,
+        ).fetchall()
 
         rows: list[dict[str, Any]] = []
         for raw in guidance:
@@ -100,6 +114,52 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                     "kind": "silence",
                     "silence_correct": None,
                 })
+
+        for raw in transcript:
+            segment = dict(raw)
+            channel = str(segment.get("channel") or "").upper()
+            if channel == "SELF_MIC":
+                continue
+            session = session_map[segment["session_id"]]
+            analysis = _json(segment.get("analysis_json"), {})
+            direct = analysis.get("direct_question") if isinstance(analysis, dict) else None
+            if not isinstance(direct, dict):
+                direct = {}
+            eligible = direct.get("eligible")
+            predicted = direct.get("predicted")
+            detector_version = str(direct.get("detector_version") or "").strip()
+            versioned_snapshot = (
+                isinstance(eligible, bool)
+                and isinstance(predicted, bool)
+                and bool(detector_version)
+            )
+            # A versioned eligible=false snapshot means the detector was
+            # explicitly not active for this row (for example AI_FORBIDDEN).
+            # It is outside the metric population, not missing evidence.
+            if versioned_snapshot and eligible is False:
+                continue
+            has_prediction = versioned_snapshot and eligible is True
+            rows.append({
+                "kind": "direct_question",
+                "session_id": segment["session_id"],
+                "space_id": segment["space_id"],
+                "profile": session["space_profile"],
+                "event_id": segment["id"],
+                "timestamp": segment["created_at"],
+                "reviewer": "",
+                "label_source": "",
+                "predicted": predicted if has_prediction else None,
+                "actual": None,
+                "prediction_unavailable": not has_prediction,
+                "system": {
+                    "channel": segment.get("channel") or "",
+                    "provider": segment.get("provider") or "",
+                    "source": segment.get("source") or "",
+                    "text": segment.get("text") or "",
+                    "direct_question_prediction": direct,
+                },
+                "notes": "",
+            })
 
         for raw in items:
             item = dict(raw)

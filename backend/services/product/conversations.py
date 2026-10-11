@@ -3122,6 +3122,9 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return {"guidance": None, "suppressed": reason, "event": event}
 
 
+DIRECT_QUESTION_DETECTOR_VERSION = "heuristic-v1"
+
+
 def _looks_like_direct_question(text: str) -> bool:
     normalized = str(text or "").strip().lower()
     if not normalized:
@@ -3142,11 +3145,41 @@ def _looks_like_direct_question(text: str) -> bool:
     return any(marker in head for marker in zh_markers) or any(head.startswith(marker) for marker in en_markers)
 
 
+def direct_question_prediction(
+    text: str,
+    *,
+    channel: str = "PRIMARY_AUDIO",
+    ai_assistance: str = "AI_ALLOWED",
+) -> dict[str, Any]:
+    """Return the detector decision that must be frozen with a final transcript.
+
+    Eligibility reflects the runtime policy that existed at capture time. A
+    PRIMARY_AUDIO row from an AI_FORBIDDEN session must not enter detector
+    precision/recall merely because the text could be classified offline.
+    The version string is part of evaluation provenance; historical rows must
+    never be reclassified by a newer detector during label export.
+    """
+    normalized_channel = str(channel or "PRIMARY_AUDIO").upper()
+    normalized_policy = str(ai_assistance or "").upper()
+    eligible = (
+        normalized_channel != "SELF_MIC"
+        and normalized_policy in {"AI_ALLOWED", "AI_EXPECTED"}
+    )
+    return {
+        "eligible": eligible,
+        "predicted": bool(eligible and _looks_like_direct_question(text)),
+        "detector_version": DIRECT_QUESTION_DETECTOR_VERSION,
+        "channel": normalized_channel,
+        "ai_assistance": normalized_policy,
+    }
+
+
 def guidance_from_transcript(
     session_id: str,
     text: str,
     *,
     channel: str = "PRIMARY_AUDIO",
+    frozen_direct_question: Optional[dict[str, Any]] = None,
 ) -> Optional[dict[str, Any]]:
     """Conservative automatic guidance from a final Conversation ASR segment.
 
@@ -3168,13 +3201,34 @@ def guidance_from_transcript(
     state["current_topic"] = cleaned
     store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
-    if str(channel or "").upper() == "SELF_MIC":
+    normalized_channel = str(channel or "PRIMARY_AUDIO").upper()
+    if frozen_direct_question is None:
+        direct_question = direct_question_prediction(
+            cleaned,
+            channel=normalized_channel,
+            ai_assistance=policy["ai_assistance"],
+        )
+    else:
+        direct_question = dict(frozen_direct_question)
+        frozen_valid = (
+            isinstance(direct_question.get("eligible"), bool)
+            and isinstance(direct_question.get("predicted"), bool)
+            and bool(str(direct_question.get("detector_version") or "").strip())
+            and str(direct_question.get("channel") or "").upper() == normalized_channel
+            and str(direct_question.get("ai_assistance") or "").upper() == policy["ai_assistance"]
+        )
+        if not frozen_valid:
+            # A capture path that cannot prove the exact detector decision must
+            # not silently recompute and then claim the new result was the one
+            # frozen with the transcript.
+            return None
+    if not direct_question["eligible"]:
         return None
 
     # Direct questions are first-class and remain allowed in Quiet mode. Use
     # only pre-existing/frozen context as the answer cue source; the just-saved
     # transcript question itself is not an answer.
-    if _looks_like_direct_question(cleaned):
+    if direct_question["predicted"]:
         result = ask(session_id, cleaned)
         useful = next(
             (
@@ -4130,6 +4184,28 @@ def diagnostics() -> dict[str, Any]:
     active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
     ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
     transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
+    transcript_eval_rows = store.rows(
+        "SELECT analysis_json FROM conversation_transcript_segment "
+        "WHERE is_final = 1 AND UPPER(channel) != 'SELF_MIC' ORDER BY created_at ASC"
+    )
+    direct_question_prediction_available = 0
+    direct_question_prediction_ineligible = 0
+    direct_question_prediction_unavailable = 0
+    for transcript_row in transcript_eval_rows:
+        analysis = transcript_row.get("analysis")
+        direct = analysis.get("direct_question") if isinstance(analysis, dict) else None
+        versioned = (
+            isinstance(direct, dict)
+            and isinstance(direct.get("eligible"), bool)
+            and isinstance(direct.get("predicted"), bool)
+            and bool(str(direct.get("detector_version") or "").strip())
+        )
+        if not versioned:
+            direct_question_prediction_unavailable += 1
+        elif direct.get("eligible") is True:
+            direct_question_prediction_available += 1
+        else:
+            direct_question_prediction_ineligible += 1
     screen_observations = int(store.scalar("SELECT COUNT(*) FROM conversation_screen_context") or 0)
     confirmed_items = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
@@ -4216,8 +4292,16 @@ def diagnostics() -> dict[str, Any]:
                 "real_cross_session_value",
                 "real_user_cognitive_load",
             ],
+            "direct_question_prediction_provenance": {
+                "detector_version": DIRECT_QUESTION_DETECTOR_VERSION,
+                "final_non_self_transcript_rows": len(transcript_eval_rows),
+                "evaluation_eligible": direct_question_prediction_available,
+                "explicitly_ineligible": direct_question_prediction_ineligible,
+                "prediction_unavailable": direct_question_prediction_unavailable,
+                "historical_reclassification": "FORBIDDEN",
+            },
             "explicit_feedback_boundary": "LOCAL_EXPLICIT_SELF_REPORT; reviewer identity and authorized real-use status are not system-verified.",
-            "interpretation": "Observed proxies are not precision/quality/PMF claims. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
+            "interpretation": "Observed proxies are not precision/quality/PMF claims. Direct-question precision/recall uses only capture-time frozen predictions plus independent human actual labels; historical rows without frozen predictions stay unavailable. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
         },
         "health": {
             "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",

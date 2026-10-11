@@ -68,7 +68,8 @@ final PRIMARY_AUDIO transcript
     eligible,
     predicted,
     detector_version,
-    channel
+    channel,
+    ai_assistance
   }
 → immutable row in product.db
 → label seed predicted
@@ -76,6 +77,8 @@ final PRIMARY_AUDIO transcript
 ```
 
 当前 detector version 为 `heuristic-v1`。未来即使 detector 规则升级，旧 transcript 的 `predicted` 仍保持当时版本的结果；这是 precision / recall 可复现性的必要条件。
+
+只有 capture-time `eligible=true` 的 versioned row 才进入 Direct Question 指标集合。若当时 `ai_assistance=AI_FORBIDDEN`（或 channel 为 SELF_MIC），snapshot 会明确记录 `eligible=false`；这表示 detector 当时没有作为产品能力运行，row 应从 reviewer queue / precision / recall 分母中排除，而不是记作 prediction 缺失。
 
 对 pre-v11 历史 transcript，如果没有冻结的 `analysis.direct_question`：
 

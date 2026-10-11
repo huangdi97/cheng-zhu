@@ -186,11 +186,11 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
     product_store.init_db()
     goal_id = goals.create_goal("MindRank", "AIDD Agent Engineer")["id"]
     assert goal_id
-    assert product_store.schema_version() == 10
+    assert product_store.schema_version() == 11
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 11)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 12)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -261,7 +261,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
 
         before = product_migrations.ensure_schema(conn)
         assert before == 7
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 11
 
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {
@@ -274,7 +274,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         assert "text" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
 
-        assert product_migrations.ensure_schema(conn) == 10
+        assert product_migrations.ensure_schema(conn) == 11
     finally:
         conn.close()
 
@@ -418,13 +418,72 @@ def test_v10_pilot_evidence_migration_adds_prediction_and_feedback_without_rewri
         conn.close()
 
 
+def test_v11_direct_question_provenance_migration_is_additive_over_v10():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 11):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        conn.execute(
+            "INSERT INTO conversation_space "
+            "(id, title, profile, description, default_goal, default_mode, relationship_key, status, "
+            "selected_source_ids_json, selected_quick_note_ids_json, selected_connector_snapshot_ids_json, "
+            "retention_policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("space-v11", "DQ", "PROJECT_SYNC", "", "", "BALANCED", "", "ACTIVE",
+             "[]", "[]", "[]", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_session "
+            "(id, space_id, goal_ids_json, template, title, capture_mode, processing_mode, assistance_mode, "
+            "consent_ack, pack_id, status, state_json, source_calendar_event_json, policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("session-v11", "space-v11", "[]", "PROJECT_SYNC", "DQ", "TRANSCRIPT", "LOCAL",
+             "BALANCED", 1, "", "ENDED", "{}", "{}", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_transcript_segment "
+            "(id, space_id, session_id, channel, text, provider, source, is_final, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("seg-v10", "space-v11", "session-v11", "PRIMARY_AUDIO", "为什么采用 v2？",
+             "whisper", "SYSTEM_LOOPBACK", 1, 1.0),
+        )
+        conn.commit()
+
+        before = conn.execute(
+            "SELECT id, text, channel FROM conversation_transcript_segment WHERE id = 'seg-v10'"
+        ).fetchone()
+
+        apply_v11, _name = product_migrations._MIGRATIONS[11]
+        apply_v11(conn)
+        conn.execute("PRAGMA user_version = 11")
+        conn.commit()
+
+        after = conn.execute(
+            "SELECT id, text, channel FROM conversation_transcript_segment WHERE id = 'seg-v10'"
+        ).fetchone()
+        assert after == before
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_transcript_segment)")}
+        assert "analysis_json" in cols
+        assert conn.execute(
+            "SELECT analysis_json FROM conversation_transcript_segment WHERE id = 'seg-v10'"
+        ).fetchone()[0] == "{}"
+    finally:
+        conn.close()
+
+
 def test_deleting_product_db_is_a_complete_rollback(v122_env):
     from services.product import goals
     from services.storage import product as product_store
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 10
+    assert product_store.schema_version() == 11
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

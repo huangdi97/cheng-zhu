@@ -139,6 +139,10 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
     },
     "MCP": {
         "label": "Model Context Protocol",
+        # The catalog remains protocol-generic, but the only concrete v2 adapter
+        # is deliberately narrow: reviewed decision_log.write. Runtime checks
+        # require every granted capability to be implemented by the registered
+        # adapter, so catalog metadata cannot manufacture a generic tool runner.
         "capabilities": sorted(conversation_connectors.KNOWN_CAPABILITIES),
         "external_kinds": ["DOCUMENT", "TASK", "ISSUE", "CALENDAR_EVENT", "MAIL_THREAD"],
         "provider_scopes": {
@@ -146,6 +150,16 @@ PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
             for capability in sorted(conversation_connectors.KNOWN_CAPABILITIES)
         },
         "sync": "SERVER_DEFINED",
+        "setup": {
+            "runtime_opt_in_env": "CHENGZHU_MCP_DECISION_LOG_CONNECTOR_ENABLE=1",
+            "credential_ref_format": "provider:mcp:env:<CONFIG_ENV>",
+            "concrete_adapter_capabilities": "decision_log.write",
+            "protocol": "2026-07-28 Streamable HTTP",
+            "write_target": "explicit decision-log target",
+            "tool_mapping": "fixed in config env; frontend cannot choose arbitrary tool",
+            "secret_storage": "PROCESS_ENV_ONLY",
+            "read_support": "NONE_IN_CONCRETE_ADAPTER",
+        },
     },
 }
 

@@ -103,6 +103,23 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
         for raw in items:
             item = dict(raw)
             session = session_map[item["session_id"]]
+            prediction = _json(item.get("prediction_json"), {})
+            # v10 freezes AI_EXTRACTED candidates before review. For historical
+            # pre-v10 rows, the current row is usable as a prediction only if it
+            # is still unreviewed. Once a legacy row has been confirmed/edited/
+            # rejected, its current type/state are post-review truth and must
+            # never be backfilled into predicted_*.
+            legacy_unreviewed = item.get("review_status") == "AI_EXTRACTED" and not prediction
+            predicted_type = (
+                str(prediction.get("type") or "")
+                if prediction
+                else str(item.get("type") or "") if legacy_unreviewed else ""
+            )
+            predicted_state = (
+                str(prediction.get("state") or "")
+                if prediction
+                else str(item.get("state") or "") if legacy_unreviewed else ""
+            )
             rows.append({
                 "kind": "truth_item",
                 "session_id": item["session_id"],
@@ -111,10 +128,11 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "event_id": item["id"],
                 "timestamp": item["created_at"],
                 "reviewer": "",
-                "predicted_type": item["type"],
+                "predicted_type": predicted_type or None,
                 "actual_type": None,
-                "predicted_state": item["state"],
+                "predicted_state": predicted_state or None,
                 "actual_state": None,
+                "prediction_unavailable": not bool(predicted_type and predicted_state),
                 "system": {
                     "review_status": item["review_status"],
                     "epistemic_status": item["epistemic_status"],
@@ -122,6 +140,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                     "due_at": item["due_at"],
                     "source_refs": _json(item["source_refs_json"], []),
                     "title": item["title"],
+                    "prediction": prediction,
                 },
                 "notes": "",
             })

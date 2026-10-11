@@ -4154,6 +4154,25 @@ def diagnostics() -> dict[str, Any]:
     active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
     ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
     transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
+    transcript_eval_rows = store.select(
+        "conversation_transcript_segment",
+        where="is_final = 1 AND UPPER(channel) != 'SELF_MIC'",
+        order="created_at ASC",
+    )
+    direct_question_prediction_available = 0
+    direct_question_prediction_unavailable = 0
+    for transcript_row in transcript_eval_rows:
+        analysis = transcript_row.get("analysis")
+        direct = analysis.get("direct_question") if isinstance(analysis, dict) else None
+        if (
+            isinstance(direct, dict)
+            and direct.get("eligible") is True
+            and isinstance(direct.get("predicted"), bool)
+            and str(direct.get("detector_version") or "").strip()
+        ):
+            direct_question_prediction_available += 1
+        else:
+            direct_question_prediction_unavailable += 1
     screen_observations = int(store.scalar("SELECT COUNT(*) FROM conversation_screen_context") or 0)
     confirmed_items = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
@@ -4240,8 +4259,15 @@ def diagnostics() -> dict[str, Any]:
                 "real_cross_session_value",
                 "real_user_cognitive_load",
             ],
+            "direct_question_prediction_provenance": {
+                "detector_version": DIRECT_QUESTION_DETECTOR_VERSION,
+                "eligible_final_transcript_rows": len(transcript_eval_rows),
+                "prediction_available": direct_question_prediction_available,
+                "prediction_unavailable": direct_question_prediction_unavailable,
+                "historical_reclassification": "FORBIDDEN",
+            },
             "explicit_feedback_boundary": "LOCAL_EXPLICIT_SELF_REPORT; reviewer identity and authorized real-use status are not system-verified.",
-            "interpretation": "Observed proxies are not precision/quality/PMF claims. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
+            "interpretation": "Observed proxies are not precision/quality/PMF claims. Direct-question precision/recall uses only capture-time frozen predictions plus independent human actual labels; historical rows without frozen predictions stay unavailable. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
         },
         "health": {
             "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",

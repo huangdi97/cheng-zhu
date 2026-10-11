@@ -68,6 +68,12 @@ Command: `git worktree add .pi/closure-wt -b chore/v2-local-full-closure-2026-10
 | license / third-party notices | `python scripts/generate_third_party_notices.py --check` | exit 0 |
 | secret scan | `python scripts/v2_local_secret_scan.py` | `passed=true`, 0 blocking findings |
 | `git diff --check` | — | clean |
+| independent re-verification | `python scripts/v2_local_reverify_closure.py --out …/reverification.json` | 23/23 checks pass, exit 0 |
+
+The re-verification harness re-derives the load-bearing facts in this report (base SHA, branch base,
+artifact hashes, packaged capture counts, clean-install results, suite shape) directly from the
+repository and the built artifacts, so the report is reproducible rather than trusted. Its one
+environment finding is recorded below.
 
 `scripts/v2_local_secret_scan.py` scans git-tracked files, `artifacts/`, `reports/`, `docs/evidence/`
 and the branch's git history for GitHub/OpenAI/AWS/Slack/Google token shapes, bearer headers, URL
@@ -86,6 +92,7 @@ classified as documented fixtures (`allowlisted_fixtures`), and anything else wo
 | Gate | Result |
 | --- | --- |
 | full suite `python -m pytest -q` | **1337 passed, 0 failed, 0 error**, 340.72 s |
+| full suite, independent re-run | **1337 passed in 278.10 s** with this machine's proxy quirk neutralised — see §26.1 |
 | strict intelligence eval | `route_accuracy_exact = 1.0` (≥0.9), seven-turn exact `= 1.0` (≥0.85), `unsupported_claim_rate = 1.0` (≥0.95), exit 0 |
 | `python -m evals.r2_eval --check` | exit 0 |
 | `python scripts/v14_validation_evidence.py --out-dir artifacts/validation` | exit 0, `{"ok": true, "thirty_session": true, "hundred_session": true, "real_user_evidence": "REAL_USER_EVIDENCE_PENDING"}` |
@@ -533,6 +540,34 @@ before use.
    corpus and local whisper instead).
 
 Nothing else remains: every other item in this report was executed and observed on this machine.
+
+### 26.1 Environment caveat found by re-verification (not a product defect)
+
+A bare local `python -m pytest -q` first reproduced `1 failed, 1336 passed`. The failure is
+`tests/test_review_analysis.py::test_get_active_llm_client` raising
+`httpx.InvalidURL: Invalid port: ':1]'`.
+
+Isolated cause: httpx 0.28.x parses every comma-separated `no_proxy` entry as a `URLPattern`, and this
+machine's user-level `NO_PROXY` ends with the bracketed IPv6 literal `[::1]`, which raises. The bare
+`::1` form — also already present in the same value — parses fine, `all_proxy` alone is fine, and an
+empty proxy environment is fine. No repository code and no test contract is involved, and CI (whose
+environment has no such entry) is green.
+
+Two Windows-specific details made this harder to pin down, and both are worth recording:
+
+1. httpx reads `no_proxy` case-insensitively, and an environment variable set in one case is visible
+   in the other on Windows, so stripping only `NO_PROXY` leaves `no_proxy` carrying the entry.
+2. Assigning to an existing `os.environ` key on Windows does not reliably propagate the new value to
+   child processes, so an assignment-only fix appears to work (the parent's own `httpx.Client()`
+   succeeds) while the pytest child still fails. The key must be removed and re-added.
+
+With both handled, the unmodified suite reports **1337 passed in 278.10 s**.
+
+Because `get_client_for_model` constructs its client with `trust_env=True`, the same machine setting
+also affects a real local run of the product. That is recorded rather than silently patched: changing
+`trust_env` is a product decision about corporate proxy support, not a closure fix.
+`scripts/run_backend_suite_clean_proxy.py` documents the setting and runs the unmodified suite in a
+sanitised environment for local verification.
 
 ## 27. Release recommendation
 

@@ -902,7 +902,7 @@ REAL_MICROSOFT_ACCOUNT_EVIDENCE_PENDING = TRUE
 V2_DESIGN_COMPLETE      = TRUE
 V2_CONTRACT_COMPLETE    = TRUE
 V2_RUNTIME_AVAILABLE    = TRUE
-V2_ENGINEERING_EVIDENCE = TRUE   (backend 1336 passed · frontend 428 passed · desktop 38 passed ·
+V2_ENGINEERING_EVIDENCE = TRUE   (backend 1337 passed · frontend 428 passed · desktop 38 passed ·
                                   Playwright 65 + visual + a11y · e2e smoke · packaged smoke ·
                                   migration matrix additive · secret scan 0 blocking)
 V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS +

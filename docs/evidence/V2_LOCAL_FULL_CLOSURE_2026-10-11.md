@@ -148,7 +148,7 @@ Real runtime evidence, no mocks for the pieces that claim runtime:
    persisted, `conversation_diagnostics_healthy`.
 2. **Same loop against a real GitHub-backed pack** — see section 14: frozen pack digest present,
    connector snapshots and grants frozen, Manual Ask grounded on the frozen external snapshot.
-3. **Semantics** are verified by named tests inside the 1336-passing suite, including: frozen pack
+3. **Semantics** are verified by named tests inside the 1337-passing suite, including: frozen pack
    vs mid-session material edits (`test_manual_ask_uses_frozen_ready_sources_not_latest_material`),
    space-goal/participant/playbook/expression freezing, the arbiter
    (`test_guidance_arbiter_critical_risk_visibility_duplicate_social_and_budget`,
@@ -184,7 +184,7 @@ Evidence: `artifacts/runtime-evidence/2026-10-11-v2-local-full-closure/`,
 
 **Status**: `PASS`
 
-- The Interview runtime is exercised by the 1336-passing backend suite and the 65-passing Playwright
+- The Interview runtime is exercised by the 1337-passing backend suite and the 65-passing Playwright
   run (`v13-product-loop.spec.mjs`, `critical-paths.spec.mjs`, `written-exam-flow.spec.mjs`,
   `r2-live-cue.spec.mjs`, `job-*`/`resume-*` linkage specs).
 - The packaged GUI evidence run captured the Interview surfaces (`01-onboarding` … `29-history`)

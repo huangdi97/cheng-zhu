@@ -2760,6 +2760,7 @@ def _persist_guidance(
     status: str,
     reason: str = "",
     score: Optional[OpportunityScore] = None,
+    origin: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     ts = store.now()
     row = {
@@ -2773,6 +2774,7 @@ def _persist_guidance(
         "status": status,
         "reason": reason,
         "score": {"value": score.value, **score.__dict__} if score else {},
+        "origin": dict(origin or {}),
         "user_action": "NONE",
         "rendered_at": ts if status == "SHOWN" else None,
         "created_at": ts,
@@ -3174,12 +3176,69 @@ def direct_question_prediction(
     }
 
 
+def _transcript_auto_origin(
+    *,
+    transcript_segment_id: str,
+    channel: str,
+    session: dict[str, Any],
+    decision_class: str = "SHOWN",
+) -> dict[str, Any]:
+    """Immutable provenance for Stable-eligible automatic Guidance evidence."""
+    segment_id = str(transcript_segment_id or "").strip()
+    if not segment_id:
+        return {}
+    policy = _normalize_session_policy(session.get("policy"))
+    return {
+        "kind": "TRANSCRIPT_AUTO",
+        "runtime": "AUTOMATIC_TRANSCRIPT_GUIDANCE",
+        "transcript_segment_id": segment_id,
+        "channel": str(channel or "PRIMARY_AUDIO").upper(),
+        "ai_assistance": str(policy.get("ai_assistance") or ""),
+        "assistance_mode": str(session.get("assistance_mode") or "BALANCED").upper(),
+        "decision_class": str(decision_class or "SHOWN").upper(),
+    }
+
+
+def _persist_transcript_silence(
+    session_id: str,
+    *,
+    session: dict[str, Any],
+    transcript_segment_id: str,
+    channel: str,
+    reason: str,
+    decision_class: str,
+    kind: str = "RECALL",
+    source_refs: Optional[list[dict[str, Any]]] = None,
+) -> None:
+    # Direct unit/dogfood calls that are not attached to a persisted transcript
+    # remain engineering-only and do not manufacture Stable evidence.
+    origin = _transcript_auto_origin(
+        transcript_segment_id=transcript_segment_id,
+        channel=channel,
+        session=session,
+        decision_class=decision_class,
+    )
+    if not origin:
+        return
+    _persist_guidance(
+        session_id,
+        kind=kind,
+        action=ExpressionAction.SILENT.value,
+        text="",
+        source_refs=list(source_refs or []),
+        status="SUPPRESSED",
+        reason=reason,
+        origin=origin,
+    )
+
+
 def guidance_from_transcript(
     session_id: str,
     text: str,
     *,
     channel: str = "PRIMARY_AUDIO",
     frozen_direct_question: Optional[dict[str, Any]] = None,
+    transcript_segment_id: str = "",
 ) -> Optional[dict[str, Any]]:
     """Conservative automatic guidance from a final Conversation ASR segment.
 
@@ -3265,6 +3324,16 @@ def guidance_from_transcript(
             limit=1,
         )
         if recent:
+            _persist_transcript_silence(
+                session_id,
+                session=session,
+                transcript_segment_id=transcript_segment_id,
+                channel=normalized_channel,
+                reason="TRANSCRIPT_DUPLICATE_DIRECT_QUESTION",
+                decision_class="ARBITER",
+                kind="ANSWER_CUE",
+                source_refs=refs,
+            )
             return None
         return _persist_guidance(
             session_id,
@@ -3274,10 +3343,33 @@ def guidance_from_transcript(
             source_refs=refs,
             status="SHOWN",
             reason="TRANSCRIPT_DIRECT_QUESTION",
+            origin=_transcript_auto_origin(
+                transcript_segment_id=transcript_segment_id,
+                channel=normalized_channel,
+                session=session,
+            ),
         )
 
     mode = str(session.get("assistance_mode") or "BALANCED").upper()
-    if mode == "QUIET" or _suggestion_budget_exhausted(session_id, mode):
+    if mode == "QUIET":
+        _persist_transcript_silence(
+            session_id,
+            session=session,
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            reason="TRANSCRIPT_MODE_QUIET",
+            decision_class="MODE_FORCED",
+        )
+        return None
+    if _suggestion_budget_exhausted(session_id, mode):
+        _persist_transcript_silence(
+            session_id,
+            session=session,
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            reason="TRANSCRIPT_SUGGESTION_BUDGET",
+            decision_class="ARBITER",
+        )
         return None
 
     # Reuse the frozen-context retrieval ranking. Only confirmed truth and
@@ -3292,15 +3384,42 @@ def guidance_from_transcript(
         None,
     )
     if not useful:
+        _persist_transcript_silence(
+            session_id,
+            session=session,
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            reason="TRANSCRIPT_NO_GROUNDED_OPPORTUNITY",
+            decision_class="ARBITER",
+        )
         return None
 
     refs = list(useful.get("source_refs") or [])
     if not refs or not _source_visibility_allows_guidance(refs):
+        _persist_transcript_silence(
+            session_id,
+            session=session,
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            reason="TRANSCRIPT_SOURCE_NOT_ELIGIBLE",
+            decision_class="PROVENANCE_FORCED",
+            source_refs=refs,
+        )
         return None
 
     authority = str(useful.get("authority") or "")
     if authority == "CONFIRMED_TRUTH":
         if not _guidance_kind_allowed(session, "RECALL"):
+            _persist_transcript_silence(
+                session_id,
+                session=session,
+                transcript_segment_id=transcript_segment_id,
+                channel=normalized_channel,
+                reason="TRANSCRIPT_PROFILE_GUIDANCE_NOT_ALLOWED",
+                decision_class="PROFILE_FORCED",
+                kind="RECALL",
+                source_refs=refs,
+            )
             return None
         kind = "RECALL"
         action = ExpressionAction.RECALL.value
@@ -3314,11 +3433,43 @@ def guidance_from_transcript(
             kind = "TALKING_POINT"
             reason = "TRANSCRIPT_SOURCE_TALKING_POINT"
         else:
+            _persist_transcript_silence(
+                session_id,
+                session=session,
+                transcript_segment_id=transcript_segment_id,
+                channel=normalized_channel,
+                reason="TRANSCRIPT_PROFILE_GUIDANCE_NOT_ALLOWED",
+                decision_class="PROFILE_FORCED",
+                kind="CONTRIBUTION_OPPORTUNITY",
+                source_refs=refs,
+            )
             return None
         action = ExpressionAction.ADD_TALKING_POINT.value
         cue = str(useful.get("excerpt") or useful.get("title") or "")[:1200]
 
-    if not cue or _recent_duplicate_guidance(session_id, cue, seconds=45.0):
+    if not cue:
+        _persist_transcript_silence(
+            session_id,
+            session=session,
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            reason="TRANSCRIPT_EMPTY_CUE",
+            decision_class="ARBITER",
+            kind=kind,
+            source_refs=refs,
+        )
+        return None
+    if _recent_duplicate_guidance(session_id, cue, seconds=45.0):
+        _persist_transcript_silence(
+            session_id,
+            session=session,
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            reason="TRANSCRIPT_DUPLICATE_GUIDANCE",
+            decision_class="ARBITER",
+            kind=kind,
+            source_refs=refs,
+        )
         return None
     return _persist_guidance(
         session_id,
@@ -3328,6 +3479,11 @@ def guidance_from_transcript(
         source_refs=refs,
         status="SHOWN",
         reason=reason,
+        origin=_transcript_auto_origin(
+            transcript_segment_id=transcript_segment_id,
+            channel=normalized_channel,
+            session=session,
+        ),
     )
 
 def record_human_coach_cue(

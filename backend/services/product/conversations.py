@@ -4217,7 +4217,7 @@ def diagnostics() -> dict[str, Any]:
                 "real_user_cognitive_load",
             ],
             "explicit_feedback_boundary": "LOCAL_EXPLICIT_SELF_REPORT; reviewer identity and authorized real-use status are not system-verified.",
-            "interpretation": "Observed proxies and local self-report rows are evidence inputs only; they are not precision/quality/real-user/PMF claims until independently labeled and paired with an authorized pilot manifest.",
+            "interpretation": "Observed proxies are not precision/quality/PMF claims. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
         },
         "health": {
             "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",

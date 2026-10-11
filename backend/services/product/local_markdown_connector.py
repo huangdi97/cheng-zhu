@@ -200,6 +200,13 @@ class LocalMarkdownDecisionLogAdapter:
             }
         before_exists = target_path.exists()
         before_stat = target_path.stat() if before_exists else None
+        if before_exists and not target_path.is_file():
+            return {
+                "ok": False,
+                "error": "Decision Log target 必须是普通 Markdown 文件，不能是目录或特殊文件",
+                "retry_safe": True,
+                "phase": "TARGET_VALIDATION_PRE_WRITE",
+            }
         if before_stat is not None and before_stat.st_size > _MAX_EXISTING_BYTES:
             return {
                 "ok": False,

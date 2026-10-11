@@ -631,6 +631,7 @@ export interface ConversationTranscriptSegment {
       predicted: boolean
       detector_version: string
       channel: string
+      ai_assistance?: string
     }
   }
   created_at: number

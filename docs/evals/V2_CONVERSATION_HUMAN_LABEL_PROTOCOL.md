@@ -56,7 +56,37 @@ silence_correct=true 表示这个时间窗口不主动打断是更好的动作�
 
 ## 5. direct_question
 
-predicted 与 actual 均为 bool。actual=true 表示当前说话者确实向用户提出需要回应的问题。不要把修辞问题、自问自答或口头语自动算 direct question。
+`predicted` 与 `actual` 均为 bool。actual=true 表示当前说话者确实向用户提出需要回应的问题。不要把修辞问题、自问自答或口头语自动算 direct question。
+
+### v11 prediction provenance
+
+Direct Question Precision / Recall 必须使用 **capture-time frozen prediction**，不能在评估时用当前 detector 重跑历史 transcript：
+
+```text
+final PRIMARY_AUDIO transcript
+→ analysis.direct_question = {
+    eligible,
+    predicted,
+    detector_version,
+    channel
+  }
+→ immutable row in product.db
+→ label seed predicted
+→ independent reviewer fills actual
+```
+
+当前 detector version 为 `heuristic-v1`。未来即使 detector 规则升级，旧 transcript 的 `predicted` 仍保持当时版本的结果；这是 precision / recall 可复现性的必要条件。
+
+对 pre-v11 历史 transcript，如果没有冻结的 `analysis.direct_question`：
+
+```text
+predicted = null
+prediction_unavailable = true
+```
+
+这类 row 不进入 Direct Question Precision / Recall 分母。**禁止**为了增加样本量而用新版 detector 重跑旧文本、根据是否出现 ANSWER_CUE 倒推所有负样本，或把人工 actual 回填成 predicted。
+
+`SELF_MIC` 不属于对方直接提问检测集合，因此不会进入 direct-question reviewer queue。Stable Gate 的 Direct Question Precision / Recall 仍要求 `label_source=INDEPENDENT_HUMAN_REVIEW`。
 
 ## 6. truth_item
 

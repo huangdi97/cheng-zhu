@@ -221,6 +221,17 @@ export interface ConversationItem {
   confidence: number
   epistemic_status: EpistemicStatus
   review_status: ReviewStatus
+  prediction?: {
+    type?: string
+    state?: string
+    title?: string
+    owner_id?: string
+    due_at?: string
+    time_semantics?: ConversationTimeSemantics
+    source_refs?: SourceRef[]
+    confidence?: number
+    captured_at?: number
+  }
   supersedes_id: string
   visibility: string
   created_at: number
@@ -254,6 +265,43 @@ export interface ConversationGuidance {
   rendered_at: number | null
   expression_plan: ConversationExpressionPlan
   created_at: number
+}
+
+export interface ConversationHumanFeedback {
+  id: string
+  space_id: string
+  session_id: string
+  kind: 'GUIDANCE' | 'SILENCE' | 'CONTINUE' | 'SESSION_OUTCOME'
+  target_id: string
+  reviewer_kind: 'SELF_USER' | string
+  labels: {
+    useful?: boolean | null
+    interruption_regret?: boolean | null
+    source_correct?: boolean | null
+    recall_correct?: boolean | null
+    silence_correct?: boolean | null
+    writeback_accurate?: boolean | null
+    cognitive_load_delta?: number | null
+    would_reuse_space?: boolean | null
+  }
+  note: string
+  created_at: number
+  updated_at: number
+}
+
+export interface ConversationFeedbackReview {
+  session_id: string
+  space_id: string
+  session_status: string
+  reviewer_kind: 'SELF_USER'
+  evidence_boundary: 'LOCAL_EXPLICIT_SELF_REPORT_NOT_REAL_USER_IDENTITY_PROOF' | string
+  guidance: Array<{ event: Pick<ConversationGuidance, 'id' | 'session_id' | 'kind' | 'expression_action' | 'text' | 'source_refs' | 'status' | 'reason' | 'score' | 'user_action' | 'rendered_at' | 'created_at'>; feedback: ConversationHumanFeedback | null }>
+  silence: Array<{ event: Pick<ConversationGuidance, 'id' | 'session_id' | 'kind' | 'expression_action' | 'text' | 'source_refs' | 'status' | 'reason' | 'score' | 'user_action' | 'rendered_at' | 'created_at'>; feedback: ConversationHumanFeedback | null }>
+  continue_feedback: ConversationHumanFeedback | null
+  session_outcome: ConversationHumanFeedback | null
+  remote_telemetry: 'OFF' | string
+  real_user_validated: false
+  pmf_proven: false
 }
 
 export interface ConversationOpenThread {
@@ -696,6 +744,7 @@ export interface ConversationSessionExport {
   confirmed_items: ConversationItem[]
   unconfirmed_candidates: ConversationItem[]
   guidance: ConversationGuidance[]
+  human_feedback: ConversationHumanFeedback[]
   draft_actions: ConversationDraftAction[]
   source_manifest: Array<Record<string, unknown>>
   connector_snapshots: Array<Record<string, unknown>>

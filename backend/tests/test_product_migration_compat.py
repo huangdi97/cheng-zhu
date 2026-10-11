@@ -186,11 +186,11 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
     product_store.init_db()
     goal_id = goals.create_goal("MindRank", "AIDD Agent Engineer")["id"]
     assert goal_id
-    assert product_store.schema_version() == 9
+    assert product_store.schema_version() == 10
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 10)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 11)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -261,7 +261,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
 
         before = product_migrations.ensure_schema(conn)
         assert before == 7
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 10
 
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {
@@ -274,7 +274,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         assert "text" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
 
-        assert product_migrations.ensure_schema(conn) == 9
+        assert product_migrations.ensure_schema(conn) == 10
     finally:
         conn.close()
 
@@ -351,13 +351,80 @@ def test_v9_snapshot_rebuild_preserves_existing_v8_rows_and_adds_space_scoped_un
         conn.close()
 
 
+def test_v10_pilot_evidence_migration_adds_prediction_and_feedback_without_rewriting_v9_rows():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 10):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        conn.execute(
+            "INSERT INTO conversation_space "
+            "(id, title, profile, description, default_goal, default_mode, relationship_key, status, "
+            "selected_source_ids_json, selected_quick_note_ids_json, selected_connector_snapshot_ids_json, "
+            "retention_policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("space-v10", "Pilot", "PROJECT_SYNC", "", "", "BALANCED", "", "ACTIVE",
+             "[]", "[]", "[]", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_session "
+            "(id, space_id, goal_ids_json, template, title, capture_mode, processing_mode, assistance_mode, "
+            "consent_ack, pack_id, status, state_json, source_calendar_event_json, policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("session-v10", "space-v10", "[]", "PROJECT_SYNC", "Pilot", "NOTES_ONLY", "LOCAL",
+             "BALANCED", 1, "", "ENDED", "{}", "{}", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_item "
+            "(id, space_id, session_id, type, state, title, source_refs_json, confidence, epistemic_status, "
+            "review_status, visibility, created_at, updated_at, time_semantics_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("item-v9", "space-v10", "session-v10", "Decision", "AGREED", "preserved v9 decision",
+             "[]", 0.8, "USER_CONFIRMED", "USER_CONFIRMED", "PRIVATE", 1.0, 1.0, "{}"),
+        )
+        conn.commit()
+
+        before_title = conn.execute(
+            "SELECT title FROM conversation_item WHERE id = 'item-v9'"
+        ).fetchone()[0]
+
+        apply_v10, _name = product_migrations._MIGRATIONS[10]
+        apply_v10(conn)
+        conn.execute("PRAGMA user_version = 10")
+        conn.commit()
+
+        assert before_title == conn.execute(
+            "SELECT title FROM conversation_item WHERE id = 'item-v9'"
+        ).fetchone()[0]
+        item_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
+        assert "prediction_json" in item_cols
+        assert conn.execute(
+            "SELECT prediction_json FROM conversation_item WHERE id = 'item-v9'"
+        ).fetchone()[0] == "{}"
+
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "conversation_human_feedback" in tables
+        feedback_cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_human_feedback)")}
+        assert {"session_id", "space_id", "kind", "target_id", "reviewer_kind", "labels_json"} <= feedback_cols
+        indexes = {row[1] for row in conn.execute("PRAGMA index_list(conversation_human_feedback)")}
+        assert "idx_conversation_feedback_session" in indexes
+        assert "idx_conversation_feedback_space" in indexes
+    finally:
+        conn.close()
+
+
 def test_deleting_product_db_is_a_complete_rollback(v122_env):
     from services.product import goals
     from services.storage import product as product_store
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 9
+    assert product_store.schema_version() == 10
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

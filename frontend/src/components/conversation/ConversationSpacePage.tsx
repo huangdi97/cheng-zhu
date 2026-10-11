@@ -3,7 +3,7 @@ import { Archive, ArrowLeft, Download, Play, Plus, RotateCcw, ShieldCheck, Trash
 import { conversationApi } from '@/lib/conversationApi'
 import { activateConversationSharePrivacy, restoreConversationSharePrivacy } from '@/lib/conversationSharePrivacy'
 import { productApi } from '@/lib/productApi'
-import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationExternalExecution, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
+import type { AssistanceMode, CaptureMode, ConversationContinue, ConversationDraftAction, ConversationExternalExecution, ConversationFeedbackReview, ConversationGoal, ConversationItem, ConversationParticipant, ConversationPreflight, ProcessingMode } from '@/lib/conversationContracts'
 import { navigate, paths, type ConversationTab } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, inputCls, useAsync } from '@/components/os/ui'
 
@@ -85,6 +85,110 @@ const DRAFT_EXECUTION_CAPABILITY: Record<ConversationDraftAction['kind'], string
   CREATE_TASK_DRAFT: 'task.create',
   CREATE_ISSUE_DRAFT: 'issue.create',
   UPDATE_DECISION_LOG_DRAFT: 'decision_log.write',
+}
+
+function PilotFeedbackPanel({ sessionId }: { sessionId: string }) {
+  const [review, setReview] = useState<ConversationFeedbackReview | null>(null)
+  const [busy, setBusy] = useState('')
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState('')
+
+  const reload = async () => {
+    const next = await conversationApi.feedbackReview(sessionId)
+    setReview(next)
+  }
+
+  useEffect(() => {
+    let alive = true
+    conversationApi.feedbackReview(sessionId)
+      .then((next) => { if (alive) setReview(next) })
+      .catch((e) => { if (alive) setError(e instanceof Error ? e.message : String(e)) })
+    return () => { alive = false }
+  }, [sessionId])
+
+  const submit = async (
+    kind: 'GUIDANCE' | 'SILENCE' | 'CONTINUE' | 'SESSION_OUTCOME',
+    targetId: string,
+    labels: Record<string, boolean | number | null>,
+  ) => {
+    const key = `${kind}:${targetId || 'session'}:${Object.keys(labels)[0] || 'label'}`
+    setBusy(key); setError(''); setSaved('')
+    try {
+      await conversationApi.recordFeedback(sessionId, { kind, target_id: targetId, labels })
+      await reload()
+      setSaved('已保存在本机')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  if (!review) {
+    return <div className="mt-4 rounded-xl border border-bg-tertiary/70 p-3 text-xs text-text-muted">正在载入本机试用反馈…</div>
+  }
+
+  const outcome = review.session_outcome?.labels ?? {}
+  const continueLabels = review.continue_feedback?.labels ?? {}
+  return (
+    <details className="mt-4 rounded-xl border border-accent-blue/20 bg-bg-primary/55 p-3" data-testid="conversation-pilot-feedback">
+      <summary className="cursor-pointer text-xs font-semibold text-text-secondary">试用反馈 · 仅保存在本机</summary>
+      <div className="mt-3 rounded-lg border border-bg-tertiary/70 bg-bg-secondary/25 p-3">
+        <div className="flex flex-wrap items-center gap-2"><StatusBadge tone="info">LOCAL ONLY</StatusBadge><StatusBadge tone="muted">SELF REPORT</StatusBadge><StatusBadge tone="muted">NO TELEMETRY</StatusBadge></div>
+        <p className="mt-2 text-[11px] leading-relaxed text-text-muted">这些是你明确填写的质量标签，不会从 Pin / 忽略 / 点击率推断。它们可进入本机 human-label 评估，但不会自动证明“真实外部用户已验证”，也不会自动把 v2 升为 Stable 或 PMF。</p>
+      </div>
+
+      {review.guidance.length ? <div className="mt-4 space-y-3">
+        <div className="text-xs font-semibold text-text-secondary">这场显示过的 Guidance</div>
+        {review.guidance.slice(0, 8).map(({ event, feedback }) => {
+          const labels = feedback?.labels ?? {}
+          return <div key={event.id} className="rounded-lg border border-bg-tertiary/70 p-3">
+            <div className="flex flex-wrap items-center gap-2"><StatusBadge tone={event.kind === 'RISK' ? 'risk' : 'muted'}>{event.kind}</StatusBadge><span className="text-[10px] text-text-muted">{event.reason}</span></div>
+            <p className="mt-1 text-xs text-text-primary">{event.text || event.expression_action}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { useful: true })}>有用{labels.useful === true ? ' ✓' : ''}</SecondaryButton>
+              <SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { useful: false })}>没帮上忙{labels.useful === false ? ' ✓' : ''}</SecondaryButton>
+              <SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { interruption_regret: true })}>打断了表达{labels.interruption_regret === true ? ' ✓' : ''}</SecondaryButton>
+              <SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { interruption_regret: false })}>时机可以{labels.interruption_regret === false ? ' ✓' : ''}</SecondaryButton>
+              {event.source_refs.length ? <><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { source_correct: true })}>来源正确{labels.source_correct === true ? ' ✓' : ''}</SecondaryButton><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { source_correct: false })}>来源有误{labels.source_correct === false ? ' ✓' : ''}</SecondaryButton></> : null}
+              {event.kind === 'RECALL' ? <><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { recall_correct: true })}>Recall 正确{labels.recall_correct === true ? ' ✓' : ''}</SecondaryButton><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('GUIDANCE', event.id, { recall_correct: false })}>Recall 有误{labels.recall_correct === false ? ' ✓' : ''}</SecondaryButton></> : null}
+            </div>
+          </div>
+        })}
+      </div> : <p className="mt-4 text-[11px] text-text-muted">这场没有可标注的已显示 Conversation AI Guidance。</p>}
+
+      {review.silence.length ? <div className="mt-4 space-y-2">
+        <div className="text-xs font-semibold text-text-secondary">SILENT / 被抑制的时机</div>
+        {review.silence.slice(0, 6).map(({ event, feedback }) => <div key={event.id} className="rounded-lg border border-bg-tertiary/70 p-3">
+          <div className="text-[11px] text-text-muted">{event.kind} · {event.reason}</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <SecondaryButton disabled={Boolean(busy)} onClick={() => submit('SILENCE', event.id, { silence_correct: true })}>保持沉默是对的{feedback?.labels.silence_correct === true ? ' ✓' : ''}</SecondaryButton>
+            <SecondaryButton disabled={Boolean(busy)} onClick={() => submit('SILENCE', event.id, { silence_correct: false })}>这里应该提醒{feedback?.labels.silence_correct === false ? ' ✓' : ''}</SecondaryButton>
+          </div>
+        </div>)}
+      </div> : null}
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-bg-tertiary/70 p-3">
+          <div className="text-xs font-semibold text-text-secondary">Continue 是否准确？</div>
+          <p className="mt-1 text-[10px] text-text-muted">检查 Decision / Commitment / Open Question / 草稿是否只用了已审核真值，owner / due / state / source 是否正确。</p>
+          <div className="mt-2 flex gap-2"><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('CONTINUE', '', { writeback_accurate: true })}>准确{continueLabels.writeback_accurate === true ? ' ✓' : ''}</SecondaryButton><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('CONTINUE', '', { writeback_accurate: false })}>有错误{continueLabels.writeback_accurate === false ? ' ✓' : ''}</SecondaryButton></div>
+        </div>
+        <div className="rounded-lg border border-bg-tertiary/70 p-3">
+          <div className="text-xs font-semibold text-text-secondary">还愿意继续用这个 Space 吗？</div>
+          <div className="mt-2 flex gap-2"><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('SESSION_OUTCOME', '', { would_reuse_space: true })}>愿意{outcome.would_reuse_space === true ? ' ✓' : ''}</SecondaryButton><SecondaryButton disabled={Boolean(busy)} onClick={() => submit('SESSION_OUTCOME', '', { would_reuse_space: false })}>不愿意{outcome.would_reuse_space === false ? ' ✓' : ''}</SecondaryButton></div>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-bg-tertiary/70 p-3">
+        <div className="text-xs font-semibold text-text-secondary">相比没有成竹，这场认知负担怎样？</div>
+        <p className="mt-1 text-[10px] text-text-muted">-2 明显降低 · -1 略有降低 · 0 无变化 · +1 略有增加 · +2 明显增加</p>
+        <div className="mt-2 flex flex-wrap gap-2">{[-2, -1, 0, 1, 2].map((value) => <SecondaryButton key={value} disabled={Boolean(busy)} onClick={() => submit('SESSION_OUTCOME', '', { cognitive_load_delta: value })}>{value > 0 ? `+${value}` : value}{outcome.cognitive_load_delta === value ? ' ✓' : ''}</SecondaryButton>)}</div>
+      </div>
+      {saved ? <p role="status" className="mt-3 text-[11px] text-status-direct">{saved}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-[11px] text-status-risk">{error}</p> : null}
+    </details>
+  )
 }
 
 export default function ConversationSpacePage({ spaceId, tab }: { spaceId: string; tab: ConversationTab }) {
@@ -1272,6 +1376,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               </div> : null}
               <p className="mt-2 text-[11px] text-text-muted">确认草稿 ≠ 外部执行。Execution Request ≠ 执行成功。直接成功必须来自 provider adapter 明确 ok=true；UNKNOWN_OUTCOME 只能通过 provider-side reconciliation 记录“已确认发生”或“已确认未发生”。两类成功证据在 audit 中保持可区分，只有“确认未发生”才会把该 row 变成 retry_safe。</p>
             </div> : null}
+            <PilotFeedbackPanel sessionId={continueData.session.id} />
             {continueData.candidates.length ? <div className="mt-4 space-y-2"><div className="text-xs font-semibold text-text-secondary">逐项确认 AI / 会中提取</div>{continueData.candidates.map((item) => <ItemRow key={item.id} item={item} onChanged={async () => { setContinueData(await conversationApi.continue(continueData.session.id)); await detail.reload(); await prepare.reload() }} />)}</div> : <p className="mt-3 text-xs text-status-direct">没有未确认事项。</p>}
           </div> : null}
         </div>

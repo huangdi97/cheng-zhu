@@ -2346,6 +2346,22 @@ def add_item(
     if not title:
         raise ValueError("事项内容不能为空")
     ts = store.now()
+    prediction = {}
+    if review_status == "AI_EXTRACTED":
+        # Freeze the model/rule candidate before any Continue review mutates
+        # type/state/owner/time truth. Evaluation must compare against this
+        # immutable snapshot rather than the later reviewed row.
+        prediction = {
+            "type": item_type,
+            "state": state,
+            "title": title[:1000],
+            "owner_id": str(owner_id or "")[:120],
+            "due_at": str(due_at or temporal.get("normalized_datetime") or "")[:120],
+            "time_semantics": temporal,
+            "source_refs": refs,
+            "confidence": max(0.0, min(1.0, float(confidence or 0.0))),
+            "captured_at": ts,
+        }
     row = {
         "id": store.new_id("ci_"),
         "space_id": session["space_id"],
@@ -2363,6 +2379,7 @@ def add_item(
         "confidence": max(0.0, min(1.0, float(confidence or 0.0))),
         "epistemic_status": epistemic_status,
         "review_status": review_status,
+        "prediction": prediction,
         "supersedes_id": str(supersedes_id or "")[:120],
         "visibility": "PRIVATE",
         "created_at": ts,
@@ -3547,6 +3564,12 @@ def export_session(session_id: str) -> dict[str, Any]:
         params=(session_id,),
         order="created_at ASC",
     )
+    human_feedback = store.select(
+        "conversation_human_feedback",
+        where="session_id = ?",
+        params=(session_id,),
+        order="created_at ASC",
+    )
     confirmed = [
         item for item in items
         if item["review_status"] in {"USER_CONFIRMED", "USER_EDITED", "SOURCE_CONFIRMED"}
@@ -3582,6 +3605,7 @@ def export_session(session_id: str) -> dict[str, Any]:
                 "session", "transcript", "screen_context_observations", "quick_notes", "confirmed_items",
                 "unconfirmed_candidates", "guidance", "draft_actions", "source_manifest",
                 "connector_snapshots", "connector_connections", "external_execution_audit", "session_packs",
+                "human_feedback",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -3605,6 +3629,7 @@ def export_session(session_id: str) -> dict[str, Any]:
         "connector_connections": integration["connections"],
         "external_execution_audit": integration["external_execution_audit"],
         "session_packs": packs,
+        "human_feedback": human_feedback,
     }
 
 def conversation_history(limit: int = 100) -> list[dict[str, Any]]:
@@ -4129,6 +4154,10 @@ def diagnostics() -> dict[str, Any]:
     dismissed_guidance = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_guidance_event WHERE user_action = 'DISMISSED'"
     ) or 0)
+    human_feedback = int(store.scalar("SELECT COUNT(*) FROM conversation_human_feedback") or 0)
+    feedback_sessions = int(store.scalar(
+        "SELECT COUNT(DISTINCT session_id) FROM conversation_human_feedback"
+    ) or 0)
     duplicate_suppressed = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED' "
         "AND reason = 'DUPLICATE_GUIDANCE'"
@@ -4160,6 +4189,8 @@ def diagnostics() -> dict[str, Any]:
             "approved_drafts": approved_drafts,
             "guidance_adopted": adopted_guidance,
             "guidance_dismissed": dismissed_guidance,
+            "explicit_human_feedback_rows": human_feedback,
+            "sessions_with_explicit_feedback": feedback_sessions,
             "duplicate_suppressed": duplicate_suppressed,
             "policy_suppressed": policy_suppressed,
         },
@@ -4185,7 +4216,8 @@ def diagnostics() -> dict[str, Any]:
                 "real_cross_session_value",
                 "real_user_cognitive_load",
             ],
-            "interpretation": "Observed proxies are runtime telemetry on this local device; they are not precision/quality/PMF claims.",
+            "explicit_feedback_boundary": "LOCAL_EXPLICIT_SELF_REPORT; reviewer identity and authorized real-use status are not system-verified.",
+            "interpretation": "Observed proxies are not precision/quality/PMF claims. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
         },
         "health": {
             "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",
@@ -4249,6 +4281,12 @@ def export_space(space_id: str) -> dict[str, Any]:
         "WHERE s.space_id = ? ORDER BY g.created_at ASC",
         (space_id,),
     )
+    human_feedback = store.select(
+        "conversation_human_feedback",
+        where="space_id = ?",
+        params=(space_id,),
+        order="created_at ASC",
+    )
     notes: list[dict[str, Any]] = []
     for note_id in detail.get("selected_quick_note_ids") or []:
         note = store.get("quick_note", str(note_id))
@@ -4288,7 +4326,7 @@ def export_space(space_id: str) -> dict[str, Any]:
                 "transcript", "screen_context_observations", "notes", "confirmed_items", "unconfirmed_candidates",
                 "guidance", "source_manifest", "connector_snapshots", "connector_connections",
                 "external_execution_audit", "open_threads", "draft_actions", "session_packs",
-                "provenance_tombstones",
+                "provenance_tombstones", "human_feedback",
             ],
             "privacy": "LOCAL_EXPORT",
             "contains_external_secrets": False,
@@ -4304,6 +4342,7 @@ def export_space(space_id: str) -> dict[str, Any]:
         "confirmed_items": confirmed,
         "unconfirmed_candidates": candidates,
         "guidance": guidance,
+        "human_feedback": human_feedback,
         "source_manifest": source_manifest,
         "connector_snapshots": integration["connector_snapshots"],
         "connector_connections": integration["connections"],

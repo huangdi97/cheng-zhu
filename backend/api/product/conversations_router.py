@@ -7,7 +7,13 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.product.common import domain_errors
-from services.product import conversation_capture, conversation_integrations, conversation_screen, conversations
+from services.product import (
+    conversation_capture,
+    conversation_feedback,
+    conversation_integrations,
+    conversation_screen,
+    conversations,
+)
 
 router = APIRouter(prefix="/conversation", tags=["product-conversation"])
 
@@ -666,6 +672,34 @@ class DraftActionReview(BaseModel):
 def review_draft_action(action_id: str, body: DraftActionReview):
     with domain_errors():
         return conversations.review_draft_action(action_id, body.action)
+
+
+class ConversationFeedbackBody(BaseModel):
+    kind: str = Field(max_length=40)
+    target_id: str = Field(default="", max_length=200)
+    labels: dict[str, Any] = Field(default_factory=dict)
+    note: str = Field(default="", max_length=2000)
+
+
+@router.get("/sessions/{session_id}/feedback-review")
+def feedback_review(session_id: str, limit: int = 40):
+    with domain_errors():
+        return conversation_feedback.review_queue(session_id, limit=limit)
+
+
+@router.post("/sessions/{session_id}/feedback")
+def record_feedback(session_id: str, body: ConversationFeedbackBody):
+    with domain_errors():
+        # Reviewer provenance is fixed server-side. The public product API
+        # cannot claim an external/verified human identity.
+        return conversation_feedback.upsert_feedback(
+            session_id,
+            kind=body.kind,
+            target_id=body.target_id,
+            labels=body.labels,
+            note=body.note,
+            reviewer_kind="SELF_USER",
+        )
 
 
 class GuidanceBody(BaseModel):

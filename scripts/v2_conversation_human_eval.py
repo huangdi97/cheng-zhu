@@ -12,8 +12,9 @@ Supported row kinds:
   continue
   session_outcome
 
-Example:
+Examples:
   python scripts/v2_conversation_human_eval.py labels.jsonl --out report.json
+  python scripts/v2_conversation_human_eval.py in-product.jsonl independent.jsonl --out report.json
 """
 from __future__ import annotations
 
@@ -56,9 +57,13 @@ def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-finite JSON number {value!r} is not allowed")
 
 
-def load_rows(path: Path) -> list[dict[str, Any]]:
+def load_rows(
+    path: Path,
+    *,
+    seen: set[tuple[str, str, str, str]] | None = None,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
+    seen = seen if seen is not None else set()
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         text = raw.strip()
         if not text or text.startswith("#"):
@@ -96,7 +101,20 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _label_source(row: dict[str, Any]) -> str:
+    explicit = str(row.get("label_source") or "").strip().upper()
+    if explicit:
+        return explicit
+    if str(row.get("reviewer") or "").strip().upper() == "IN_PRODUCT_SELF_REPORT":
+        return "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+    return "UNSPECIFIED"
+
+
+def aggregate(
+    rows: list[dict[str, Any]],
+    *,
+    include_source_breakdown: bool = True,
+) -> dict[str, Any]:
     by_kind = Counter(str(row["kind"]) for row in rows)
 
     guidance_rows = [r for r in rows if r["kind"] == "guidance"]
@@ -191,7 +209,7 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
     labeled_metric_count = sum(1 for value in metrics.values() if value["n"] > 0)
-    return {
+    report = {
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "rows": len(rows),
         "rows_by_kind": dict(sorted(by_kind.items())),
@@ -203,9 +221,20 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "Human label aggregates do not verify that respondents were real external users. No threshold in this script upgrades PMF or release status."
+            "Human label aggregates do not verify that respondents were real external users. Label-source provenance is preserved separately; no threshold in this script upgrades PMF or release status."
         ),
     }
+    if include_source_breakdown:
+        by_source = Counter(_label_source(row) for row in rows)
+        report["rows_by_label_source"] = dict(sorted(by_source.items()))
+        report["metrics_by_label_source"] = {
+            source: aggregate(
+                [row for row in rows if _label_source(row) == source],
+                include_source_breakdown=False,
+            )["metrics"]
+            for source in sorted(by_source)
+        }
+    return report
 
 
 def markdown(report: dict[str, Any]) -> str:
@@ -232,18 +261,25 @@ def markdown(report: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("labels", help="human-labeled JSONL")
+    parser.add_argument(
+        "labels",
+        nargs="+",
+        help="one or more human-labeled JSONL files; duplicate reviewer/session/kind/event labels are rejected across files",
+    )
     parser.add_argument("--out", default="")
     parser.add_argument("--markdown-out", default="")
     args = parser.parse_args()
 
-    labels_path = Path(args.labels)
+    label_paths = [Path(value) for value in args.labels]
     output_paths = [Path(path) for path in (args.out, args.markdown_out) if path]
-    resolved = [labels_path.resolve(), *(path.resolve() for path in output_paths)]
+    resolved = [*(path.resolve() for path in label_paths), *(path.resolve() for path in output_paths)]
     if len(resolved) != len(set(resolved)):
-        parser.error("evaluation outputs must not overwrite the labels or each other")
+        parser.error("evaluation outputs must not overwrite labels, labels must be distinct, and outputs must differ")
 
-    rows = load_rows(labels_path)
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for labels_path in label_paths:
+        rows.extend(load_rows(labels_path, seen=seen))
     report = aggregate(rows)
     payload = json.dumps(report, ensure_ascii=False, indent=2)
     print(payload)

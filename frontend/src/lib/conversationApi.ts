@@ -10,7 +10,9 @@ import type {
   ConversationContinue,
   ConversationDraftAction,
   ConversationExternalExecution,
+  ConversationFeedbackReview,
   ConversationGuidance,
+  ConversationHumanFeedback,
   ConversationHistoryItem,
   ConversationReminder,
   ConversationHome,
@@ -212,6 +214,17 @@ export const conversationApi = {
     request<ConversationCaptureStatus>(`${B}/sessions/${encodeURIComponent(id)}/capture/stop`, json('POST')),
   transcript: (id: string, limit = 100) =>
     request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/transcript?limit=${limit}`).then((p) => list<ConversationTranscriptSegment>(p)),
+  feedbackReview: (id: string, limit = 40) =>
+    request<ConversationFeedbackReview>(`${B}/sessions/${encodeURIComponent(id)}/feedback-review?limit=${limit}`),
+  recordFeedback: (
+    id: string,
+    body: {
+      kind: 'GUIDANCE' | 'SILENCE' | 'CONTINUE' | 'SESSION_OUTCOME'
+      target_id?: string
+      labels: Record<string, boolean | number | null>
+      note?: string
+    },
+  ) => request<ConversationHumanFeedback>(`${B}/sessions/${encodeURIComponent(id)}/feedback`, json('POST', body)),
   guidanceHistory: (id: string, limit = 30) =>
     request<unknown>(`${B}/sessions/${encodeURIComponent(id)}/guidance?limit=${limit}`).then((p) => list<ConversationGuidance>(p)),
   preflight: (id: string) => request<ConversationPreflight>(`${B}/sessions/${encodeURIComponent(id)}/preflight`),

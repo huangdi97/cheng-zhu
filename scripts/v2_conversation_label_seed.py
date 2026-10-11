@@ -72,6 +72,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "event_id": event["id"],
                 "timestamp": event["created_at"],
                 "reviewer": "",
+                "label_source": "",
                 "system": {
                     "kind": event["kind"],
                     "expression_action": event["expression_action"],
@@ -103,6 +104,23 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
         for raw in items:
             item = dict(raw)
             session = session_map[item["session_id"]]
+            prediction = _json(item.get("prediction_json"), {})
+            # v10 freezes AI_EXTRACTED candidates before review. For historical
+            # pre-v10 rows, the current row is usable as a prediction only if it
+            # is still unreviewed. Once a legacy row has been confirmed/edited/
+            # rejected, its current type/state are post-review truth and must
+            # never be backfilled into predicted_*.
+            legacy_unreviewed = item.get("review_status") == "AI_EXTRACTED" and not prediction
+            predicted_type = (
+                str(prediction.get("type") or "")
+                if prediction
+                else str(item.get("type") or "") if legacy_unreviewed else ""
+            )
+            predicted_state = (
+                str(prediction.get("state") or "")
+                if prediction
+                else str(item.get("state") or "") if legacy_unreviewed else ""
+            )
             rows.append({
                 "kind": "truth_item",
                 "session_id": item["session_id"],
@@ -111,10 +129,12 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "event_id": item["id"],
                 "timestamp": item["created_at"],
                 "reviewer": "",
-                "predicted_type": item["type"],
+                "label_source": "",
+                "predicted_type": predicted_type or None,
                 "actual_type": None,
-                "predicted_state": item["state"],
+                "predicted_state": predicted_state or None,
                 "actual_state": None,
+                "prediction_unavailable": not bool(predicted_type and predicted_state),
                 "system": {
                     "review_status": item["review_status"],
                     "epistemic_status": item["epistemic_status"],
@@ -122,6 +142,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                     "due_at": item["due_at"],
                     "source_refs": _json(item["source_refs_json"], []),
                     "title": item["title"],
+                    "prediction": prediction,
                 },
                 "notes": "",
             })
@@ -135,6 +156,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "space_id": session["space_id"],
                 "profile": session["space_profile"],
                 "reviewer": "",
+                "label_source": "",
                 "writeback_accurate": None,
                 "notes": "",
             })
@@ -144,6 +166,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "space_id": session["space_id"],
                 "profile": session["space_profile"],
                 "reviewer": "",
+                "label_source": "",
                 "cognitive_load_delta": None,
                 "would_reuse_space": None,
                 "notes": "",
@@ -173,7 +196,8 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     # Exclusive creation also protects against a race between the check and open.
     with out.open("x", encoding="utf-8") as fh:
-        fh.write("# UNLABELED REVIEW SEED — fill reviewer + label fields before evaluation.\n")
+        fh.write("# UNLABELED REVIEW SEED — fill reviewer + label_source + label fields before evaluation.\n")
+        fh.write("# For stable review use label_source=INDEPENDENT_HUMAN_REVIEW for independent reviewers.\n")
         fh.write("# This file is not real-user evidence until a human reviews the rows.\n")
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")

@@ -13,6 +13,14 @@
 
 每行一个 JSON object。kind 必须是 guidance、silence、direct_question、truth_item、continue、session_outcome 之一；reviewer 与 session_id 必填。可选共同字段：space_id、profile、event_id、timestamp、notes。
 
+为了进入 Stable Promotion Gate，人工标签还必须显式写 `label_source`：
+
+- `INDEPENDENT_HUMAN_REVIEW`：独立人工 reviewer 按本协议复核；
+- `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`：用户在成竹 Continue 里显式填写的本机自报；
+- 缺失/空值会被汇总为 `UNSPECIFIED`，可用于调试汇总，但 **永远不能满足 Stable Gate 的指标来源要求**。
+
+`reviewer` 是去重与审计标识，不是身份认证；即使填写真实姓名，也不能替代 authorized pilot manifest。
+
 运行：python scripts/v2_conversation_human_eval.py labels.jsonl --out report.json --markdown-out report.md
 
 从本地 dogfood 数据先生成“待人工标注 seed”：
@@ -72,6 +80,62 @@ cognitive_load_delta 建议使用 -2 到 +2：-2 明显降低，-1 略有降低�
 
 只做 Project Sync / Design Review。每个用户先积累 5–10 个真实 Session；每场对 shown guidance 与关键 silence 抽样标注；每场结束至少标一次 Continue；每个 Space 至少跨 3 场。第一阶段重点是找错误模式，而不是追求漂亮平均分。
 
+## 10.1 产品内 Pilot Evidence Bridge（beta.3 后）
+
+Conversation Continue 允许用户在会后显式填写本机反馈：
+
+- shown Guidance：`useful`、`interruption_regret`、`source_correct`；RECALL 额外允许 `recall_correct`；
+- SILENT / suppressed decision：`silence_correct`；
+- Continue：`writeback_accurate`；
+- Session Outcome：`cognitive_load_delta`、`would_reuse_space`。
+
+硬边界：
+
+1. 反馈写入 `conversation_human_feedback`，只保存在本机 product.db；当前没有远程 telemetry uploader；
+2. Product API 固定记录 `reviewer_kind=SELF_USER`，前端不能自称 `VERIFIED_EXTERNAL_USER`；
+3. Pin / Used / Dismissed / click-through 不会被自动转换成 useful / wrong / silence_correct；
+4. 产品内自报只能叫 `LOCAL_EXPLICIT_SELF_REPORT`，不能单独证明 reviewer 身份、授权真实 pilot 或 PMF；
+5. 原始 labels 与可能包含的 notes 仍按私人评估数据处理，不自动上传公开仓库或 CI artifact。
+
+导出产品内显式反馈：
+
+```bash
+python scripts/v2_conversation_feedback_export.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --out in-product-self-report.jsonl
+```
+
+与独立 reviewer 标签可以分文件聚合，避免手工拼接：
+
+```bash
+python scripts/v2_conversation_human_eval.py \
+  in-product-self-report.jsonl \
+  independent-review.jsonl \
+  --out human-report.json \
+  --markdown-out human-report.md
+```
+
+同一 reviewer / session / kind / event 即使跨文件重复也会被拒绝。
+
+### Prediction leakage 防线
+
+schema v10 起，AI_EXTRACTED Conversation Item 在创建时冻结不可变 `prediction_json`。Continue 的 CONFIRM / EDIT / REJECT / DONE / SUPERSEDE 只能修改当前 truth row，不得改写 prediction snapshot。
+
+因此 label seed 的 `predicted_type / predicted_state` 只允许来自：
+
+1. v10+ immutable prediction snapshot；或
+2. 历史 pre-v10 且仍处于 `AI_EXTRACTED`、尚未人工 review 的 row。
+
+若一个历史 item 已被 review、但没有原始 prediction snapshot，则：
+
+```text
+predicted_type = null
+predicted_state = null
+prediction_unavailable = true
+```
+
+宁可从 precision 分母中排除，也禁止把 post-review truth 倒灌成模型 prediction。Decision / Commitment state 的独立 reviewer 应标注“在该 prediction 时刻、按 Truth Boundary 应输出的类型/状态”，而不是事后拿最终长期状态倒推当时预测。
+
 ## 11. 状态升级边界
 
 human-label report 本身只证明存在人工标签；它不能验证 reviewer 是否是真实外部用户，也不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。
@@ -84,7 +148,7 @@ python scripts/v2_conversation_stable_readiness.py \
   real-pilot.json
 ```
 
-稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。即使全部通过，也只允许：
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。policy v2 起每个指标同时冻结 `allowed_label_sources`：用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源替代该指标所需证据。即使全部通过，也只允许：
 
 ```text
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE

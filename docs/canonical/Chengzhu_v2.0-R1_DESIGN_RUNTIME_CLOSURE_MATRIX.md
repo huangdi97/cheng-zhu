@@ -940,3 +940,54 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
 公开 Beta 已推进到 `v2.0.0-beta.3` prerelease；下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
+
+---
+
+## Pilot Evidence Bridge closure · 2026-10-11
+
+beta.3 公开后，下一阶段工程目标从“继续增加 Conversation 功能”切换为“可信地采集真实 pilot 证据”。当前源码 runtime 已新增以下闭环；它们尚未进入已发布 beta.3 二进制：
+
+```text
+PRODUCT_SCHEMA_VERSION = 10
+IMMUTABLE_AI_PREDICTION_SNAPSHOT = TRUE
+POST_REVIEW_LABEL_LEAKAGE_GUARD = TRUE
+LOCAL_EXPLICIT_SELF_REPORT = TRUE
+REMOTE_PILOT_TELEMETRY = OFF
+PIN_USED_DISMISS_AS_QUALITY_LABEL = FORBIDDEN
+MULTI_SOURCE_HUMAN_EVAL = TRUE
+LABEL_SOURCE_AWARE_STABLE_GATE = TRUE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+### Prediction truth
+
+AI_EXTRACTED Conversation Item 创建时冻结 `prediction_json`；后续 Continue CONFIRM / EDIT / REJECT / DONE / SUPERSEDE 只能改变当前 truth row，不能改写原始 prediction。pre-v10 已审核 row 若没有可恢复 prediction，则 label seed 输出 `prediction_unavailable=true`，不允许拿审核后的 type/state 冒充预测。
+
+### Explicit feedback truth
+
+Continue 会后面板可显式记录：
+
+- Guidance usefulness / interruption regret / source correctness / Recall correctness；
+- SILENT / suppression correctness；
+- Continue write-back accuracy；
+- cognitive-load delta；
+- same-Space reuse intent。
+
+这些 row 只写本机 `conversation_human_feedback`，Product API 固定 reviewer provenance 为 `SELF_USER`。它们不会从 Pin / Used / Dismissed 推断，不会自动上传，也不会自动改变 release maturity。
+
+### Stable evidence-source truth
+
+Stable Promotion Policy v2 对每个指标冻结可接受 `allowed_label_sources`。用户感知指标允许 `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`；Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。聚合总分、`UNSPECIFIED` labels 或大量 self-report 不能替代需要独立复核的指标。
+
+因此当前状态仍为：
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.3
+PILOT_EVIDENCE_CAPTURE_RUNTIME = SOURCE_READY_PENDING_RELEASE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+

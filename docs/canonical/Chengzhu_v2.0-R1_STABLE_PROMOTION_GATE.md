@@ -1,5 +1,5 @@
 # Chengzhu v2 Stable Promotion Evidence Gate
-## From public beta.2 to stable-review eligibility
+## From public beta.3 to stable-review eligibility
 
 **Status**: CANONICAL ACCEPTANCE POLICY  
 **Scope**: Project Sync + Design Review first  
@@ -9,7 +9,7 @@
 
 ## 1. Why a separate gate is required
 
-beta.2 already proves:
+beta.3 already proves:
 
 - public downloadable prerelease;
 - exact-SHA release provenance;
@@ -77,21 +77,21 @@ Synthetic, CI, mock and Dry Run sessions do not count.
 
 ## 4. Human-label thresholds
 
-| Metric | Gate | Minimum labeled n |
-| --- | ---: | ---: |
-| Opportunity Precision | >= 0.80 | 30 |
-| Interruption Regret | <= 0.15 | 30 |
-| Source Attribution Accuracy | >= 0.95 | 30 |
-| Recall Precision | >= 0.90 | 20 |
-| Useful Silence Rate | >= 0.80 | 30 |
-| Direct Question Precision | >= 0.90 | 20 |
-| Direct Question Recall | >= 0.85 | 20 |
-| Decision/Commitment State Precision | >= 0.90 | 30 |
-| Continue Write-back Accuracy | >= 0.95 | 20 |
-| Mean Cognitive Load Delta | <= -0.25 | 15 |
-| Space Reuse Intent Rate | >= 0.70 | 15 |
+| Metric | Gate | Minimum labeled n | Stable-eligible label source |
+| --- | ---: | ---: | --- |
+| Opportunity Precision | >= 0.80 | 30 | self-report or independent review |
+| Interruption Regret | <= 0.15 | 30 | local explicit self-report |
+| Source Attribution Accuracy | >= 0.95 | 30 | independent human review |
+| Recall Precision | >= 0.90 | 20 | independent human review |
+| Useful Silence Rate | >= 0.80 | 30 | self-report or independent review |
+| Direct Question Precision | >= 0.90 | 20 | independent human review |
+| Direct Question Recall | >= 0.85 | 20 | independent human review |
+| Decision/Commitment State Precision | >= 0.90 | 30 | independent human review |
+| Continue Write-back Accuracy | >= 0.95 | 20 | independent human review |
+| Mean Cognitive Load Delta | <= -0.25 | 15 | local explicit self-report |
+| Space Reuse Intent Rate | >= 0.70 | 15 | local explicit self-report |
 
-A metric below its sample floor is failure, not “N/A but okay”.
+A metric below its sample floor is failure, not “N/A but okay”. Sample size and threshold are computed only from that metric's frozen `allowed_label_sources`; `UNSPECIFIED` rows and disallowed sources are ignored for Stable promotion even when the overall aggregate looks good.
 
 Thresholds are frozen in:
 
@@ -116,6 +116,31 @@ Critical incidents must equal zero.
 This remains a local/user-operated attestation boundary; the script does not verify human identity.
 
 ---
+
+## 5.1 Pilot feedback evidence bridge
+
+beta.3 之后的源码 runtime 增加了本机显式 feedback bridge，但它只减少真实 pilot 的采集摩擦，不降低本 Gate 的独立证据要求：
+
+```text
+Continue self-report
+→ local conversation_human_feedback
+→ explicit feedback exporter
+→ human-eval aggregate
+```
+
+同时 AI_EXTRACTED item 在 schema v10 起冻结 immutable prediction snapshot，防止 Continue review 后的 state/type 被反向当成模型 prediction。
+
+以下仍然不成立：
+
+```text
+SELF_USER feedback row == verified external user
+USED / PINNED == useful
+DISMISSED == wrong
+reviewed final state == original prediction
+human-report == authorized real pilot manifest
+```
+
+Stable review 仍必须同时有 authorized pilot manifest、足够的独立 human labels、零 critical incident，并满足 frozen policy thresholds。
 
 ## 6. Tooling
 

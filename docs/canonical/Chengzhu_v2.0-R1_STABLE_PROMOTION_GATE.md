@@ -155,7 +155,7 @@ final transcript
 → human eval computes precision + recall
 ```
 
-Stable review accepts Direct Question Precision / Recall only from `INDEPENDENT_HUMAN_REVIEW`. A versioned snapshot with `eligible=false` is explicitly outside the metric population (for example AI assistance was forbidden); it is not an evaluation failure. A transcript without a capture-time versioned prediction is `prediction_unavailable` and contributes to neither metric.
+Stable review accepts Direct Question Precision / Recall only from `INDEPENDENT_HUMAN_REVIEW`. A versioned snapshot with `eligible=false` is explicitly outside the metric population (for example automatic transcript guidance was disabled by AI_LIMITED / AI_FORBIDDEN); it is not an evaluation failure. A transcript without a capture-time versioned prediction is `prediction_unavailable` and contributes to neither metric.
 
 The following are explicitly forbidden:
 

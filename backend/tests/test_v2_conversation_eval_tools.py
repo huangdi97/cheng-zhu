@@ -465,6 +465,26 @@ def test_label_seed_uses_frozen_direct_question_prediction_and_marks_legacy_unav
         "created_at": 2.0,
     })
     store.insert("conversation_transcript_segment", {
+        "id": "cts-dq-disabled",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "为什么这个 session 没启用 AI？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": False,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_FORBIDDEN",
+            },
+        },
+        "created_at": 2.5,
+    })
+    store.insert("conversation_transcript_segment", {
         "id": "cts-dq-legacy",
         "space_id": space["id"],
         "session_id": session["id"],
@@ -508,6 +528,7 @@ def test_label_seed_uses_frozen_direct_question_prediction_and_marks_legacy_unav
     assert by_id["cts-dq-false"]["prediction_unavailable"] is False
     assert by_id["cts-dq-legacy"]["predicted"] is None
     assert by_id["cts-dq-legacy"]["prediction_unavailable"] is True
+    assert "cts-dq-disabled" not in by_id
     assert "cts-self-mic" not in by_id
     assert by_id["cts-dq-true"]["actual"] is None
     assert by_id["cts-dq-true"]["reviewer"] == ""

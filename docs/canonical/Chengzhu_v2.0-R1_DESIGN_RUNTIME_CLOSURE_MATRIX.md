@@ -978,7 +978,7 @@ Continue 会后面板可显式记录：
 
 ### Stable evidence-source truth
 
-Stable Promotion Policy v2 对每个指标冻结可接受 `allowed_label_sources`。用户感知指标允许 `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`；Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。聚合总分、`UNSPECIFIED` labels 或大量 self-report 不能替代需要独立复核的指标。
+Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_sources` 与 metric population contract。用户感知指标允许 `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`；Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。聚合总分、`UNSPECIFIED` labels 或大量 self-report 不能替代需要独立复核的指标。
 
 因此当前状态仍为：
 
@@ -1061,3 +1061,52 @@ PMF_PROVEN = FALSE
 `retention_preview` 会分别显示 `dependent_human_feedback` 和 `orphan_human_feedback`。只有显式确认后才删除；不会为了评测永久保留已经按用户 retention 到期的 Guidance，也不会让失去目标事件的反馈继续冒充可审计证据。
 
 该修复不需要新的 schema migration；它修复的是 v10/v11 数据生命周期语义与本机 pilot evidence integrity。
+
+
+---
+
+## Auto-runtime Stable evidence closure · 2026-10-11
+
+继续审计 Pilot Evidence Bridge 后发现两个会污染真实 Stable Gate 的问题：
+
+1. pre-v12 的自动 transcript 路径只在“显示提示”时持久化 Guidance，多数“不提示”直接 `return None`，因此 Useful Silence 缺少真实自动运行分母；高级手工 Guidance Lab 反而会产生 SUPPRESSED event。
+2. `decision_commitment_state_precision` 旧聚合器把所有 truth item 都放进分母，OpenQuestion / Risk / Proposal 等非目标类会稀释 Decision / Commitment / Task precision。
+
+当前源码收口为：
+
+```text
+PRODUCT_SCHEMA_VERSION = 12
+GUIDANCE_ORIGIN_JSON = IMMUTABLE
+AUTO_RUNTIME_ORIGIN_KIND = TRANSCRIPT_AUTO
+AUTO_TURN_DECISION_EVIDENCE = SHOWN_OR_SILENT
+EXACT_TRANSCRIPT_SEGMENT_LINK = REQUIRED
+MANUAL_GUIDANCE_LAB_STABLE_ELIGIBLE = FALSE
+PRE_V12_GUIDANCE_RECLASSIFICATION = FORBIDDEN
+
+USEFUL_SILENCE_POPULATION = TRANSCRIPT_AUTO + ARBITER
+FORCED_SILENCE_STABLE_USEFUL_SILENCE = FALSE
+
+DECISION_COMMITMENT_PRECISION_PREDICTED_TYPES =
+  Decision + Commitment + Task
+OTHER_TRUTH_ITEM_DENOMINATOR_DILUTION = FORBIDDEN
+
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-3
+NUMERICAL_THRESHOLDS_CHANGED_FROM_V2 = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+真实 capture 链：
+
+```text
+final PRIMARY_AUDIO transcript
+→ transcript row
+→ exact auto Guidance decision
+→ origin {TRANSCRIPT_AUTO, transcript_segment_id, policy/mode, decision_class}
+→ local review queue / label seed
+→ allowed label source
+→ policy-v3 metric population
+→ Stable readiness
+```
+
+这次修改只修复证据来源与分母定义，不代表已经有真实用户证据。公开 `v2.0.0-beta.3` 仍不包含 schema v10/v11/v12 的 Pilot Evidence Bridge；进入真实 pilot 前应发布新的 prerelease candidate。

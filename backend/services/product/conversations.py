@@ -3835,6 +3835,17 @@ def _retention_candidates(space_id: str, policy: dict[str, Any], now_value: floa
             and str(row.get("target_id") or "") in expiring_guidance_ids
         )
     ]
+    # Repair pre-fix local databases that may already contain feedback whose
+    # Guidance target was deleted by an older retention run. Such rows cannot
+    # be evaluated or audited and should be previewed before explicit cleanup.
+    orphan_feedback_rows = store.rows(
+        "SELECT hf.* FROM conversation_human_feedback hf "
+        "LEFT JOIN conversation_guidance_event g "
+        "ON g.id = hf.target_id AND g.session_id = hf.session_id "
+        "WHERE hf.space_id = ? AND hf.kind IN ('GUIDANCE','SILENCE') AND g.id IS NULL "
+        "ORDER BY hf.created_at ASC",
+        (space_id,),
+    )
 
     # Drafts that already have an external execution audit are retained.  The
     # audit row is evidence of an attempted real-world side effect and must not
@@ -3868,6 +3879,9 @@ def _retention_candidates(space_id: str, policy: dict[str, Any], now_value: floa
     ]
     return {
         "transcript_segments": transcript_rows,
+        # Pre-fix orphan labels are a separate preview category so cleanup is
+        # visible rather than silently hidden inside another retention count.
+        "orphan_human_feedback": orphan_feedback_rows,
         # Guidance/Silence feedback has meaning only while its target Guidance
         # event exists. Delete it in the same confirmed retention transaction
         # boundary instead of leaving an orphan label that exporters must skip.
@@ -3915,6 +3929,7 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
 
     table_by_category = {
         "transcript_segments": "conversation_transcript_segment",
+        "orphan_human_feedback": "conversation_human_feedback",
         "dependent_human_feedback": "conversation_human_feedback",
         "guidance_events": "conversation_guidance_event",
         "draft_actions": "conversation_draft_action",
@@ -4257,6 +4272,12 @@ def diagnostics() -> dict[str, Any]:
     feedback_sessions = int(store.scalar(
         "SELECT COUNT(DISTINCT session_id) FROM conversation_human_feedback"
     ) or 0)
+    orphan_guidance_feedback = int(store.scalar(
+        "SELECT COUNT(*) FROM conversation_human_feedback hf "
+        "LEFT JOIN conversation_guidance_event g "
+        "ON g.id = hf.target_id AND g.session_id = hf.session_id "
+        "WHERE hf.kind IN ('GUIDANCE','SILENCE') AND g.id IS NULL"
+    ) or 0)
     duplicate_suppressed = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED' "
         "AND reason = 'DUPLICATE_GUIDANCE'"
@@ -4290,6 +4311,7 @@ def diagnostics() -> dict[str, Any]:
             "guidance_dismissed": dismissed_guidance,
             "explicit_human_feedback_rows": human_feedback,
             "sessions_with_explicit_feedback": feedback_sessions,
+            "orphan_guidance_feedback_rows": orphan_guidance_feedback,
             "duplicate_suppressed": duplicate_suppressed,
             "policy_suppressed": policy_suppressed,
         },
@@ -4331,6 +4353,7 @@ def diagnostics() -> dict[str, Any]:
             "capture": "AVAILABLE" if not capture["active"] else "IN_USE",
             "continuity": "AVAILABLE" if spaces > 0 else "LIMITED",
             "review_queue": "NEEDS_ACTION" if pending_items > 0 else "AVAILABLE",
+            "human_feedback_integrity": "NEEDS_RETENTION_CLEANUP" if orphan_guidance_feedback > 0 else "AVAILABLE",
             "session_pack_context": "AVAILABLE",
             "retrieval": "AVAILABLE",
             "state_engine": "AVAILABLE",

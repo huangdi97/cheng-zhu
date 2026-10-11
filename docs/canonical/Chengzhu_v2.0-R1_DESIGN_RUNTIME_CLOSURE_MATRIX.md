@@ -1005,7 +1005,8 @@ Pilot Evidence Bridge 继续审计后发现：Stable Promotion Policy 已要求 
 PRODUCT_SCHEMA_VERSION = 11
 DIRECT_QUESTION_DETECTOR_VERSION = heuristic-v1
 CAPTURE_TIME_DQ_PREDICTION_SNAPSHOT = TRUE
-PRIMARY_AUDIO_TRUE_AND_FALSE_PREDICTIONS = FROZEN
+PRIMARY_AUDIO_TRUE_AND_FALSE_PREDICTIONS = FROZEN_WHEN_RUNTIME_ELIGIBLE
+AI_FORBIDDEN_DQ_EVAL_ELIGIBLE = FALSE
 SELF_MIC_DQ_EVAL_ELIGIBLE = FALSE
 PRE_V11_RECLASSIFICATION = FORBIDDEN
 PRE_V11_MISSING_PREDICTION = prediction_unavailable
@@ -1019,7 +1020,7 @@ PMF_PROVEN = FALSE
 
 ```text
 final transcript
-→ analysis.direct_question {eligible,predicted,detector_version,channel}
+→ analysis.direct_question {eligible,predicted,detector_version,channel,ai_assistance}
 → immutable product.db row
 → v2_conversation_label_seed.py
 → independent reviewer actual

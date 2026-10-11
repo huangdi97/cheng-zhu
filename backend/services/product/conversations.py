@@ -3179,6 +3179,7 @@ def guidance_from_transcript(
     text: str,
     *,
     channel: str = "PRIMARY_AUDIO",
+    frozen_direct_question: Optional[dict[str, Any]] = None,
 ) -> Optional[dict[str, Any]]:
     """Conservative automatic guidance from a final Conversation ASR segment.
 
@@ -3200,11 +3201,27 @@ def guidance_from_transcript(
     state["current_topic"] = cleaned
     store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
-    direct_question = direct_question_prediction(
-        cleaned,
-        channel=channel,
-        ai_assistance=policy["ai_assistance"],
-    )
+    normalized_channel = str(channel or "PRIMARY_AUDIO").upper()
+    if frozen_direct_question is None:
+        direct_question = direct_question_prediction(
+            cleaned,
+            channel=normalized_channel,
+            ai_assistance=policy["ai_assistance"],
+        )
+    else:
+        direct_question = dict(frozen_direct_question)
+        frozen_valid = (
+            isinstance(direct_question.get("eligible"), bool)
+            and isinstance(direct_question.get("predicted"), bool)
+            and bool(str(direct_question.get("detector_version") or "").strip())
+            and str(direct_question.get("channel") or "").upper() == normalized_channel
+            and str(direct_question.get("ai_assistance") or "").upper() == policy["ai_assistance"]
+        )
+        if not frozen_valid:
+            # A capture path that cannot prove the exact detector decision must
+            # not silently recompute and then claim the new result was the one
+            # frozen with the transcript.
+            return None
     if not direct_question["eligible"]:
         return None
 
@@ -4167,10 +4184,9 @@ def diagnostics() -> dict[str, Any]:
     active_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ACTIVE'") or 0)
     ended_sessions = int(store.scalar("SELECT COUNT(*) FROM conversation_session WHERE status = 'ENDED'") or 0)
     transcripts = int(store.scalar("SELECT COUNT(*) FROM conversation_transcript_segment") or 0)
-    transcript_eval_rows = store.select(
-        "conversation_transcript_segment",
-        where="is_final = 1 AND UPPER(channel) != 'SELF_MIC'",
-        order="created_at ASC",
+    transcript_eval_rows = store.rows(
+        "SELECT analysis_json FROM conversation_transcript_segment "
+        "WHERE is_final = 1 AND UPPER(channel) != 'SELF_MIC' ORDER BY created_at ASC"
     )
     direct_question_prediction_available = 0
     direct_question_prediction_ineligible = 0

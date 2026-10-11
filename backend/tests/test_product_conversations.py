@@ -3434,6 +3434,12 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
     assert question_event["reason"] == "TRANSCRIPT_DIRECT_QUESTION"
     assert question_event["origin"]["decision_class"] == "SHOWN"
 
+    evidence_diag = conversations.diagnostics()["evaluation"]["auto_runtime_guidance_provenance"]
+    assert evidence_diag["auto_shown"] == 1
+    assert evidence_diag["auto_arbiter_silent"] == 1
+    assert evidence_diag["auto_forced_silent"] == 0
+    assert evidence_diag["stable_live_population"] == "TRANSCRIPT_AUTO_ONLY"
+
     conversation_capture.pause(session["id"])
     assert conversation_capture.status(session["id"])["paused"] is True
     conversation_capture.resume(session["id"])

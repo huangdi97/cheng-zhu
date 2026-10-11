@@ -3352,6 +3352,7 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
         "predicted": False,
         "detector_version": "heuristic-v1",
         "channel": "PRIMARY_AUDIO",
+        "ai_assistance": "AI_ALLOWED",
     }
 
     question = conversation_capture.record_transcription(
@@ -3362,6 +3363,14 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
     )
     assert question and question["analysis"]["direct_question"]["predicted"] is True
     assert question["analysis"]["direct_question"]["detector_version"] == "heuristic-v1"
+    blocked_prediction = conversations.direct_question_prediction(
+        "为什么之前选择 offline migration v2？",
+        channel="PRIMARY_AUDIO",
+        ai_assistance="AI_FORBIDDEN",
+    )
+    assert blocked_prediction["eligible"] is False
+    assert blocked_prediction["predicted"] is False
+    assert blocked_prediction["ai_assistance"] == "AI_FORBIDDEN"
 
     transcript = conversation_capture.transcript(session["id"])
     assert [segment["text"] for segment in transcript] == [
@@ -3605,6 +3614,26 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         "created_at": 1.0,
     })
     store.insert("conversation_transcript_segment", {
+        "id": "cts-diag-disabled",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "AI assistance disabled for this session row",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": False,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_FORBIDDEN",
+            },
+        },
+        "created_at": 2.0,
+    })
+    store.insert("conversation_transcript_segment", {
         "id": "cts-diag-legacy",
         "space_id": space["id"],
         "session_id": session["id"],
@@ -3614,7 +3643,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         "source": "SYSTEM_LOOPBACK",
         "is_final": True,
         "analysis": {},
-        "created_at": 2.0,
+        "created_at": 3.0,
     })
     diag = conversations.diagnostics()
     assert diag["schema_version"] == 11
@@ -3623,8 +3652,9 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
     assert diag["runtime"]["pending_review_items"] == 1
     dq = diag["evaluation"]["direct_question_prediction_provenance"]
     assert dq["detector_version"] == "heuristic-v1"
-    assert dq["eligible_final_transcript_rows"] == 2
-    assert dq["prediction_available"] == 1
+    assert dq["final_non_self_transcript_rows"] == 3
+    assert dq["evaluation_eligible"] == 1
+    assert dq["explicitly_ineligible"] == 1
     assert dq["prediction_unavailable"] == 1
     assert dq["historical_reclassification"] == "FORBIDDEN"
     assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"

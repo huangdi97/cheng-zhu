@@ -1,6 +1,6 @@
 {
-  "policy_version": "v2.0-R1-stable-promotion-2",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Metric thresholds are evaluated only from explicitly allowed human-label sources. This is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
+  "policy_version": "v2.0-R1-stable-promotion-3",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Thresholds are unchanged from policy v2, but metric populations are now bound to immutable runtime provenance so manual/dogfood events and forced silence cannot inflate Stable evidence. This is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -120,10 +120,59 @@
       "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
     ]
   },
-  "change_control": "Thresholds must be revised by an explicit design change before looking at a new pilot result; do not lower a threshold merely to make a failing pilot pass.",
+  "change_control": "Thresholds are unchanged from policy v2. Policy v3 is a pre-pilot population/provenance correction made before real pilot results are available: do not broaden populations, mix manual-lab events, count forced silence, or lower a threshold merely to make a failing pilot pass.",
   "label_source_policy": {
     "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT": "Explicit post-session labels entered in Chengzhu on the local device. Valid for user-perception/outcome measures only where a metric explicitly allows it; not verified identity proof.",
     "INDEPENDENT_HUMAN_REVIEW": "Explicit human review performed independently from the in-product self-report surface under the human-label protocol.",
     "UNSPECIFIED": "Never accepted for stable-promotion metric thresholds."
+  },
+  "metric_population_contract": {
+    "live_guidance_metrics": {
+      "applies_to": [
+        "opportunity_precision",
+        "interruption_regret",
+        "source_attribution_accuracy",
+        "recall_precision"
+      ],
+      "required_origin_kind": "TRANSCRIPT_AUTO",
+      "required_transcript_segment_id": true,
+      "excluded": [
+        "MANUAL_GUIDANCE_LAB",
+        "PRE_V12_UNCLASSIFIED_GUIDANCE"
+      ]
+    },
+    "useful_silence_rate": {
+      "required_origin_kind": "TRANSCRIPT_AUTO",
+      "required_decision_class": "ARBITER",
+      "excluded_decision_classes": [
+        "MODE_FORCED",
+        "PROFILE_FORCED",
+        "PROVENANCE_FORCED"
+      ],
+      "interpretation": "Measures whether the automatic Guidance Arbiter correctly chose not to interrupt; policy/profile/provenance hard blocks are audit evidence, not Useful Silence samples."
+    },
+    "decision_commitment_state_precision": {
+      "predicted_types": [
+        "Decision",
+        "Commitment",
+        "Task"
+      ],
+      "denominator": "Rows whose immutable predicted_type is Decision, Commitment, or Task and that have independent actual_type + actual_state labels.",
+      "correctness": "predicted_type == actual_type AND predicted_state == actual_state",
+      "excluded_predicted_types": [
+        "Deadline",
+        "Risk",
+        "Assumption",
+        "OpenQuestion",
+        "Proposal",
+        "Objection",
+        "Metric",
+        "Status"
+      ]
+    },
+    "direct_question": {
+      "source": "v11 capture-time conversation_transcript_segment.analysis.direct_question",
+      "historical_reclassification": "FORBIDDEN"
+    }
   }
 }

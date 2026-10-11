@@ -4,7 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from services.product import conversations
+from services.product import conversation_feedback, conversations
 from services.storage import product as store
 
 
@@ -215,3 +215,206 @@ def test_human_eval_cli_never_overwrites_its_labels(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         human_eval.main()
     assert not report.exists()
+
+
+def test_ai_candidate_prediction_snapshot_survives_review_mutation(product_env):
+    space = conversations.create_space("Prediction Freeze", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    item = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="采用 offline migration v2",
+        state="PROPOSED",
+        source_refs=[{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-1", "visibility": "PRIVATE"}],
+        confidence=0.87,
+        epistemic_status="INFERRED",
+        review_status="AI_EXTRACTED",
+    )
+    frozen = item["prediction"]
+    assert frozen["type"] == "Decision"
+    assert frozen["state"] == "PROPOSED"
+    assert frozen["title"] == "采用 offline migration v2"
+
+    reviewed = conversations.review_item(item["id"], "CONFIRM")
+    assert reviewed["state"] == "AGREED"
+    assert reviewed["review_status"] == "USER_CONFIRMED"
+    assert reviewed["prediction"] == frozen
+    assert reviewed["prediction"]["state"] == "PROPOSED"
+
+
+def test_label_seed_does_not_leak_reviewed_legacy_truth_into_prediction(product_env):
+    seed = _load("v2_label_seed_no_leakage", "scripts/v2_conversation_label_seed.py")
+    space = conversations.create_space("Legacy Seed", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    item = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="旧数据候选",
+        state="PROPOSED",
+        source_refs=[{"kind": "USER_NOTE", "visibility": "PRIVATE"}],
+    )
+    # Simulate a pre-v10 row: no immutable prediction snapshot existed yet.
+    store.update("conversation_item", item["id"], {"prediction": {}})
+    conversations.review_item(item["id"], "CONFIRM")
+    conversations.end_session(session["id"])
+
+    row = next(
+        value for value in seed.export_rows(Path(store.DB_PATH))
+        if value["kind"] == "truth_item" and value["event_id"] == item["id"]
+    )
+    assert row["predicted_type"] is None
+    assert row["predicted_state"] is None
+    assert row["prediction_unavailable"] is True
+
+
+def test_local_feedback_is_explicit_upsert_and_never_identity_proof(product_env):
+    import pytest
+
+    space = conversations.create_space("Pilot Feedback", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    shown = conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "补充 rollback owner",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "rollback owner 未定", "visibility": "PRIVATE"}],
+        "relevance": 1,
+        "novelty": 1,
+        "provenance_strength": 1,
+        "goal_relevance": 1,
+        "decision_impact": 1,
+    })["guidance"]
+    assert shown and shown["status"] == "SHOWN"
+
+    first = conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="GUIDANCE",
+        target_id=shown["id"],
+        labels={"useful": True, "interruption_regret": False, "source_correct": True},
+    )
+    second = conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="GUIDANCE",
+        target_id=shown["id"],
+        labels={"useful": False},
+    )
+    assert first["id"] == second["id"]
+    assert second["labels"]["useful"] is False
+    assert len(conversation_feedback.list_feedback(session["id"])) == 1
+
+    with pytest.raises(ValueError, match="recall_correct"):
+        conversation_feedback.upsert_feedback(
+            session["id"],
+            kind="GUIDANCE",
+            target_id=shown["id"],
+            labels={"recall_correct": True},
+        )
+    with pytest.raises(ValueError, match="Session 结束"):
+        conversation_feedback.upsert_feedback(
+            session["id"],
+            kind="SESSION_OUTCOME",
+            labels={"would_reuse_space": True},
+        )
+    with pytest.raises(ValueError, match="reviewer_kind"):
+        conversation_feedback.upsert_feedback(
+            session["id"],
+            kind="GUIDANCE",
+            target_id=shown["id"],
+            labels={"useful": True},
+            reviewer_kind="VERIFIED_EXTERNAL_USER",
+        )
+
+    conversations.end_session(session["id"])
+    outcome = conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="SESSION_OUTCOME",
+        labels={"cognitive_load_delta": -1, "would_reuse_space": True},
+    )
+    assert outcome["reviewer_kind"] == "SELF_USER"
+    queue = conversation_feedback.review_queue(session["id"])
+    assert queue["real_user_validated"] is False
+    assert queue["pmf_proven"] is False
+    assert queue["evidence_boundary"] == "LOCAL_EXPLICIT_SELF_REPORT_NOT_REAL_USER_IDENTITY_PROOF"
+
+
+def test_feedback_export_uses_only_explicit_rows_not_guidance_actions(product_env):
+    exporter = _load("v2_feedback_export", "scripts/v2_conversation_feedback_export.py")
+    space = conversations.create_space("Feedback Export", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    unlabeled = conversations.evaluate_guidance(session["id"], {
+        "direct_question": "状态如何？",
+    })["guidance"]
+    assert unlabeled
+    conversations.set_guidance_action(unlabeled["id"], "DISMISSED")
+
+    labeled = conversations.evaluate_guidance(session["id"], {
+        "candidate_text": "提醒已确认的风险",
+        "source_refs": [{"kind": "USER_NOTE", "excerpt": "risk", "visibility": "PRIVATE"}],
+        "relevance": 1,
+        "novelty": 1,
+        "provenance_strength": 1,
+        "goal_relevance": 1,
+        "decision_impact": 1,
+    })["guidance"]
+    assert labeled
+    conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="GUIDANCE",
+        target_id=labeled["id"],
+        labels={"useful": True, "source_correct": True},
+    )
+    conversations.end_session(session["id"])
+    conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="CONTINUE",
+        labels={"writeback_accurate": True},
+    )
+
+    rows = exporter.export_rows(Path(store.DB_PATH))
+    assert {row["event_id"] for row in rows if row["kind"] == "guidance"} == {labeled["id"]}
+    assert all(row["reviewer"] == "IN_PRODUCT_SELF_REPORT" for row in rows)
+    assert any(row["kind"] == "continue" and row["writeback_accurate"] is True for row in rows)
+
+
+def test_session_export_contains_local_feedback_but_keeps_claim_boundary(product_env):
+    space = conversations.create_space("Feedback Export Contract", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    conversations.end_session(session["id"])
+    feedback = conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="SESSION_OUTCOME",
+        labels={"cognitive_load_delta": 0, "would_reuse_space": False},
+    )
+    exported = conversations.export_session(session["id"])
+    assert "human_feedback" in exported["export_manifest"]["categories"]
+    assert [row["id"] for row in exported["human_feedback"]] == [feedback["id"]]
+    diagnostics = conversations.diagnostics()
+    assert diagnostics["runtime"]["explicit_human_feedback_rows"] >= 1
+    assert diagnostics["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
+    assert diagnostics["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
+
+
+def test_human_eval_global_dedup_spans_multiple_label_files(tmp_path):
+    import json
+    import pytest
+
+    human_eval = _load("v2_human_eval_multifile", "scripts/v2_conversation_human_eval.py")
+    row = {
+        "kind": "guidance",
+        "session_id": "cs_multi",
+        "event_id": "g_multi",
+        "reviewer": "IN_PRODUCT_SELF_REPORT",
+        "guidance_class": "PROACTIVE",
+        "useful": True,
+    }
+    first = tmp_path / "first.jsonl"
+    second = tmp_path / "second.jsonl"
+    first.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    second.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    seen = set()
+    assert len(human_eval.load_rows(first, seen=seen)) == 1
+    with pytest.raises(ValueError, match="duplicate label"):
+        human_eval.load_rows(second, seen=seen)

@@ -91,10 +91,39 @@ def evaluate(
             )
 
     metrics = human_report.get("metrics") or {}
+    metrics_by_source = human_report.get("metrics_by_label_source") or {}
     for name, rule in (policy.get("metrics") or {}).items():
-        entry = metrics.get(name) or {}
-        value = _finite_number(entry.get("value"))
-        n = entry.get("n")
+        allowed_sources = [str(value) for value in (rule.get("allowed_label_sources") or [])]
+        if allowed_sources:
+            source_entries: list[tuple[str, float, int]] = []
+            source_counts: dict[str, int] = {}
+            for source in allowed_sources:
+                entry = (metrics_by_source.get(source) or {}).get(name) or {}
+                source_value = _finite_number(entry.get("value"))
+                source_n = entry.get("n")
+                valid_n = int(source_n) if isinstance(source_n, int) and not isinstance(source_n, bool) and source_n > 0 else 0
+                source_counts[source] = valid_n
+                if source_value is not None and valid_n > 0:
+                    source_entries.append((source, source_value, valid_n))
+            n = sum(item[2] for item in source_entries)
+            value = (
+                sum(item[1] * item[2] for item in source_entries) / n
+                if n
+                else None
+            )
+            if value is not None:
+                value = round(value, 6)
+            add(
+                f"metric:{name}:label_source",
+                bool(source_entries),
+                actual=source_counts,
+                required=allowed_sources,
+                reason="Only explicitly allowed label sources count toward stable-promotion thresholds.",
+            )
+        else:
+            entry = metrics.get(name) or {}
+            value = _finite_number(entry.get("value"))
+            n = entry.get("n")
         min_n = int(rule.get("min_n") or 0)
         add(
             f"metric:{name}:sample_size",
@@ -141,8 +170,9 @@ def evaluate(
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "PASS only permits a stable-release review. Packaging/signing/release gates remain independent, "
-            "and this tool does not establish PMF or universal user value."
+            "PASS only permits a stable-release review. Each metric is evaluated only from the label sources "
+            "explicitly allowed by the frozen policy; in-product self-report cannot satisfy independent-review metrics. "
+            "Packaging/signing/release gates remain independent, and this tool does not establish PMF or universal user value."
         ),
     }
 

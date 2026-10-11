@@ -98,6 +98,12 @@ def test_local_markdown_rejects_target_escape_and_non_markdown_before_write(monk
     assert absolute["ok"] is False
     assert not (tmp_path / "outside.md").exists()
 
+    backslash = adapter.execute(target="Projects\\\\Alpha\\\\Decisions.md", **base)
+    assert backslash["ok"] is False
+    assert backslash["retry_safe"] is True
+    assert backslash["phase"] == "TARGET_VALIDATION_PRE_WRITE"
+    assert not (root / "Projects" / "Alpha" / "Decisions.md").exists()
+
     wrong_suffix = adapter.execute(target="Decisions.txt", **base)
     assert wrong_suffix["ok"] is False
     assert not (root / "Decisions.txt").exists()

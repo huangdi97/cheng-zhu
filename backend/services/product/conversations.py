@@ -3821,6 +3821,20 @@ def _retention_candidates(space_id: str, policy: dict[str, Any], now_value: floa
         "WHERE s.space_id = ? AND g.created_at <= ?",
         (space_id, guidance_cutoff),
     )
+    expiring_guidance_ids = {str(row.get("id") or "") for row in guidance_rows if row.get("id")}
+    dependent_feedback_rows = [
+        row
+        for row in store.select(
+            "conversation_human_feedback",
+            where="space_id = ?",
+            params=(space_id,),
+            order="created_at ASC",
+        )
+        if (
+            str(row.get("kind") or "") in {"GUIDANCE", "SILENCE"}
+            and str(row.get("target_id") or "") in expiring_guidance_ids
+        )
+    ]
 
     # Drafts that already have an external execution audit are retained.  The
     # audit row is evidence of an attempted real-world side effect and must not
@@ -3854,6 +3868,10 @@ def _retention_candidates(space_id: str, policy: dict[str, Any], now_value: floa
     ]
     return {
         "transcript_segments": transcript_rows,
+        # Guidance/Silence feedback has meaning only while its target Guidance
+        # event exists. Delete it in the same confirmed retention transaction
+        # boundary instead of leaving an orphan label that exporters must skip.
+        "dependent_human_feedback": dependent_feedback_rows,
         "guidance_events": guidance_rows,
         "draft_actions": draft_rows,
         "screen_context_observations": screen_rows,
@@ -3878,6 +3896,10 @@ def retention_preview(space_id: str, now: Optional[float] = None) -> dict[str, A
             "selected_connector_snapshots": "KEEP",
             "external_execution_audit": "KEEP",
             "drafts_with_external_execution_audit": "KEEP",
+            "session_level_human_feedback": "KEEP_UNTIL_SESSION_OR_SPACE_DELETE",
+        },
+        "dependent_cleanup": {
+            "guidance_or_silence_feedback": "DELETE_WITH_TARGET_GUIDANCE",
         },
         "destructive": any(counts.values()),
     }
@@ -3893,6 +3915,7 @@ def apply_retention(space_id: str, *, confirm: bool = False) -> dict[str, Any]:
 
     table_by_category = {
         "transcript_segments": "conversation_transcript_segment",
+        "dependent_human_feedback": "conversation_human_feedback",
         "guidance_events": "conversation_guidance_event",
         "draft_actions": "conversation_draft_action",
         "screen_context_observations": "conversation_screen_context",

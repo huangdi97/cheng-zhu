@@ -78,6 +78,16 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for raw in guidance:
             event = dict(raw)
+            origin = _json(event.get("origin_json"), {})
+            if (
+                not isinstance(origin, dict)
+                or origin.get("kind") != "TRANSCRIPT_AUTO"
+                or not str(origin.get("transcript_segment_id") or "").strip()
+            ):
+                # Stable live-guidance review is scoped to the real automatic
+                # transcript runtime. Manual Guidance Lab and pre-v12 events
+                # remain engineering history, not human-eval denominator rows.
+                continue
             session = session_map[event["session_id"]]
             base = {
                 "session_id": event["session_id"],
@@ -95,6 +105,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                     "text": event["text"],
                     "source_refs": _json(event["source_refs_json"], []),
                     "score": _json(event["score_json"], {}),
+                    "origin": origin,
                 },
                 "notes": "",
             }
@@ -109,6 +120,8 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                     "recall_correct": None if event["kind"] == "RECALL" else None,
                 })
             else:
+                if str(origin.get("decision_class") or "") != "ARBITER":
+                    continue
                 rows.append({
                     **base,
                     "kind": "silence",

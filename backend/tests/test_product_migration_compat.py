@@ -186,11 +186,11 @@ def test_upgrading_an_existing_product_db_snapshots_it_first(v122_env, monkeypat
     product_store.init_db()
     goal_id = goals.create_goal("MindRank", "AIDD Agent Engineer")["id"]
     assert goal_id
-    assert product_store.schema_version() == 11
+    assert product_store.schema_version() == 12
 
     # Simulate the next schema release: the shipped file is now one version
     # behind, which is the only situation where a pre-upgrade snapshot is owed.
-    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 12)
+    monkeypatch.setattr(product_store, "LATEST_SCHEMA_VERSION", 13)
     product_store._READY_PATHS.clear()
 
     product_store.init_db()
@@ -261,7 +261,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
 
         before = product_migrations.ensure_schema(conn)
         assert before == 7
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 12
 
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {
@@ -274,7 +274,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         assert "text" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
 
-        assert product_migrations.ensure_schema(conn) == 11
+        assert product_migrations.ensure_schema(conn) == 12
     finally:
         conn.close()
 
@@ -477,13 +477,73 @@ def test_v11_direct_question_provenance_migration_is_additive_over_v10():
         conn.close()
 
 
+def test_v12_guidance_origin_migration_is_additive_over_v11():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 12):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        conn.execute(
+            "INSERT INTO conversation_space "
+            "(id, title, profile, description, default_goal, default_mode, relationship_key, status, "
+            "selected_source_ids_json, selected_quick_note_ids_json, selected_connector_snapshot_ids_json, "
+            "retention_policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("space-v12", "Origin", "PROJECT_SYNC", "", "", "BALANCED", "", "ACTIVE",
+             "[]", "[]", "[]", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_session "
+            "(id, space_id, goal_ids_json, template, title, capture_mode, processing_mode, assistance_mode, "
+            "consent_ack, pack_id, status, state_json, source_calendar_event_json, policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("session-v12", "space-v12", "[]", "PROJECT_SYNC", "Origin", "TRANSCRIPT", "LOCAL",
+             "BALANCED", 1, "", "ENDED", "{}", "{}", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_guidance_event "
+            "(id, session_id, candidate_id, kind, expression_action, text, source_refs_json, status, reason, "
+            "score_json, user_action, rendered_at, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("ge-v11", "session-v12", "gc-v11", "RECALL", "RECALL", "legacy", "[]", "SHOWN",
+             "TRANSCRIPT_TOPIC_RECALL", "{}", "NONE", 1.0, 1.0),
+        )
+        conn.commit()
+
+        before = conn.execute(
+            "SELECT id, kind, reason, text FROM conversation_guidance_event WHERE id = 'ge-v11'"
+        ).fetchone()
+
+        apply_v12, _name = product_migrations._MIGRATIONS[12]
+        apply_v12(conn)
+        conn.execute("PRAGMA user_version = 12")
+        conn.commit()
+
+        after = conn.execute(
+            "SELECT id, kind, reason, text FROM conversation_guidance_event WHERE id = 'ge-v11'"
+        ).fetchone()
+        assert after == before
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_guidance_event)")}
+        assert "origin_json" in cols
+        assert conn.execute(
+            "SELECT origin_json FROM conversation_guidance_event WHERE id = 'ge-v11'"
+        ).fetchone()[0] == "{}"
+    finally:
+        conn.close()
+
+
 def test_deleting_product_db_is_a_complete_rollback(v122_env):
     from services.product import goals
     from services.storage import product as product_store
 
     seeded = _seed_v122()
     goals.backfill_from_legacy()
-    assert product_store.schema_version() == 11
+    assert product_store.schema_version() == 12
 
     # Rollback: drop the v1.3-owned file only. Nothing else is involved.
     product_store._READY_PATHS.clear()

@@ -41,7 +41,7 @@ def _connect_calendar_read_adapter(label: str = "Work Calendar"):
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 11
+    assert store.schema_version() == 12
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -3415,6 +3415,31 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
         "为什么之前选择 offline migration v2？",
     ]
 
+    history = conversations.guidance_history(session["id"], limit=10)
+    auto_events = [
+        event for event in history
+        if (event.get("origin") or {}).get("kind") == "TRANSCRIPT_AUTO"
+    ]
+    assert len(auto_events) == 2
+    by_segment = {
+        event["origin"]["transcript_segment_id"]: event
+        for event in auto_events
+    }
+    neutral_event = by_segment[row["id"]]
+    assert neutral_event["status"] == "SUPPRESSED"
+    assert neutral_event["reason"] == "TRANSCRIPT_NO_GROUNDED_OPPORTUNITY"
+    assert neutral_event["origin"]["decision_class"] == "ARBITER"
+    question_event = by_segment[question["id"]]
+    assert question_event["status"] == "SHOWN"
+    assert question_event["reason"] == "TRANSCRIPT_DIRECT_QUESTION"
+    assert question_event["origin"]["decision_class"] == "SHOWN"
+
+    evidence_diag = conversations.diagnostics()["evaluation"]["auto_runtime_guidance_provenance"]
+    assert evidence_diag["auto_shown"] == 1
+    assert evidence_diag["auto_arbiter_silent"] == 1
+    assert evidence_diag["auto_forced_silent"] == 0
+    assert evidence_diag["stable_live_population"] == "TRANSCRIPT_AUTO_ONLY"
+
     conversation_capture.pause(session["id"])
     assert conversation_capture.status(session["id"])["paused"] is True
     conversation_capture.resume(session["id"])
@@ -3683,7 +3708,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         "created_at": 3.0,
     })
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 11
+    assert diag["schema_version"] == 12
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

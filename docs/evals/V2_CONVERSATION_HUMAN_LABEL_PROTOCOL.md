@@ -54,6 +54,45 @@ recall_correct 仅用于 RECALL：对象正确、状态仍有效、没有被 sup
 
 silence_correct=true 表示这个时间窗口不主动打断是更好的动作；false 表示当时存在高价值、可溯源、时间敏感的信息且应该主动出现。
 
+schema v12 起，Useful Silence 的 Stable 样本只来自真实自动 transcript runtime 且 `origin.decision_class=ARBITER` 的 SILENT 决策。以下静默仍保留审计，但不进入 Useful Silence 分母：
+
+- `MODE_FORCED`：例如 Quiet mode 强制不主动提示；
+- `PROFILE_FORCED`：Profile 本身不允许该 Guidance lane；
+- `PROVENANCE_FORCED`：来源/visibility 不允许展示。
+
+这些是 policy/profile/provenance compliance，不是 Guidance Arbiter 对“此刻值不值得打断”的自由判断，混入分母会虚高 Useful Silence。
+
+## 4.1 v12 Auto-runtime Evidence Contract
+
+Stable 的实时 Guidance 人体评测只允许来自真实自动 TRANSCRIPT 主路径，不允许用高级手工 Guidance Lab 或 pre-v12 历史事件补样本。
+
+每个可评估的 final PRIMARY_AUDIO turn 在 v12 runtime 中必须留下：
+
+```text
+conversation_transcript_segment
+→ exactly one automatic decision evidence
+   ├─ SHOWN Guidance
+   └─ SILENT / SUPPRESSED Guidance
+→ origin = {
+     kind: TRANSCRIPT_AUTO,
+     transcript_segment_id,
+     channel,
+     ai_assistance,
+     assistance_mode,
+     decision_class
+   }
+```
+
+Stable live-guidance population 要求：
+
+- `origin.kind = TRANSCRIPT_AUTO`；
+- `origin.transcript_segment_id` 非空；
+- Opportunity / Interruption / Source Attribution / Recall 使用自动 SHOWN Guidance；
+- Useful Silence 进一步要求 `decision_class = ARBITER`；
+- manual Guidance Lab、没有 v12 origin 的历史 Guidance、forced silence 不进入这些指标分母。
+
+pre-v12 历史事件不得根据 `reason=TRANSCRIPT_*` 事后回填 origin；历史样本身份必须保持不可重建，避免评测口径随代码演进漂移。
+
 ## 5. direct_question
 
 `predicted` 与 `actual` 均为 bool。actual=true 表示当前说话者确实向用户提出需要回应的问题。不要把修辞问题、自问自答或口头语自动算 direct question。
@@ -96,6 +135,8 @@ Direct Question 指标只有在存在 final transcript 时才有可复核样本�
 ## 6. truth_item
 
 需要 predicted_type / actual_type / predicted_state / actual_state。重点检查 Proposal 是否误判 Decision、能力表态是否误判 Commitment、owner 是否凭空变成 me、Deadline 是否有明确来源、supersession 是否正确、OpenQuestion 是否真的未解决。
+
+`decision_commitment_state_precision` 的分母不是所有 truth item，而是模型 **预测为** `Decision / Commitment / Task` 的 row。Task 在产品真值模型中与 Commitment 共用 COMMITTED/owner 约束，因此属于该指标目标类。预测为 OpenQuestion / Risk / Proposal / Deadline 等 row 不得用来稀释这个 precision 分母；若模型把 Proposal 错预测成 Decision，则 predicted_type=Decision，仍然必须进入分母并计错。
 
 ## 7. continue
 
@@ -210,7 +251,7 @@ python scripts/v2_conversation_stable_readiness.py \
   real-pilot.json
 ```
 
-稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。policy v2 起每个指标同时冻结 `allowed_label_sources`：用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源替代该指标所需证据。即使全部通过，也只允许：
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。policy v3 同时冻结 `allowed_label_sources` 与 metric population contract：用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源替代该指标所需证据。即使全部通过，也只允许：
 
 ```text
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE

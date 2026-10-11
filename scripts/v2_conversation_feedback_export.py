@@ -88,6 +88,17 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                     # become evaluation evidence without its source event.
                     continue
                 event = dict(event)
+                origin = _json(event.get("origin_json"), {})
+                if (
+                    not isinstance(origin, dict)
+                    or origin.get("kind") != "TRANSCRIPT_AUTO"
+                    or not str(origin.get("transcript_segment_id") or "").strip()
+                ):
+                    # Pre-v12/manual-lab feedback stays local history but cannot
+                    # enter Stable live-guidance metric populations.
+                    continue
+                if kind == "SILENCE" and str(origin.get("decision_class") or "") != "ARBITER":
+                    continue
                 if kind == "GUIDANCE":
                     row = {
                         **base,
@@ -102,6 +113,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                             "expression_action": event.get("expression_action"),
                             "reason": event.get("reason"),
                             "status": event.get("status"),
+                            "origin": origin,
                         },
                     }
                 else:
@@ -114,6 +126,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                             "expression_action": event.get("expression_action"),
                             "reason": event.get("reason"),
                             "status": event.get("status"),
+                            "origin": origin,
                         },
                     }
                 rows.append(row)

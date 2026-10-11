@@ -11,6 +11,20 @@ from services.storage import product as store
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def _auto_system(segment_id: str, decision_class: str = "SHOWN") -> dict:
+    return {
+        "origin": {
+            "kind": "TRANSCRIPT_AUTO",
+            "runtime": "AUTOMATIC_TRANSCRIPT_GUIDANCE",
+            "transcript_segment_id": segment_id,
+            "channel": "PRIMARY_AUDIO",
+            "ai_assistance": "AI_ALLOWED",
+            "assistance_mode": "BALANCED",
+            "decision_class": decision_class,
+        }
+    }
+
+
 def _load(name: str, rel: str):
     spec = importlib.util.spec_from_file_location(name, ROOT / rel)
     assert spec and spec.loader
@@ -50,6 +64,7 @@ def test_human_eval_uses_only_explicit_human_labels():
             "useful": True,
             "interruption_regret": False,
             "source_correct": True,
+            "system": _auto_system("seg-guidance-1"),
         },
         {
             "kind": "guidance",
@@ -59,12 +74,14 @@ def test_human_eval_uses_only_explicit_human_labels():
             "useful": False,
             "interruption_regret": True,
             "source_correct": False,
+            "system": _auto_system("seg-guidance-2"),
         },
         {
             "kind": "silence",
             "session_id": "cs_1",
             "reviewer": "reviewer",
             "silence_correct": True,
+            "system": _auto_system("seg-silence-1", "ARBITER"),
         },
         {
             "kind": "direct_question",
@@ -90,11 +107,41 @@ def test_label_seed_is_unlabeled_review_queue(product_env, tmp_path):
     space = conversations.create_space("Dogfood Seed", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True)
     conversations.start_session(session["id"])
-    shown = conversations.evaluate_guidance(session["id"], {
-        "direct_question": "为什么？",
-        "source_refs": [{"kind": "USER_NOTE", "excerpt": "source", "visibility": "PRIVATE"}],
-    })["guidance"]
-    assert shown
+    segment_id = "cts-seed-auto"
+    store.insert("conversation_transcript_segment", {
+        "id": segment_id,
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "为什么？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": True,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_ALLOWED",
+            },
+        },
+        "created_at": store.now(),
+    })
+    shown = conversations.guidance_from_transcript(
+        session["id"],
+        "为什么？",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question={
+            "eligible": True,
+            "predicted": True,
+            "detector_version": "heuristic-v1",
+            "channel": "PRIMARY_AUDIO",
+            "ai_assistance": "AI_ALLOWED",
+        },
+        transcript_segment_id=segment_id,
+    )
+    assert shown and shown["origin"]["kind"] == "TRANSCRIPT_AUTO"
     conversations.add_item(
         session["id"],
         item_type="OpenQuestion",
@@ -349,16 +396,41 @@ def test_feedback_export_uses_only_explicit_rows_not_guidance_actions(product_en
     assert unlabeled
     conversations.set_guidance_action(unlabeled["id"], "DISMISSED")
 
-    labeled = conversations.evaluate_guidance(session["id"], {
-        "candidate_text": "提醒已确认的风险",
-        "source_refs": [{"kind": "USER_NOTE", "excerpt": "risk", "visibility": "PRIVATE"}],
-        "relevance": 1,
-        "novelty": 1,
-        "provenance_strength": 1,
-        "goal_relevance": 1,
-        "decision_impact": 1,
-    })["guidance"]
-    assert labeled
+    segment_id = "cts-feedback-auto"
+    store.insert("conversation_transcript_segment", {
+        "id": segment_id,
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "状态如何？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": True,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_ALLOWED",
+            },
+        },
+        "created_at": store.now(),
+    })
+    labeled = conversations.guidance_from_transcript(
+        session["id"],
+        "状态如何？",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question={
+            "eligible": True,
+            "predicted": True,
+            "detector_version": "heuristic-v1",
+            "channel": "PRIMARY_AUDIO",
+            "ai_assistance": "AI_ALLOWED",
+        },
+        transcript_segment_id=segment_id,
+    )
+    assert labeled and labeled["origin"]["transcript_segment_id"] == segment_id
     conversation_feedback.upsert_feedback(
         session["id"],
         kind="GUIDANCE",
@@ -418,6 +490,119 @@ def test_human_eval_global_dedup_spans_multiple_label_files(tmp_path):
     assert len(human_eval.load_rows(first, seen=seen)) == 1
     with pytest.raises(ValueError, match="duplicate label"):
         human_eval.load_rows(second, seen=seen)
+
+
+def test_human_eval_excludes_manual_and_forced_silence_from_stable_live_populations():
+    human_eval = _load("v2_human_eval_runtime_population", "scripts/v2_conversation_human_eval.py")
+    rows = [
+        {
+            "kind": "guidance", "session_id": "s", "reviewer": "r",
+            "guidance_class": "PROACTIVE", "useful": True, "interruption_regret": False,
+            "source_correct": True, "system": _auto_system("seg-auto"),
+        },
+        {
+            "kind": "guidance", "session_id": "s", "reviewer": "r",
+            "guidance_class": "PROACTIVE", "useful": False, "interruption_regret": True,
+            "source_correct": False, "system": {},
+        },
+        {
+            "kind": "silence", "session_id": "s", "reviewer": "r",
+            "silence_correct": True, "system": _auto_system("seg-arbiter", "ARBITER"),
+        },
+        {
+            "kind": "silence", "session_id": "s", "reviewer": "r",
+            "silence_correct": True, "system": _auto_system("seg-quiet", "MODE_FORCED"),
+        },
+    ]
+    report = human_eval.aggregate(rows)
+    assert report["metrics"]["opportunity_precision"] == {"value": 1.0, "n": 1}
+    assert report["metrics"]["interruption_regret"] == {"value": 0.0, "n": 1}
+    assert report["metrics"]["source_attribution_accuracy"] == {"value": 1.0, "n": 1}
+    assert report["metrics"]["useful_silence_rate"] == {"value": 1.0, "n": 1}
+    assert report["metric_population"]["excluded_non_auto_guidance_rows"] == 1
+    assert report["metric_population"]["excluded_non_arbiter_or_non_auto_silence_rows"] == 1
+
+
+def test_human_eval_decision_commitment_precision_uses_only_predicted_target_classes():
+    human_eval = _load("v2_human_eval_truth_population", "scripts/v2_conversation_human_eval.py")
+    rows = [
+        {
+            "kind": "truth_item", "session_id": "s", "reviewer": "r", "event_id": "d1",
+            "predicted_type": "Decision", "predicted_state": "PROPOSED",
+            "actual_type": "Decision", "actual_state": "PROPOSED",
+        },
+        {
+            "kind": "truth_item", "session_id": "s", "reviewer": "r", "event_id": "c1",
+            "predicted_type": "Commitment", "predicted_state": "PROPOSED",
+            "actual_type": "Commitment", "actual_state": "COMMITTED",
+        },
+        {
+            "kind": "truth_item", "session_id": "s", "reviewer": "r", "event_id": "t1",
+            "predicted_type": "Task", "predicted_state": "PROPOSED",
+            "actual_type": "Task", "actual_state": "PROPOSED",
+        },
+        {
+            "kind": "truth_item", "session_id": "s", "reviewer": "r", "event_id": "q1",
+            "predicted_type": "OpenQuestion", "predicted_state": "PROPOSED",
+            "actual_type": "OpenQuestion", "actual_state": "PROPOSED",
+        },
+        {
+            "kind": "truth_item", "session_id": "s", "reviewer": "r", "event_id": "r1",
+            "predicted_type": "Risk", "predicted_state": "PROPOSED",
+            "actual_type": "Risk", "actual_state": "PROPOSED",
+        },
+    ]
+    report = human_eval.aggregate(rows)
+    assert report["metrics"]["decision_commitment_state_precision"] == {"value": 0.666667, "n": 3}
+    assert report["metric_population"]["decision_commitment_task_predicted_rows"] == 3
+    assert report["metric_population"]["excluded_other_truth_item_rows"] == 2
+
+
+def test_feedback_review_queue_excludes_manual_and_forced_silence(product_env):
+    space = conversations.create_space("Runtime Feedback Queue", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    manual = conversations.evaluate_guidance(session["id"], {"direct_question": "manual?"})["guidance"]
+    assert manual and not manual.get("origin")
+
+    auto = conversations._persist_guidance(
+        session["id"],
+        kind="CONTRIBUTION_OPPORTUNITY",
+        action="ADD_TALKING_POINT",
+        text="auto",
+        source_refs=[],
+        status="SHOWN",
+        reason="TRANSCRIPT_SOURCE_OPPORTUNITY",
+        origin=_auto_system("seg-auto")["origin"],
+    )
+    arbiter_silent = conversations._persist_guidance(
+        session["id"],
+        kind="RECALL",
+        action="SILENT",
+        text="",
+        source_refs=[],
+        status="SUPPRESSED",
+        reason="TRANSCRIPT_NO_GROUNDED_OPPORTUNITY",
+        origin=_auto_system("seg-silent", "ARBITER")["origin"],
+    )
+    forced_silent = conversations._persist_guidance(
+        session["id"],
+        kind="RECALL",
+        action="SILENT",
+        text="",
+        source_refs=[],
+        status="SUPPRESSED",
+        reason="TRANSCRIPT_MODE_QUIET",
+        origin=_auto_system("seg-forced", "MODE_FORCED")["origin"],
+    )
+
+    queue = conversation_feedback.review_queue(session["id"])
+    assert [entry["event"]["id"] for entry in queue["guidance"]] == [auto["id"]]
+    assert [entry["event"]["id"] for entry in queue["silence"]] == [arbiter_silent["id"]]
+    flat = repr(queue)
+    assert manual["id"] not in flat
+    assert forced_silent["id"] not in flat
 
 
 def test_label_seed_uses_frozen_direct_question_prediction_and_marks_legacy_unavailable(product_env):

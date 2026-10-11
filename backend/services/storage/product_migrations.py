@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 11
+LATEST_SCHEMA_VERSION = 12
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -826,6 +826,21 @@ def _apply_v11(conn: sqlite3.Connection) -> None:
         )
 
 
+# --- v2.0 real-pilot evidence: immutable Guidance runtime origin provenance ---
+# Stable human-eval must distinguish automatic transcript runtime decisions from
+# the advanced/manual Guidance lab. Historical events without origin stay
+# unclassified rather than being reconstructed from reason strings.
+def _apply_v12(conn: sqlite3.Connection) -> None:
+    guidance_cols = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_guidance_event)").fetchall()
+    }
+    if "origin_json" not in guidance_cols:
+        conn.execute(
+            "ALTER TABLE conversation_guidance_event "
+            "ADD COLUMN origin_json TEXT NOT NULL DEFAULT '{}'"
+        )
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -843,6 +858,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     9: (_apply_v9, "v2.0 Space-scoped immutable connector snapshot provenance"),
     10: (_apply_v10, "v2.0 immutable AI prediction snapshots and local pilot human feedback"),
     11: (_apply_v11, "v2.0 immutable direct-question transcript prediction provenance"),
+    12: (_apply_v12, "v2.0 immutable Guidance auto-runtime origin provenance"),
 }
 
 

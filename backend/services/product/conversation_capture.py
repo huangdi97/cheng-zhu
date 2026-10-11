@@ -252,6 +252,7 @@ def record_transcription(
         cleaned,
         channel=normalized_channel,
         frozen_direct_question=row["analysis"]["direct_question"],
+        transcript_segment_id=row["id"],
     )
     try:
         from api.realtime.ws import broadcast

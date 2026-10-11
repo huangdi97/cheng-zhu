@@ -553,7 +553,8 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
                 <span>Frozen external snapshots · {liveContext.data.connector_snapshots?.length ?? 0}</span>
                 <span>Inference · {liveContext.data.processing_runtime.data_path?.inference ?? '—'}</span>
                 <span>Retention · {liveContext.data.processing_runtime.data_path?.retention ?? '—'}</span>
-                <span>Write-back · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
+                <span>Reviewed draft · {liveContext.data.processing_runtime.data_path?.writeback ?? '—'}</span>
+                <span>External execution · {liveContext.data.processing_runtime.data_path?.external_execution ?? '—'}</span>
                 <span>Screen · {liveContext.data.screen_runtime?.mode === 'MANUAL' ? `${liveContext.data.screen_runtime.route ?? '—'} / ${liveContext.data.screen_runtime.model_id || liveContext.data.screen_runtime.model_name || 'vision'}` : liveContext.data.screen_runtime?.mode ?? 'OFF'}</span>
                 <span>Raw screen image · {liveContext.data.screen_runtime?.raw_image_persisted ? 'PERSISTED' : 'NOT STORED'}</span>
               </div>

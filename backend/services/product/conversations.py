@@ -3122,6 +3122,9 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return {"guidance": None, "suppressed": reason, "event": event}
 
 
+DIRECT_QUESTION_DETECTOR_VERSION = "heuristic-v1"
+
+
 def _looks_like_direct_question(text: str) -> bool:
     normalized = str(text or "").strip().lower()
     if not normalized:
@@ -3140,6 +3143,26 @@ def _looks_like_direct_question(text: str) -> bool:
         "can you ", "could you ", "do you ", "did you ", "is there ", "are there ",
     )
     return any(marker in head for marker in zh_markers) or any(head.startswith(marker) for marker in en_markers)
+
+
+def direct_question_prediction(
+    text: str,
+    *,
+    channel: str = "PRIMARY_AUDIO",
+) -> dict[str, Any]:
+    """Return the detector decision that must be frozen with a final transcript.
+
+    The version string is part of evaluation provenance. Historical rows must
+    never be reclassified by a newer detector during label export.
+    """
+    normalized_channel = str(channel or "PRIMARY_AUDIO").upper()
+    eligible = normalized_channel != "SELF_MIC"
+    return {
+        "eligible": eligible,
+        "predicted": bool(eligible and _looks_like_direct_question(text)),
+        "detector_version": DIRECT_QUESTION_DETECTOR_VERSION,
+        "channel": normalized_channel,
+    }
 
 
 def guidance_from_transcript(
@@ -3168,13 +3191,14 @@ def guidance_from_transcript(
     state["current_topic"] = cleaned
     store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
-    if str(channel or "").upper() == "SELF_MIC":
+    direct_question = direct_question_prediction(cleaned, channel=channel)
+    if not direct_question["eligible"]:
         return None
 
     # Direct questions are first-class and remain allowed in Quiet mode. Use
     # only pre-existing/frozen context as the answer cue source; the just-saved
     # transcript question itself is not an answer.
-    if _looks_like_direct_question(cleaned):
+    if direct_question["predicted"]:
         result = ask(session_id, cleaned)
         useful = next(
             (

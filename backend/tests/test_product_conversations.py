@@ -3347,7 +3347,27 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
         source="SYSTEM_LOOPBACK",
     )
     assert row and row["session_id"] == session["id"] and row["channel"] == "PRIMARY_AUDIO"
-    assert conversation_capture.transcript(session["id"])[0]["text"] == "offline migration 继续使用 v2"
+    assert row["analysis"]["direct_question"] == {
+        "eligible": True,
+        "predicted": False,
+        "detector_version": "heuristic-v1",
+        "channel": "PRIMARY_AUDIO",
+    }
+
+    question = conversation_capture.record_transcription(
+        "为什么之前选择 offline migration v2？",
+        channel="PRIMARY_AUDIO",
+        provider="whisper",
+        source="SYSTEM_LOOPBACK",
+    )
+    assert question and question["analysis"]["direct_question"]["predicted"] is True
+    assert question["analysis"]["direct_question"]["detector_version"] == "heuristic-v1"
+
+    transcript = conversation_capture.transcript(session["id"])
+    assert [segment["text"] for segment in transcript] == [
+        "offline migration 继续使用 v2",
+        "为什么之前选择 offline migration v2？",
+    ]
 
     conversation_capture.pause(session["id"])
     assert conversation_capture.status(session["id"])["paused"] is True

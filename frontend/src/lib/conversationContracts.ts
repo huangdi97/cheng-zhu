@@ -261,6 +261,15 @@ export interface ConversationGuidance {
   status: 'SHOWN' | 'SUPPRESSED'
   reason: string
   score: Record<string, number>
+  origin: {
+    kind?: 'TRANSCRIPT_AUTO' | string
+    runtime?: string
+    transcript_segment_id?: string
+    channel?: string
+    ai_assistance?: string
+    assistance_mode?: string
+    decision_class?: 'SHOWN' | 'ARBITER' | 'MODE_FORCED' | 'PROFILE_FORCED' | 'PROVENANCE_FORCED' | string
+  }
   user_action: string
   rendered_at: number | null
   expression_plan: ConversationExpressionPlan

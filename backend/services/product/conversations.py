@@ -3149,19 +3149,28 @@ def direct_question_prediction(
     text: str,
     *,
     channel: str = "PRIMARY_AUDIO",
+    ai_assistance: str = "AI_ALLOWED",
 ) -> dict[str, Any]:
     """Return the detector decision that must be frozen with a final transcript.
 
-    The version string is part of evaluation provenance. Historical rows must
+    Eligibility reflects the runtime policy that existed at capture time. A
+    PRIMARY_AUDIO row from an AI_FORBIDDEN session must not enter detector
+    precision/recall merely because the text could be classified offline.
+    The version string is part of evaluation provenance; historical rows must
     never be reclassified by a newer detector during label export.
     """
     normalized_channel = str(channel or "PRIMARY_AUDIO").upper()
-    eligible = normalized_channel != "SELF_MIC"
+    normalized_policy = str(ai_assistance or "").upper()
+    eligible = (
+        normalized_channel != "SELF_MIC"
+        and normalized_policy in {"AI_ALLOWED", "AI_EXPECTED"}
+    )
     return {
         "eligible": eligible,
         "predicted": bool(eligible and _looks_like_direct_question(text)),
         "detector_version": DIRECT_QUESTION_DETECTOR_VERSION,
         "channel": normalized_channel,
+        "ai_assistance": normalized_policy,
     }
 
 
@@ -3191,7 +3200,11 @@ def guidance_from_transcript(
     state["current_topic"] = cleaned
     store.update("conversation_session", session_id, {"state": state, "updated_at": store.now()})
 
-    direct_question = direct_question_prediction(cleaned, channel=channel)
+    direct_question = direct_question_prediction(
+        cleaned,
+        channel=channel,
+        ai_assistance=policy["ai_assistance"],
+    )
     if not direct_question["eligible"]:
         return None
 

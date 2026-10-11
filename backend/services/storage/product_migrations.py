@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 9
+LATEST_SCHEMA_VERSION = 10
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -773,6 +773,44 @@ def _apply_v9(conn: sqlite3.Connection) -> None:
     )
 
 
+# --- v2.0 pilot evidence bridge: immutable AI prediction + local human feedback ---
+# The prediction snapshot prevents post-review truth from leaking back into
+# evaluation as if it were the model's original prediction. Feedback is local
+# product evidence only; reviewer_kind is a provenance category, not identity
+# proof and never upgrades REAL_USER_VALIDATED on its own.
+_V10_TABLES: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS conversation_human_feedback (
+        id TEXT PRIMARY KEY,
+        space_id TEXT NOT NULL REFERENCES conversation_space(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL REFERENCES conversation_session(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        target_id TEXT NOT NULL DEFAULT '',
+        reviewer_kind TEXT NOT NULL DEFAULT 'SELF_USER',
+        labels_json TEXT NOT NULL DEFAULT '{}',
+        note TEXT NOT NULL DEFAULT '',
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL,
+        UNIQUE(session_id, kind, target_id, reviewer_kind)
+    )
+    """,
+)
+
+_V10_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_conversation_feedback_session ON conversation_human_feedback(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversation_feedback_space ON conversation_human_feedback(space_id, created_at)",
+)
+
+
+def _apply_v10(conn: sqlite3.Connection) -> None:
+    item_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_item)").fetchall()}
+    if "prediction_json" not in item_cols:
+        conn.execute(
+            "ALTER TABLE conversation_item ADD COLUMN prediction_json TEXT NOT NULL DEFAULT '{}'"
+        )
+    _apply_statements(conn, _V10_TABLES + _V10_INDEXES)
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -788,6 +826,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     7: (lambda conn: _apply_statements(conn, _V7_TABLES + _V7_INDEXES), "v2.0 manual Conversation screen context observations"),
     8: (_apply_v8, "v2.0 external connector snapshots and reviewed execution audit"),
     9: (_apply_v9, "v2.0 Space-scoped immutable connector snapshot provenance"),
+    10: (_apply_v10, "v2.0 immutable AI prediction snapshots and local pilot human feedback"),
 }
 
 

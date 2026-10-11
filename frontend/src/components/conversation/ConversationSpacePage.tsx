@@ -441,7 +441,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
   const applyRetention = async () => {
     if (!retention.data) return
     const counts = retention.data.would_delete
-    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、draft ${counts.draft_actions}、未选 external snapshot ${counts.connector_snapshots ?? 0}；已确认事项、已选 snapshot、execution audit 与 provenance 不删除。`)) return
+    if (!window.confirm(`按当前策略清理本地数据？将删除 transcript ${counts.transcript_segments}、guidance ${counts.guidance_events}、依附 Guidance/SILENCE 的反馈 ${counts.dependent_human_feedback ?? 0}、历史孤儿反馈 ${counts.orphan_human_feedback ?? 0}、draft ${counts.draft_actions}、未选 external snapshot ${counts.connector_snapshots ?? 0}；已确认事项、Session Pack、会话级 Continue/Outcome feedback、已选 snapshot、execution audit 与 provenance 不删除。`)) return
     setSessionBusy(true); setSessionError(''); setLifecycleMessage('')
     try {
       const result = await conversationApi.applyRetention(spaceId, true)
@@ -965,8 +965,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
               <SecondaryButton disabled={sessionBusy} onClick={() => setRetentionPreset('STANDARD')}>Standard</SecondaryButton>
             </div>
             {retention.loading ? <div className="mt-2"><Loading /></div> : retention.data ? <div className="mt-3 rounded-xl bg-bg-secondary/40 p-3">
-              <p className="text-xs text-text-primary">当前策略若现在执行：transcript {retention.data.would_delete.transcript_segments} · guidance {retention.data.would_delete.guidance_events} · draft {retention.data.would_delete.draft_actions}</p>
-              <p className="mt-1 text-[11px] text-text-muted">已确认事项、Session Pack 与 provenance tombstone 始终保留；原始音频当前默认不长期保存。</p>
+              <p className="text-xs text-text-primary">当前策略若现在执行：transcript {retention.data.would_delete.transcript_segments} · guidance {retention.data.would_delete.guidance_events} · 依附反馈 {retention.data.would_delete.dependent_human_feedback ?? 0} · 历史孤儿反馈 {retention.data.would_delete.orphan_human_feedback ?? 0} · draft {retention.data.would_delete.draft_actions}</p>
+              <p className="mt-1 text-[11px] text-text-muted">Guidance/SILENCE 反馈会随目标 Guidance 一起清理，避免留下不可审计孤儿证据；Continue/Session Outcome 会话级反馈不会因单条 Guidance 到期而删除。已确认事项、Session Pack 与 provenance tombstone 保留；原始音频当前默认不长期保存。</p>
               <div className="mt-3"><SecondaryButton disabled={sessionBusy || !retention.data.destructive} onClick={applyRetention}>预览后执行本地清理</SecondaryButton></div>
             </div> : null}
           </Section>

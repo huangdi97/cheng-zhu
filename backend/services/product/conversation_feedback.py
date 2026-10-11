@@ -139,13 +139,15 @@ def upsert_feedback(
     if kind in {"CONTINUE", "SESSION_OUTCOME"}:
         target_id = ""
 
-    normalized = _normalize_labels(session, kind, target_id, dict(labels or {}))
     now = store.now()
     existing = store.rows(
         "SELECT * FROM conversation_human_feedback "
         "WHERE session_id = ? AND kind = ? AND target_id = ? AND reviewer_kind = ? LIMIT 1",
         (session_id, kind, target_id, reviewer_kind),
     )
+    merged_labels = dict(existing[0].get("labels") or {}) if existing else {}
+    merged_labels.update(dict(labels or {}))
+    normalized = _normalize_labels(session, kind, target_id, merged_labels)
     if existing:
         row_id = existing[0]["id"]
         store.update("conversation_human_feedback", row_id, {

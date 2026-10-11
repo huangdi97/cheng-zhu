@@ -67,7 +67,9 @@ class LocalMarkdownDecisionLogAdapter:
 
     @staticmethod
     def _target(root: Path, value: str) -> tuple[str, Path]:
-        raw = str(value or "").strip().replace("\\", "/") or "decisions.md"
+        raw = str(value or "").strip() or "decisions.md"
+        if "\\" in raw:
+            raise ValueError("Local Markdown target 只接受 / 分隔的 canonical relative path")
         if "\x00" in raw or "\r" in raw or "\n" in raw or len(raw) > 500:
             raise ValueError("Local Markdown target 包含非法字符或过长")
         if re.match(r"^[A-Za-z]:", raw) or raw.startswith(("/", "//")):

@@ -1,21 +1,19 @@
 {
   "evidence_type": "V2_LOCAL_CLOSURE_REVERIFICATION",
   "worktree": "E:\\AI\\面试助手\\.pi\\closure-wt",
-  "head": "0b676066383c8e49305a00a1b94d5e99b3c22c45",
+  "head": "60a6f2f333bec4cbc336e06ffc01282244e0f190",
   "expected_base_sha": "c581c0d764cf6dd4f59a254957b90dd7eb409f45",
-  "generated_at": "2026-10-11T11:50:40+0800",
-  "duration_seconds": 9.84,
+  "generated_at": "2026-10-11T13:18:55+0800",
+  "duration_seconds": 9.79,
   "checks_total": 23,
-  "checks_passed": 22,
-  "checks_failed": 1,
-  "failed_checks": [
-    "no_uncommitted_tracked_changes"
-  ],
+  "checks_passed": 23,
+  "checks_failed": 0,
+  "failed_checks": [],
   "checks": [
     {
       "check": "worktree_head_is_sha",
       "pass": true,
-      "observed": "0b676066383c8e49305a00a1b94d5e99b3c22c45"
+      "observed": "60a6f2f333bec4cbc336e06ffc01282244e0f190"
     },
     {
       "check": "origin_main_matches_expected_base",
@@ -37,13 +35,13 @@
     {
       "check": "branch_is_ahead_of_beta2",
       "pass": true,
-      "observed": 17,
+      "observed": 20,
       "expected": ">0"
     },
     {
       "check": "no_uncommitted_tracked_changes",
-      "pass": false,
-      "observed": "M docs/evidence/V2_LOCAL_FULL_CLOSURE_2026-10-11.md"
+      "pass": true,
+      "observed": "(clean)"
     },
     {
       "check": "artifact_sha256::Chengzhu-Setup-x64.exe",
@@ -150,5 +148,5 @@
       "note": "httpx 0.28.x raises InvalidURL for a bracketed IPv6 no_proxy entry; this is a machine proxy setting, not a product defect. Run `python -m pytest` with that entry removed for a clean local suite."
     }
   ],
-  "passed": false
+  "passed": true
 }

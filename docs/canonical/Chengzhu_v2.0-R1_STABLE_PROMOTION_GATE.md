@@ -93,11 +93,11 @@ Synthetic, CI, mock and Dry Run sessions do not count.
 
 A metric below its sample floor is failure, not “N/A but okay”. Sample size and threshold are computed only from that metric's frozen `allowed_label_sources`; `UNSPECIFIED` rows and disallowed sources are ignored for Stable promotion even when the overall aggregate looks good.
 
-Thresholds are frozen in:
+Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-They must not be lowered after seeing a failing pilot merely to create a PASS.
+Current policy = `v2.0-R1-stable-promotion-3`. Its numerical thresholds are unchanged from policy v2; v3 is a **pre-pilot provenance/population correction made before any real pilot result exists**. Thresholds must not be lowered, and sample populations must not be broadened, after seeing a failing pilot merely to create a PASS.
 
 ---
 
@@ -167,6 +167,29 @@ silently mix detector versions without preserving row-level provenance
 ```
 
 This makes historical metrics reproducible when the detector evolves; it does not make the detector scientifically validated and does not change the real-user / PMF boundary.
+
+## 5.3 Auto-runtime evidence + denominator integrity
+
+schema v12 adds immutable `conversation_guidance_event.origin_json` so Stable review can distinguish the product's real automatic TRANSCRIPT path from the advanced/manual Guidance validation lab.
+
+```text
+final eligible PRIMARY_AUDIO transcript
+→ exact transcript_segment_id
+→ automatic Guidance decision
+   ├─ SHOWN
+   └─ SILENT
+→ immutable origin.kind = TRANSCRIPT_AUTO
+```
+
+Stable population rules:
+
+- Opportunity Precision / Interruption Regret / Source Attribution Accuracy / Recall Precision: only v12 `TRANSCRIPT_AUTO` Guidance rows with exact transcript provenance;
+- Useful Silence: only `TRANSCRIPT_AUTO + decision_class=ARBITER`;
+- `MODE_FORCED / PROFILE_FORCED / PROVENANCE_FORCED` silence is audit/policy evidence, not Useful Silence;
+- manual Guidance Lab and pre-v12 unclassified Guidance are excluded;
+- Decision/Commitment State Precision denominator = immutable predictions whose `predicted_type` is `Decision / Commitment / Task`; other predicted truth types cannot dilute the metric.
+
+No threshold was lowered by this correction. Historical events are not reclassified from reason strings.
 
 ## 6. Tooling
 

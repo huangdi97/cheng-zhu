@@ -884,10 +884,14 @@ Botless / sidecar 的透明性必须单独处理：参与者同意状态与“�
 Capture     = LOCAL_DEVICE_CAPTURE / STRUCTURED_NOTES_ONLY / NO_CAPTURE
 STT         = LOCAL_ONLY / REMOTE_POSSIBLE / NOT_USED
 Inference   = LOCAL_DETERMINISTIC
-Retention   = LOCAL_PRODUCT_DB
-Write-back  = LOCAL_REVIEWED_DRAFT_ONLY / DISABLED
-Audio store = OFF
+Retention          = LOCAL_PRODUCT_DB
+Reviewed Draft     = LOCAL_REVIEWED_DRAFT / DISABLED
+External Execution = EXPLICIT_SECOND_STEP_PROVIDER / DISABLED
+Audio store        = OFF
 ```
+
+
+这里必须把 **Reviewed Draft** 与 **External Execution** 分开：用户把 DraftAction 标为 `APPROVED` 仍只代表本地审核；只有选择 exact CONNECTED account、创建 Execution Request 并进行第二次显式 Execute 后，才可能发生 provider side effect。没有可用 provider/credential/capability 时，外部执行仍然 fail-closed。
 
 这里的 `Inference = LOCAL_DETERMINISTIC` 只描述当前 Conversation Guidance / Manual Ask runtime；未来一旦接入 LLM provider，必须改成按真实 resolved provider 计算，不能继续沿用这个标签。
 

@@ -72,6 +72,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "event_id": event["id"],
                 "timestamp": event["created_at"],
                 "reviewer": "",
+                "label_source": "",
                 "system": {
                     "kind": event["kind"],
                     "expression_action": event["expression_action"],
@@ -128,6 +129,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "event_id": item["id"],
                 "timestamp": item["created_at"],
                 "reviewer": "",
+                "label_source": "",
                 "predicted_type": predicted_type or None,
                 "actual_type": None,
                 "predicted_state": predicted_state or None,
@@ -154,6 +156,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "space_id": session["space_id"],
                 "profile": session["space_profile"],
                 "reviewer": "",
+                "label_source": "",
                 "writeback_accurate": None,
                 "notes": "",
             })
@@ -163,6 +166,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 "space_id": session["space_id"],
                 "profile": session["space_profile"],
                 "reviewer": "",
+                "label_source": "",
                 "cognitive_load_delta": None,
                 "would_reuse_space": None,
                 "notes": "",
@@ -192,7 +196,8 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     # Exclusive creation also protects against a race between the check and open.
     with out.open("x", encoding="utf-8") as fh:
-        fh.write("# UNLABELED REVIEW SEED — fill reviewer + label fields before evaluation.\n")
+        fh.write("# UNLABELED REVIEW SEED — fill reviewer + label_source + label fields before evaluation.\n")
+        fh.write("# For stable review use label_source=INDEPENDENT_HUMAN_REVIEW for independent reviewers.\n")
         fh.write("# This file is not real-user evidence until a human reviews the rows.\n")
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")

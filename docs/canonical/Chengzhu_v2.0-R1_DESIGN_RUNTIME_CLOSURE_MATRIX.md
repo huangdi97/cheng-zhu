@@ -418,7 +418,8 @@ Transcript retention
 ```text
 Inference = LOCAL_DETERMINISTIC
 Retention = LOCAL_PRODUCT_DB
-Write-back = LOCAL_REVIEWED_DRAFT_ONLY / DISABLED
+Reviewed Draft = LOCAL_REVIEWED_DRAFT / DISABLED
+External Execution = EXPLICIT_SECOND_STEP_PROVIDER / DISABLED
 Audio retention = OFF
 ```
 

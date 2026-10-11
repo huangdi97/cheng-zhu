@@ -346,7 +346,8 @@ export interface ConversationProcessingRuntime {
     stt: 'LOCAL_ONLY' | 'REMOTE_POSSIBLE' | 'NOT_USED' | string
     inference: 'LOCAL_DETERMINISTIC' | string
     retention: 'LOCAL_PRODUCT_DB' | string
-    writeback: 'DISABLED' | 'LOCAL_REVIEWED_DRAFT_ONLY' | string
+    writeback: 'DISABLED' | 'LOCAL_REVIEWED_DRAFT' | string
+    external_execution: 'DISABLED' | 'EXPLICIT_SECOND_STEP_PROVIDER' | string
     audio_retention: string
     transcript_retention: string
   }

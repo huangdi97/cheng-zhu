@@ -2438,7 +2438,8 @@ def test_frozen_pack_records_resolved_processing_route(product_env, monkeypatch)
         "stt": "LOCAL_ONLY",
         "inference": "LOCAL_DETERMINISTIC",
         "retention": "LOCAL_PRODUCT_DB",
-        "writeback": "LOCAL_REVIEWED_DRAFT_ONLY",
+        "writeback": "LOCAL_REVIEWED_DRAFT",
+        "external_execution": "EXPLICIT_SECOND_STEP_PROVIDER",
         "audio_retention": "OFF",
         "transcript_retention": "SPACE_POLICY",
     }
@@ -2475,6 +2476,7 @@ def test_resolved_data_path_distinguishes_no_capture_and_writeback_off(product_e
     assert runtime["data_path"]["inference"] == "LOCAL_DETERMINISTIC"
     assert runtime["data_path"]["retention"] == "LOCAL_PRODUCT_DB"
     assert runtime["data_path"]["writeback"] == "DISABLED"
+    assert runtime["data_path"]["external_execution"] == "DISABLED"
 
 
 def test_profile_aware_guidance_taxonomy_and_expression_delivery(product_env, monkeypatch):

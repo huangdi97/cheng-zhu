@@ -320,7 +320,8 @@ function mocks() {
           stt: 'NOT_USED',
           inference: 'LOCAL_DETERMINISTIC',
           retention: 'LOCAL_PRODUCT_DB',
-          writeback: 'LOCAL_REVIEWED_DRAFT_ONLY',
+          writeback: 'LOCAL_REVIEWED_DRAFT',
+          external_execution: 'EXPLICIT_SECOND_STEP_PROVIDER',
           audio_retention: 'OFF',
           transcript_retention: 'SPACE_POLICY',
         },
@@ -387,7 +388,8 @@ function mocks() {
             stt: 'NOT_USED',
             inference: 'LOCAL_DETERMINISTIC',
             retention: 'LOCAL_PRODUCT_DB',
-            writeback: 'LOCAL_REVIEWED_DRAFT_ONLY',
+            writeback: 'LOCAL_REVIEWED_DRAFT',
+            external_execution: 'EXPLICIT_SECOND_STEP_PROVIDER',
             audio_retention: 'OFF',
             transcript_retention: 'SPACE_POLICY',
           },
@@ -503,7 +505,8 @@ function mocks() {
           stt: 'NOT_USED',
           inference: 'LOCAL_DETERMINISTIC',
           retention: 'LOCAL_PRODUCT_DB',
-          writeback: 'LOCAL_REVIEWED_DRAFT_ONLY',
+          writeback: 'LOCAL_REVIEWED_DRAFT',
+          external_execution: 'EXPLICIT_SECOND_STEP_PROVIDER',
           audio_retention: 'OFF',
           transcript_retention: 'SPACE_POLICY',
         },
@@ -835,7 +838,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText(REVIEWED_OPEN.title).last()).toBeVisible()
     await expect(page.getByText('Inference · LOCAL_DETERMINISTIC')).toBeVisible()
     await expect(page.getByText('Retention · LOCAL_PRODUCT_DB')).toBeVisible()
-    await expect(page.getByText('Write-back · LOCAL_REVIEWED_DRAFT_ONLY')).toBeVisible()
+    await expect(page.getByText('Reviewed draft · LOCAL_REVIEWED_DRAFT')).toBeVisible()
+    await expect(page.getByText('External execution · EXPLICIT_SECOND_STEP_PROVIDER')).toBeVisible()
     await expect(page.getByText('Screen · OFF')).toBeVisible()
     await expect(page.getByText('Raw screen image · NOT STORED')).toBeVisible()
     await expect(page.getByText('Frozen AI behavior')).toBeVisible()

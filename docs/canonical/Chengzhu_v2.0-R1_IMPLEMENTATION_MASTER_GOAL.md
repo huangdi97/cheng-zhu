@@ -591,19 +591,41 @@ MANUAL 与 explicit-start AUTO 都已实现为 Conversation-owned capability。M
 已实现桌面 runtime：Conversation Session Policy 可请求 `PRIVATE_OVERLAY`；Preflight 只声明“Start 时验证”，点击开始前前端通过 Electron bridge 临时启用 `setContentProtection` 并再次读取状态，随后把 runtime proof 交给 backend。proof 缺失/无效时 Start fail-closed。verified state 冻结进 Session Pack，Live 显示保护状态；会话正常结束后恢复开始前的全局 Share Privacy 默认。Web fallback 没有 Electron bridge 时不得开始该 policy。该能力只降低受支持捕获路径中的意外暴露，不是安全、隐身或“不可检测”保证。
 
 ## External connectors
-Calendar / mail / project tracker read path 未接线时，非空 connector permission 必须阻断或保持 unavailable。
+当前已经有 concrete opt-in providers，但“代码存在”仍不等于任意真实账号已经连接：
+
+- GitHub：`project.read` + reviewed `issue.create`；2026-10-11 专用私有测试仓库 real-account replay PASS；
+- Google Calendar：read-only `calendar.read`；真实 Google account evidence 仍 pending；
+- Google Drive / Docs：read-only `docs.read`；真实 Google account evidence 仍 pending；
+- Gmail：reviewed `email.send` only，不读取 inbox；真实账号 evidence 与 Google sensitive-scope publication/verification 仍是 external gate；
+- Microsoft To Do：reviewed `task.create` only；真实 Microsoft account evidence 仍 pending；
+- Local Markdown / Obsidian：reviewed `decision_log.write`，本机 root 只通过 opaque env reference 解析；
+- MCP：只有 capability contract，没有 concrete adapter/auth/account runtime。
+
+所有 read permission 必须满足 real adapter + CONNECTED account + exact grant + current health；否则 Preflight fail-closed。Write capability 不能继承为 Session read permission，必须进入独立 reviewed execution flow。
 
 ## Actual external write-back
-当前：
-- local draft；
-- review；
-- approve local draft。
+当前真实语义：
 
-不等于：
-- email 已发送；
-- task 已创建；
-- issue 已写入；
-- decision log 已同步。
+```text
+Conversation truth
+→ local DraftAction
+→ explicit review
+→ APPROVED
+→ exact CONNECTED account + target
+→ Execution Request
+→ second explicit Execute
+→ provider outcome
+```
+
+因此：
+
+- `APPROVED` 仍只表示本地审核完成；
+- `Execution Request` 仍不等于外部副作用已经发生；
+- 只有 provider 明确返回成功，或用户完成 provider-side reconciliation，才允许进入 `SUCCEEDED`；
+- timeout / transport exception / missing explicit outcome 必须进入 `UNKNOWN_OUTCOME`，不得自动重试可能已发生的副作用；
+- GitHub issue.create 已有真实测试账号 replay；
+- Gmail / Microsoft To Do 的真实 success 仍需要各自真实账号 evidence；
+- Local Markdown decision_log.write 为本机 reviewed external execution，不代表云端同步。
 
 ---
 
@@ -745,7 +767,7 @@ PR 合并后至少要有：
 
 ## Public Conversation Beta Prerelease Gate
 
-`v2.0.0-beta.2` 本次公开发布沿用以下门禁：
+`v2.0.0-beta.2` 已按以下门禁公开发布；`v2.0.0-beta.3` 必须复用完全相同的 exact-SHA / clean-install / download-back / provenance 门禁，不能因为是后续 Beta 降级：
 
 - exact green main SHA；
 - Windows installer + portable；
@@ -761,14 +783,17 @@ PR 合并后至少要有：
 - `latest=false`；
 - GitHub Stable Latest 仍不是该 Beta tag。
 
-公开 prerelease 已于 2026-10-09 完成，允许：
+截至 beta.3 candidate 合并前，公开 release truth 仍是：
 
 ```text
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
-BETA_TAG = v2.0.0-beta.2
-BETA_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
+PUBLISHED_BETA_TAG = v2.0.0-beta.2
+PUBLISHED_BETA_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
+NEXT_BETA_CANDIDATE = v2.0.0-beta.3
 STABLE_LATEST = v1.4.2
 ```
+
+只有 beta.3 的 main CI、Windows release workflow、draft download-back、downloaded installer replay、tag/source invariant 与最终 publish 全部成功后，才允许把 published Beta truth 更新为 beta.3。
 
 仍不允许：
 

@@ -1029,6 +1029,7 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                     <div>
                       <div className="text-xs font-semibold text-text-primary">Local Markdown / Obsidian · reviewed Decision Log</div>
                       <p className="mt-1 text-[10px] text-text-muted">启动后端前设置 {localMarkdownProvider.setup?.runtime_opt_in_env || 'CHENGZHU_LOCAL_MARKDOWN_CONNECTOR_ENABLE=1'}，并用单独环境变量指向一个明确可写的本地目录。只实现 decision_log.write，不读取 vault、不索引本地文件。</p>
+                      <p className="mt-1 text-[10px] text-text-muted">root path 不进入 product.db；Chengzhu 只保存 opaque environment-variable reference，不持久化本地目录绝对路径。</p>
                     </div>
                     <StatusBadge tone={localMarkdownProvider.adapter_available ? 'ok' : 'muted'}>{localMarkdownProvider.adapter_available ? 'adapter available' : 'restart with opt-in env'}</StatusBadge>
                   </div>

@@ -91,6 +91,8 @@ prediction_unavailable = true
 
 `SELF_MIC` 不属于对方直接提问检测集合，因此不会进入 direct-question reviewer queue。Stable Gate 的 Direct Question Precision / Recall 仍要求 `label_source=INDEPENDENT_HUMAN_REVIEW`。
 
+Direct Question 指标只有在存在 final transcript 时才有可复核样本；`NOTES_ONLY` Session 不会凭空生成此类 row。由于 prediction snapshot 与 transcript 共用其 retention 生命周期，pilot 应在 transcript retention 清理前完成 seed 导出 / independent review，或明确延长经授权的本地 retention。不要为了凑样本而关闭隐私清理或重建已删除的原始对话。
+
 ## 6. truth_item
 
 需要 predicted_type / actual_type / predicted_state / actual_state。重点检查 Proposal 是否误判 Decision、能力表态是否误判 Commitment、owner 是否凭空变成 me、Deadline 是否有明确来源、supersession 是否正确、OpenQuestion 是否真的未解决。

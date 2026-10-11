@@ -295,8 +295,8 @@ export interface ConversationFeedbackReview {
   session_status: string
   reviewer_kind: 'SELF_USER'
   evidence_boundary: 'LOCAL_EXPLICIT_SELF_REPORT_NOT_REAL_USER_IDENTITY_PROOF' | string
-  guidance: Array<{ event: ConversationGuidance; feedback: ConversationHumanFeedback | null }>
-  silence: Array<{ event: ConversationGuidance; feedback: ConversationHumanFeedback | null }>
+  guidance: Array<{ event: Pick<ConversationGuidance, 'id' | 'session_id' | 'kind' | 'expression_action' | 'text' | 'source_refs' | 'status' | 'reason' | 'score' | 'user_action' | 'rendered_at' | 'created_at'>; feedback: ConversationHumanFeedback | null }>
+  silence: Array<{ event: Pick<ConversationGuidance, 'id' | 'session_id' | 'kind' | 'expression_action' | 'text' | 'source_refs' | 'status' | 'reason' | 'score' | 'user_action' | 'rendered_at' | 'created_at'>; feedback: ConversationHumanFeedback | null }>
   continue_feedback: ConversationHumanFeedback | null
   session_outcome: ConversationHumanFeedback | null
   remote_telemetry: 'OFF' | string

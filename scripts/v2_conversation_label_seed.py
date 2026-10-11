@@ -10,6 +10,8 @@ Prediction provenance is never reconstructed from newer logic:
   (or a still-unreviewed legacy candidate);
 - Direct Question predictions come only from v11 capture-time transcript
   analysis snapshots;
+- versioned rows where the detector was explicitly ineligible (for example
+  AI_FORBIDDEN or SELF_MIC) are outside the metric population;
 - historical reviewed/unversioned rows are marked prediction_unavailable.
 """
 from __future__ import annotations

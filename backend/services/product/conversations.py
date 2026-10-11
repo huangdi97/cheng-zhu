@@ -368,11 +368,16 @@ def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool
     inference_path = "LOCAL_DETERMINISTIC"
 
     retention_path = "LOCAL_PRODUCT_DB"
-    writeback_path = (
-        "DISABLED"
-        if policy["external_writeback"] == "OFF"
-        else "LOCAL_REVIEWED_DRAFT_ONLY"
-    )
+    if policy["external_writeback"] == "OFF":
+        writeback_path = "DISABLED"
+        external_execution_path = "DISABLED"
+    else:
+        # Reviewing a DraftAction is always local. Any provider side effect is a
+        # separate, explicit second-step execution against one exact connected
+        # account. Keep these two paths distinct so Preflight/Session Pulse do
+        # not imply that APPROVED already means externally written.
+        writeback_path = "LOCAL_REVIEWED_DRAFT"
+        external_execution_path = "EXPLICIT_SECOND_STEP_PROVIDER"
 
     return {
         "mode": mode,
@@ -386,6 +391,7 @@ def processing_runtime_status(session: dict[str, Any], *, include_self_mic: bool
             "inference": inference_path,
             "retention": retention_path,
             "writeback": writeback_path,
+            "external_execution": external_execution_path,
             "audio_retention": "OFF",
             "transcript_retention": policy["transcript_retention"],
         },

@@ -1029,3 +1029,35 @@ final transcript
 ```
 
 这关闭的是 **evaluation reproducibility / provenance gap**，不是产品价值证据。已发布 `v2.0.0-beta.3` 仍不包含 schema v10/v11 的 Pilot Evidence Bridge；这些能力进入公开下载需要新的 prerelease candidate。Stable v2 / REAL_USER_VALIDATED / PMF 状态不变。
+
+
+---
+
+## Pilot feedback retention integrity closure · 2026-10-11
+
+在 Pilot Evidence Bridge 收口后继续审计发现：schema v10 的 `conversation_human_feedback` 对 Guidance 使用逻辑 `target_id`，而旧 retention 只删除过期 `conversation_guidance_event`，不会同步删除对应 `GUIDANCE/SILENCE` feedback。结果可能出现：
+
+```text
+feedback row exists
+target Guidance missing
+→ exporter must skip
+→ local evidence becomes orphaned / unauditable
+```
+
+当前源码修复为：
+
+```text
+GUIDANCE_RETENTION_DELETE = TARGET + DEPENDENT_FEEDBACK
+LEGACY_ORPHAN_DETECTION = TRUE
+LEGACY_ORPHAN_EXPLICIT_PREVIEW = TRUE
+LEGACY_ORPHAN_CONFIRMED_CLEANUP = TRUE
+SESSION_LEVEL_FEEDBACK_RETENTION = PRESERVED
+DIAGNOSTIC_ORPHAN_COUNT = TRUE
+REMOTE_TELEMETRY = OFF
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+`retention_preview` 会分别显示 `dependent_human_feedback` 和 `orphan_human_feedback`。只有显式确认后才删除；不会为了评测永久保留已经按用户 retention 到期的 Guidance，也不会让失去目标事件的反馈继续冒充可审计证据。
+
+该修复不需要新的 schema migration；它修复的是 v10/v11 数据生命周期语义与本机 pilot evidence integrity。

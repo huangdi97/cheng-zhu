@@ -125,11 +125,18 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                 direct = {}
             eligible = direct.get("eligible")
             predicted = direct.get("predicted")
-            has_prediction = (
-                eligible is True
+            detector_version = str(direct.get("detector_version") or "").strip()
+            versioned_snapshot = (
+                isinstance(eligible, bool)
                 and isinstance(predicted, bool)
-                and bool(str(direct.get("detector_version") or "").strip())
+                and bool(detector_version)
             )
+            # A versioned eligible=false snapshot means the detector was
+            # explicitly not active for this row (for example AI_FORBIDDEN).
+            # It is outside the metric population, not missing evidence.
+            if versioned_snapshot and eligible is False:
+                continue
+            has_prediction = versioned_snapshot and eligible is True
             rows.append({
                 "kind": "direct_question",
                 "session_id": segment["session_id"],

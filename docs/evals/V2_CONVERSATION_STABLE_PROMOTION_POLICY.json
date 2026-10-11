@@ -1,6 +1,6 @@
 {
-  "policy_version": "v2.0-R1-stable-promotion-1",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. This policy is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
+  "policy_version": "v2.0-R1-stable-promotion-2",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Metric thresholds are evaluated only from explicitly allowed human-label sources. This is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -14,17 +14,96 @@
     }
   },
   "metrics": {
-    "opportunity_precision": {"direction": "gte", "threshold": 0.8, "min_n": 30},
-    "interruption_regret": {"direction": "lte", "threshold": 0.15, "min_n": 30},
-    "source_attribution_accuracy": {"direction": "gte", "threshold": 0.95, "min_n": 30},
-    "recall_precision": {"direction": "gte", "threshold": 0.9, "min_n": 20},
-    "useful_silence_rate": {"direction": "gte", "threshold": 0.8, "min_n": 30},
-    "direct_question_precision": {"direction": "gte", "threshold": 0.9, "min_n": 20},
-    "direct_question_recall": {"direction": "gte", "threshold": 0.85, "min_n": 20},
-    "decision_commitment_state_precision": {"direction": "gte", "threshold": 0.9, "min_n": 30},
-    "continue_writeback_accuracy": {"direction": "gte", "threshold": 0.95, "min_n": 20},
-    "mean_cognitive_load_delta": {"direction": "lte", "threshold": -0.25, "min_n": 15},
-    "space_reuse_intent_rate": {"direction": "gte", "threshold": 0.7, "min_n": 15}
+    "opportunity_precision": {
+      "direction": "gte",
+      "threshold": 0.8,
+      "min_n": 30,
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "interruption_regret": {
+      "direction": "lte",
+      "threshold": 0.15,
+      "min_n": 30,
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+      ]
+    },
+    "source_attribution_accuracy": {
+      "direction": "gte",
+      "threshold": 0.95,
+      "min_n": 30,
+      "allowed_label_sources": [
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "recall_precision": {
+      "direction": "gte",
+      "threshold": 0.9,
+      "min_n": 20,
+      "allowed_label_sources": [
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "useful_silence_rate": {
+      "direction": "gte",
+      "threshold": 0.8,
+      "min_n": 30,
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "direct_question_precision": {
+      "direction": "gte",
+      "threshold": 0.9,
+      "min_n": 20,
+      "allowed_label_sources": [
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "direct_question_recall": {
+      "direction": "gte",
+      "threshold": 0.85,
+      "min_n": 20,
+      "allowed_label_sources": [
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "decision_commitment_state_precision": {
+      "direction": "gte",
+      "threshold": 0.9,
+      "min_n": 30,
+      "allowed_label_sources": [
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "continue_writeback_accuracy": {
+      "direction": "gte",
+      "threshold": 0.95,
+      "min_n": 20,
+      "allowed_label_sources": [
+        "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "mean_cognitive_load_delta": {
+      "direction": "lte",
+      "threshold": -0.25,
+      "min_n": 15,
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+      ]
+    },
+    "space_reuse_intent_rate": {
+      "direction": "gte",
+      "threshold": 0.7,
+      "min_n": 15,
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+      ]
+    }
   },
   "required_attestations": [
     "AUTHORIZED_REAL_USE",
@@ -41,5 +120,10 @@
       "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
     ]
   },
-  "change_control": "Thresholds must be revised by an explicit design change before looking at a new pilot result; do not lower a threshold merely to make a failing pilot pass."
+  "change_control": "Thresholds must be revised by an explicit design change before looking at a new pilot result; do not lower a threshold merely to make a failing pilot pass.",
+  "label_source_policy": {
+    "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT": "Explicit post-session labels entered in Chengzhu on the local device. Valid for user-perception/outcome measures only where a metric explicitly allows it; not verified identity proof.",
+    "INDEPENDENT_HUMAN_REVIEW": "Explicit human review performed independently from the in-product self-report surface under the human-label protocol.",
+    "UNSPECIFIED": "Never accepted for stable-promotion metric thresholds."
+  }
 }

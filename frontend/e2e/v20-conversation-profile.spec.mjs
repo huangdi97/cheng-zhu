@@ -1256,6 +1256,103 @@ test.describe('v2.0 Conversation Profile', () => {
   })
 
 
+  test('Continue collects explicit local pilot self-report without claiming real-user validation', async ({ context, page }) => {
+    const base = mocks()
+    let continueFeedback = null
+    let outcomeLabels = {}
+    const posts = []
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus', 'chengzhu-product-profile': 'conversation' },
+      apiOverrides: async (pathname, method, request) => {
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback-review`) {
+          return {
+            session_id: SESSION.id,
+            space_id: SPACE.id,
+            session_status: 'ENDED',
+            reviewer_kind: 'SELF_USER',
+            evidence_boundary: 'LOCAL_EXPLICIT_SELF_REPORT_NOT_REAL_USER_IDENTITY_PROOF',
+            guidance: [],
+            silence: [],
+            continue_feedback: continueFeedback,
+            session_outcome: Object.keys(outcomeLabels).length ? {
+              id: 'hf-outcome',
+              space_id: SPACE.id,
+              session_id: SESSION.id,
+              kind: 'SESSION_OUTCOME',
+              target_id: '',
+              reviewer_kind: 'SELF_USER',
+              labels: outcomeLabels,
+              note: '',
+              created_at: 3,
+              updated_at: 4,
+            } : null,
+            remote_telemetry: 'OFF',
+            real_user_validated: false,
+            pmf_proven: false,
+          }
+        }
+        if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback` && method === 'POST') {
+          const body = request.postDataJSON()
+          posts.push(body)
+          if (body.kind === 'CONTINUE') {
+            continueFeedback = {
+              id: 'hf-continue',
+              space_id: SPACE.id,
+              session_id: SESSION.id,
+              kind: 'CONTINUE',
+              target_id: '',
+              reviewer_kind: 'SELF_USER',
+              labels: { ...(continueFeedback?.labels || {}), ...(body.labels || {}) },
+              note: '',
+              created_at: 3,
+              updated_at: 4,
+            }
+            return continueFeedback
+          }
+          if (body.kind === 'SESSION_OUTCOME') {
+            outcomeLabels = { ...outcomeLabels, ...(body.labels || {}) }
+            return {
+              id: 'hf-outcome',
+              space_id: SPACE.id,
+              session_id: SESSION.id,
+              kind: 'SESSION_OUTCOME',
+              target_id: '',
+              reviewer_kind: 'SELF_USER',
+              labels: outcomeLabels,
+              note: '',
+              created_at: 3,
+              updated_at: 4,
+            }
+          }
+        }
+        return base(pathname, method, request)
+      },
+    })
+
+    await page.goto(`/#/conversation/spaces/${SPACE.id}/sessions`)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    const panel = page.getByTestId('conversation-pilot-feedback')
+    await expect(panel).toBeVisible()
+    await panel.locator('summary').click()
+    await expect(panel.getByText('LOCAL ONLY')).toBeVisible()
+    await expect(panel.getByText(/不会自动证明“真实外部用户已验证”/)).toBeVisible()
+
+    await panel.getByRole('button', { name: '准确', exact: true }).click()
+    await panel.getByRole('button', { name: '愿意', exact: true }).click()
+    await panel.getByRole('button', { name: '-1', exact: true }).click()
+
+    await expect.poll(() => posts.length).toBe(3)
+    expect(posts[0]).toMatchObject({ kind: 'CONTINUE', labels: { writeback_accurate: true } })
+    expect(posts[1]).toMatchObject({ kind: 'SESSION_OUTCOME', labels: { would_reuse_space: true } })
+    expect(posts[2]).toMatchObject({ kind: 'SESSION_OUTCOME', labels: { cognitive_load_delta: -1 } })
+    expect(posts.some((row) => row.reviewer_kind)).toBe(false)
+    await expect(panel.getByRole('button', { name: '准确 ✓', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: '愿意 ✓', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: '-1 ✓', exact: true })).toBeVisible()
+  })
+
+
   test('Review Queue never silently assigns unknown commitment owner to me', async ({ context, page }) => {
     const base = mocks()
     let reviewed = false

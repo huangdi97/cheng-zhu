@@ -3585,11 +3585,48 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         session["id"], item_type="OpenQuestion", title="owner?",
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-diag-frozen",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "为什么采用 v2？",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": True,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+            },
+        },
+        "created_at": 1.0,
+    })
+    store.insert("conversation_transcript_segment", {
+        "id": "cts-diag-legacy",
+        "space_id": space["id"],
+        "session_id": session["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "历史 transcript 无冻结 prediction",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {},
+        "created_at": 2.0,
+    })
     diag = conversations.diagnostics()
     assert diag["schema_version"] == 11
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1
+    dq = diag["evaluation"]["direct_question_prediction_provenance"]
+    assert dq["detector_version"] == "heuristic-v1"
+    assert dq["eligible_final_transcript_rows"] == 2
+    assert dq["prediction_available"] == 1
+    assert dq["prediction_unavailable"] == 1
+    assert dq["historical_reclassification"] == "FORBIDDEN"
     assert diag["evidence"]["real_conversation_user_evidence"] == "REAL_CONVERSATION_USER_EVIDENCE_PENDING"
     assert diag["evidence"]["pmf"] == "PMF_PROVEN_FALSE"
     assert diag["privacy"]["auto_external_writeback"] == "OFF"

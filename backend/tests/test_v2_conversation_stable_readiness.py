@@ -19,15 +19,24 @@ def _module():
 def _human_report():
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     metrics = {}
+    metrics_by_source = {}
     for name, rule in policy["metrics"].items():
         threshold = rule["threshold"]
         value = threshold
-        metrics[name] = {"value": value, "n": rule["min_n"]}
+        entry = {"value": value, "n": rule["min_n"]}
+        metrics[name] = dict(entry)
+        source = rule["allowed_label_sources"][0]
+        metrics_by_source.setdefault(source, {})[name] = dict(entry)
     return {
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "claims": {"HUMAN_LABELS_AVAILABLE": True, "PMF_PROVEN": False},
         "metrics": metrics,
+        "metrics_by_label_source": metrics_by_source,
     }
+
+
+def _source_for(policy, metric: str) -> str:
+    return policy["metrics"][metric]["allowed_label_sources"][0]
 
 
 def _pilot():
@@ -70,7 +79,7 @@ def test_stable_readiness_fails_when_sample_size_is_insufficient():
     module = _module()
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     human = _human_report()
-    human["metrics"]["opportunity_precision"]["n"] = 1
+    human["metrics_by_label_source"][_source_for(policy, "opportunity_precision")]["opportunity_precision"]["n"] = 1
     report = module.evaluate(human, _pilot(), policy)
     assert report["status"] == "NO_GO"
     assert any(
@@ -83,7 +92,7 @@ def test_stable_readiness_fails_on_bad_quality_even_with_large_n():
     module = _module()
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     human = _human_report()
-    human["metrics"]["interruption_regret"] = {"value": 0.5, "n": 100}
+    human["metrics_by_label_source"][_source_for(policy, "interruption_regret")]["interruption_regret"] = {"value": 0.5, "n": 100}
     report = module.evaluate(human, _pilot(), policy)
     assert report["status"] == "NO_GO"
     assert any(
@@ -126,3 +135,37 @@ def test_stable_readiness_fails_on_critical_incident():
     report = module.evaluate(_human_report(), pilot, policy)
     assert report["status"] == "NO_GO"
     assert any(item["name"] == "critical_incidents_zero" for item in report["failed_checks"])
+
+
+def test_stable_readiness_self_report_cannot_satisfy_independent_review_metric():
+    module = _module()
+    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    human = _human_report()
+    metric = "recall_precision"
+    independent = "INDEPENDENT_HUMAN_REVIEW"
+    self_report = "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+    entry = human["metrics_by_label_source"][independent].pop(metric)
+    human["metrics_by_label_source"].setdefault(self_report, {})[metric] = entry
+
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == f"metric:{metric}:label_source"
+        for item in report["failed_checks"]
+    )
+
+
+def test_stable_readiness_ignores_unspecified_labels_even_when_aggregate_looks_good():
+    module = _module()
+    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    human = _human_report()
+    metric = "source_attribution_accuracy"
+    independent = "INDEPENDENT_HUMAN_REVIEW"
+    entry = human["metrics_by_label_source"][independent].pop(metric)
+    human["metrics_by_label_source"].setdefault("UNSPECIFIED", {})[metric] = entry
+
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    failed = {item["name"] for item in report["failed_checks"]}
+    assert f"metric:{metric}:label_source" in failed
+    assert f"metric:{metric}:sample_size" in failed

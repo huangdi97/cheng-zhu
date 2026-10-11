@@ -77,21 +77,21 @@ Synthetic, CI, mock and Dry Run sessions do not count.
 
 ## 4. Human-label thresholds
 
-| Metric | Gate | Minimum labeled n |
-| --- | ---: | ---: |
-| Opportunity Precision | >= 0.80 | 30 |
-| Interruption Regret | <= 0.15 | 30 |
-| Source Attribution Accuracy | >= 0.95 | 30 |
-| Recall Precision | >= 0.90 | 20 |
-| Useful Silence Rate | >= 0.80 | 30 |
-| Direct Question Precision | >= 0.90 | 20 |
-| Direct Question Recall | >= 0.85 | 20 |
-| Decision/Commitment State Precision | >= 0.90 | 30 |
-| Continue Write-back Accuracy | >= 0.95 | 20 |
-| Mean Cognitive Load Delta | <= -0.25 | 15 |
-| Space Reuse Intent Rate | >= 0.70 | 15 |
+| Metric | Gate | Minimum labeled n | Stable-eligible label source |
+| --- | ---: | ---: | --- |
+| Opportunity Precision | >= 0.80 | 30 | self-report or independent review |
+| Interruption Regret | <= 0.15 | 30 | local explicit self-report |
+| Source Attribution Accuracy | >= 0.95 | 30 | independent human review |
+| Recall Precision | >= 0.90 | 20 | independent human review |
+| Useful Silence Rate | >= 0.80 | 30 | self-report or independent review |
+| Direct Question Precision | >= 0.90 | 20 | independent human review |
+| Direct Question Recall | >= 0.85 | 20 | independent human review |
+| Decision/Commitment State Precision | >= 0.90 | 30 | independent human review |
+| Continue Write-back Accuracy | >= 0.95 | 20 | independent human review |
+| Mean Cognitive Load Delta | <= -0.25 | 15 | local explicit self-report |
+| Space Reuse Intent Rate | >= 0.70 | 15 | local explicit self-report |
 
-A metric below its sample floor is failure, not “N/A but okay”.
+A metric below its sample floor is failure, not “N/A but okay”. Sample size and threshold are computed only from that metric's frozen `allowed_label_sources`; `UNSPECIFIED` rows and disallowed sources are ignored for Stable promotion even when the overall aggregate looks good.
 
 Thresholds are frozen in:
 

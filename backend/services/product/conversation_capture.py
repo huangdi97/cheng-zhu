@@ -240,6 +240,7 @@ def record_transcription(
             "direct_question": conversations.direct_question_prediction(
                 cleaned,
                 channel=normalized_channel,
+                ai_assistance=str((session.get("policy") or {}).get("ai_assistance") or ""),
             ),
         },
         "created_at": store.now(),

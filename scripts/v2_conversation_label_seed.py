@@ -4,6 +4,13 @@
 The output deliberately contains null label fields. It is a review queue, not
 evaluation evidence. Humans must fill labels before running
 v2_conversation_human_eval.py.
+
+Prediction provenance is never reconstructed from newer logic:
+- Conversation Item predictions come from immutable v10 prediction snapshots
+  (or a still-unreviewed legacy candidate);
+- Direct Question predictions come only from v11 capture-time transcript
+  analysis snapshots;
+- historical reviewed/unversioned rows are marked prediction_unavailable.
 """
 from __future__ import annotations
 

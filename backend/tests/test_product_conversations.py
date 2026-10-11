@@ -3701,6 +3701,8 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
     assert diag["health"]["retrieval"] == "AVAILABLE"
     assert diag["health"]["state_engine"] == "AVAILABLE"
     assert diag["health"]["guidance_arbiter"] == "AVAILABLE"
+    assert diag["health"]["human_feedback_integrity"] == "AVAILABLE"
+    assert diag["runtime"]["orphan_guidance_feedback_rows"] == 0
     assert diag["health"]["export_delete_integrity"] == "AVAILABLE"
     assert diag["health"]["processing_policy"] == "AVAILABLE"
     assert diag["health"]["speaker_diarization"] == "LIMITED_CHANNEL_ONLY"
@@ -3969,6 +3971,7 @@ def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(p
     result = conversations.apply_retention(space["id"], confirm=True)
     assert result["deleted"] == {
         "transcript_segments": 1,
+        "orphan_human_feedback": 0,
         "dependent_human_feedback": 1,
         "guidance_events": 1,
         "draft_actions": 1,
@@ -3985,6 +3988,48 @@ def test_retention_preview_requires_confirmation_and_preserves_confirmed_truth(p
         continue_feedback["id"],
         outcome_feedback["id"],
     }
+
+
+def test_retention_preview_repairs_preexisting_orphan_guidance_feedback(product_env, monkeypatch):
+    clock = [2_000_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+    space = conversations.create_space("Legacy Orphan Repair", "PROJECT_SYNC")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+
+    shown = conversations.evaluate_guidance(
+        session["id"],
+        {"direct_question": "为什么？", "answer_cue": "先回答核心原因。"},
+    )["guidance"]
+    feedback = conversation_feedback.upsert_feedback(
+        session["id"],
+        kind="GUIDANCE",
+        target_id=shown["id"],
+        labels={"useful": True},
+    )
+    # Simulate a pre-fix retention run that deleted the Guidance but left the
+    # local feedback row behind.
+    assert store.delete("conversation_guidance_event", shown["id"]) is True
+    assert store.get("conversation_human_feedback", feedback["id"]) is not None
+
+    diag = conversations.diagnostics()
+    assert diag["runtime"]["orphan_guidance_feedback_rows"] == 1
+    assert diag["health"]["human_feedback_integrity"] == "NEEDS_RETENTION_CLEANUP"
+
+    preview = conversations.retention_preview(space["id"])
+    assert preview["would_delete"]["orphan_human_feedback"] == 1
+    assert preview["would_delete"]["dependent_human_feedback"] == 0
+
+    with pytest.raises(ValueError, match="明确确认"):
+        conversations.apply_retention(space["id"], confirm=False)
+
+    result = conversations.apply_retention(space["id"], confirm=True)
+    assert result["deleted"]["orphan_human_feedback"] == 1
+    assert store.get("conversation_human_feedback", feedback["id"]) is None
+
+    repaired = conversations.diagnostics()
+    assert repaired["runtime"]["orphan_guidance_feedback_rows"] == 0
+    assert repaired["health"]["human_feedback_integrity"] == "AVAILABLE"
 
 
 def test_export_is_categorized_and_keeps_truth_classes_separate(product_env):

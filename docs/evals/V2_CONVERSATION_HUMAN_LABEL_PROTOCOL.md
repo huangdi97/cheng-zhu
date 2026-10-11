@@ -72,6 +72,62 @@ cognitive_load_delta 建议使用 -2 到 +2：-2 明显降低，-1 略有降低�
 
 只做 Project Sync / Design Review。每个用户先积累 5–10 个真实 Session；每场对 shown guidance 与关键 silence 抽样标注；每场结束至少标一次 Continue；每个 Space 至少跨 3 场。第一阶段重点是找错误模式，而不是追求漂亮平均分。
 
+## 10.1 产品内 Pilot Evidence Bridge（beta.3 后）
+
+Conversation Continue 允许用户在会后显式填写本机反馈：
+
+- shown Guidance：`useful`、`interruption_regret`、`source_correct`；RECALL 额外允许 `recall_correct`；
+- SILENT / suppressed decision：`silence_correct`；
+- Continue：`writeback_accurate`；
+- Session Outcome：`cognitive_load_delta`、`would_reuse_space`。
+
+硬边界：
+
+1. 反馈写入 `conversation_human_feedback`，只保存在本机 product.db；当前没有远程 telemetry uploader；
+2. Product API 固定记录 `reviewer_kind=SELF_USER`，前端不能自称 `VERIFIED_EXTERNAL_USER`；
+3. Pin / Used / Dismissed / click-through 不会被自动转换成 useful / wrong / silence_correct；
+4. 产品内自报只能叫 `LOCAL_EXPLICIT_SELF_REPORT`，不能单独证明 reviewer 身份、授权真实 pilot 或 PMF；
+5. 原始 labels 与可能包含的 notes 仍按私人评估数据处理，不自动上传公开仓库或 CI artifact。
+
+导出产品内显式反馈：
+
+```bash
+python scripts/v2_conversation_feedback_export.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --out in-product-self-report.jsonl
+```
+
+与独立 reviewer 标签可以分文件聚合，避免手工拼接：
+
+```bash
+python scripts/v2_conversation_human_eval.py \
+  in-product-self-report.jsonl \
+  independent-review.jsonl \
+  --out human-report.json \
+  --markdown-out human-report.md
+```
+
+同一 reviewer / session / kind / event 即使跨文件重复也会被拒绝。
+
+### Prediction leakage 防线
+
+schema v10 起，AI_EXTRACTED Conversation Item 在创建时冻结不可变 `prediction_json`。Continue 的 CONFIRM / EDIT / REJECT / DONE / SUPERSEDE 只能修改当前 truth row，不得改写 prediction snapshot。
+
+因此 label seed 的 `predicted_type / predicted_state` 只允许来自：
+
+1. v10+ immutable prediction snapshot；或
+2. 历史 pre-v10 且仍处于 `AI_EXTRACTED`、尚未人工 review 的 row。
+
+若一个历史 item 已被 review、但没有原始 prediction snapshot，则：
+
+```text
+predicted_type = null
+predicted_state = null
+prediction_unavailable = true
+```
+
+宁可从 precision 分母中排除，也禁止把 post-review truth 倒灌成模型 prediction。Decision / Commitment state 的独立 reviewer 应标注“在该 prediction 时刻、按 Truth Boundary 应输出的类型/状态”，而不是事后拿最终长期状态倒推当时预测。
+
 ## 11. 状态升级边界
 
 human-label report 本身只证明存在人工标签；它不能验证 reviewer 是否是真实外部用户，也不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。

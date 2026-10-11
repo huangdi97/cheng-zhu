@@ -101,6 +101,33 @@ Direct Question 指标只有在存在 final transcript 时才有可复核样本�
 
 writeback_accurate=true 要求 Follow-up / Task / Issue / Decision Log Draft 不包含未 review 的 AI candidate，owner/due/state 正确，source 可追溯，而且没有声称外部系统已经写入。
 
+
+
+## 7.1 Feedback retention integrity
+
+本机显式 feedback 与其被标注对象遵循同一可解释生命周期：
+
+```text
+GUIDANCE / SILENCE feedback
+→ target = conversation_guidance_event
+→ target Guidance 到期删除
+→ dependent feedback 同一次 confirmed retention cleanup 删除
+
+CONTINUE / SESSION_OUTCOME feedback
+→ target = Session-level outcome
+→ 不随单条 Guidance retention 删除
+→ 随 Session / Space 删除边界清理
+```
+
+`retention_preview()` 必须在用户确认前显式列出：
+
+- `dependent_human_feedback`：即将随目标 Guidance 一起删除的反馈；
+- `orphan_human_feedback`：旧版本可能已经留下、但目标 Guidance 不存在的不可审计反馈。
+
+旧 orphan feedback 不是可用 evaluation evidence。diagnostics 会报告 `orphan_guidance_feedback_rows`；存在时 `human_feedback_integrity = NEEDS_RETENTION_CLEANUP`。显式执行 retention cleanup 后才恢复 `AVAILABLE`。
+
+这条规则的目标是同时满足两件事：不为了评测永久绕过用户配置的隐私 retention，也不保留失去被标注事件后无法解释的孤儿标签。
+
 ## 8. session_outcome
 
 cognitive_load_delta 建议使用 -2 到 +2：-2 明显降低，-1 略有降低，0 无变化，+1 略有增加，+2 明显增加。would_reuse_space 为用户是否愿意继续使用同一 Space。

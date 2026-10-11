@@ -108,6 +108,14 @@ def test_local_markdown_rejects_target_escape_and_non_markdown_before_write(monk
     assert wrong_suffix["ok"] is False
     assert not (root / "Decisions.txt").exists()
 
+    directory_target = root / "Directory.md"
+    directory_target.mkdir()
+    directory_result = adapter.execute(target="Directory.md", **base)
+    assert directory_result["ok"] is False
+    assert directory_result["retry_safe"] is True
+    assert directory_result["phase"] == "TARGET_VALIDATION_PRE_WRITE"
+    assert directory_target.is_dir()
+
 
 
 

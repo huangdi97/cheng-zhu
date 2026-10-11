@@ -1920,6 +1920,18 @@ def _query_tokens(text: str) -> set[str]:
     return tokens
 
 
+_DISTINCTIVE_TOKEN_RE = re.compile(r"[0-9a-z$%]+")
+
+
+def _has_distinctive_token(haystack: str, token: str) -> bool:
+    """True when *token* occurs in *haystack* as its own alphanumeric token.
+
+    A loose substring test would let the question token "3" match the "3" inside
+    "30 days", which would silently ground a question about a different number.
+    """
+    return re.search(rf"(?<![0-9a-z]){re.escape(token)}(?![0-9a-z])", haystack) is not None
+
+
 def _text_match_score(question: str, haystack: str) -> int:
     q = str(question or "").strip().lower()
     h = str(haystack or "").lower()
@@ -1927,20 +1939,18 @@ def _text_match_score(question: str, haystack: str) -> int:
         return 0
 
     q_tokens = _query_tokens(q)
-    # Distinctive alphanumeric tokens such as 50x, v2, sha256, Q4 or 30%
-    # carry factual identity. Only use *real segmented tokens* here: _query_tokens
-    # also adds a compact no-space token for CJK substring matching, and treating
-    # that synthetic token as a required numeric identity would incorrectly
-    # reject legitimate queries such as "offline migration v2".
-    segmented = q
-    for ch in "？?，,。；;：:/\\|()（）[]【】":
-        segmented = segmented.replace(ch, " ")
-    base_tokens = {x for x in segmented.split() if len(x) >= 2}
+    # Distinctive alphanumeric tokens such as 50x, v2, sha256, Q4, 2026 or 30%
+    # carry factual identity: when the number/version/date/ratio token changes,
+    # the fact changes, so each such token must occur in the haystack as its own
+    # token -- "3 days" is not "30 days". Only *real segmented tokens* are
+    # collected here; the compact no-space token that _query_tokens adds for CJK
+    # substring matching carries no factual identity and must not reject
+    # legitimate queries such as "offline migration v2".
     distinctive = {
-        token for token in base_tokens
+        token for token in re.findall(_DISTINCTIVE_TOKEN_RE, q)
         if any(ch.isdigit() for ch in token)
     }
-    if distinctive and any(token not in h for token in distinctive):
+    if distinctive and any(not _has_distinctive_token(h, token) for token in distinctive):
         return 0
 
     score = 4 if q in h else 0

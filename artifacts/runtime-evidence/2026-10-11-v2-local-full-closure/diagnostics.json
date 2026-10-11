@@ -1,0 +1,317 @@
+{
+  "contract": "v2.0-R1",
+  "schema_version": 9,
+  "expected_schema_version": 9,
+  "capture": {
+    "active": false,
+    "session_id": "",
+    "owns_requested_session": false,
+    "device_id": null,
+    "candidate_mic_device_id": null,
+    "mode": "IDLE",
+    "paused": false,
+    "stopping": false
+  },
+  "runtime": {
+    "spaces": 0,
+    "sessions": 0,
+    "active_sessions": 0,
+    "ended_sessions": 0,
+    "transcript_segments": 0,
+    "screen_context_observations": 0,
+    "confirmed_items": 0,
+    "pending_review_items": 0,
+    "guidance_shown": 0,
+    "guidance_suppressed": 0,
+    "sourced_guidance_shown": 0,
+    "draft_actions": 0,
+    "approved_drafts": 0,
+    "guidance_adopted": 0,
+    "guidance_dismissed": 0,
+    "duplicate_suppressed": 0,
+    "policy_suppressed": 0
+  },
+  "evaluation": {
+    "observed_proxies": {
+      "source_attribution_coverage": null,
+      "guidance_adoption_rate": null,
+      "guidance_dismissal_rate": null,
+      "suppression_rate": null,
+      "duplicate_suppression_count": 0,
+      "review_queue_size": 0,
+      "approved_draft_rate": null
+    },
+    "requires_human_labels": [
+      "recall_precision",
+      "source_attribution_accuracy",
+      "direct_question_detection",
+      "decision_commitment_state_precision",
+      "opportunity_precision",
+      "interruption_regret",
+      "useful_silence_rate",
+      "continue_writeback_accuracy",
+      "real_cross_session_value",
+      "real_user_cognitive_load"
+    ],
+    "interpretation": "Observed proxies are runtime telemetry on this local device; they are not precision/quality/PMF claims."
+  },
+  "health": {
+    "database": "AVAILABLE",
+    "capture": "AVAILABLE",
+    "continuity": "LIMITED",
+    "review_queue": "AVAILABLE",
+    "session_pack_context": "AVAILABLE",
+    "retrieval": "AVAILABLE",
+    "state_engine": "AVAILABLE",
+    "guidance_arbiter": "AVAILABLE",
+    "export_delete_integrity": "AVAILABLE",
+    "processing_policy": "AVAILABLE",
+    "speaker_diarization": "LIMITED_CHANNEL_ONLY",
+    "external_connectors": "NOT_CONFIGURED",
+    "conversation_screen_context": "MANUAL_AND_EXPLICIT_AUTO_RUNTIME_AVAILABLE",
+    "conversation_share_privacy": "DESKTOP_RUNTIME_AVAILABLE_VERIFY_AT_START",
+    "conversation_human_coach": "RUNTIME_CANDIDATE_EXPLICIT_SESSION_LINK",
+    "external_writeback_execution": "REVIEWED_SECOND_EXPLICIT_EXECUTION_BOUNDARY"
+  },
+  "evidence": {
+    "engineering": "SYNTHETIC_AND_LOCAL_RUNTIME",
+    "real_conversation_user_evidence": "REAL_CONVERSATION_USER_EVIDENCE_PENDING",
+    "pmf": "PMF_PROVEN_FALSE"
+  },
+  "privacy": {
+    "remote_telemetry": "OFF",
+    "auto_external_writeback": "OFF",
+    "speaker_biometric_identity": "OFF",
+    "emotion_sentiment_profiling": "OFF",
+    "hidden_intent_claims": "OFF",
+    "screen_raw_image_persistence": "OFF",
+    "share_privacy_default": "OFF",
+    "share_privacy_runtime": "ELECTRON_CONTENT_PROTECTION_BEST_EFFORT",
+    "share_privacy_undetectability_claim": "NEVER",
+    "human_coach_default": "OFF_EXPLICIT_START_ONLY",
+    "human_coach_truth_authority": "ADVICE_ONLY_NOT_EVIDENCE",
+    "human_coach_public_relay": "BLOCKED_UNLESS_CONFIGURED"
+  },
+  "connectors": {
+    "provider_count": 0,
+    "providers": [],
+    "available_capabilities": [],
+    "read_capabilities": [
+      "calendar.read",
+      "docs.read",
+      "mail.read",
+      "project.read"
+    ],
+    "write_capabilities": [
+      "decision_log.write",
+      "email.send",
+      "issue.create",
+      "task.create"
+    ],
+    "default": "FAIL_CLOSED_EMPTY_REGISTRY"
+  },
+  "integrations": {
+    "catalog": [
+      {
+        "provider_id": "GOOGLE_CALENDAR",
+        "label": "Google Calendar",
+        "capabilities": [
+          "calendar.read"
+        ],
+        "read_capabilities": [
+          "calendar.read"
+        ],
+        "write_capabilities": [],
+        "external_kinds": [
+          "CALENDAR_EVENT"
+        ],
+        "provider_scopes": {
+          "calendar.read": "https://www.googleapis.com/auth/calendar.events.readonly"
+        },
+        "identity_scopes": [],
+        "sync": "NATIVE_SYNC_TOKEN",
+        "setup": {
+          "runtime_opt_in_env": "CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1",
+          "credential_ref_format": "provider:google-calendar:env:<ENV_VAR>",
+          "read_target": "calendar_id (default primary)",
+          "secret_storage": "PROCESS_ENV_ONLY",
+          "write_support": "NONE"
+        },
+        "adapter_available": false
+      },
+      {
+        "provider_id": "GOOGLE_MAIL",
+        "label": "Gmail",
+        "capabilities": [
+          "email.send"
+        ],
+        "read_capabilities": [],
+        "write_capabilities": [
+          "email.send"
+        ],
+        "external_kinds": [],
+        "provider_scopes": {
+          "email.send": "https://www.googleapis.com/auth/gmail.send"
+        },
+        "identity_scopes": [
+          "openid",
+          "email"
+        ],
+        "sync": "WRITE_ONLY_NO_SYNC",
+        "setup": {
+          "runtime_opt_in_env": "CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1",
+          "credential_ref_format": "provider:google-mail:env:<ENV_VAR>",
+          "write_target": "single recipient email address",
+          "secret_storage": "PROCESS_ENV_ONLY",
+          "mailbox_read_support": "NONE",
+          "oauth_required_scopes": "openid email gmail.send",
+          "oauth_scope_classification": "GMAIL_SEND_SENSITIVE",
+          "public_release_gate": "GOOGLE_OAUTH_APP_VERIFICATION_REQUIRED"
+        },
+        "adapter_available": false
+      },
+      {
+        "provider_id": "GOOGLE_DRIVE",
+        "label": "Google Drive / Docs",
+        "capabilities": [
+          "docs.read"
+        ],
+        "read_capabilities": [
+          "docs.read"
+        ],
+        "write_capabilities": [],
+        "external_kinds": [
+          "DOCUMENT"
+        ],
+        "provider_scopes": {
+          "docs.read": "https://www.googleapis.com/auth/drive.readonly"
+        },
+        "identity_scopes": [],
+        "sync": "FULL_TARGET_REFRESH",
+        "setup": {
+          "runtime_opt_in_env": "CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1",
+          "credential_ref_format": "provider:google-drive:env:<ENV_VAR>",
+          "read_target": "folder_id (default root)",
+          "secret_storage": "PROCESS_ENV_ONLY",
+          "write_support": "NONE",
+          "workspace_export": "Docs/Slides=text/plain; Sheets=first-sheet CSV"
+        },
+        "adapter_available": false
+      },
+      {
+        "provider_id": "MICROSOFT_GRAPH",
+        "label": "Microsoft To Do",
+        "capabilities": [
+          "task.create"
+        ],
+        "read_capabilities": [],
+        "write_capabilities": [
+          "task.create"
+        ],
+        "external_kinds": [],
+        "provider_scopes": {
+          "task.create": "Tasks.ReadWrite"
+        },
+        "identity_scopes": [],
+        "sync": "WRITE_ONLY_NO_SYNC",
+        "setup": {
+          "runtime_opt_in_env": "CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1",
+          "credential_ref_format": "provider:microsoft-graph:env:<ENV_VAR>",
+          "write_target": "default or explicit Microsoft To Do task-list id",
+          "secret_storage": "PROCESS_ENV_ONLY",
+          "read_support": "NONE",
+          "delegated_permission": "Tasks.ReadWrite"
+        },
+        "adapter_available": false
+      },
+      {
+        "provider_id": "GITHUB",
+        "label": "GitHub",
+        "capabilities": [
+          "project.read",
+          "issue.create"
+        ],
+        "read_capabilities": [
+          "project.read"
+        ],
+        "write_capabilities": [
+          "issue.create"
+        ],
+        "external_kinds": [
+          "ISSUE"
+        ],
+        "provider_scopes": {
+          "project.read": "Issues: read",
+          "issue.create": "Issues: write"
+        },
+        "identity_scopes": [],
+        "sync": "UPDATED_AT_CURSOR_WITH_OVERLAP",
+        "setup": {
+          "runtime_opt_in_env": "CHENGZHU_GITHUB_CONNECTOR_ENABLE=1",
+          "credential_ref_format": "provider:github:env:<ENV_VAR>",
+          "read_target": "owner/repo",
+          "write_target": "owner/repo",
+          "secret_storage": "PROCESS_ENV_ONLY"
+        },
+        "adapter_available": false
+      },
+      {
+        "provider_id": "MCP",
+        "label": "Model Context Protocol",
+        "capabilities": [
+          "calendar.read",
+          "decision_log.write",
+          "docs.read",
+          "email.send",
+          "issue.create",
+          "mail.read",
+          "project.read",
+          "task.create"
+        ],
+        "read_capabilities": [
+          "calendar.read",
+          "docs.read",
+          "mail.read",
+          "project.read"
+        ],
+        "write_capabilities": [
+          "decision_log.write",
+          "email.send",
+          "issue.create",
+          "task.create"
+        ],
+        "external_kinds": [
+          "DOCUMENT",
+          "TASK",
+          "ISSUE",
+          "CALENDAR_EVENT",
+          "MAIL_THREAD"
+        ],
+        "provider_scopes": {
+          "calendar.read": "server-defined",
+          "decision_log.write": "server-defined",
+          "docs.read": "server-defined",
+          "email.send": "server-defined",
+          "issue.create": "server-defined",
+          "mail.read": "server-defined",
+          "project.read": "server-defined",
+          "task.create": "server-defined"
+        },
+        "identity_scopes": [],
+        "sync": "SERVER_DEFINED",
+        "setup": {},
+        "adapter_available": false
+      }
+    ],
+    "connections": [],
+    "connected_count": 0,
+    "registered_adapters": [],
+    "snapshot_count": 0,
+    "execution_count": 0,
+    "external_execution": "REVIEW_SECOND_EXECUTE_WITH_AMBIGUOUS_OUTCOME_GUARD",
+    "unknown_outcome_count": 0,
+    "orphaned_executions_recovered": 0,
+    "secret_storage": "OPAQUE_REFERENCE_ONLY",
+    "default": "NO_PROVIDER_ADAPTERS_CONFIGURED"
+  }
+}

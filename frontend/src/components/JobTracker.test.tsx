@@ -665,7 +665,8 @@ describe('JobTracker', () => {
     render(<JobTracker />)
     await waitFor(() => expect(screen.getAllByText('Acme').length).toBeGreaterThan(0))
 
-    fireEvent.click(screen.getByRole('button', { name: '编辑核心信息' }))
+    const coreEditButton = await screen.findByRole('button', { name: '编辑核心信息' })
+    fireEvent.click(coreEditButton)
     fireEvent.change(screen.getByLabelText('公司名称'), { target: { value: 'Acme Labs' } })
 
     expect(screen.getByText('待保存')).toBeInTheDocument()
@@ -701,7 +702,8 @@ describe('JobTracker', () => {
     render(<JobTracker />)
     await waitFor(() => expect(screen.getAllByText('Acme').length).toBeGreaterThan(0))
 
-    fireEvent.click(screen.getByRole('button', { name: '编辑核心信息' }))
+    const coreEditButton = await screen.findByRole('button', { name: '编辑核心信息' })
+    fireEvent.click(coreEditButton)
     fireEvent.change(screen.getByLabelText('公司名称'), { target: { value: 'Acme Labs' } })
     fireEvent.click(screen.getAllByRole('button', { name: '保存核心信息' })[0])
 

@@ -732,3 +732,24 @@ def test_calendar_cursor_never_crosses_explicit_calendar_targets(monkeypatch):
     assert "syncToken" not in params
     assert "timeMin" in params
     assert urlparse(transport.calls[0]["url"]).path.endswith("/calendars/shared%40example.test/events")
+
+
+def test_timezone_database_is_declared_and_resolvable_for_calendar_timestamps():
+    """Calendar event instants need the IANA time zone database.
+
+    ``zoneinfo.ZoneInfo`` raises ``ZoneInfoNotFoundError`` (a ``KeyError``) when
+    the platform has no tz database, and Windows ships none at all. The Calendar
+    connector's ``_timestamp`` catches that as "no time", so a naive Google
+    ``dateTime`` combined with a named ``timeZone`` would silently lose its
+    instant. The database is therefore a declared runtime dependency (``tzdata``
+    in backend/requirements.txt, also bundled into the packaged sidecar) and this
+    test fails loudly wherever it is missing, instead of letting the calendar
+    assertions quietly rot in a different environment.
+    """
+    import zoneinfo
+
+    from services.product.google_calendar_connector import _timestamp
+
+    assert zoneinfo.ZoneInfo("Asia/Shanghai") is not None
+    assert _timestamp("2026-10-11T09:00:00", "Asia/Shanghai") is not None
+    assert _timestamp("2026-10-11T09:00:00+08:00", "") is not None

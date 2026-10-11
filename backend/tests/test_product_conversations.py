@@ -1862,6 +1862,113 @@ def test_rejected_open_thread_candidate_never_enters_long_term_continuity(produc
     assert conversations.space_detail(space["id"])["threads"] == []
 
 
+def test_conversation_item_review_statuses_gate_confirmed_truth_by_real_contract(product_env):
+    space = conversations.create_space("Review Set", "DESIGN_REVIEW")
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    refs = [{"kind": "TRANSCRIPT_SEGMENT", "id": "seg-review", "excerpt": "我们决定采用 v9"}]
+
+    # AI_EXTRACTED is the extraction boundary: a candidate is never agreement.
+    candidate = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="我们决定采用 v9",
+        source_refs=refs,
+        source_excerpt="我们决定采用 v9",
+    )
+    assert candidate["review_status"] == "AI_EXTRACTED"
+    assert candidate["state"] == "PROPOSED"
+    with pytest.raises(ValueError, match="明确确认"):
+        conversations.add_item(
+            session["id"],
+            item_type="Decision",
+            title="我们决定采用 v9b",
+            state="AGREED",
+            review_status="AI_EXTRACTED",
+            source_refs=refs,
+        )
+
+    # The review set is closed: an invented status is not a product state.
+    with pytest.raises(ValueError, match="审核状态"):
+        conversations.add_item(
+            session["id"],
+            item_type="Risk",
+            title="invented review state",
+            review_status="MODEL_CONFIRMED",
+            source_refs=refs,
+        )
+
+    risk = conversations.add_item(
+        session["id"],
+        item_type="Risk",
+        title="可能破坏 rollback window",
+        source_refs=refs,
+        source_excerpt="只是猜测",
+    )
+    rejected = conversations.review_item(risk["id"], "REJECT")
+    assert rejected["review_status"] == "USER_REJECTED"
+    assert rejected["state"] == "UNKNOWN"
+
+    decision = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="我们决定采用 v10",
+        source_refs=refs,
+        source_excerpt="我们决定采用 v10",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    edited = conversations.review_item(
+        decision["id"], "EDIT", {"title": "我们决定采用 v10 并冻结发布窗口"},
+    )
+    assert edited["review_status"] == "USER_EDITED"
+    assert edited["state"] == "AGREED"
+
+    # SOURCE_CONFIRMED: no review action and no extraction path produces this
+    # state -- the explicit add_item contract is its only producer -- and the rest
+    # of the truth model treats it exactly like USER_CONFIRMED / USER_EDITED.
+    source_confirmed = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="我们决定采用 v11",
+        state="AGREED",
+        review_status="SOURCE_CONFIRMED",
+        epistemic_status="SOURCE_CONFIRMED",
+        source_refs=refs,
+        source_excerpt="来源本身写明了 v11",
+    )
+    assert source_confirmed["review_status"] == "SOURCE_CONFIRMED"
+    assert source_confirmed["state"] == "AGREED"
+
+    confirmed_thread = conversations.add_item(
+        session["id"],
+        item_type="OpenQuestion",
+        title="谁负责 v12 的 rollback drill？",
+        review_status="SOURCE_CONFIRMED",
+        epistemic_status="SOURCE_CONFIRMED",
+        source_refs=refs,
+    )
+
+    assert {item["id"] for item in conversations._confirmed_context_items(space["id"])} == {
+        edited["id"],
+        source_confirmed["id"],
+        confirmed_thread["id"],
+    }
+
+    prepared = conversations.prepare_space(space["id"])
+    assert {item["id"] for item in prepared["related_decisions"]} == {edited["id"], source_confirmed["id"]}
+    assert {item["id"] for item in prepared["open_questions"]} == {confirmed_thread["id"]}
+
+    thread_item_ids = {
+        ref["id"]
+        for thread in conversations.space_detail(space["id"])["threads"]
+        for ref in thread["source_refs"]
+        if str(ref.get("kind") or "") == "CONVERSATION_ITEM"
+    }
+    assert thread_item_ids == {confirmed_thread["id"]}
+    assert rejected["id"] not in thread_item_ids
+    assert candidate["id"] not in thread_item_ids
+
+
 def test_deadline_requires_provenance(product_env):
     space = conversations.create_space("Deadline Truth", "PROJECT_SYNC")
     session = conversations.create_session(space["id"], consent_ack=True)
@@ -2690,6 +2797,195 @@ def test_manual_ask_uses_frozen_ready_sources_not_latest_material(product_env):
 
     not_silently_refreshed = conversations.ask(session["id"], "50x data scale")
     assert not_silently_refreshed["grounded"] is False
+
+
+def test_manual_ask_does_not_ground_changed_version_token(product_env):
+    material = materials.create_material(
+        "Architecture Brief",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Architecture brief: the cutover uses offline migration v2 across the rollback window. rollback owner remained open.",
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    started = conversations.start_session(session["id"])
+    frozen_version = started["pack"]["payload"]["sources"][0]["version_id"]
+
+    matched = conversations.ask(session["id"], "offline migration v2")
+    assert matched["grounded"] is True
+    assert matched["matches"][0]["kind"] == "FROZEN_SOURCE"
+    assert matched["matches"][0]["source_refs"][0]["version_id"] == frozen_version
+
+    # Same generic words, different version token: the fact changed, so the
+    # frozen source must not answer for it.
+    changed = conversations.ask(session["id"], "offline migration v3")
+    assert changed["grounded"] is False
+    assert changed["matches"] == []
+
+
+def test_manual_ask_does_not_ground_changed_year_token(product_env):
+    material = materials.create_material(
+        "Release Plan",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Release plan: the rollout window opens 2026 after the compliance freeze. rollback owner remained open.",
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    started = conversations.start_session(session["id"])
+    frozen_version = started["pack"]["payload"]["sources"][0]["version_id"]
+
+    matched = conversations.ask(session["id"], "rollout window 2026")
+    assert matched["grounded"] is True
+    assert matched["matches"][0]["kind"] == "FROZEN_SOURCE"
+    assert matched["matches"][0]["source_refs"][0]["version_id"] == frozen_version
+
+    changed = conversations.ask(session["id"], "rollout window 2025")
+    assert changed["grounded"] is False
+    assert changed["matches"] == []
+
+
+def test_manual_ask_does_not_ground_changed_ratio_token(product_env):
+    material = materials.create_material(
+        "Budget Note",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Budget note: the migration is approved at $10k per month for the rollout window. rollback owner remained open.",
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    started = conversations.start_session(session["id"])
+    frozen_version = started["pack"]["payload"]["sources"][0]["version_id"]
+
+    matched = conversations.ask(session["id"], "$10k budget")
+    assert matched["grounded"] is True
+    assert matched["matches"][0]["kind"] == "FROZEN_SOURCE"
+    assert matched["matches"][0]["source_refs"][0]["version_id"] == frozen_version
+
+    changed = conversations.ask(session["id"], "$100k budget")
+    assert changed["grounded"] is False
+    assert changed["matches"] == []
+
+
+def test_manual_ask_does_not_ground_changed_duration_token(product_env):
+    thirty_days = materials.create_material(
+        "Release Checklist",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Release checklist: the migration window is 30 days before the freeze. rollback owner remained open.",
+    )
+    three_days = materials.create_material(
+        "Short Checklist",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Short checklist: the migration window is 3 days before the freeze. rollback owner remained open.",
+    )
+
+    # A single-digit day count is its own fact-bearing token in both directions:
+    # "3 days" must not be answered by a source that only says "30 days", and the
+    # reverse is true as well, even though every generic word is shared.
+    for material, matching_question, changed_question in (
+        (thirty_days, "migration window 30 days", "migration window 3 days"),
+        (three_days, "migration window 3 days", "migration window 30 days"),
+    ):
+        space = conversations.create_space(
+            "Architecture",
+            "DESIGN_REVIEW",
+            selected_source_ids=[material["id"]],
+        )
+        session = conversations.create_session(space["id"], consent_ack=True)
+        conversations.start_session(session["id"])
+
+        matched = conversations.ask(session["id"], matching_question)
+        assert matched["grounded"] is True, matching_question
+        assert matched["matches"][0]["id"] == material["id"], matching_question
+
+        changed = conversations.ask(session["id"], changed_question)
+        assert changed["grounded"] is False, changed_question
+        assert changed["matches"] == [], changed_question
+
+
+def test_manual_ask_returns_confirmed_truth_authority_for_reviewed_items(product_env):
+    material = materials.create_material(
+        "Architecture Brief",
+        kind="PROJECT",
+        usage="FACTS",
+        text="Architecture brief: the cutover keeps offline migration on v2 and the rollback owner stayed open.",
+    )
+    space = conversations.create_space(
+        "Architecture",
+        "DESIGN_REVIEW",
+        selected_source_ids=[material["id"]],
+    )
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    refs = [{"kind": "DOCUMENT", "id": material["id"], "excerpt": "offline migration uses v2"}]
+
+    confirmed = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="offline migration 采用 v2",
+        source_refs=refs,
+        source_excerpt="offline migration uses v2",
+    )
+    confirmed = conversations.review_item(confirmed["id"], "CONFIRM")
+    assert confirmed["review_status"] == "USER_CONFIRMED"
+
+    edited = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="offline migration 采用 v3",
+        source_refs=refs,
+        source_excerpt="offline migration uses v3",
+    )
+    conversations.review_item(edited["id"], "CONFIRM")
+    edited = conversations.review_item(edited["id"], "EDIT", {"title": "offline migration 采用 v3 cutover"})
+    assert edited["review_status"] == "USER_EDITED"
+
+    source_confirmed = conversations.add_item(
+        session["id"],
+        item_type="Decision",
+        title="offline migration 采用 v4",
+        state="AGREED",
+        review_status="SOURCE_CONFIRMED",
+        epistemic_status="SOURCE_CONFIRMED",
+        source_refs=refs,
+        source_excerpt="the brief records v4 as the migration version",
+    )
+    assert source_confirmed["review_status"] == "SOURCE_CONFIRMED"
+
+    first = conversations.ask(session["id"], "offline migration v2")
+    assert first["grounded"] is True
+    assert first["truth_confirmed"] is True
+    assert first["matches"][0]["kind"] == "CONFIRMED_ITEM"
+    assert first["matches"][0]["authority"] == "CONFIRMED_TRUTH"
+    assert first["matches"][0]["id"] == confirmed["id"]
+    # Confirmed truth outranks the frozen Ready source that shares the wording.
+    assert first["matches"][1]["kind"] == "FROZEN_SOURCE"
+    assert first["matches"][1]["authority"] == "PERSONAL_EVIDENCE"
+
+    for item, question in (
+        (edited, "offline migration v3"),
+        (source_confirmed, "offline migration v4"),
+    ):
+        result = conversations.ask(session["id"], question)
+        assert result["grounded"] is True
+        assert result["truth_confirmed"] is True
+        assert result["matches"][0]["id"] == item["id"]
+        assert result["matches"][0]["authority"] == "CONFIRMED_TRUTH"
+        assert result["matches"][0]["review_status"] == item["review_status"]
 
 
 def test_manual_ask_labels_quick_note_and_transcript_without_promoting_truth(product_env):

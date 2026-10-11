@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-10-11 02:55:37",
+  "results": [
+    {
+      "hours": 3.0,
+      "turns": 180,
+      "wall_seconds": 29.8,
+      "rss_start_mb": 106.7,
+      "rss_end_mb": 133.8,
+      "traced_peak_mb": 10.2,
+      "qa_pairs_in_session": 80,
+      "state_topic_stack": 12,
+      "state_open_threads": 0,
+      "db_bytes": 1130496,
+      "prompt_chars_first_hour_avg": 451,
+      "prompt_chars_last_hour_avg": 485,
+      "context_pollution": false,
+      "pack_ids_seen": [
+        "pack-6f693134345f4b97"
+      ],
+      "pack_stable": true,
+      "session_claims": 1,
+      "provider_failures_injected": 7,
+      "coach_sessions_active_after": 0,
+      "latency_history_len": 173,
+      "checks": {
+        "no_context_pollution": true,
+        "pack_stable": true,
+        "state_bounded": true,
+        "coach_no_leak": true,
+        "latency_history_bounded": true
+      },
+      "passed": true
+    }
+  ],
+  "not_simulated": {
+    "audio_switching": "BLOCKED-EXTERNAL",
+    "sleep_wake": "BLOCKED-EXTERNAL",
+    "real_participants": "BLOCKED-EXTERNAL"
+  }
+}

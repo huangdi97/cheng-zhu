@@ -1,0 +1,152 @@
+{
+  "evidence_type": "V2_LOCAL_CLOSURE_REVERIFICATION",
+  "worktree": "E:\\AI\\面试助手\\.pi\\closure-wt",
+  "head": "60a6f2f333bec4cbc336e06ffc01282244e0f190",
+  "expected_base_sha": "c581c0d764cf6dd4f59a254957b90dd7eb409f45",
+  "generated_at": "2026-10-11T13:18:55+0800",
+  "duration_seconds": 9.79,
+  "checks_total": 23,
+  "checks_passed": 23,
+  "checks_failed": 0,
+  "failed_checks": [],
+  "checks": [
+    {
+      "check": "worktree_head_is_sha",
+      "pass": true,
+      "observed": "60a6f2f333bec4cbc336e06ffc01282244e0f190"
+    },
+    {
+      "check": "origin_main_matches_expected_base",
+      "pass": true,
+      "observed": "c581c0d764cf6dd4f59a254957b90dd7eb409f45",
+      "expected": "c581c0d764cf6dd4f59a254957b90dd7eb409f45"
+    },
+    {
+      "check": "branch_is_based_on_expected_base",
+      "pass": true,
+      "observed": "c581c0d764cf6dd4f59a254957b90dd7eb409f45",
+      "expected": "c581c0d764cf6dd4f59a254957b90dd7eb409f45"
+    },
+    {
+      "check": "beta2_tag_present_locally",
+      "pass": true,
+      "observed": "cac605edf413ec248babf02ea9f73da708d156f8"
+    },
+    {
+      "check": "branch_is_ahead_of_beta2",
+      "pass": true,
+      "observed": 20,
+      "expected": ">0"
+    },
+    {
+      "check": "no_uncommitted_tracked_changes",
+      "pass": true,
+      "observed": "(clean)"
+    },
+    {
+      "check": "artifact_sha256::Chengzhu-Setup-x64.exe",
+      "pass": true,
+      "observed": "d9c86fb0d4718faef213ee980d3c6390d050de99ff759f4f9bb90166aa0793bb",
+      "expected": "d9c86fb0d4718faef213ee980d3c6390d050de99ff759f4f9bb90166aa0793bb",
+      "note": "203371880 bytes"
+    },
+    {
+      "check": "artifact_sha256::Chengzhu-Portable-x64.zip",
+      "pass": true,
+      "observed": "ae86074bd6042fdac9c32cd1f99a134404f4b3ae32d8c88e6c146836da41e762",
+      "expected": "ae86074bd6042fdac9c32cd1f99a134404f4b3ae32d8c88e6c146836da41e762",
+      "note": "270147648 bytes"
+    },
+    {
+      "check": "artifact_sha256::chengzhu-backend.exe",
+      "pass": true,
+      "observed": "22ed600ae95137745fea7222b9eee1e4e4ddcdcb9edbe317c61d48e6f9959907",
+      "expected": "22ed600ae95137745fea7222b9eee1e4e4ddcdcb9edbe317c61d48e6f9959907",
+      "note": "17118408 bytes"
+    },
+    {
+      "check": "asar_contains::overlayLayout.js",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "check": "asar_contains::conversationReminders.js",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "check": "packaged_guid_capture_count",
+      "pass": true,
+      "observed": 46,
+      "expected": 46
+    },
+    {
+      "check": "packaged_conversation_capture_count",
+      "pass": true,
+      "observed": 6,
+      "expected": 6
+    },
+    {
+      "check": "clean_install_passed",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "check": "clean_install_no_python_on_path",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "check": "clean_install_no_node_on_path",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "check": "clean_install_no_repo_checkout",
+      "pass": true,
+      "observed": false,
+      "expected": false
+    },
+    {
+      "check": "clean_install_sha256_all_match",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "check": "clean_install_uninstall_removes_dir",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "check": "clean_install_keeps_user_data",
+      "pass": true,
+      "observed": true,
+      "expected": true
+    },
+    {
+      "check": "clean_install_portable_launches",
+      "pass": true,
+      "observed": 3.3
+    },
+    {
+      "check": "backend_tests_collected",
+      "pass": true,
+      "observed": 1337,
+      "expected": 1337
+    },
+    {
+      "check": "no_proxy_has_bracketed_ipv6",
+      "pass": true,
+      "observed": true,
+      "note": "httpx 0.28.x raises InvalidURL for a bracketed IPv6 no_proxy entry; this is a machine proxy setting, not a product defect. Run `python -m pytest` with that entry removed for a clean local suite."
+    }
+  ],
+  "passed": true
+}

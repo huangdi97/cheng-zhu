@@ -1,0 +1,478 @@
+{
+  "policy_version": "v2.0-R1-stable-promotion-1",
+  "status": "NO_GO",
+  "checks_total": 37,
+  "checks_failed": 29,
+  "failed_checks": [
+    {
+      "name": "human_labels_available",
+      "passed": false,
+      "actual": false,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "profile:PROJECT_SYNC:distinct_users",
+      "passed": false,
+      "actual": 0,
+      "required": ">=5",
+      "reason": ""
+    },
+    {
+      "name": "profile:PROJECT_SYNC:sessions",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "profile:PROJECT_SYNC:cross_session_spaces",
+      "passed": false,
+      "actual": 0,
+      "required": ">=3",
+      "reason": ""
+    },
+    {
+      "name": "profile:DESIGN_REVIEW:distinct_users",
+      "passed": false,
+      "actual": 0,
+      "required": ">=5",
+      "reason": ""
+    },
+    {
+      "name": "profile:DESIGN_REVIEW:sessions",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "profile:DESIGN_REVIEW:cross_session_spaces",
+      "passed": false,
+      "actual": 0,
+      "required": ">=3",
+      "reason": ""
+    },
+    {
+      "name": "metric:opportunity_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:opportunity_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.8",
+      "reason": ""
+    },
+    {
+      "name": "metric:interruption_regret:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:interruption_regret:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "lte 0.15",
+      "reason": ""
+    },
+    {
+      "name": "metric:source_attribution_accuracy:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:source_attribution_accuracy:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.95",
+      "reason": ""
+    },
+    {
+      "name": "metric:recall_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:recall_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.9",
+      "reason": ""
+    },
+    {
+      "name": "metric:useful_silence_rate:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:useful_silence_rate:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.8",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.9",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_recall:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_recall:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.85",
+      "reason": ""
+    },
+    {
+      "name": "metric:decision_commitment_state_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:decision_commitment_state_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.9",
+      "reason": ""
+    },
+    {
+      "name": "metric:continue_writeback_accuracy:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:continue_writeback_accuracy:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.95",
+      "reason": ""
+    },
+    {
+      "name": "metric:mean_cognitive_load_delta:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=15",
+      "reason": ""
+    },
+    {
+      "name": "metric:mean_cognitive_load_delta:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "lte -0.25",
+      "reason": ""
+    },
+    {
+      "name": "metric:space_reuse_intent_rate:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=15",
+      "reason": ""
+    },
+    {
+      "name": "metric:space_reuse_intent_rate:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.7",
+      "reason": ""
+    }
+  ],
+  "checks": [
+    {
+      "name": "human_report_evidence_type",
+      "passed": true,
+      "actual": "HUMAN_LABELED_CONVERSATION_EVAL",
+      "required": "HUMAN_LABELED_CONVERSATION_EVAL",
+      "reason": ""
+    },
+    {
+      "name": "human_labels_available",
+      "passed": false,
+      "actual": false,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "pilot_manifest_type",
+      "passed": true,
+      "actual": "AUTHORIZED_REAL_CONVERSATION_PILOT",
+      "required": "AUTHORIZED_REAL_CONVERSATION_PILOT",
+      "reason": ""
+    },
+    {
+      "name": "attestation:AUTHORIZED_REAL_USE",
+      "passed": true,
+      "actual": true,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "attestation:NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
+      "passed": true,
+      "actual": true,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "attestation:RAW_LABELS_KEPT_LOCAL",
+      "passed": true,
+      "actual": true,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "attestation:NO_CRITICAL_PRIVACY_INCIDENT",
+      "passed": true,
+      "actual": true,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "attestation:NO_KNOWN_DATA_LOSS",
+      "passed": true,
+      "actual": true,
+      "required": true,
+      "reason": ""
+    },
+    {
+      "name": "profile:PROJECT_SYNC:distinct_users",
+      "passed": false,
+      "actual": 0,
+      "required": ">=5",
+      "reason": ""
+    },
+    {
+      "name": "profile:PROJECT_SYNC:sessions",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "profile:PROJECT_SYNC:cross_session_spaces",
+      "passed": false,
+      "actual": 0,
+      "required": ">=3",
+      "reason": ""
+    },
+    {
+      "name": "profile:DESIGN_REVIEW:distinct_users",
+      "passed": false,
+      "actual": 0,
+      "required": ">=5",
+      "reason": ""
+    },
+    {
+      "name": "profile:DESIGN_REVIEW:sessions",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "profile:DESIGN_REVIEW:cross_session_spaces",
+      "passed": false,
+      "actual": 0,
+      "required": ">=3",
+      "reason": ""
+    },
+    {
+      "name": "metric:opportunity_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:opportunity_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.8",
+      "reason": ""
+    },
+    {
+      "name": "metric:interruption_regret:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:interruption_regret:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "lte 0.15",
+      "reason": ""
+    },
+    {
+      "name": "metric:source_attribution_accuracy:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:source_attribution_accuracy:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.95",
+      "reason": ""
+    },
+    {
+      "name": "metric:recall_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:recall_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.9",
+      "reason": ""
+    },
+    {
+      "name": "metric:useful_silence_rate:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:useful_silence_rate:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.8",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.9",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_recall:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:direct_question_recall:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.85",
+      "reason": ""
+    },
+    {
+      "name": "metric:decision_commitment_state_precision:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=30",
+      "reason": ""
+    },
+    {
+      "name": "metric:decision_commitment_state_precision:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.9",
+      "reason": ""
+    },
+    {
+      "name": "metric:continue_writeback_accuracy:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=20",
+      "reason": ""
+    },
+    {
+      "name": "metric:continue_writeback_accuracy:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.95",
+      "reason": ""
+    },
+    {
+      "name": "metric:mean_cognitive_load_delta:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=15",
+      "reason": ""
+    },
+    {
+      "name": "metric:mean_cognitive_load_delta:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "lte -0.25",
+      "reason": ""
+    },
+    {
+      "name": "metric:space_reuse_intent_rate:sample_size",
+      "passed": false,
+      "actual": 0,
+      "required": ">=15",
+      "reason": ""
+    },
+    {
+      "name": "metric:space_reuse_intent_rate:threshold",
+      "passed": false,
+      "actual": null,
+      "required": "gte 0.7",
+      "reason": ""
+    },
+    {
+      "name": "critical_incidents_zero",
+      "passed": true,
+      "actual": 0,
+      "required": 0,
+      "reason": ""
+    }
+  ],
+  "claims": {
+    "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": false,
+    "V2_STABLE_RELEASE": false,
+    "PMF_PROVEN": false
+  },
+  "interpretation": "PASS only permits a stable-release review. Packaging/signing/release gates remain independent, and this tool does not establish PMF or universal user value."
+}

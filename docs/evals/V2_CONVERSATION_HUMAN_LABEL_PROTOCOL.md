@@ -13,6 +13,14 @@
 
 每行一个 JSON object。kind 必须是 guidance、silence、direct_question、truth_item、continue、session_outcome 之一；reviewer 与 session_id 必填。可选共同字段：space_id、profile、event_id、timestamp、notes。
 
+为了进入 Stable Promotion Gate，人工标签还必须显式写 `label_source`：
+
+- `INDEPENDENT_HUMAN_REVIEW`：独立人工 reviewer 按本协议复核；
+- `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`：用户在成竹 Continue 里显式填写的本机自报；
+- 缺失/空值会被汇总为 `UNSPECIFIED`，可用于调试汇总，但 **永远不能满足 Stable Gate 的指标来源要求**。
+
+`reviewer` 是去重与审计标识，不是身份认证；即使填写真实姓名，也不能替代 authorized pilot manifest。
+
 运行：python scripts/v2_conversation_human_eval.py labels.jsonl --out report.json --markdown-out report.md
 
 从本地 dogfood 数据先生成“待人工标注 seed”：
@@ -140,7 +148,7 @@ python scripts/v2_conversation_stable_readiness.py \
   real-pilot.json
 ```
 
-稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。即使全部通过，也只允许：
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。policy v2 起每个指标同时冻结 `allowed_label_sources`：用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源替代该指标所需证据。即使全部通过，也只允许：
 
 ```text
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE

@@ -247,7 +247,12 @@ def record_transcription(
     }
     store.insert("conversation_transcript_segment", row)
 
-    guidance = conversations.guidance_from_transcript(session_id, cleaned, channel=normalized_channel)
+    guidance = conversations.guidance_from_transcript(
+        session_id,
+        cleaned,
+        channel=normalized_channel,
+        frozen_direct_question=row["analysis"]["direct_question"],
+    )
     try:
         from api.realtime.ws import broadcast
         broadcast({"type": "conversation_transcription", "session_id": session_id, "segment": row})

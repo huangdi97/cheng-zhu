@@ -1,9 +1,9 @@
 # Chengzhu v2 Conversation Connector Capability Contract
 ## Post-beta.2 Capability Registry + Audited Integration Boundary
 
-**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY IMPLEMENTED / GITHUB ADAPTER OPT-IN CANDIDATE  
+**状态**：DESIGN COMPLETE / CAPABILITY REGISTRY AVAILABLE / INTEGRATION BOUNDARY IMPLEMENTED / SIX CONCRETE OPT-IN PROVIDERS  
 **适用**：Calendar / Docs / Mail / project tracker / MCP / reviewed external write-back  
-**主线边界**：PR #61 已合入 main（merge commit `72e810c1`）；当前 GitHub real adapter 在 `feat/chengzhu-v2-github-provider`，合并前不声明真实账户可用
+**主线边界**：PR #61 的 audited integration boundary 及 GitHub / Google Calendar / Google Drive / Gmail / Microsoft To Do adapters 已进入 main；2026-10-11 GitHub 专用私有测试仓库 real-account replay PASS；本 contract 继续纳入 Local Markdown reviewed `decision_log.write` provider。
 
 ---
 
@@ -103,6 +103,7 @@ Conversation truth
 | Gmail | email.send（send-only；mail.read 未实现） |
 | Google Drive / Docs | docs.read |
 | Microsoft To Do (Graph) | task.create only |
+| Local Markdown / Obsidian | decision_log.write only |
 | GitHub | project.read / issue.create |
 | MCP | server-defined subset of canonical capability vocabulary |
 
@@ -120,6 +121,7 @@ CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1
 CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1
 CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1
+CHENGZHU_LOCAL_MARKDOWN_CONNECTOR_ENABLE=1
 ```
 
 才注册为 `adapter_available=true`。Google Mail 当前只注册 `email.send`，不注册 `mail.read`；Microsoft To Do 当前只注册 `task.create`，不注册 Outlook/Calendar/Files read/write。MCP 仍不能仅凭 catalog 条目冒充真实 adapter。
@@ -138,6 +140,7 @@ email.send    → openid + email + Gmail send
 mail.read     → 未实现；不因 email.send 偷加 Gmail readonly
 
 task.create   → Microsoft Tasks.ReadWrite
+decision_log.write → local.filesystem.markdown.write
 
 project.read  → GitHub Issues: read
 issue.create  → GitHub Issues: write
@@ -670,7 +673,7 @@ CREATE_ISSUE_DRAFT
 - GitHub issues endpoint 返回的 Pull Request 必须过滤；
 - provider 5xx / transport failure 继续走 UNKNOWN_OUTCOME，不自动 retry；
 - issue body 带 Chengzhu execution marker，便于 provider-side reconciliation；
-- 没有真实 token/account/runtime evidence 时，禁止声明 `GITHUB_ACCOUNT_CONNECTED = TRUE`。
+- 2026-10-11 已有专用私有测试仓库真实 token/account/runtime replay，允许声明 `GITHUB_REAL_TEST_ACCOUNT_REPLAY = PASS` 与 `GITHUB_REAL_ISSUE_CREATE_EVIDENCE = PASS`；这不等于任意用户的 GitHub account 已连接。
 
 实现与使用说明见：
 
@@ -717,9 +720,44 @@ Tasks.ReadWrite
 
 ---
 
+## 19.10 Local Markdown / Obsidian reviewed Decision Log provider
+
+当前 `LOCAL_MARKDOWN` concrete adapter 只实现：
+
+```text
+UPDATE_DECISION_LOG_DRAFT
+→ APPROVED
+→ exact Local Markdown connection
+→ relative .md target under configured root
+→ Execution Request
+→ second Execute
+→ atomic local Markdown append
+→ provider ok=true / FAILED / UNKNOWN_OUTCOME
+```
+
+边界：
+
+- adapter 默认不注册；只有 `CHENGZHU_LOCAL_MARKDOWN_CONNECTOR_ENABLE=1` 才 available；
+- product.db 只保存 `provider:local-markdown:env:<ENV_VAR>`，实际 root path 只从 backend process environment 解析；
+- Verify 只证明 root 当前存在且可读写，不读取/索引 vault 内容；
+- capability = `decision_log.write`，scope = `local.filesystem.markdown.write`；
+- target 只能是 root 下相对 `.md` 路径，拒绝绝对路径、`..`、反斜杠 target、symlink target 与 root escape；
+- existing target 超过 10 MiB 时在读取前拒绝；
+- outbound payload 若被安全层脱敏修改，则拒绝写入，要求用户重新审核；
+- write 使用同目录 temp + fsync + `os.replace`；
+- 文件中写入 `chengzhu-execution:<idempotency_key>` marker，重复 Execute 可 provider-level 去重；
+- replace 后异常继续由共享边界记录 `UNKNOWN_OUTCOME`，禁止自动 retry；
+- 不提供 docs.read、目录枚举、搜索、删除、rename、shell、Git commit/push。
+
+实现说明：
+
+- [Local Markdown Decision Log Connector](../architecture/LOCAL_MARKDOWN_DECISION_LOG_CONNECTOR.md)
+
+---
+
 ## 20. 当前 repo truth
 
-PR #61 + GitHub provider + Calendar provider 合并后，repo engineering truth 允许声明：
+截至 2026-10-11，repo engineering truth 允许声明：
 
 ```text
 CONNECTOR_CAPABILITY_CONTRACT = IMPLEMENTED
@@ -729,10 +767,13 @@ IMMUTABLE_EXTERNAL_SNAPSHOT_PATH = IMPLEMENTED
 REVIEWED_TWO_STEP_EXECUTION_BOUNDARY = IMPLEMENTED
 AMBIGUOUS_EXTERNAL_OUTCOME_GUARD = IMPLEMENTED
 GITHUB_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+GITHUB_REAL_TEST_ACCOUNT_REPLAY = PASS
+GITHUB_REAL_ISSUE_CREATE_EVIDENCE = PASS
 GOOGLE_CALENDAR_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_DRIVE_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 GOOGLE_MAIL_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 MICROSOFT_TODO_PROVIDER_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
+LOCAL_MARKDOWN_DECISION_LOG_ADAPTER = RUNTIME_AVAILABLE_OPT_IN
 ```
 
 仍禁止在缺少真实 adapter/account/runtime evidence 时声明：
@@ -746,14 +787,15 @@ PROJECT_TRACKER_ACCOUNT_CONNECTED = TRUE
 GOOGLE_ACCOUNT_CONNECTED = TRUE
 MICROSOFT_ACCOUNT_CONNECTED = TRUE
 REAL_MICROSOFT_TASK_CREATE_PROVEN = TRUE
-GITHUB_ACCOUNT_CONNECTED = TRUE
+ARBITRARY_USER_GITHUB_ACCOUNT_CONNECTED = TRUE
 MCP_SERVER_CONNECTED = TRUE
-REAL_EXTERNAL_ACTION_EVIDENCE = TRUE
+ALL_PROVIDER_REAL_EXTERNAL_ACTION_EVIDENCE = TRUE
 ```
 
 进一步实现细节见：
 
 - [Conversation Integration Boundary](../architecture/CONVERSATION_INTEGRATION_BOUNDARY.md)
 - [Google Drive Conversation Connector](../architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
+- [Local Markdown Decision Log Connector](../architecture/LOCAL_MARKDOWN_DECISION_LOG_CONNECTOR.md)
 
 外部 provider 真正接线后，仍需独立 adapter tests、授权 evidence、runtime replay 与 external result evidence。

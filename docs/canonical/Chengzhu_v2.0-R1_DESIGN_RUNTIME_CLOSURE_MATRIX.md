@@ -550,14 +550,15 @@ reviewed output evidence
 | Connector capability contract / registry | RUNTIME_AVAILABLE · NO PROVIDER BY DEFAULT | capability registry 默认空且 fail-closed；只回答 capability truth |
 | Local scheduled Conversation reminder | RUNTIME_AVAILABLE_DESKTOP | 只读取 Chengzhu 内手工排期的 UPCOMING Session；用户显式 opt-in；默认提前 10 分钟；通知不泄露 Session/Space 标题；点击进入对应 Space Prepare；不等于 Calendar connector |
 | External Integration Boundary | RUNTIME_AVAILABLE | PR #61 已合入 main：schema v9、opaque credential ref、CONNECTED account、Space-scoped immutable snapshot、canonical hash、per-capability cursor、exact grant、retention/export、Execution Request / audit、UNKNOWN_OUTCOME reconciliation |
-| GitHub project tracker / issue provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 首个真实 REST adapter：project.read + issue.create；默认不注册，需 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1；token 仅经 env credential reference 解析；没有真实账户连接/外部 action evidence 前不得宣称 GITHUB_ACCOUNT_CONNECTED |
+| GitHub project tracker / issue provider | RUNTIME_AVAILABLE_OPT_IN · REAL TEST-ACCOUNT REPLAY PASS | project.read + issue.create；默认不注册，需 CHENGZHU_GITHUB_CONNECTOR_ENABLE=1；token 仅经 env credential reference 解析；2026-10-11 已在专用私有测试仓库完成真实账号 snapshot → frozen Pack → reviewed issue.create → second Execute → exactly one issue replay；该证据不代表任意用户账户已连接 |
 | Google Calendar provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `calendar.read` concrete adapter；native sync token + 410 reset；immutable revision audit；latest-revision import；upstream drift 可见；默认关闭；没有真实 Google account replay 前不得声明 account connected |
 | Google Drive / Docs provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | read-only `docs.read` concrete adapter；显式 folder FULL_TARGET_REFRESH；Docs/Slides text export、Sheets first-sheet CSV partial truth、binary metadata-only truth；默认关闭；没有真实 Google account replay 前不得声明 account connected |
 | Gmail send-only provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT / OAUTH VERIFICATION EVIDENCE PENDING | 只实现 reviewed `email.send`；OIDC identity = `openid + email`，mailbox scope = `gmail.send`；不实现 mail.read/inbox sync；`gmail.send` 属 Google Sensitive scope，公共/稳定 provider 仍需适用的 OAuth app verification；没有真实 Gmail account replay 前不得声明邮件已发出 |
 | Microsoft To Do provider | RUNTIME_AVAILABLE_OPT_IN · REAL ACCOUNT EVIDENCE PENDING | 只实现 reviewed `task.create`；delegated `Tasks.ReadWrite`；opaque env credential；default/显式 task-list target；无 Outlook/Calendar/Files/read sync；没有真实 Microsoft account replay 前不得宣称真实 Task 已创建 |
+| Local Markdown / Obsidian Decision Log provider | RUNTIME_AVAILABLE_OPT_IN · LOCAL EVIDENCE | reviewed `decision_log.write` concrete adapter；root 只经 env ref 解析；relative .md only；symlink/root-escape fail-closed；atomic replace + execution marker idempotency；不读取 vault |
 | MCP provider | NOT CONFIGURED | capability contract 已定义；没有 concrete adapter/auth/account/runtime evidence 就不能宣称可用 |
-| External task/email/issue write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact account → Execution Request → second Execute → provider result；UNKNOWN_OUTCOME 只能经 provider-side reconciliation；GitHub `issue.create`、Gmail `email.send`、Microsoft To Do `task.create` 已有 opt-in real adapter，Decision Log provider 仍 fail-closed |
-| Real external action evidence | NOT AVAILABLE | 只有 provider 真连接并返回 SUCCEEDED 后才能形成；mock/FakeAdapter 只证明边界逻辑 |
+| Reviewed write-back execution boundary | RUNTIME_AVAILABLE | reviewed Draft → exact connection → Execution Request → second Execute → provider result；GitHub `issue.create`、Gmail `email.send`、Microsoft To Do `task.create` 与 Local Markdown `decision_log.write` 均有 concrete adapter；UNKNOWN_OUTCOME 仍只能经 provider-side reconciliation |
+| Real external action evidence | PARTIAL · GITHUB TEST-ACCOUNT PASS | GitHub 已有 2026-10-11 专用测试账号真实 issue.create evidence；Google Calendar / Drive / Gmail / Microsoft To Do 仍缺本机真实账号 replay；mock/FakeAdapter 仍只证明边界逻辑 |
 | 自动 participant chat notice / watermark | NOT WIRED | 当前只记录 user transparency plan |
 | Organization / shared team truth registry | FUTURE | 必须在个人 v2 真实验证后再做 |
 
@@ -753,11 +754,11 @@ PR #19 合并后的最终仓库审计只关闭**不依赖外部系统、Windows 
 
 以下仍保持 external/productization gate，不得为了“全做完”伪实现：
 
-- Microsoft / MCP adapter + account authorization；
-- GitHub / Google Calendar / Google Drive / Gmail 的真实账户 authorization / real provider replay（adapter code 已存在，真实账户证据仍是 external gate）；
+- MCP adapter + server/auth runtime；Microsoft To Do adapter 已存在，但真实 Microsoft account replay 仍是 external gate；
+- Google Calendar / Google Drive / Gmail / Microsoft To Do 的真实账户 authorization / real provider replay；GitHub 专用测试账号 replay 已 PASS，但任意用户连接仍必须逐账户验证；
 - external Calendar/meeting discovery；
 - Human Coach real-session evidence；
-- real external action evidence（边界/runtime 可在 repo 内实现；provider success 必须来自真实 adapter/account）；
+- cross-provider real external action evidence（GitHub test-account issue.create 已有真实证据；其余 provider success 仍必须来自各自真实 adapter/account）；
 - participant auto chat notice / watermark；
 - Windows v2 stable packaged release；
 - real-user validation。
@@ -889,6 +890,25 @@ REAL_MICROSOFT_ACCOUNT_EVIDENCE_PENDING = TRUE
 工程证据只证明 adapter / fake transport / least-privilege scope / list target resolution / reviewed execution / failure ambiguity / product flow。没有真实 Microsoft delegated token/account replay 时不得声明真实 Microsoft To Do 已连接或真实 Task 已创建。
 
 
+
+## Local Markdown Decision Log provider closure · 2026-10-11
+
+当前新增第六个 concrete Conversation provider，并关闭最后一种 DraftAction 的 provider execution 空洞：
+
+```text
+LOCAL_MARKDOWN_DECISION_LOG_ADAPTER_CODE = TRUE
+DECISION_LOG_WRITE_ONLY = TRUE
+LOCAL_ROOT_FROM_ENV_REFERENCE = TRUE
+ROOT_PATH_NOT_PERSISTED = TRUE
+RELATIVE_MD_TARGET_ONLY = TRUE
+SYMLINK_AND_ROOT_ESCAPE_GUARD = TRUE
+ATOMIC_REPLACE = TRUE
+PROVIDER_LEVEL_MARKER_IDEMPOTENCY = TRUE
+VAULT_READ = FALSE
+GENERIC_FILESYSTEM_ACCESS = FALSE
+```
+
+该 provider 不需要云账号，因此不存在“真实账号 OAuth replay”门槛；但它仍要求用户本机显式 opt-in、真实可写 root、APPROVED Decision Log Draft 与第二次显式 Execute。工程测试只证明 provider/runtime 边界，不提升 v2 stable / real-user / PMF 状态。
 
 ---
 

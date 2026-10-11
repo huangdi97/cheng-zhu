@@ -4409,6 +4409,25 @@ def diagnostics() -> dict[str, Any]:
     ) or 0)
     shown = int(store.scalar("SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SHOWN'") or 0)
     suppressed = int(store.scalar("SELECT COUNT(*) FROM conversation_guidance_event WHERE status = 'SUPPRESSED'") or 0)
+    guidance_origin_rows = store.rows(
+        "SELECT origin_json, status FROM conversation_guidance_event ORDER BY created_at ASC"
+    )
+    auto_guidance_shown = 0
+    auto_arbiter_silent = 0
+    auto_forced_silent = 0
+    guidance_without_auto_origin = 0
+    for guidance_row in guidance_origin_rows:
+        origin = guidance_row.get("origin")
+        if not isinstance(origin, dict) or origin.get("kind") != "TRANSCRIPT_AUTO":
+            guidance_without_auto_origin += 1
+            continue
+        decision_class = str(origin.get("decision_class") or "")
+        if guidance_row.get("status") == "SHOWN":
+            auto_guidance_shown += 1
+        elif decision_class == "ARBITER":
+            auto_arbiter_silent += 1
+        else:
+            auto_forced_silent += 1
     sourced_shown = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_guidance_event "
         "WHERE status = 'SHOWN' AND source_refs_json NOT IN ('[]','null','')"
@@ -4501,8 +4520,16 @@ def diagnostics() -> dict[str, Any]:
                 "prediction_unavailable": direct_question_prediction_unavailable,
                 "historical_reclassification": "FORBIDDEN",
             },
+            "auto_runtime_guidance_provenance": {
+                "auto_shown": auto_guidance_shown,
+                "auto_arbiter_silent": auto_arbiter_silent,
+                "auto_forced_silent": auto_forced_silent,
+                "manual_or_pre_v12_unclassified": guidance_without_auto_origin,
+                "stable_live_population": "TRANSCRIPT_AUTO_ONLY",
+                "useful_silence_population": "TRANSCRIPT_AUTO_DECISION_CLASS_ARBITER_ONLY",
+            },
             "explicit_feedback_boundary": "LOCAL_EXPLICIT_SELF_REPORT; reviewer identity and authorized real-use status are not system-verified.",
-            "interpretation": "Observed proxies are not precision/quality/PMF claims. Direct-question precision/recall uses only capture-time frozen predictions plus independent human actual labels; historical rows without frozen predictions stay unavailable. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
+            "interpretation": "Observed proxies are not precision/quality/PMF claims. Direct-question precision/recall uses only capture-time frozen predictions plus independent human actual labels. Stable live-guidance metrics use only v12 TRANSCRIPT_AUTO origin; Useful Silence counts only ARBITER silence, while manual/pre-v12 and forced silence remain audit history outside that denominator. Local self-report rows are evidence inputs only; they are not real-user identity proof or release evidence until independently labeled and paired with an authorized pilot manifest.",
         },
         "health": {
             "database": "AVAILABLE" if store.schema_version() == LATEST_SCHEMA_VERSION else "NEEDS_ACTION",

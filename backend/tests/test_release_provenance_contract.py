@@ -51,7 +51,30 @@ def test_publication_materializes_and_verifies_the_exact_tag_sha() -> None:
     tag_i = publish.index('git/ref/tags/$tag')
     assert edit_i < tag_i
     assert "if ($tagSha -ne $sourceSha)" in publish
-    assert "$verification.tag_sha = $tagSha" in publish
+    assert "scripts/enrich_release_verification.ps1" in publish
+    assert "-TagSha $tagSha" in publish
+    assert "-ReleaseChannel $releaseChannel" in publish
+    assert "-IsPrerelease $isPrerelease" in publish
+
+
+def test_release_verification_enrichment_supports_missing_publication_fields() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    helper = (ROOT / "scripts" / "enrich_release_verification.ps1").read_text(encoding="utf-8")
+    regression = _section(
+        text,
+        "- name: Release verification metadata regression",
+        "- name: Upload download-back verification",
+    )
+
+    # The pre-publish JSON intentionally does not contain all publication-only
+    # fields. Direct assignment to a missing PSCustomObject property is exactly
+    # what broke beta.3 after publication, so the helper must use Add-Member.
+    assert 'Add-Member -NotePropertyName "tag_sha"' in helper
+    assert 'Add-Member -NotePropertyName "release_channel"' in helper
+    assert 'Add-Member -NotePropertyName "is_prerelease"' in helper
+    assert "-Force" in helper
+    assert "scripts/enrich_release_verification.ps1" in regression
+    assert "release_channel enrichment regression" in regression
 
 
 def test_download_back_evidence_is_uploaded_only_after_public_tag_verification() -> None:

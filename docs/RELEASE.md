@@ -23,20 +23,19 @@ Rules:
 - a Beta uses the same exact-SHA, clean-install, SHA256, download-back and provenance gates as stable;
 - a public Beta proves productization engineering, not real-user value or PMF.
 
-Current channel truth while beta.3 is a release candidate:
+Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Published = v2.0.0-beta.2
-Published Beta tag/source SHA = cac605edf413ec248babf02ea9f73da708d156f8
-Next Conversation Beta Candidate = v2.0.0-beta.3
+Conversation Beta Published = v2.0.0-beta.3
+Published Beta tag/source SHA = b0cbfb628a5fc224c571288b92576992fa25dc77
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.2 provenance is recorded in `docs/releases/V2_0_0_BETA_2_PUBLICATION_PROVENANCE.md`. Do not rewrite the published Beta truth to beta.3 until its exact green main SHA has completed the Windows release workflow, draft download-back, downloaded-install replay, tag/source verification and final publish.
+Published beta.3 provenance is recorded in `docs/releases/V2_0_0_BETA_3_PUBLICATION_PROVENANCE.md`. The original publish run completed the release-critical build, clean-install, draft download-back, downloaded-install smoke, prerelease-channel and tag/source checks before failing in a **post-publish evidence-enrichment step**: PowerShell could not assign new properties directly to a `ConvertFrom-Json` PSCustomObject. The public beta.3 Release itself is valid and independently rechecked; the workflow defect is fixed separately and guarded by a PR-stage regression.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 
@@ -79,9 +78,10 @@ Required path:
 17. verify SHA256 on downloaded assets;
 18. reinstall the downloaded installer;
 19. rerun packaged smoke from downloaded/installed files;
-20. re-check tag SHA = binary source SHA and publish the verified Release.
+20. re-check tag SHA = binary source SHA and publish the verified Release;
+21. enrich and upload the post-publish verification JSON without changing the release itself.
 
-A failing clean-install, download-back or source/tag provenance gate is a release failure.
+A failing clean-install, download-back or source/tag provenance gate is a release failure. A failure **after** publication must be classified by step: do not automatically treat an already-published artifact as corrupt when the failed step only writes evidence metadata. The public tag, release channel, target SHA and downloadable assets must be independently re-verified before deciding whether to withdraw or republish.
 
 ### Conversation packaged UI evidence visibility
 

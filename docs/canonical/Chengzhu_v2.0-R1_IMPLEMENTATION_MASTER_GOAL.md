@@ -767,7 +767,7 @@ PR 合并后至少要有：
 
 ## Public Conversation Beta Prerelease Gate
 
-`v2.0.0-beta.2` 已按以下门禁公开发布；`v2.0.0-beta.3` 必须复用完全相同的 exact-SHA / clean-install / download-back / provenance 门禁，不能因为是后续 Beta 降级：
+`v2.0.0-beta.2` 与 `v2.0.0-beta.3` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
 
 - exact green main SHA；
 - Windows installer + portable；
@@ -783,17 +783,16 @@ PR 合并后至少要有：
 - `latest=false`；
 - GitHub Stable Latest 仍不是该 Beta tag。
 
-截至 beta.3 candidate 合并前，公开 release truth 仍是：
+当前公开 release truth：
 
 ```text
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
-PUBLISHED_BETA_TAG = v2.0.0-beta.2
-PUBLISHED_BETA_SOURCE_SHA = cac605edf413ec248babf02ea9f73da708d156f8
-NEXT_BETA_CANDIDATE = v2.0.0-beta.3
+PUBLISHED_BETA_TAG = v2.0.0-beta.3
+PUBLISHED_BETA_SOURCE_SHA = b0cbfb628a5fc224c571288b92576992fa25dc77
 STABLE_LATEST = v1.4.2
 ```
 
-只有 beta.3 的 main CI、Windows release workflow、draft download-back、downloaded installer replay、tag/source invariant 与最终 publish 全部成功后，才允许把 published Beta truth 更新为 beta.3。
+beta.3 的发布路径已完成 exact green main SHA、Windows build、clean-install、draft download-back、downloaded installer packaged smoke、prerelease channel 与 tag/source invariant，并于 2026-10-11 公开。原 Release run #300 在 **publish 完成后** 因 verification JSON 向 PSCustomObject 追加不存在字段的 PowerShell 缺陷被标记为 failure；该失败不发生在二进制、download-back、tag/source 或 release-channel gate。公开 Release 与 tag/source 已独立复核，workflow 修复另加 PR-stage regression。详见 `docs/releases/V2_0_0_BETA_3_PUBLICATION_PROVENANCE.md`。
 
 仍不允许：
 
@@ -874,7 +873,7 @@ PMF_PROVEN = TRUE
 - Counterparty 不做隐藏心理事实化；
 - participant consent / transparency 只记录用户报告，不伪装系统已验证/已通知；
 - Local processing fail-closed；
-- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime 并进入 beta.2；Calendar / Docs / Mail / project-tracker connectors 与真实 external execution 仍明确 unavailable；
+- Manual + explicit-start AUTO Screen Context、Conversation Human Coach、desktop Private Overlay / Share Privacy 均已有真实 runtime；GitHub / Google Calendar / Google Drive / Gmail / Microsoft To Do / Local Markdown concrete opt-in providers 与 reviewed second-step external execution 已进入 beta.3，其中 GitHub 有真实测试账号 replay，Google / Microsoft real-account evidence 仍 pending；
 - diagnostics 分 observed proxy 与 human-label metrics，并暴露 Pack / retrieval / state / arbiter / export-delete 等子系统健康；
 - 全局 Conversation Search 返回 grounded Item + Space / Session / time / source；
 - Ctrl+K Find Decision / Commitment / Open Question 与 current Session export 为真实 runtime；

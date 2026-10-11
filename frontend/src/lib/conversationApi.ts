@@ -132,8 +132,17 @@ export const conversationApi = {
   retentionPreview: (id: string) => request<{
     space_id: string
     policy: Record<string, unknown>
-    would_delete: { transcript_segments: number; guidance_events: number; draft_actions: number; screen_context_observations: number; connector_snapshots: number }
+    would_delete: {
+      transcript_segments: number
+      orphan_human_feedback: number
+      dependent_human_feedback: number
+      guidance_events: number
+      draft_actions: number
+      screen_context_observations: number
+      connector_snapshots: number
+    }
     kept: Record<string, string>
+    dependent_cleanup: Record<string, string>
     destructive: boolean
   }>(`${B}/spaces/${encodeURIComponent(id)}/retention`),
   applyRetention: (id: string, confirm: boolean) =>

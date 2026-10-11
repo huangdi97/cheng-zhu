@@ -41,7 +41,7 @@ def _connect_calendar_read_adapter(label: str = "Work Calendar"):
 
 
 def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
-    assert store.schema_version() == 9
+    assert store.schema_version() == 10
     conn = sqlite3.connect(store.DB_PATH)
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
@@ -49,6 +49,7 @@ def test_v2_schema_is_additive_and_keeps_v1_tables(product_env):
     assert {
         "conversation_space",
         "conversation_goal",
+        "conversation_human_feedback",
         "conversation_session",
         "conversation_session_pack",
         "conversation_participant",
@@ -3565,7 +3566,7 @@ def test_conversation_diagnostics_reports_local_engineering_not_pmf(product_env)
         source_refs=[{"kind": "USER_NOTE", "excerpt": "待确认"}],
     )
     diag = conversations.diagnostics()
-    assert diag["schema_version"] == 9
+    assert diag["schema_version"] == 10
     assert diag["runtime"]["spaces"] == 1
     assert diag["runtime"]["sessions"] == 1
     assert diag["runtime"]["pending_review_items"] == 1

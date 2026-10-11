@@ -14,22 +14,24 @@ marked as inherited. Machine-readable output:
 
 ```
 Base SHA:   c581c0d764cf6dd4f59a254957b90dd7eb409f45   (origin/main — exactly the expected baseline)
-Final SHA:  c07830429ba27340e938a656b0fc1c89ade39bd6
+Final SHA:  c07830429ba27340e938a656b0fc1c89ade39bd6   (last commit carrying code, scripts or evidence)
+Docs HEAD:  bc62877fa7329840f600eac3bee585d1c9a05f19   (this report; documentation only)
 Branch:     chore/v2-local-full-closure-2026-10-11
 PR:         #70  https://github.com/huangdi97/cheng-zhu/pull/70   (OPEN, MERGEABLE)
-CI:         run 38109785879 "CI"      => success
-            run 38109785877 "Release" => success  (windows job: build + packaged smoke + clean install)
+CI:         run 38109785879 "CI"      => success      @ c078304
+            run 38109785877 "Release" => success      @ c078304  (windows job: build + packaged smoke + clean install)
 ```
 
 Nine of nine required CI checks are `pass` at the final SHA: `backend`, `frontend`, `desktop`,
-`e2e-playwright`, `e2e-visual`, `e2e-smoke`, `packaged-smoke`, `windows`, `ci-gate`. The two earlier
-`Release` runs on this branch were red and the latest is green, so a real defect was found and fixed
-rather than the gate being waived.
-
-Every earlier `Release` run on this branch was red until the tzdata defect was fixed; both workflows
-are now green on the exact final SHA. The `Release` workflow ran the full packaging path (sidecar,
+`e2e-playwright`, `e2e-visual`, `e2e-smoke`, `packaged-smoke`, `windows`, `ci-gate`. Earlier `Release`
+runs on this branch were red until the tzdata defect was fixed, so a real defect was found and fixed
+rather than the gate being waived. The `Release` workflow ran the full packaging path (sidecar,
 installer, portable, packaged smoke, clean install) as a build-only job and **created no tag or GitHub
 Release**, which is correct: this repository publishes only from a green `main`.
+
+The two commits are separated deliberately. Documentation cannot certify the SHA that contains it
+without a re-commit loop, so the verified candidate is the last commit that changed code, scripts or
+evidence, and this report is a docs-only commit on top of it.
 
 ---
 

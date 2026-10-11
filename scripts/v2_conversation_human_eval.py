@@ -101,7 +101,20 @@ def load_rows(
     return rows
 
 
-def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _label_source(row: dict[str, Any]) -> str:
+    explicit = str(row.get("label_source") or "").strip().upper()
+    if explicit:
+        return explicit
+    if str(row.get("reviewer") or "").strip().upper() == "IN_PRODUCT_SELF_REPORT":
+        return "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+    return "UNSPECIFIED"
+
+
+def aggregate(
+    rows: list[dict[str, Any]],
+    *,
+    include_source_breakdown: bool = True,
+) -> dict[str, Any]:
     by_kind = Counter(str(row["kind"]) for row in rows)
 
     guidance_rows = [r for r in rows if r["kind"] == "guidance"]
@@ -196,7 +209,7 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
     labeled_metric_count = sum(1 for value in metrics.values() if value["n"] > 0)
-    return {
+    report = {
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "rows": len(rows),
         "rows_by_kind": dict(sorted(by_kind.items())),
@@ -208,9 +221,20 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "Human label aggregates do not verify that respondents were real external users. No threshold in this script upgrades PMF or release status."
+            "Human label aggregates do not verify that respondents were real external users. Label-source provenance is preserved separately; no threshold in this script upgrades PMF or release status."
         ),
     }
+    if include_source_breakdown:
+        by_source = Counter(_label_source(row) for row in rows)
+        report["rows_by_label_source"] = dict(sorted(by_source.items()))
+        report["metrics_by_label_source"] = {
+            source: aggregate(
+                [row for row in rows if _label_source(row) == source],
+                include_source_breakdown=False,
+            )["metrics"]
+            for source in sorted(by_source)
+        }
+    return report
 
 
 def markdown(report: dict[str, Any]) -> str:

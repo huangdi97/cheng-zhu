@@ -2331,6 +2331,43 @@ def test_transcript_direct_question_is_first_class_even_in_quiet_and_self_mic_ne
     assert self_mic is None
 
 
+def test_transcript_guidance_consumes_frozen_direct_question_decision_without_reclassification(product_env, monkeypatch):
+    space = conversations.create_space("Frozen DQ Runtime", "PROJECT_SYNC")
+    live = conversations.create_session(space["id"], consent_ack=True, assistance_mode="QUIET")
+    conversations.start_session(live["id"])
+
+    frozen = {
+        "eligible": True,
+        "predicted": True,
+        "detector_version": "heuristic-v1",
+        "channel": "PRIMARY_AUDIO",
+        "ai_assistance": "AI_ALLOWED",
+    }
+
+    def must_not_reclassify(_text):
+        raise AssertionError("capture-time frozen prediction must be reused")
+
+    monkeypatch.setattr(conversations, "_looks_like_direct_question", must_not_reclassify)
+    cue = conversations.guidance_from_transcript(
+        live["id"],
+        "这段文本即使 detector 实现后来变化，也必须使用冻结结果",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question=frozen,
+    )
+    assert cue is not None
+    assert cue["kind"] == "ANSWER_CUE"
+    assert cue["reason"] == "TRANSCRIPT_DIRECT_QUESTION"
+
+    # A malformed/mismatched snapshot fails closed instead of being
+    # reclassified with whatever detector happens to ship now.
+    assert conversations.guidance_from_transcript(
+        live["id"],
+        "为什么？",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question={**frozen, "channel": "SELF_MIC"},
+    ) is None
+
+
 def test_transcript_can_surface_frozen_source_as_contribution_opportunity_without_promoting_notes(product_env):
     material = materials.create_material(
         "Q4 Benchmark",

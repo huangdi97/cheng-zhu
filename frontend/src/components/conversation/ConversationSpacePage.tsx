@@ -1139,7 +1139,8 @@ export default function ConversationSpacePage({ spaceId, tab }: { spaceId: strin
                   <span>STT · {preflight.processing_runtime.data_path.stt} ({preflight.processing_runtime.configured_stt_provider})</span>
                   <span>Inference · {preflight.processing_runtime.data_path.inference}</span>
                   <span>Retention · {preflight.processing_runtime.data_path.retention}</span>
-                  <span>Write-back · {preflight.processing_runtime.data_path.writeback}</span>
+                  <span>Reviewed draft · {preflight.processing_runtime.data_path.writeback}</span>
+                  <span>External execution · {preflight.processing_runtime.data_path.external_execution}</span>
                   <span>Audio retention · {preflight.processing_runtime.data_path.audio_retention}</span>
                   <span>Screen · {['MANUAL', 'AUTO'].includes(preflight.screen_runtime.mode) ? `${preflight.screen_runtime.mode} / ${preflight.screen_runtime.route} / ${preflight.screen_runtime.model_id || preflight.screen_runtime.model_name || 'vision'}` : preflight.screen_runtime.mode}</span>
                   <span>Share Privacy · {preflight.share_privacy_runtime.requested === 'PRIVATE_OVERLAY' ? 'VERIFY_AT_START / Electron content protection' : 'OFF'}</span>

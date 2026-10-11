@@ -202,12 +202,22 @@ def review_queue(session_id: str, limit: int = 40) -> dict[str, Any]:
     for event in events:
         if str(event.get("kind") or "") not in _AI_GUIDANCE_KINDS:
             continue
+        origin = event.get("origin")
+        if not isinstance(origin, dict) or origin.get("kind") != "TRANSCRIPT_AUTO":
+            # The pilot review surface represents real automatic runtime, not
+            # the advanced/manual Guidance validation lab or pre-v12 history.
+            continue
         if event.get("status") == "SHOWN" and event.get("expression_action") != "SILENT":
             guidance.append({
                 "event": event,
                 "feedback": feedback_by_key.get(("GUIDANCE", event["id"])),
             })
-        elif event.get("status") == "SUPPRESSED" or event.get("expression_action") == "SILENT":
+        elif (
+            (event.get("status") == "SUPPRESSED" or event.get("expression_action") == "SILENT")
+            and str(origin.get("decision_class") or "") == "ARBITER"
+        ):
+            # Policy/profile/provenance-forced silence is auditable but does not
+            # belong in the user-perceived Useful Silence metric population.
             silence.append({
                 "event": event,
                 "feedback": feedback_by_key.get(("SILENCE", event["id"])),

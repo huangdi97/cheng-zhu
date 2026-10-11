@@ -12,8 +12,9 @@ Supported row kinds:
   continue
   session_outcome
 
-Example:
+Examples:
   python scripts/v2_conversation_human_eval.py labels.jsonl --out report.json
+  python scripts/v2_conversation_human_eval.py in-product.jsonl independent.jsonl --out report.json
 """
 from __future__ import annotations
 
@@ -56,9 +57,13 @@ def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-finite JSON number {value!r} is not allowed")
 
 
-def load_rows(path: Path) -> list[dict[str, Any]]:
+def load_rows(
+    path: Path,
+    *,
+    seen: set[tuple[str, str, str, str]] | None = None,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
+    seen = seen if seen is not None else set()
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         text = raw.strip()
         if not text or text.startswith("#"):
@@ -232,18 +237,25 @@ def markdown(report: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("labels", help="human-labeled JSONL")
+    parser.add_argument(
+        "labels",
+        nargs="+",
+        help="one or more human-labeled JSONL files; duplicate reviewer/session/kind/event labels are rejected across files",
+    )
     parser.add_argument("--out", default="")
     parser.add_argument("--markdown-out", default="")
     args = parser.parse_args()
 
-    labels_path = Path(args.labels)
+    label_paths = [Path(value) for value in args.labels]
     output_paths = [Path(path) for path in (args.out, args.markdown_out) if path]
-    resolved = [labels_path.resolve(), *(path.resolve() for path in output_paths)]
+    resolved = [*(path.resolve() for path in label_paths), *(path.resolve() for path in output_paths)]
     if len(resolved) != len(set(resolved)):
-        parser.error("evaluation outputs must not overwrite the labels or each other")
+        parser.error("evaluation outputs must not overwrite labels, labels must be distinct, and outputs must differ")
 
-    rows = load_rows(labels_path)
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for labels_path in label_paths:
+        rows.extend(load_rows(labels_path, seen=seen))
     report = aggregate(rows)
     payload = json.dumps(report, ensure_ascii=False, indent=2)
     print(payload)

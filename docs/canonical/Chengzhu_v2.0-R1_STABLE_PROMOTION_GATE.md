@@ -147,14 +147,15 @@ Stable review 仍必须同时有 authorized pilot manifest、足够的独立 hum
 schema v11 closes the remaining Direct Question evaluation-replay gap.
 
 ```text
-final non-SELF_MIC transcript
-→ freeze detector decision + detector_version at capture time
+final transcript
+→ freeze detector decision + detector_version + AI-assistance eligibility at capture time
+→ only eligible=true rows enter the review population
 → label seed preserves predicted=true / false
 → independent reviewer supplies actual=true / false
 → human eval computes precision + recall
 ```
 
-Stable review accepts Direct Question Precision / Recall only from `INDEPENDENT_HUMAN_REVIEW`. A transcript without a capture-time versioned prediction is `prediction_unavailable` and contributes to neither metric.
+Stable review accepts Direct Question Precision / Recall only from `INDEPENDENT_HUMAN_REVIEW`. A versioned snapshot with `eligible=false` is explicitly outside the metric population (for example AI assistance was forbidden); it is not an evaluation failure. A transcript without a capture-time versioned prediction is `prediction_unavailable` and contributes to neither metric.
 
 The following are explicitly forbidden:
 

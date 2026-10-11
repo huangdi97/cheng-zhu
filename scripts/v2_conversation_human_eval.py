@@ -110,6 +110,23 @@ def _label_source(row: dict[str, Any]) -> str:
     return "UNSPECIFIED"
 
 
+DECISION_COMMITMENT_PREDICTED_TYPES = {"Decision", "Commitment", "Task"}
+
+
+def _runtime_origin(row: dict[str, Any]) -> dict[str, Any]:
+    system = row.get("system")
+    origin = system.get("origin") if isinstance(system, dict) else None
+    return origin if isinstance(origin, dict) else {}
+
+
+def _is_auto_runtime(row: dict[str, Any]) -> bool:
+    origin = _runtime_origin(row)
+    return bool(
+        origin.get("kind") == "TRANSCRIPT_AUTO"
+        and str(origin.get("transcript_segment_id") or "").strip()
+    )
+
+
 def aggregate(
     rows: list[dict[str, Any]],
     *,
@@ -117,7 +134,8 @@ def aggregate(
 ) -> dict[str, Any]:
     by_kind = Counter(str(row["kind"]) for row in rows)
 
-    guidance_rows = [r for r in rows if r["kind"] == "guidance"]
+    all_guidance_rows = [r for r in rows if r["kind"] == "guidance"]
+    guidance_rows = [r for r in all_guidance_rows if _is_auto_runtime(r)]
     proactive = [r for r in guidance_rows if str(r.get("guidance_class") or "") == "PROACTIVE"]
     recall = [r for r in guidance_rows if str(r.get("guidance_class") or "") == "RECALL"]
 
@@ -126,7 +144,13 @@ def aggregate(
     source_labeled = [r for r in guidance_rows if _boolean(r, "source_correct") is not None]
     recall_labeled = [r for r in recall if _boolean(r, "recall_correct") is not None]
 
-    silence_rows = [r for r in rows if r["kind"] == "silence" and _boolean(r, "silence_correct") is not None]
+    all_silence_rows = [r for r in rows if r["kind"] == "silence"]
+    silence_rows = [
+        r for r in all_silence_rows
+        if _is_auto_runtime(r)
+        and str(_runtime_origin(r).get("decision_class") or "") == "ARBITER"
+        and _boolean(r, "silence_correct") is not None
+    ]
 
     dq_rows = [r for r in rows if r["kind"] == "direct_question"]
     dq_labeled = [
@@ -145,8 +169,12 @@ def aggregate(
         and str(r.get("predicted_state") or "")
         and str(r.get("actual_state") or "")
     ]
+    decision_commitment_rows = [
+        r for r in truth_rows
+        if str(r.get("predicted_type") or "") in DECISION_COMMITMENT_PREDICTED_TYPES
+    ]
     truth_correct = sum(
-        1 for r in truth_rows
+        1 for r in decision_commitment_rows
         if r["predicted_type"] == r["actual_type"]
         and r["predicted_state"] == r["actual_state"]
     )
@@ -191,8 +219,8 @@ def aggregate(
             "n": tp + fn,
         },
         "decision_commitment_state_precision": {
-            "value": _rate(truth_correct, len(truth_rows)),
-            "n": len(truth_rows),
+            "value": _rate(truth_correct, len(decision_commitment_rows)),
+            "n": len(decision_commitment_rows),
         },
         "continue_writeback_accuracy": {
             "value": _rate(sum(1 for r in continue_rows if r["writeback_accurate"]), len(continue_rows)),
@@ -213,6 +241,14 @@ def aggregate(
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "rows": len(rows),
         "rows_by_kind": dict(sorted(by_kind.items())),
+        "metric_population": {
+            "auto_guidance_rows": len(guidance_rows),
+            "excluded_non_auto_guidance_rows": len(all_guidance_rows) - len(guidance_rows),
+            "arbiter_silence_rows": len(silence_rows),
+            "excluded_non_arbiter_or_non_auto_silence_rows": len(all_silence_rows) - len(silence_rows),
+            "decision_commitment_task_predicted_rows": len(decision_commitment_rows),
+            "excluded_other_truth_item_rows": len(truth_rows) - len(decision_commitment_rows),
+        },
         "metrics": metrics,
         "status": "HAS_HUMAN_LABELS" if rows and labeled_metric_count else "INSUFFICIENT_EVIDENCE",
         "claims": {
@@ -221,7 +257,7 @@ def aggregate(
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "Human label aggregates do not verify that respondents were real external users. Label-source provenance is preserved separately; no threshold in this script upgrades PMF or release status."
+            "Stable live-guidance metrics use only v12 capture-time TRANSCRIPT_AUTO provenance; manual Guidance Lab and pre-v12 Guidance rows are excluded. Useful Silence counts only ARBITER decisions, not policy/profile/provenance-forced silence. Decision/Commitment State Precision is scoped to predictions of Decision/Commitment/Task. Human labels still do not verify external-user identity, and no threshold here upgrades PMF or release status."
         ),
     }
     if include_source_breakdown:

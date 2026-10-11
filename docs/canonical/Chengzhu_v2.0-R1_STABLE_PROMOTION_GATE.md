@@ -1,5 +1,5 @@
 # Chengzhu v2 Stable Promotion Evidence Gate
-## From public beta.2 to stable-review eligibility
+## From public beta.3 to stable-review eligibility
 
 **Status**: CANONICAL ACCEPTANCE POLICY  
 **Scope**: Project Sync + Design Review first  
@@ -9,7 +9,7 @@
 
 ## 1. Why a separate gate is required
 
-beta.2 already proves:
+beta.3 already proves:
 
 - public downloadable prerelease;
 - exact-SHA release provenance;
@@ -116,6 +116,31 @@ Critical incidents must equal zero.
 This remains a local/user-operated attestation boundary; the script does not verify human identity.
 
 ---
+
+## 5.1 Pilot feedback evidence bridge
+
+beta.3 之后的源码 runtime 增加了本机显式 feedback bridge，但它只减少真实 pilot 的采集摩擦，不降低本 Gate 的独立证据要求：
+
+```text
+Continue self-report
+→ local conversation_human_feedback
+→ explicit feedback exporter
+→ human-eval aggregate
+```
+
+同时 AI_EXTRACTED item 在 schema v10 起冻结 immutable prediction snapshot，防止 Continue review 后的 state/type 被反向当成模型 prediction。
+
+以下仍然不成立：
+
+```text
+SELF_USER feedback row == verified external user
+USED / PINNED == useful
+DISMISSED == wrong
+reviewed final state == original prediction
+human-report == authorized real pilot manifest
+```
+
+Stable review 仍必须同时有 authorized pilot manifest、足够的独立 human labels、零 critical incident，并满足 frozen policy thresholds。
 
 ## 6. Tooling
 

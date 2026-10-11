@@ -14,17 +14,22 @@ marked as inherited. Machine-readable output:
 
 ```
 Base SHA:   c581c0d764cf6dd4f59a254957b90dd7eb409f45   (origin/main — exactly the expected baseline)
-Final SHA:  0b676066383c8e49305a00a1b94d5e99b3c22c45
+Final SHA:  c07830429ba27340e938a656b0fc1c89ade39bd6
 Branch:     chore/v2-local-full-closure-2026-10-11
 PR:         #70  https://github.com/huangdi97/cheng-zhu/pull/70   (OPEN, MERGEABLE)
-CI:         run 38092922051 "CI"      => success
-            run 38092922055 "Release" => success
+CI:         run 38109785879 "CI"      => success
+            run 38109785877 "Release" => success  (windows job: build + packaged smoke + clean install)
 ```
 
 Nine of nine required CI checks are `pass` at the final SHA: `backend`, `frontend`, `desktop`,
 `e2e-playwright`, `e2e-visual`, `e2e-smoke`, `packaged-smoke`, `windows`, `ci-gate`. The two earlier
 `Release` runs on this branch were red and the latest is green, so a real defect was found and fixed
 rather than the gate being waived.
+
+Every earlier `Release` run on this branch was red until the tzdata defect was fixed; both workflows
+are now green on the exact final SHA. The `Release` workflow ran the full packaging path (sidecar,
+installer, portable, packaged smoke, clean install) as a build-only job and **created no tag or GitHub
+Release**, which is correct: this repository publishes only from a green `main`.
 
 ---
 
@@ -231,10 +236,13 @@ closure branch, and are not published.
 9. **`BLOCKED_HUMAN_EVIDENCE`** — real device switching, sleep-wake and real participants
    (`soak_sim` marks these `BLOCKED-EXTERNAL`), plus a real multi-hour Interview / Project Sync /
    Design Review session with a human speaker.
-10. **`BLOCKED_EXTERNAL_PERMISSION`** — download-back verification. No GitHub Release was created,
-    because publishing is gated on a green `main` by
-    `.github/workflows/publish-current-version-on-green-main.yml` and PR #70 is not merged. Merging,
-    tagging and publishing are outside this machine's authority.
+10. **`BLOCKED_EXTERNAL_PERMISSION`** — download-back verification of a published release. No GitHub
+    Release or tag was created: this repository publishes only from a green `main` via
+    `.github/workflows/publish-current-version-on-green-main.yml`, and PR #70 is not merged. The
+    `Release` workflow has already exercised the whole packaging path on this exact SHA (sidecar,
+    installer, portable, packaged smoke, clean install) and is green, so the installers are staged
+    with checksums and a ready-to-run replay; only merge → publish → download-back remains, and that
+    requires repository authority this machine does not hold.
 11. **`BLOCKED_EXTERNAL_PERMISSION`** — deleting the throwaway replay repo
     `huangdi97/chengzhu-connector-replay-2026-10-11`: the token has `repo` but not `delete_repo`.
 
@@ -253,9 +261,9 @@ real-account GitHub replay all pass, and the packaged Windows product is *better
 beta.2 because the launch defect found here was fixed. Stable promotion is not eligible:
 `BLOCKED_HUMAN_EVIDENCE` is unmet and the gate itself returns `NO_GO` / `PMF_PROVEN = FALSE`.
 
-No beta.3 version bump was performed: it would invalidate the currently green exact-SHA
-CI + Release + clean-install evidence, and the repository's own policy routes publication through a
-green `main`. It should be cut deliberately as a separate pass after PR #70 merges.
+No beta.3 version bump was performed: it would invalidate the currently green exact-SHA CI + Release +
+clean-install evidence, and the repository's own policy routes publication through a green `main`. It
+should be cut deliberately as a separate pass after PR #70 merges.
 
 ---
 
@@ -289,5 +297,5 @@ EXTERNAL_BLOCKERS = [
 HUMAN_EVIDENCE_PENDING = TRUE
 
 STABLE_READY = FALSE
-RECOMMENDED_NEXT_RELEASE = v2.0.0-beta.3 (prerelease), staged from PR #70 / 0b67606
+RECOMMENDED_NEXT_RELEASE = v2.0.0-beta.3 (prerelease), staged from PR #70 / c078304
 ```

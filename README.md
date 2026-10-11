@@ -58,13 +58,16 @@ v2 方向已经正式收敛为 **Personal Conversation Intelligence**：一个 C
 
 ### Conversation External Context · 当前 provider truth
 
-Conversation Beta 已有三个 concrete opt-in provider：
+Conversation Beta 已有六个 concrete opt-in provider：
 
 - **GitHub**：`project.read` + reviewed `issue.create`；
 - **Google Calendar**：只读 `calendar.read`，支持 native sync token、immutable event snapshots，以及用户显式把 future event 导入为 Space 的 UPCOMING Session；
 - **Google Drive / Docs**：只读 `docs.read`，显式 folder full refresh → immutable DOCUMENT snapshots；Docs / Slides 文本导出，Sheets 明确标 first-sheet CSV partial，二进制只保存 metadata。
+- **Gmail**：reviewed `email.send` only；不读 inbox，仍受 Google Sensitive-scope OAuth verification/publication gate。
+- **Microsoft To Do**：reviewed `task.create` only；不读 Outlook / Calendar / OneDrive。
+- **Local Markdown / Obsidian**：reviewed `decision_log.write` only；root 仅由 opaque env reference 在本机解析，绝对路径不进入 `product.db`，只允许 root 下 canonical relative `.md` target。
 
-三个 provider 默认都不自动连接账户；credential 只保存 opaque env reference。Google Calendar 没有 event.write，Google Drive 没有任何 write capability；两者目前都没有仓库内真实 Google account/runtime replay evidence。详见 [Google Calendar Connector](docs/architecture/GOOGLE_CALENDAR_CONVERSATION_CONNECTOR.md)、[Google Drive Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md) 与 [Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)。
+六个 provider 均默认不自动连接或执行。云 provider 的 credential 只保存 opaque env reference；Local Markdown 也只保存环境变量引用，不持久化 root path。Google Calendar / Drive / Gmail / Microsoft To Do 仍缺本机真实账号 replay；GitHub 已于 2026-10-11 在专用私有测试仓库完成真实账号 read snapshot + reviewed issue.create replay。详见各 Connector Architecture 与 [Connector Capability Contract](docs/canonical/Chengzhu_v2.0-R1_CONNECTOR_CAPABILITY_CONTRACT.md)。
 
 ## 为什么值得试
 
@@ -148,13 +151,13 @@ Conversation Home
 - Conversation `PRIVATE_OVERLAY` 已有桌面 runtime：Start 时验证 Electron content protection，Live 可见，End 恢复会话前默认；Web fallback fail-closed；best-effort only，不承诺“不可检测”；
 - Conversation Human Coach 已有真实 runtime：仅在 frozen policy = `HUMAN_ALLOWED` 且记录 transparency plan 时允许；Live 中显式生成一次性、session-scoped 教练链接，逐项授权 transcript / AI Guidance / frozen Session Context；helper 不读取 Interview Resume/JD；建议标记为 `HUMAN_COACH` 且 `is_evidence=false`，Session 结束/删除自动 revoke；runtime 可用且已进入 beta.2 public prerelease，仍不等于 stable v2 或真实用户验证；
 - beta.2 public prerelease 已包含 frozen Profile Playbooks、auditable Expression Plan、explicit-start AUTO Screen Context、verified desktop Share Privacy 与 Conversation Human Coach；release tag 精确指向 `cac605edf413ec248babf02ea9f73da708d156f8`，且 Stable Latest 仍为 v1.4.2；
-- GitHub project tracker / issue provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GITHUB_CONNECTOR_ENABLE=1` + opaque env credential ref；`project.read` 可 Sync immutable issue snapshots，reviewed `CREATE_ISSUE_DRAFT` 可进入两阶段 `issue.create`；没有真实账号/runtime replay 前不得宣称已连接或已创建真实 Issue；
+- GitHub project tracker / issue provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GITHUB_CONNECTOR_ENABLE=1` + opaque env credential ref；`project.read` 可 Sync immutable issue snapshots，reviewed `CREATE_ISSUE_DRAFT` 可进入两阶段 `issue.create`；2026-10-11 已在专用私有测试仓库完成真实账号 replay（read snapshot → frozen Pack → reviewed draft → second Execute → exactly one issue），但这不代表任意用户账户已连接；
 - Google Calendar provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_CALENDAR_CONNECTOR_ENABLE=1` + opaque env credential ref；native sync token / immutable snapshots / explicit Next Session import 已实现；历史 revision 仅审计、上游改期/取消显式显示 drift；没有真实 Google account/runtime replay 前不得宣称已连接；
 - Google Drive / Docs provider：真实只读 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_DRIVE_CONNECTOR_ENABLE=1` + opaque env credential ref；显式 folder full refresh、immutable DOCUMENT snapshots、content availability / partial-content truth 已实现；没有真实 Google account/runtime replay 前不得宣称已连接；
 - Gmail send-only provider：真实 adapter code 已存在，默认关闭；需 `CHENGZHU_GOOGLE_MAIL_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 scope = `openid + email + gmail.send`，只支持 reviewed `FOLLOWUP_EMAIL_DRAFT → email.send`，不读 inbox、不实现 `mail.read`；`gmail.send` 属 Google Sensitive scope，公共/稳定 provider 仍需适用的 OAuth consent / app verification；没有真实 Google account/runtime replay 前不得宣称邮件已发出；
 - Microsoft To Do provider：真实 `task.create` adapter code 已存在，默认关闭；需 `CHENGZHU_MICROSOFT_TODO_CONNECTOR_ENABLE=1` + opaque env credential ref；最小 delegated permission = `Tasks.ReadWrite`，只支持 reviewed `CREATE_TASK_DRAFT → task.create`，不读 Outlook Mail / Calendar / OneDrive、不做 To Do background sync；没有真实 Microsoft account/runtime replay 前不得宣称已连接或已创建真实 Task；
 - MCP provider 仍未配置真实 adapter/auth/account runtime；
-- external Decision Log provider execution 仍无真实 provider；当前真实 write adapter code 为 GitHub `issue.create`、Gmail `email.send` 与 Microsoft To Do `task.create`，均要求第二次显式 Execute；各 provider 的真实账号结果仍需独立 runtime evidence；
+- Local Markdown / Obsidian Decision Log provider：opt-in `decision_log.write` concrete adapter；root 只通过 `provider:local-markdown:env:<ENV_VAR>` 解析且不持久化绝对路径；只允许 canonical relative `.md` target，traversal/backslash/symlink escape fail-closed；APPROVED Draft 仍必须经过 Execution Request 与第二次显式 Execute；
 - v2 packaged stable release；
 - real-user / PMF evidence。
 
@@ -170,6 +173,7 @@ Conversation Home
 - [Google Drive Conversation Connector](docs/architecture/GOOGLE_DRIVE_CONVERSATION_CONNECTOR.md)
 - [Google Mail Conversation Connector](docs/architecture/GOOGLE_MAIL_CONVERSATION_CONNECTOR.md)
 - [Microsoft To Do Conversation Connector](docs/architecture/MICROSOFT_TODO_CONVERSATION_CONNECTOR.md)
+- [Local Markdown Decision Log Connector](docs/architecture/LOCAL_MARKDOWN_DECISION_LOG_CONNECTOR.md)
 - [v2 Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)
 
 ### 当前 Live 层级

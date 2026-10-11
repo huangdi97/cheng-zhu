@@ -991,3 +991,40 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
+
+
+---
+
+## Direct Question evaluation provenance closure · 2026-10-11
+
+Pilot Evidence Bridge 继续审计后发现：Stable Promotion Policy 已要求 Direct Question Precision / Recall，但 pre-v11 runtime 只在命中直接问题时持久化 `TRANSCRIPT_DIRECT_QUESTION` Guidance，没有冻结每条 final transcript 的 detector true/false prediction。这样无法可靠构造 recall 的 predicted=false 分母，而且未来 detector 规则变化会导致历史预测漂移。
+
+当前源码已收口：
+
+```text
+PRODUCT_SCHEMA_VERSION = 11
+DIRECT_QUESTION_DETECTOR_VERSION = heuristic-v1
+CAPTURE_TIME_DQ_PREDICTION_SNAPSHOT = TRUE
+PRIMARY_AUDIO_TRUE_AND_FALSE_PREDICTIONS = FROZEN
+SELF_MIC_DQ_EVAL_ELIGIBLE = FALSE
+PRE_V11_RECLASSIFICATION = FORBIDDEN
+PRE_V11_MISSING_PREDICTION = prediction_unavailable
+DIRECT_QUESTION_REVIEW_QUEUE = SOURCE_READY
+DIRECT_QUESTION_STABLE_LABEL_SOURCE = INDEPENDENT_HUMAN_REVIEW
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+链路为：
+
+```text
+final transcript
+→ analysis.direct_question {eligible,predicted,detector_version,channel}
+→ immutable product.db row
+→ v2_conversation_label_seed.py
+→ independent reviewer actual
+→ v2_conversation_human_eval.py
+→ source-aware stable readiness
+```
+
+这关闭的是 **evaluation reproducibility / provenance gap**，不是产品价值证据。已发布 `v2.0.0-beta.3` 仍不包含 schema v10/v11 的 Pilot Evidence Bridge；这些能力进入公开下载需要新的 prerelease candidate。Stable v2 / REAL_USER_VALIDATED / PMF 状态不变。

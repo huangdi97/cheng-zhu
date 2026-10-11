@@ -4173,19 +4173,23 @@ def diagnostics() -> dict[str, Any]:
         order="created_at ASC",
     )
     direct_question_prediction_available = 0
+    direct_question_prediction_ineligible = 0
     direct_question_prediction_unavailable = 0
     for transcript_row in transcript_eval_rows:
         analysis = transcript_row.get("analysis")
         direct = analysis.get("direct_question") if isinstance(analysis, dict) else None
-        if (
+        versioned = (
             isinstance(direct, dict)
-            and direct.get("eligible") is True
+            and isinstance(direct.get("eligible"), bool)
             and isinstance(direct.get("predicted"), bool)
-            and str(direct.get("detector_version") or "").strip()
-        ):
+            and bool(str(direct.get("detector_version") or "").strip())
+        )
+        if not versioned:
+            direct_question_prediction_unavailable += 1
+        elif direct.get("eligible") is True:
             direct_question_prediction_available += 1
         else:
-            direct_question_prediction_unavailable += 1
+            direct_question_prediction_ineligible += 1
     screen_observations = int(store.scalar("SELECT COUNT(*) FROM conversation_screen_context") or 0)
     confirmed_items = int(store.scalar(
         "SELECT COUNT(*) FROM conversation_item WHERE review_status IN ('USER_CONFIRMED','USER_EDITED','SOURCE_CONFIRMED')"
@@ -4274,8 +4278,9 @@ def diagnostics() -> dict[str, Any]:
             ],
             "direct_question_prediction_provenance": {
                 "detector_version": DIRECT_QUESTION_DETECTOR_VERSION,
-                "eligible_final_transcript_rows": len(transcript_eval_rows),
-                "prediction_available": direct_question_prediction_available,
+                "final_non_self_transcript_rows": len(transcript_eval_rows),
+                "evaluation_eligible": direct_question_prediction_available,
+                "explicitly_ineligible": direct_question_prediction_ineligible,
                 "prediction_unavailable": direct_question_prediction_unavailable,
                 "historical_reclassification": "FORBIDDEN",
             },

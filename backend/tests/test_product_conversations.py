@@ -3415,6 +3415,25 @@ def test_conversation_capture_isolated_transcription_only_bridge(product_env, mo
         "为什么之前选择 offline migration v2？",
     ]
 
+    history = conversations.guidance_history(session["id"], limit=10)
+    auto_events = [
+        event for event in history
+        if (event.get("origin") or {}).get("kind") == "TRANSCRIPT_AUTO"
+    ]
+    assert len(auto_events) == 2
+    by_segment = {
+        event["origin"]["transcript_segment_id"]: event
+        for event in auto_events
+    }
+    neutral_event = by_segment[row["id"]]
+    assert neutral_event["status"] == "SUPPRESSED"
+    assert neutral_event["reason"] == "TRANSCRIPT_NO_GROUNDED_OPPORTUNITY"
+    assert neutral_event["origin"]["decision_class"] == "ARBITER"
+    question_event = by_segment[question["id"]]
+    assert question_event["status"] == "SHOWN"
+    assert question_event["reason"] == "TRANSCRIPT_DIRECT_QUESTION"
+    assert question_event["origin"]["decision_class"] == "SHOWN"
+
     conversation_capture.pause(session["id"])
     assert conversation_capture.status(session["id"])["paused"] is True
     conversation_capture.resume(session["id"])

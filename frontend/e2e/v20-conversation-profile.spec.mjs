@@ -636,6 +636,35 @@ function mocks() {
       what_changed: [DECISION], pins: [],
       next_focus: { kind: 'OPEN_QUESTION', title: REVIEWED_OPEN.title, source_ref: REVIEWED_OPEN.id }, review_required: 1,
     }
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback-review`) return {
+      session_id: SESSION.id,
+      space_id: SPACE.id,
+      session_status: 'ENDED',
+      reviewer_kind: 'SELF_USER',
+      evidence_boundary: 'LOCAL_EXPLICIT_SELF_REPORT_NOT_REAL_USER_IDENTITY_PROOF',
+      guidance: [],
+      silence: [],
+      continue_feedback: null,
+      session_outcome: null,
+      remote_telemetry: 'OFF',
+      real_user_validated: false,
+      pmf_proven: false,
+    }
+    if (pathname === `/api/product/conversation/sessions/${SESSION.id}/feedback` && method === 'POST') {
+      const body = request.postDataJSON()
+      return {
+        id: 'hf-e2e',
+        space_id: SPACE.id,
+        session_id: SESSION.id,
+        kind: body.kind,
+        target_id: body.target_id || '',
+        reviewer_kind: 'SELF_USER',
+        labels: body.labels || {},
+        note: body.note || '',
+        created_at: 3,
+        updated_at: 3,
+      }
+    }
     if (pathname === `/api/product/conversation/sessions/${SESSION.id}/derived-draft` && method === 'POST') {
       const kind = request.postDataJSON().kind
       const title = kind === 'UPDATE_DECISION_LOG_DRAFT' ? 'Architecture Review · Decision Log Draft'

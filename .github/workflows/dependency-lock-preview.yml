@@ -1,0 +1,44 @@
+name: Dependency Lock Refresh Preview
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  refresh:
+    if: github.head_ref == 'chore/dependency-security-upgrades'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve frontend security patch versions
+        working-directory: frontend
+        run: |
+          npm install --save-dev --package-lock-only --ignore-scripts vite@6.4.4
+
+      - name: Resolve desktop build-tool security patch versions
+        working-directory: desktop
+        run: |
+          npm install --save-dev --package-lock-only --ignore-scripts electron-builder@26.16.1
+
+      - name: Record generated dependency files
+        run: |
+          mkdir -p dependency-lock-refresh/frontend dependency-lock-refresh/desktop
+          cp frontend/package.json dependency-lock-refresh/frontend/package.json
+          cp frontend/package-lock.json dependency-lock-refresh/frontend/package-lock.json
+          cp desktop/package.json dependency-lock-refresh/desktop/package.json
+          cp desktop/package-lock.json dependency-lock-refresh/desktop/package-lock.json
+          git diff -- frontend/package.json frontend/package-lock.json desktop/package.json desktop/package-lock.json > dependency-lock-refresh/diff.patch
+
+      - name: Upload generated lockfiles
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lock-refresh
+          path: dependency-lock-refresh
+          retention-days: 3
+          if-no-files-found: error

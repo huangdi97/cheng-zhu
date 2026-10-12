@@ -266,6 +266,21 @@ def test_read_and_explicit_write_claims_are_separate(monkeypatch):
     assert write_report["claims"]["REAL_PROVIDER_WRITE_REPLAY_VALIDATED"] is True
 
 
+def test_failure_evidence_redacts_token_target_and_email():
+    mod = _load()
+    message = mod._safe_error_text(
+        "provider failure token-secret for replay-recipient@example.test target-123",
+        token="token-secret",
+        target="target-123",
+    )
+    assert "token-secret" not in message
+    assert "target-123" not in message
+    assert "replay-recipient@example.test" not in message
+    assert "[REDACTED_TOKEN]" in message
+    assert "[REDACTED_TARGET]" in message
+    assert "[REDACTED_EMAIL]" in message
+
+
 def test_evidence_output_never_overwrites_existing_file(tmp_path):
     mod = _load()
     out = tmp_path / "provider-replay.json"

@@ -73,6 +73,14 @@ def _schema_version(db: Path) -> int:
         conn.close()
 
 
+def _require_hash(path: Path, expected: str, label: str) -> None:
+    actual = _sha256(path)
+    if not expected or actual != expected:
+        raise ValueError(
+            f"{label} hash drift detected; preserve the old workspace and create a new one instead of mutating frozen evidence inputs"
+        )
+
+
 def _json_load(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
@@ -198,7 +206,9 @@ def init_workspace(
     temp_dir.mkdir()
     try:
         policy_out = temp_dir / "stable-promotion-policy.json"
-        _write_json(policy_out, policy)
+        # Keep the exact policy bytes, not a reserialized equivalent, so the
+        # workspace hash is a byte-for-byte provenance anchor.
+        shutil.copyfile(policy_path, policy_out)
         draft_out = temp_dir / "pilot-manifest.draft.json"
         _write_json(draft_out, draft_manifest)
         seed_out = temp_dir / "independent-review.seed.jsonl"
@@ -288,9 +298,21 @@ def finalize_workspace(
     metadata = _json_load(workspace / "workspace.json")
     if metadata.get("contract_version") != WORKSPACE_CONTRACT:
         raise ValueError("unsupported pilot workspace contract")
-    policy = _json_load(workspace / "stable-promotion-policy.json")
+    policy_path = workspace / "stable-promotion-policy.json"
+    policy = _json_load(policy_path)
+    _require_hash(
+        policy_path,
+        str((metadata.get("policy") or {}).get("sha256") or ""),
+        "stable-promotion-policy.json",
+    )
     _policy_contract_check(policy)
     draft_path = workspace / "pilot-manifest.draft.json"
+    draft_meta = (metadata.get("outputs") or {}).get("pilot_manifest_draft") or {}
+    _require_hash(
+        draft_path,
+        str(draft_meta.get("sha256") or ""),
+        "pilot-manifest.draft.json",
+    )
     draft = _json_load(draft_path)
     if draft.get("evidence_type") != pilot_manifest.DRAFT_EVIDENCE_TYPE:
         raise ValueError("workspace draft manifest is not fail-closed")
@@ -342,9 +364,35 @@ def evaluate_workspace(
     final_manifest_path = workspace / "pilot-manifest.final.json"
     if not final_manifest_path.is_file():
         raise ValueError("workspace is not finalized; pilot-manifest.final.json is required")
+    finalization_path = workspace / "finalization.json"
+    if not finalization_path.is_file():
+        raise ValueError("workspace is missing finalization.json provenance")
+    finalization = _json_load(finalization_path)
     policy_path = workspace / "stable-promotion-policy.json"
     self_report_path = workspace / "self-report.jsonl"
     seed_path = workspace / "independent-review.seed.jsonl"
+
+    _require_hash(
+        policy_path,
+        str((metadata.get("policy") or {}).get("sha256") or ""),
+        "stable-promotion-policy.json",
+    )
+    self_report_meta = (metadata.get("outputs") or {}).get("self_report") or {}
+    _require_hash(
+        self_report_path,
+        str(self_report_meta.get("sha256") or ""),
+        "self-report.jsonl",
+    )
+    _require_hash(
+        final_manifest_path,
+        str(finalization.get("final_manifest_sha256") or ""),
+        "pilot-manifest.final.json",
+    )
+    _require_hash(
+        workspace / "pilot-manifest.draft.json",
+        str(finalization.get("draft_manifest_sha256") or ""),
+        "pilot-manifest.draft.json",
+    )
 
     reviews = [Path(path) for path in review_paths]
     if not reviews:

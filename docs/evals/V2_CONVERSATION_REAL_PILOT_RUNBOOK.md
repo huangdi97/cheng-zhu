@@ -180,9 +180,19 @@ The reviewer must fill:
 
 - `reviewer`;
 - `label_source=INDEPENDENT_HUMAN_REVIEW` where policy requires it;
-- the metric-specific actual/quality labels.
+- the metric-specific actual/quality labels;
+- optional human `notes`.
 
-The seed is not evidence until reviewed.
+The reviewer must **not** change or invent any frozen seed provenance. In particular, keep unchanged:
+
+- `session_id / space_id / profile / event_id / timestamp`;
+- `predicted / predicted_type / predicted_state / prediction_unavailable`;
+- Guidance class and all `system` provenance, including transcript/runtime origin;
+- source refs, detector version and frozen prediction payloads.
+
+At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.jsonl`, binds every independent-review row to the exact frozen `(session_id, kind, event_id)` seed row, and compares every non-human field. An invented event, altered prediction, altered runtime origin, unknown extra field, changed profile/Space, or edited source provenance fails closed before aggregation.
+
+The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
 
 Stable live-guidance metrics use only v12 TRANSCRIPT_AUTO provenance.
 
@@ -277,12 +287,15 @@ The workflow refuses to continue when any frozen input hash changes:
 - `selected-cohort.snapshot.json`;
 - `stable-promotion-policy.json`;
 - `pilot-manifest.draft.json`;
+- `independent-review.seed.jsonl`;
 - `self-report.jsonl`;
 - `pilot-manifest.final.json`.
 
 The selected-cohort snapshot is additionally recomputed from logical SQLite rows at finalization. This avoids false drift from unrelated WAL-backed database changes while still failing closed on selected Session/Pack drift.
 
-Independent reviewer files are external inputs and their SHA256 values are recorded in `evaluation-manifest.json`.
+Independent reviewer files are external inputs and their SHA256 values are recorded in `evaluation-manifest.json`. The manifest also records the frozen seed SHA256, seed row count, verified independent-review row count, and `EVENT_LEVEL_IMMUTABLE_PROVENANCE_VERIFIED`.
+
+The reviewer binding proves only that the human label is attached to a real frozen local review event/prediction. It does **not** prove the reviewer's identity, independence, competence, authorization, or honesty.
 
 This is tamper-evident local provenance, not a cryptographic identity/authorization system.
 

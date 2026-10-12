@@ -44,6 +44,12 @@ jobs:
             exit 0
           fi
 
+          if [ -f ".github/RELEASE_HOLD" ]; then
+            echo "release hold is active for $SOURCE_SHA; nothing to publish"
+            cat .github/RELEASE_HOLD
+            exit 0
+          fi
+
           version="$(node -p "require('./desktop/package.json').version")"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "unsupported release version: $version" >&2

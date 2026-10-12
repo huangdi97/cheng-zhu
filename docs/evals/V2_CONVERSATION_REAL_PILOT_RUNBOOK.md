@@ -1,0 +1,296 @@
+# Chengzhu v2 Real Pilot Operator Runbook
+
+**Status**: SOURCE-SIDE OPERATOR WORKFLOW  
+**Public Beta**: v2.0.0-beta.5  
+**Stable v2**: NOT CLAIMED  
+**REAL_USER_VALIDATED**: FALSE  
+**PMF_PROVEN**: FALSE
+
+This runbook defines the operator path from a real Conversation pilot to a Stable Promotion evidence review.
+
+It does not change any release or evidence claim by itself.
+
+## 1. Preconditions
+
+Use the current source tree with product schema >= v12.
+
+The participant-facing/runtime product may still be public beta.5, but the operator tooling in this runbook is post-beta.5 source-side tooling and is not claimed to exist inside the beta.5 installer.
+
+Required launch profiles:
+
+- PROJECT_SYNC
+- DESIGN_REVIEW
+
+Stable policy currently requires each profile to satisfy:
+
+- >= 5 distinct pseudonymous users;
+- >= 20 authorized real Sessions;
+- >= 3 cross-session Spaces;
+- each qualifying cross-session Space contains >= 3 authorized Sessions.
+
+These are acceptance floors, not scientific sample-size claims.
+
+## 2. Evidence boundaries
+
+The workflow separates four different facts:
+
+```text
+runtime facts
+human labels
+operator authorization attestations
+stable-release decision
+```
+
+None substitutes for another.
+
+In particular:
+
+```text
+Session exists != authorized real use
+consent_ack != system-verified participant consent
+user_ref != verified identity
+self-report != independent review
+Stable Gate PASS != stable release
+Stable release != PMF
+```
+
+Raw review material may contain transcript/source excerpts and must stay local.
+
+## 3. Select the pilot cohort
+
+Only select real, ended Project Sync / Design Review Sessions that you are authorized to use for evaluation.
+
+Assign each real participant a stable local pseudonymous key, for example:
+
+```text
+pilot-user-01
+pilot-user-02
+pilot-user-03
+```
+
+Do not use names, email addresses or other direct identifiers as `user_ref`.
+
+A Session may be selected only when the local database confirms:
+
+- Session status = ENDED;
+- launch profile is PROJECT_SYNC or DESIGN_REVIEW;
+- Session consent acknowledgement exists;
+- Frozen Session Pack exists and belongs to that Session.
+
+## 4. Initialize a frozen workspace
+
+Recommended command:
+
+```bash
+python scripts/v2_conversation_pilot_workspace.py init \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --session cv_project_001=pilot-user-01 \
+  --session cv_project_002=pilot-user-01 \
+  --session cv_design_001=pilot-user-02 \
+  --out-dir <LOCAL_PRIVATE_PATH>/pilot-2026-10
+```
+
+The command creates a new directory and refuses to overwrite an existing one.
+
+Expected files:
+
+```text
+workspace.json
+stable-promotion-policy.json
+pilot-manifest.draft.json
+independent-review.seed.jsonl
+self-report.jsonl
+README.md
+```
+
+Important properties:
+
+- only explicitly selected Sessions enter the seed/export;
+- unrelated Sessions are not copied;
+- the absolute product.db path is not recorded;
+- source DB SHA256 is recorded;
+- the exact Stable Promotion policy bytes are frozen;
+- the draft manifest is deliberately not Stable-eligible;
+- self-report remains explicit local self-report only;
+- `REAL_USER_VALIDATED`, `V2_STABLE_RELEASE` and `PMF_PROVEN` remain false.
+
+## 5. Independent review
+
+Never edit `independent-review.seed.jsonl` in place.
+
+Make a reviewer-specific copy, for example:
+
+```text
+reviewer-a.jsonl
+reviewer-b.jsonl
+```
+
+The reviewer must fill:
+
+- `reviewer`;
+- `label_source=INDEPENDENT_HUMAN_REVIEW` where policy requires it;
+- the metric-specific actual/quality labels.
+
+The seed is not evidence until reviewed.
+
+Stable live-guidance metrics use only v12 TRANSCRIPT_AUTO provenance.
+
+Direct Question metrics use only v11 capture-time frozen predictions.
+
+Reviewed post-hoc truth must never be copied back into prediction fields.
+
+## 6. Finalize the authorized cohort
+
+Review the draft cohort locally first.
+
+Finalization requires explicit operator declarations. Example:
+
+```bash
+python scripts/v2_conversation_pilot_workspace.py finalize \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --workspace <LOCAL_PRIVATE_PATH>/pilot-2026-10 \
+  --critical-incidents 0 \
+  --attest AUTHORIZED_REAL_USE \
+  --attest NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL \
+  --attest RAW_LABELS_KEPT_LOCAL \
+  --attest NO_CRITICAL_PRIVACY_INCIDENT \
+  --attest NO_KNOWN_DATA_LOSS
+```
+
+This creates:
+
+```text
+pilot-manifest.final.json
+finalization.json
+```
+
+The command revalidates the selected Sessions against product.db.
+
+It does not system-verify:
+
+- participant identity;
+- real-world authorization;
+- participant consent;
+- the truth of operator attestations;
+- PMF.
+
+If any frozen policy/draft hash has changed, finalization fails closed.
+
+If cohort membership or attestations must change, create a new workspace instead of rewriting the old one.
+
+## 7. Run the evidence gate
+
+After independent review files are complete:
+
+```bash
+python scripts/v2_conversation_pilot_workspace.py evaluate \
+  --workspace <LOCAL_PRIVATE_PATH>/pilot-2026-10 \
+  --review reviewer-a.jsonl \
+  --review reviewer-b.jsonl
+```
+
+The command automatically combines:
+
+```text
+explicit local self-report
++
+independent human review
+→ human-label report
+→ frozen Stable policy v5
+→ stable-readiness report
+```
+
+It creates:
+
+```text
+evaluation/
+  human-report.json
+  human-report.md
+  stable-readiness.json
+  stable-readiness.md
+  evaluation-manifest.json
+```
+
+The evaluation directory is immutable-by-convention: the tool refuses to overwrite it.
+
+To rerun with changed labels/cohort/rules, preserve the old workspace and create a new one.
+
+## 8. Hash and mutation rules
+
+Workspace provenance protects against accidental evidence drift.
+
+The workflow refuses to continue when any frozen input hash changes:
+
+- `stable-promotion-policy.json`;
+- `pilot-manifest.draft.json`;
+- `self-report.jsonl`;
+- `pilot-manifest.final.json`.
+
+Independent reviewer files are external inputs and their SHA256 values are recorded in `evaluation-manifest.json`.
+
+This is tamper-evident local provenance, not a cryptographic identity/authorization system.
+
+## 9. Retention interaction
+
+Guidance/Silence feedback follows its Guidance target lifecycle.
+
+When retention deletes a Guidance event:
+
+- dependent GUIDANCE/SILENCE feedback is deleted in the same confirmed cleanup boundary;
+- legacy orphan feedback is previewed and repaired;
+- Session-level CONTINUE / SESSION_OUTCOME feedback remains until Session/Space deletion.
+
+Pilot operators should export/review privacy-sensitive transcript-dependent evidence before the authorized local retention window removes it.
+
+Do not disable privacy retention merely to increase metric sample size.
+
+## 10. Interpreting NO_GO
+
+`NO_GO` is the expected result until the real pilot is large and strong enough.
+
+Do not respond to NO_GO by:
+
+- lowering thresholds;
+- changing cross-session definition;
+- mixing manual Guidance Lab events into automatic runtime populations;
+- counting forced silence as Useful Silence;
+- relabeling self-report as independent review;
+- adding synthetic/CI Sessions;
+- re-running newer detectors over historical transcript to manufacture predictions.
+
+Fix the product or gather more legitimate evidence.
+
+## 11. Interpreting PASS
+
+A PASS means only:
+
+```text
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW
+```
+
+It still does not mean:
+
+```text
+V2_STABLE_RELEASE = TRUE
+PMF_PROVEN = TRUE
+REAL_USER_VALUE_UNIVERSALLY_PROVEN = TRUE
+```
+
+A separate release review must still verify current main, current packaged artifacts, privacy/security incidents, installer provenance, rollback and release notes.
+
+## 12. Current product truth
+
+As of the source state introducing this orchestrator:
+
+```text
+PUBLIC_BETA = v2.0.0-beta.5
+PILOT_RUNTIME_AVAILABLE = TRUE
+PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
+AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
+PILOT_WORKSPACE_ORCHESTRATOR = SOURCE_SIDE
+STABLE_POLICY = v2.0-R1-stable-promotion-5
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

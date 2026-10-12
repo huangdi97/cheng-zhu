@@ -355,7 +355,7 @@ def test_pilot_builder_contract_tracks_machine_readable_stable_policy():
         (ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json")
         .read_text(encoding="utf-8")
     )
-    assert policy["policy_version"] == "v2.0-R1-stable-promotion-5"
+    assert policy["policy_version"] == "v2.0-R1-stable-promotion-6"
     assert module.CONTRACT_VERSION == policy["pilot_manifest_contract_version"]
     assert list(module.REQUIRED_PROFILES) == policy["metric_profiles"]
     assert list(module.REQUIRED_ATTESTATIONS) == policy["required_attestations"]

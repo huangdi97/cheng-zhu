@@ -101,14 +101,27 @@ def _profile_sessions(profile: str, policy: dict):
     count = int(requirements["sessions"])
     distinct_users = int(requirements["distinct_users"])
     cross_spaces = int(requirements["cross_session_spaces"])
-    return [
-        {
+    min_sessions = int(policy["cross_session_space_min_sessions"])
+    rows = []
+    repeated = cross_spaces * min_sessions
+    for index in range(count):
+        if index < repeated:
+            # Each qualifying continuity Space belongs to one pseudonymous
+            # Chengzhu user and contributes the canonical >=3 Sessions.
+            space_index = index // min_sessions
+            user_index = space_index % distinct_users
+        else:
+            # Remaining Sessions use one-off Spaces while cycling through the
+            # remaining cohort users so the baseline still has 5 users/20 Sessions.
+            tail = index - repeated
+            space_index = cross_spaces + tail
+            user_index = (cross_spaces + tail) % distinct_users
+        rows.append({
             "session_id": _session_id(profile, index),
-            "space_id": _space_id(profile, index % cross_spaces),
-            "user_ref": f"{profile.lower()}-user-{index % distinct_users}",
-        }
-        for index in range(count)
-    ]
+            "space_id": _space_id(profile, space_index),
+            "user_ref": f"{profile.lower()}-user-{user_index}",
+        })
+    return rows
 
 
 def _pilot():
@@ -249,7 +262,9 @@ def test_two_session_spaces_do_not_satisfy_canonical_cross_session_floor():
     # bug counted these as cross-session and could therefore pass this floor.
     for index, entry in enumerate(sessions):
         if index < 6:
-            entry["space_id"] = _space_id("PROJECT_SYNC", index // 2)
+            pair = index // 2
+            entry["space_id"] = _space_id("PROJECT_SYNC", pair)
+            entry["user_ref"] = f"project_sync-user-{pair}"
         else:
             entry["space_id"] = f"cs-project-single-{index}"
 
@@ -261,6 +276,52 @@ def test_two_session_spaces_do_not_satisfy_canonical_cross_session_floor():
     )
     assert cross["actual"] == 0
     assert cross["required"] == ">=3"
+
+
+def test_cross_session_space_must_belong_to_one_pseudonymous_user():
+    module = _module()
+    policy = _policy()
+    pilot = _pilot()
+    sessions = pilot["profiles"]["PROJECT_SYNC"]["sessions"]
+
+    target_space = sessions[0]["space_id"]
+    target = [entry for entry in sessions if entry["space_id"] == target_space]
+    assert len(target) == policy["cross_session_space_min_sessions"] == 3
+    assert len({entry["user_ref"] for entry in target}) == 1
+
+    # Keep Session count and total distinct-user floor intact while splitting
+    # one longitudinal Space across two pilot users. Old policy-v6 counting
+    # looked only at space_id/session count and incorrectly accepted this.
+    target[1]["user_ref"] = "project_sync-user-4"
+
+    report = module.evaluate(_human_report(), pilot, policy)
+    assert report["status"] == "NO_GO"
+    integrity = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "pilot_manifest_cohort_integrity"
+    )
+    assert any("one Conversation Space" in error for error in integrity["actual"])
+    cross = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "profile:PROJECT_SYNC:cross_session_spaces"
+    )
+    assert cross["actual"] == 2
+    assert cross["required"] == ">=3"
+
+
+def test_policy_requires_single_user_binding_for_cross_session_spaces():
+    module = _module()
+    weakened = _policy()
+    weakened["cross_session_space_user_binding"] = "ALLOW_MIXED_USERS"
+
+    report = module.evaluate(_human_report(), _pilot(), weakened)
+    assert report["status"] == "NO_GO"
+    check = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "cross_session_space_user_binding_contract"
+    )
+    assert check["actual"] == "ALLOW_MIXED_USERS"
+    assert check["required"] == "SINGLE_PSEUDONYMOUS_USER_REF"
 
 
 def test_policy_cannot_lower_cross_session_space_qualification_below_three():

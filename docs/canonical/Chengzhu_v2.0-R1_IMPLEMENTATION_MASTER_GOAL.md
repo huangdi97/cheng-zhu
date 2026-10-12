@@ -767,7 +767,7 @@ PR 合并后至少要有：
 
 ## Public Conversation Beta Prerelease Gate
 
-`v2.0.0-beta.2` 与 `v2.0.0-beta.3` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
+`v2.0.0-beta.2`、`v2.0.0-beta.3` 与 `v2.0.0-beta.4` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
 
 - exact green main SHA；
 - Windows installer + portable；
@@ -787,12 +787,12 @@ PR 合并后至少要有：
 
 ```text
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
-PUBLISHED_BETA_TAG = v2.0.0-beta.3
-PUBLISHED_BETA_SOURCE_SHA = b0cbfb628a5fc224c571288b92576992fa25dc77
+PUBLISHED_BETA_TAG = v2.0.0-beta.4
+PUBLISHED_BETA_SOURCE_SHA = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
 STABLE_LATEST = v1.4.2
 ```
 
-beta.3 的发布路径已完成 exact green main SHA、Windows build、clean-install、draft download-back、downloaded installer packaged smoke、prerelease channel 与 tag/source invariant，并于 2026-10-11 公开。原 Release run #300 在 **publish 完成后** 因 verification JSON 向 PSCustomObject 追加不存在字段的 PowerShell 缺陷被标记为 failure；该失败不发生在二进制、download-back、tag/source 或 release-channel gate。公开 Release 与 tag/source 已独立复核，workflow 修复另加 PR-stage regression。详见 `docs/releases/V2_0_0_BETA_3_PUBLICATION_PROVENANCE.md`。
+beta.4 已于 2026-10-11 从 exact green main SHA `0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc` 公开为 GitHub Prerelease。Release run #304 完成 Windows build/test、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant 与 post-publish verification regression；公开 tag/source 精确一致。beta.4 已把 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT provenance 带入可安装包。详见 `docs/releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md`。beta.3 原始 post-publish PowerShell 缺陷保留在其历史 provenance 中。
 
 仍不允许：
 

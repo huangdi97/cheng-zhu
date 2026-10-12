@@ -930,7 +930,7 @@ V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS
                                   clean-install replay，PATH 中无 Python/Node)
 V2_CONNECTOR_RUNTIME    = PARTIAL (GitHub 真实账号 replay PASS；Google Calendar / Drive /
                                   Gmail / Microsoft To Do = BLOCKED_ACCOUNT，本机无凭据)
-V2_PUBLIC_BETA           = v2.0.0-beta.3 @ b0cbfb628a5fc224c571288b92576992fa25dc77
+V2_PUBLIC_BETA           = v2.0.0-beta.4 @ 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
 V2_PRODUCTIZED_RELEASE  = FALSE  (只有 prerelease；stable promotion 需要真实用户证据)
 REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 ```
@@ -939,13 +939,13 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
-公开 Beta 已推进到 `v2.0.0-beta.3` prerelease；下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
+公开 Beta 已推进到 `v2.0.0-beta.4` prerelease；beta.4 已把 schema v10–v12 的 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT evidence 带入可安装 Windows 包。下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
 
 ---
 
 ## Pilot Evidence Bridge closure · 2026-10-11
 
-beta.3 公开后，下一阶段工程目标从“继续增加 Conversation 功能”切换为“可信地采集真实 pilot 证据”。当前源码 runtime 已新增以下闭环；它们尚未进入已发布 beta.3 二进制：
+beta.3 公开后，下一阶段工程目标从“继续增加 Conversation 功能”切换为“可信地采集真实 pilot 证据”。下列闭环最初在 beta.3 之后的源码阶段完成；它们现已随 `v2.0.0-beta.4` 进入公开 packaged prerelease：
 
 ```text
 PRODUCT_SCHEMA_VERSION = 10
@@ -983,8 +983,8 @@ Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_s
 因此当前状态仍为：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.3
-PILOT_EVIDENCE_CAPTURE_RUNTIME = SOURCE_READY_PENDING_RELEASE
+V2_PUBLIC_BETA = v2.0.0-beta.4
+PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
@@ -1028,7 +1028,7 @@ final transcript
 → source-aware stable readiness
 ```
 
-这关闭的是 **evaluation reproducibility / provenance gap**，不是产品价值证据。已发布 `v2.0.0-beta.3` 仍不包含 schema v10/v11 的 Pilot Evidence Bridge；这些能力进入公开下载需要新的 prerelease candidate。Stable v2 / REAL_USER_VALIDATED / PMF 状态不变。
+这关闭的是 **evaluation reproducibility / provenance gap**，不是产品价值证据。schema v10/v11 的 Pilot Evidence Bridge 已随 `v2.0.0-beta.4` 进入公开下载；Stable v2 / REAL_USER_VALIDATED / PMF 状态不变。
 
 
 ---
@@ -1109,4 +1109,51 @@ final PRIMARY_AUDIO transcript
 → Stable readiness
 ```
 
-这次修改只修复证据来源与分母定义，不代表已经有真实用户证据。公开 `v2.0.0-beta.3` 仍不包含 schema v10/v11/v12 的 Pilot Evidence Bridge；进入真实 pilot 前应发布新的 prerelease candidate。
+这次修改只修复证据来源与分母定义，不代表已经有真实用户证据。schema v10/v11/v12 的 Pilot Evidence Bridge 已随公开 `v2.0.0-beta.4` packaged prerelease 发布；现在可以开始真实、授权的 Project Sync / Design Review pilot，但仍必须满足 independent human review 与 Stable Promotion Policy v3，不能因此宣称 stable / REAL_USER_VALIDATED / PMF。
+
+
+---
+
+## Beta.4 publication closure · 2026-10-11
+
+`v2.0.0-beta.4` 已完成公开 prerelease 发布，publication provenance 见
+[`docs/releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md`](../releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md)。
+
+```text
+PUBLIC_BETA_TAG = v2.0.0-beta.4
+PUBLIC_BETA_SOURCE_SHA = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+PUBLIC_BETA_PRERELEASE = TRUE
+PUBLIC_BETA_DRAFT = FALSE
+STABLE_LATEST = v1.4.2
+RELEASE_RUN_304 = SUCCESS
+MAIN_CI_894 = SUCCESS
+TAG_SOURCE_INVARIANT = PASS
+DOWNLOAD_BACK_SHA256 = PASS
+DOWNLOADED_INSTALLER_REPLAY = PASS
+PACKAGED_SMOKE = PASS
+POST_PUBLISH_METADATA_REGRESSION = PASS
+
+PRODUCT_SCHEMA_VERSION = 12
+PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+beta.4 的工程意义是：**真实 pilot 的采集与评估链已经进入用户可下载的 Windows Beta**。它不是 Stable promotion，也不是用户价值结论。
+
+下一阶段产品主线应从继续扩功能切换为：
+
+```text
+authorized Project Sync / Design Review pilot
+→ explicit local self-report
+→ independent human review
+→ policy-v3 metric populations
+→ stable-readiness evaluator
+→ human release review
+```
+
+同时继续补齐 Google Calendar / Drive / Gmail / Microsoft To Do 的适用 real-account evidence，以及 Gmail OAuth sensitive-scope/publication external gate。GitHub provider 的真实账号 replay evidence 保持独立记录。
+
+任何 beta.4 之后的源码提交都不得移动或重写 `v2.0.0-beta.4` tag；新的可下载代码必须使用新的版本和全新的 exact-SHA release cycle。

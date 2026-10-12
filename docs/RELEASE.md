@@ -27,15 +27,15 @@ Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Published = v2.0.0-beta.3
-Published Beta tag/source SHA = b0cbfb628a5fc224c571288b92576992fa25dc77
+Conversation Beta Published = v2.0.0-beta.4
+Published Beta tag/source SHA = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.3 provenance is recorded in `docs/releases/V2_0_0_BETA_3_PUBLICATION_PROVENANCE.md`. The original publish run completed the release-critical build, clean-install, draft download-back, downloaded-install smoke, prerelease-channel and tag/source checks before failing in a **post-publish evidence-enrichment step**: PowerShell could not assign new properties directly to a `ConvertFrom-Json` PSCustomObject. The public beta.3 Release itself is valid and independently rechecked; the workflow defect is fixed separately and guarded by a PR-stage regression.
+Published beta.4 provenance is recorded in `docs/releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md`. beta.4 was published from exact green main SHA `0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc` through Release run #304 after the Windows build/test, clean-install, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel, Stable-Latest-preservation, tag/source and post-publish verification-metadata regression gates all completed successfully. The earlier beta.3 post-publish PowerShell defect remains documented in its own provenance file as historical release evidence.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

@@ -26,6 +26,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -45,6 +46,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 API = "/api/product/conversation"
 REPORT_CONTRACT = "v2.0-R1-real-provider-account-replay-1"
+_EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9._%+-])")
 
 
 @dataclass(frozen=True)
@@ -284,17 +286,23 @@ def _start_backend(
     deadline = time.time() + 90
     while time.time() < deadline:
         if process.poll() is not None:
-            output = process.stdout.read() if process.stdout else ""
+            if process.stdout:
+                process.stdout.read()
             raise ReplayFailure(
-                f"backend exited early ({process.returncode}); log tail omitted from evidence; "
-                f"last line={output.splitlines()[-1][:240] if output.splitlines() else ''}"
+                f"backend exited early ({process.returncode}); backend log content omitted from evidence"
             )
         try:
             _http(f"http://127.0.0.1:{port}", "GET", "/api/options", timeout=5)
             return process
         except Exception:
             time.sleep(0.5)
-    raise ReplayFailure("backend did not become ready in 90s")
+    process.terminate()
+    try:
+        process.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+    raise ReplayFailure("backend did not become ready in 90s; temporary backend terminated")
 
 
 def _catalog_item(base: str, provider_id: str) -> dict[str, Any]:
@@ -348,6 +356,16 @@ def _must(report: dict[str, Any], name: str, condition: bool, detail: Any = "") 
     report["assertions"].append(item)
     if not condition:
         raise ReplayFailure(f"assertion failed: {name}")
+
+
+def _safe_error_text(value: str, *, token: str = "", target: str = "") -> str:
+    text = str(value or "")
+    if token:
+        text = text.replace(token, "[REDACTED_TOKEN]")
+    if target:
+        text = text.replace(target, "[REDACTED_TARGET]")
+    text = _EMAIL_RE.sub("[REDACTED_EMAIL]", text)
+    return text[:1200]
 
 
 def _blocked_report(spec: ProviderSpec, source_sha: str, token_env: str) -> dict[str, Any]:
@@ -714,7 +732,7 @@ def run_replay(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             finally:
                 _stop_backend(enabled)
     except Exception as exc:
-        message = str(exc).replace(token, "[REDACTED_TOKEN]")[:1200]
+        message = _safe_error_text(str(exc), token=token, target=target)
         report["status"] = "FAILED"
         report["error_class"] = type(exc).__name__
         report["error"] = message

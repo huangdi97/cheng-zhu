@@ -30,7 +30,7 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-2"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-3"
 MIN_PRODUCT_SCHEMA = 12
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
@@ -377,6 +377,107 @@ def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]], headers: Iterable[s
     return count
 
 
+REVIEW_EDITABLE_FIELDS: dict[str, set[str]] = {
+    "guidance": {
+        "reviewer", "label_source", "notes",
+        "useful", "interruption_regret", "source_correct", "recall_correct",
+    },
+    "silence": {"reviewer", "label_source", "notes", "silence_correct"},
+    "direct_question": {"reviewer", "label_source", "notes", "actual"},
+    "truth_item": {"reviewer", "label_source", "notes", "actual_type", "actual_state"},
+    "continue": {"reviewer", "label_source", "notes", "writeback_accurate"},
+    "session_outcome": {
+        "reviewer", "label_source", "notes",
+        "cognitive_load_delta", "would_reuse_space",
+    },
+}
+EVENT_KINDS = {"guidance", "silence", "direct_question", "truth_item"}
+
+
+def _jsonl_objects(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        text = raw.strip()
+        if not text or text.startswith("#"):
+            continue
+        try:
+            row = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path.name} line {lineno}: invalid JSON: {exc}") from exc
+        if not isinstance(row, dict):
+            raise ValueError(f"{path.name} line {lineno}: row must be an object")
+        rows.append(row)
+    return rows
+
+
+def _review_seed_key(row: dict[str, Any]) -> tuple[str, str, str]:
+    kind = str(row.get("kind") or "").strip()
+    session_id = str(row.get("session_id") or "").strip()
+    event_id = str(row.get("event_id") or "").strip()
+    if kind not in REVIEW_EDITABLE_FIELDS:
+        raise ValueError(f"unsupported review kind for seed binding: {kind!r}")
+    if not session_id:
+        raise ValueError("review row missing session_id")
+    if kind in EVENT_KINDS and not event_id:
+        raise ValueError(f"{kind} review row missing event_id")
+    if kind not in EVENT_KINDS and event_id:
+        raise ValueError(f"{kind} review row must not invent event_id")
+    return session_id, kind, event_id
+
+
+def _review_immutable_projection(row: dict[str, Any]) -> dict[str, Any]:
+    kind = str(row.get("kind") or "").strip()
+    editable = REVIEW_EDITABLE_FIELDS.get(kind)
+    if editable is None:
+        raise ValueError(f"unsupported review kind for seed binding: {kind!r}")
+    return {
+        key: value
+        for key, value in row.items()
+        if key not in editable
+    }
+
+
+def _review_seed_index(seed_path: Path) -> dict[tuple[str, str, str], dict[str, Any]]:
+    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in _jsonl_objects(seed_path):
+        key = _review_seed_key(row)
+        if key in index:
+            raise ValueError(
+                "frozen independent-review seed contains duplicate session/kind/event identity"
+            )
+        index[key] = row
+    if not index:
+        raise ValueError("frozen independent-review seed is empty")
+    return index
+
+
+def _bind_review_rows_to_seed(
+    rows: Iterable[dict[str, Any]],
+    seed_index: dict[tuple[str, str, str], dict[str, Any]],
+    *,
+    source_name: str,
+) -> int:
+    bound = 0
+    for row in rows:
+        key = _review_seed_key(row)
+        seed = seed_index.get(key)
+        if seed is None:
+            session_id, kind, event_id = key
+            raise ValueError(
+                f"{source_name}: reviewer row is not present in frozen independent-review seed: "
+                f"session={session_id} kind={kind} event={event_id or '<session-level>'}"
+            )
+        if _review_immutable_projection(row) != _review_immutable_projection(seed):
+            session_id, kind, event_id = key
+            raise ValueError(
+                f"{source_name}: immutable seed provenance mismatch: "
+                f"session={session_id} kind={kind} event={event_id or '<session-level>'}; "
+                "reviewers may change labels/reviewer/notes only"
+            )
+        bound += 1
+    return bound
+
+
 def _assignments_from_manifest(manifest: dict[str, Any]) -> list[tuple[str, str]]:
     assignments: list[tuple[str, str]] = []
     for profile in pilot_manifest.REQUIRED_PROFILES:
@@ -425,6 +526,9 @@ This directory is **local evidence workspace**, not a release artifact and not p
 1. Review `pilot-manifest.draft.json` and the selected Session/user pseudonym mapping.
 2. Have independent reviewers fill a copy of `independent-review.seed.jsonl`.
    Use `label_source=INDEPENDENT_HUMAN_REVIEW` where required by policy.
+   Reviewers may edit only reviewer / label_source / notes and the kind-specific
+   human label fields. Event identity, prediction, profile/Space, runtime origin,
+   source refs and all other frozen seed provenance must remain unchanged.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
 4. Finalize only after you can truthfully make every required operator attestation.
 5. Evaluate with the finalized manifest plus independent-review file(s).
@@ -714,6 +818,13 @@ def evaluate_workspace(
         str(self_report_meta.get("sha256") or ""),
         "self-report.jsonl",
     )
+    seed_meta = (metadata.get("outputs") or {}).get("independent_review_seed") or {}
+    _require_hash(
+        seed_path,
+        str(seed_meta.get("sha256") or ""),
+        "independent-review.seed.jsonl",
+    )
+    seed_index = _review_seed_index(seed_path)
     _require_hash(
         final_manifest_path,
         str(finalization.get("final_manifest_sha256") or ""),
@@ -744,10 +855,17 @@ def evaluate_workspace(
     try:
         rows: list[dict[str, Any]] = []
         seen: set[tuple[str, str, str, str]] = set()
+        verified_review_rows = 0
         if self_report_path.is_file():
             rows.extend(human_eval.load_rows(self_report_path, seen=seen))
         for path in reviews:
-            rows.extend(human_eval.load_rows(path, seen=seen))
+            review_rows = human_eval.load_rows(path, seen=seen)
+            verified_review_rows += _bind_review_rows_to_seed(
+                review_rows,
+                seed_index,
+                source_name=path.name,
+            )
+            rows.extend(review_rows)
 
         human_report = human_eval.aggregate(rows)
         human_json = temp_dir / "human-report.json"
@@ -776,6 +894,10 @@ def evaluate_workspace(
                 "pilot_manifest_final_sha256": _sha256(final_manifest_path),
                 "policy_sha256": _sha256(policy_path),
                 "self_report_sha256": _sha256(self_report_path) if self_report_path.is_file() else None,
+                "independent_review_seed_sha256": _sha256(seed_path),
+                "independent_review_seed_rows": len(seed_index),
+                "verified_independent_review_rows": verified_review_rows,
+                "review_seed_binding": "EVENT_LEVEL_IMMUTABLE_PROVENANCE_VERIFIED",
                 "independent_reviews": [
                     {"filename": path.name, "sha256": _sha256(path)}
                     for path in reviews
@@ -789,7 +911,9 @@ def evaluate_workspace(
             "claims": stable_report.get("claims"),
             "interpretation": (
                 "This evaluation uses the policy snapshot frozen in the workspace. "
-                "A PASS permits only a separate stable-release review; it does not publish a release or prove PMF."
+                "Independent-review rows are bound to the exact frozen seed event identity and immutable "
+                "prediction/runtime provenance before aggregation. A PASS permits only a separate stable-release "
+                "review; it does not publish a release or prove PMF."
             ),
         }
         _write_json(temp_dir / "evaluation-manifest.json", evaluation_manifest)

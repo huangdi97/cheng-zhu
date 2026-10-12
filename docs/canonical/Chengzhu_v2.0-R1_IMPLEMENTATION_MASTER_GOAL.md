@@ -767,7 +767,7 @@ PR 合并后至少要有：
 
 ## Public Conversation Beta Prerelease Gate
 
-`v2.0.0-beta.2`、`v2.0.0-beta.3` 与 `v2.0.0-beta.4` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
+`v2.0.0-beta.2`、`v2.0.0-beta.3`、`v2.0.0-beta.4` 与 `v2.0.0-beta.5` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
 
 - exact green main SHA；
 - Windows installer + portable；
@@ -787,12 +787,12 @@ PR 合并后至少要有：
 
 ```text
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
-PUBLISHED_BETA_TAG = v2.0.0-beta.4
-PUBLISHED_BETA_SOURCE_SHA = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+PUBLISHED_BETA_TAG = v2.0.0-beta.5
+PUBLISHED_BETA_SOURCE_SHA = 3c29112b6256d78f26c7d70670b558c6c24d6a3b
 STABLE_LATEST = v1.4.2
 ```
 
-beta.4 已于 2026-10-11 从 exact green main SHA `0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc` 公开为 GitHub Prerelease。Release run #304 完成 Windows build/test、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant 与 post-publish verification regression；公开 tag/source 精确一致。beta.4 已把 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT provenance 带入可安装包。详见 `docs/releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md`。beta.3 原始 post-publish PowerShell 缺陷保留在其历史 provenance 中。
+beta.5 已于 2026-10-12 从 exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` 公开为 GitHub Prerelease。Main CI #923 与 Release run #316 均 SUCCESS；Release 完成 Windows build/test、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant、post-publish verification regression 与 verification artifact upload。beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge / retention / auto-runtime provenance，并进一步打包 scope-aware dependency-security hardening、electron-builder 26.17.0、Vite 6.4.4 与 Stable Promotion Policy v4 authorized-cohort binding。详见 `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`。beta.4 / beta.3 继续作为不可变历史发布 provenance 保留。
 
 仍不允许：
 
@@ -897,7 +897,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 使用已经公开发布的 `v2.0.0-beta.2` 进行 local dogfood，优先 Project Sync / Design Review；
+1. 使用当前公开发布的 `v2.0.0-beta.5` 进行授权 local dogfood / real pilot，优先 Project Sync / Design Review；
 2. 进行真实 Project Sync / Design Review 小规模使用；
 3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；

@@ -1,6 +1,6 @@
 {
-  "policy_version": "v2.0-R1-stable-promotion-4",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical thresholds remain unchanged from policy v3. Policy v4 binds every human-label session to an authorized pilot cohort, derives profile floors from enumerated pseudonymous session entries instead of hand-entered counts, and restricts Stable metric aggregation to the required Project Sync / Design Review profiles.",
+  "policy_version": "v2.0-R1-stable-promotion-5",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical quality/profile floors remain unchanged from policy v4. Policy v5 fixes the cross-session Space qualification contract to the canonical definition: a Space counts as cross-session only when the authorized pilot manifest enumerates at least 3 Sessions in that same Space. This closes a pre-pilot evaluator bug that incorrectly counted 2-Session Spaces.",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -120,7 +120,7 @@
       "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
     ]
   },
-  "change_control": "Thresholds are unchanged from policy v2. Policy v3 is a pre-pilot population/provenance correction made before real pilot results are available: do not broaden populations, mix manual-lab events, count forced silence, or lower a threshold merely to make a failing pilot pass.",
+  "change_control": "Numerical quality thresholds and required profile floors are unchanged from policy v4. Policy v5 is a pre-pilot cohort-semantics correction: canonical documentation already required >=3 Sessions in the same Space, while the v4 evaluator incorrectly counted >=2. Do not lower cross_session_space_min_sessions, broaden populations, mix manual-lab events, count forced silence, or lower a quality threshold merely to make a failing pilot pass.",
   "label_source_policy": {
     "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT": "Explicit post-session labels entered in Chengzhu on the local device. Valid for user-perception/outcome measures only where a metric explicitly allows it; not verified identity proof.",
     "INDEPENDENT_HUMAN_REVIEW": "Explicit human review performed independently from the in-product self-report surface under the human-label protocol.",
@@ -180,5 +180,6 @@
   "metric_profiles": [
     "PROJECT_SYNC",
     "DESIGN_REVIEW"
-  ]
+  ],
+  "cross_session_space_min_sessions": 3
 }

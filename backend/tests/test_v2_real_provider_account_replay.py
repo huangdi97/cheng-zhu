@@ -84,6 +84,19 @@ def test_provider_contracts_keep_read_and_write_boundaries_explicit():
             _args(provider="google-drive", limit=501),
         )
 
+    with pytest.raises(ValueError, match="runtime control"):
+        mod._validate_cli(
+            mod.PROVIDERS["google-mail"],
+            _args(token_env="PATH"),
+        )
+
+    with pytest.raises(ValueError, match="runtime control"):
+        mod._validate_cli(
+            mod.PROVIDERS["google-mail"],
+            _args(token_env=mod.PROVIDERS["google-mail"].enable_env),
+        )
+
+
 
 def test_blocked_account_report_is_fail_closed_and_contains_no_credential_value():
     mod = _load()

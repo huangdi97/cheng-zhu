@@ -351,3 +351,17 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+### Finalize 的双重 cohort revalidation
+
+`finalize` 不是“先检查一次、然后相信后续 live DB 不再变化”。它会：
+
+```text
+revalidate selected cohort against frozen snapshot
+→ build final manifest from live DB
+→ revalidate selected cohort again
+→ only then persist pilot-manifest.final.json / finalization.json
+```
+
+因此，如果选中 Session / Frozen Session Pack 在 final manifest 的独立 DB 读取窗口内发生漂移，finalize 必须失败，而且不能留下半成品 final evidence。与 cohort 无关的其他 Session/WAL 增长仍允许。

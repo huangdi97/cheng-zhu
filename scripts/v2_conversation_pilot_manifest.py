@@ -9,7 +9,8 @@ A final AUTHORIZED_REAL_CONVERSATION_PILOT manifest requires:
 - explicit --finalize;
 - every required --attest value supplied by the operator;
 - explicit --critical-incidents;
-- only ended PROJECT_SYNC / DESIGN_REVIEW sessions selected from product.db;\n- each selected Session has consent acknowledgement and a matching Frozen Session Pack.
+- only ended PROJECT_SYNC / DESIGN_REVIEW sessions selected from product.db;
+- each selected Session has consent acknowledgement and a matching Frozen Session Pack.
 
 No transcript text, participant names, Space titles, or other content is copied
 into the manifest. user_ref is a local pseudonymous cohort key, not identity
@@ -316,7 +317,7 @@ def main() -> int:
         "stable_readiness_eligible_manifest_type": args.finalize,
         "interpretation": (
             "This builder validates local Session membership and structure only; "
-            "it does not verify real-user identity, authorization, consent, or PMF."
+            "it does not verify real-user identity, real-world authorization, participant consent, or PMF."
         ),
     }, ensure_ascii=False))
     return 0

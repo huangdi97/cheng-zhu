@@ -930,7 +930,7 @@ V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS
                                   clean-install replay，PATH 中无 Python/Node)
 V2_CONNECTOR_RUNTIME    = PARTIAL (GitHub 真实账号 replay PASS；Google Calendar / Drive /
                                   Gmail / Microsoft To Do = BLOCKED_ACCOUNT，本机无凭据)
-V2_PUBLIC_BETA           = v2.0.0-beta.5 @ 3c29112b6256d78f26c7d70670b558c6c24d6a3b
+V2_PUBLIC_BETA           = v2.0.0-beta.6 @ 38a70b719b2d5b0c9e8273e6a908fed9229ab706
 V2_PRODUCTIZED_RELEASE  = FALSE  (只有 prerelease；stable promotion 需要真实用户证据)
 REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 ```
@@ -939,7 +939,7 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
-公开 Beta 已推进到 `v2.0.0-beta.5` prerelease；beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT evidence，并进一步打包 dependency-security hardening 与 Stable Promotion Policy v4 authorized-cohort binding。下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
+公开 Beta 已推进到 `v2.0.0-beta.6` prerelease；beta.6 继承 beta.5 已发布的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity、auto-runtime Guidance/SILENT evidence、dependency-security hardening，并进一步把 Quick Debrief 与当前 real-pilot operationalization/evidence-integrity contract 纳入公开 prerelease，包括 Stable Policy v6、authorized pilot workspace、privacy-minimized Session inventory、WAL/TOCTOU selected-cohort provenance、frozen independent-review seed binding 与 unique-event-per-metric sample enforcement。下一阶段不再通过继续堆 Beta 功能冒充验证，而应执行 Project Sync / Design Review 授权真实 pilot 与独立 review，同时补 Google / Microsoft real-account evidence。仍不声明 stable。
 
 ---
 
@@ -983,7 +983,7 @@ Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_s
 因此当前状态仍为：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.5
+V2_PUBLIC_BETA = v2.0.0-beta.6
 PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -1404,10 +1404,11 @@ init workspace
 
 This is post-beta.5 source-side operator tooling. It does not change the already-published beta.5 binaries and does not justify beta.6 by itself. Its purpose is to make the first real Project Sync / Design Review pilot reproducible without manual JSON assembly.
 
-Current truth remains:
+That source-side operator state has now been packaged into the later beta.6 release cycle. Current truth is:
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.5
+V2_PUBLIC_BETA = v2.0.0-beta.6
+V2_PUBLIC_BETA_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
@@ -1489,3 +1490,69 @@ PMF_PROVEN = FALSE
 - Stable `min_n` 现在明确是 **unique product event × metric observations**。
 
 该修复与 event-level frozen seed binding 一起构成 beta.6 的 evidence-integrity release blocker。release hold 必须保持，直到两项修复合并、exact main 全量 CI 通过、再通过独立 unhold 流程解除。
+
+
+---
+
+## Beta.6 publication closure · 2026-10-12
+
+beta.6 的 release hold 在 selected-cohort WAL/TOCTOU provenance 与 independent-review seed/event binding、unique-event-per-metric sample-unit 两项 blocker 合并并通过 exact-main CI 后解除。随后 generic publisher 只对当前 main tip 触发 Release，最终形成新的不可变公开 prerelease：
+
+```text
+PUBLIC_BETA_TAG = v2.0.0-beta.6
+PUBLIC_BETA_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
+PUBLIC_BETA_PRERELEASE = TRUE
+PUBLIC_BETA_DRAFT = FALSE
+STABLE_LATEST = v1.4.2
+
+MAIN_CI_980 = SUCCESS
+RELEASE_RUN_318 = SUCCESS
+TAG_SOURCE_INVARIANT = PASS
+PACKAGED_UI_EVIDENCE = PASS
+CLEAN_INSTALL_REPLAY = PASS
+DOWNLOAD_BACK_SHA256 = PASS
+DOWNLOADED_INSTALLER_REPLAY = PASS
+PACKAGED_SMOKE = PASS
+PRERELEASE_CHANNEL = PASS
+STABLE_LATEST_PRESERVED = PASS
+POST_PUBLISH_METADATA_REGRESSION = PASS
+DOWNLOAD_BACK_VERIFICATION_ARTIFACT = PASS
+```
+
+beta.6 当前公开 source truth 包含：
+
+```text
+QUICK_DEBRIEF = PACKAGED
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-6
+AUTHORIZED_PILOT_WORKSPACE = AVAILABLE
+PRIVACY_MINIMIZED_SESSION_INVENTORY = AVAILABLE
+SELECTED_COHORT_WAL_SAFE_LOGICAL_SNAPSHOT = TRUE
+FINALIZE_TOCTOU_REVALIDATION = TRUE
+FROZEN_INDEPENDENT_REVIEW_SEED_BINDING = TRUE
+UNIQUE_EVENT_PER_METRIC_SAMPLE_UNIT = TRUE
+RELEASE_HOLD = OFF_AFTER_EXACT_MAIN_PROOF
+```
+
+这组能力把 real-pilot **执行、采集、归因与 Stable readiness 评估**做成了可重复的工程路径；它们没有把 operator/human boundary 变成机器事实。系统仍不验证：
+
+- 人的真实身份；
+- reviewer 是否真的独立；
+- real-world authorization 的真实性；
+- participant consent 的真实性；
+- real-user value；
+- PMF。
+
+因此 beta.6 发布后的成熟度仍是：
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.6
+PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+发布 provenance：`docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`。
+
+从这里开始，默认下一步不再是 beta.7 功能扩张，而是使用 beta.6 执行授权真实 Project Sync / Design Review pilot、完成 Quick Debrief + independent review、用 frozen Policy v6 跑 Stable readiness；只有真实 pilot 暴露 runtime defect、需要打包修复，或出现新的 provider/runtime evidence 才进入新的 prerelease cycle。

@@ -1,7 +1,8 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: SOURCE-SIDE OPERATOR WORKFLOW  
-**Public Beta**: v2.0.0-beta.5  
+**Status**: BETA.6 REAL-PILOT OPERATOR WORKFLOW  
+**Public Beta**: v2.0.0-beta.6  
+**Published source/tag SHA**: `38a70b719b2d5b0c9e8273e6a908fed9229ab706`  
 **Stable v2**: NOT CLAIMED  
 **REAL_USER_VALIDATED**: FALSE  
 **PMF_PROVEN**: FALSE
@@ -12,9 +13,9 @@ It does not change any release or evidence claim by itself.
 
 ## 1. Preconditions
 
-Use the current source tree with product schema >= v12.
+Use the current beta.6-compatible source/runtime with product schema >= v12.
 
-The participant-facing/runtime product may still be public beta.5, but the operator tooling in this runbook is post-beta.5 source-side tooling and is not claimed to exist inside the beta.5 installer.
+The participant-facing/runtime product may use the published `v2.0.0-beta.6` Windows prerelease. The exact beta.6 source/tag SHA includes the current real-pilot operationalization/evidence-integrity chain described here. This runbook still represents an **operator workflow**, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -358,21 +359,25 @@ A separate release review must still verify current main, current packaged artif
 
 ## 13. Current product truth
 
-As of the source state introducing this orchestrator:
+After beta.6 publication:
 
 ```text
-PUBLIC_BETA = v2.0.0-beta.5
+PUBLIC_BETA = v2.0.0-beta.6
+PUBLIC_BETA_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
 PILOT_RUNTIME_AVAILABLE = TRUE
 PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
-PILOT_WORKSPACE_ORCHESTRATOR = SOURCE_SIDE
-PILOT_SESSION_INVENTORY = SOURCE_SIDE_PRIVACY_MINIMIZED
+PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
+PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
 STABLE_POLICY = v2.0-R1-stable-promotion-6
+PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+Publication provenance: `docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`.
 
 
 ### Finalize 的双重 cohort revalidation

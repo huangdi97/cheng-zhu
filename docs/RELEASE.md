@@ -27,16 +27,15 @@ Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Published = v2.0.0-beta.5
-Published Beta tag/source SHA = 3c29112b6256d78f26c7d70670b558c6c24d6a3b
-Next Conversation Beta Candidate = v2.0.0-beta.6
+Conversation Beta Published = v2.0.0-beta.6
+Published Beta tag/source SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.5 provenance is recorded in `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`. Current source is preparing `v2.0.0-beta.6` as the **real-pilot operationalization** candidate: it packages the immediate post-Session Quick Debrief and current Stable Policy v5 runtime/source truth, while the new privacy-minimized pilot inventory remains source-side operator tooling. Do not rewrite published Beta truth to beta.6 until its exact green main SHA completes the full release/download-back/provenance gate. beta.5 is the **post-beta.4 hardening rebuild** that packages the scope-aware npm security gate, electron-builder 26.17.0, Vite 6.4.4, and Stable Promotion evaluator policy v4 authorized-cohort binding. It was published from exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` through main CI #923 and Release run #316 after Windows build/test, clean-install, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel, Stable-Latest-preservation, tag/source and post-publish verification-metadata regression all completed successfully. beta.4 remains immutable at its original source SHA and must not be rewritten as containing beta.5 hardening. The earlier beta.3 post-publish PowerShell defect remains documented in its own provenance file as historical release evidence.
+Published beta.6 provenance is recorded in `docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`. beta.6 is the **real-pilot operationalization** prerelease. It was published from exact green main/tag SHA `38a70b719b2d5b0c9e8273e6a908fed9229ab706` through main CI #980 and Release run #318 after Backend/Frontend/Desktop gates, dependency-security/release consistency, Windows build, packaged UI evidence, clean-install replay, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel verification, Stable-Latest preservation, public tag/source equality and post-publish verification-artifact upload all completed successfully. The release includes the immediate post-Session Quick Debrief and the current fail-closed real-pilot/evidence-integrity source truth present at that exact SHA, including Stable Policy v6, authorized pilot workspace, privacy-minimized Session inventory, WAL/TOCTOU selected-cohort provenance, frozen independent-review seed binding and unique-event-per-metric sample enforcement. These are validation/productization mechanisms, not real-user or PMF evidence. beta.5 / beta.4 / beta.3 remain immutable historical releases and must not be rewritten as containing beta.6 changes. The original beta.6 release-notes asset contains candidate/future-tense wording because it was authored pre-publication; keep that artifact immutable and use the beta.6 publication provenance/current channel truth for post-publication status.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

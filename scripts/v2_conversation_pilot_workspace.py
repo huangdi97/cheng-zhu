@@ -21,6 +21,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import shutil
 import sqlite3
 from datetime import datetime, timezone
@@ -71,6 +72,227 @@ def _schema_version(db: Path) -> int:
         return int(conn.execute("PRAGMA user_version").fetchone()[0])
     finally:
         conn.close()
+
+
+def _finite_optional_timestamp(value: Any) -> float | None:
+    if type(value) not in (int, float):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _iso_optional(value: float | None) -> str | None:
+    if value is None:
+        return None
+    return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
+    """Return privacy-minimized structural inventory for pilot cohort selection.
+
+    This intentionally exports no Session title, Space title, participant,
+    transcript, Guidance text, source excerpt or user_ref. It answers only:
+    "which local Session IDs are structurally selectable by the cohort builder?"
+    Authorization and identity remain explicit operator responsibilities.
+    """
+    db = Path(db)
+    schema = _schema_version(db)
+    if schema < MIN_PRODUCT_SCHEMA:
+        raise ValueError(
+            f"product.db schema v{schema} is too old for Stable pilot evidence; "
+            f"require >= v{MIN_PRODUCT_SCHEMA}"
+        )
+
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    try:
+        tables = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        required = {
+            "conversation_session",
+            "conversation_session_pack",
+            "conversation_human_feedback",
+        }
+        if not required <= tables:
+            missing = sorted(required - tables)
+            raise ValueError("product.db 缺少 pilot inspection schema: " + ", ".join(missing))
+
+        session_rows = conn.execute(
+            "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
+            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id "
+            "FROM conversation_session s "
+            "LEFT JOIN conversation_session_pack p "
+            "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
+            "ORDER BY COALESCE(s.ended_at, s.started_at, s.created_at) DESC, s.id"
+        ).fetchall()
+        feedback_rows = conn.execute(
+            "SELECT session_id, kind, labels_json "
+            "FROM conversation_human_feedback "
+            "WHERE reviewer_kind = 'SELF_USER'"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    feedback: dict[str, dict[str, Any]] = {}
+    for row in feedback_rows:
+        session_id = str(row["session_id"])
+        bucket = feedback.setdefault(session_id, {
+            "rows": 0,
+            "guidance_rows": 0,
+            "silence_rows": 0,
+            "continue_labels": {},
+            "outcome_labels": {},
+        })
+        bucket["rows"] += 1
+        kind = str(row["kind"] or "").upper()
+        try:
+            labels = json.loads(str(row["labels_json"] or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            labels = {}
+        if not isinstance(labels, dict):
+            labels = {}
+        if kind == "GUIDANCE":
+            bucket["guidance_rows"] += 1
+        elif kind == "SILENCE":
+            bucket["silence_rows"] += 1
+        elif kind == "CONTINUE":
+            bucket["continue_labels"] = labels
+        elif kind == "SESSION_OUTCOME":
+            bucket["outcome_labels"] = labels
+
+    sessions: list[dict[str, Any]] = []
+    profile_summary: dict[str, dict[str, int]] = {
+        profile: {
+            "sessions": 0,
+            "structurally_selectable": 0,
+            "quick_debrief_complete": 0,
+        }
+        for profile in pilot_manifest.REQUIRED_PROFILES
+    }
+
+    for row in session_rows:
+        session_id = str(row["id"])
+        profile = str(row["template"] or "").upper()
+        status = str(row["status"] or "").upper()
+        started_at = _finite_optional_timestamp(row["started_at"])
+        ended_at = _finite_optional_timestamp(row["ended_at"])
+        consent_ack_recorded = bool(row["consent_ack"])
+        pack_id = str(row["pack_id"] or "").strip()
+        frozen_pack_verified = bool(
+            pack_id and str(row["frozen_pack_id"] or "").strip() == pack_id
+        )
+        blockers: list[str] = []
+        if profile not in pilot_manifest.REQUIRED_PROFILES:
+            blockers.append("PROFILE_NOT_LAUNCH_COHORT")
+        if status != "ENDED":
+            blockers.append("SESSION_NOT_ENDED")
+        if not consent_ack_recorded:
+            blockers.append("CONSENT_ACK_NOT_RECORDED")
+        if not frozen_pack_verified:
+            blockers.append("FROZEN_SESSION_PACK_NOT_VERIFIED")
+        if started_at is None:
+            blockers.append("STARTED_AT_INVALID")
+        if ended_at is None:
+            blockers.append("ENDED_AT_INVALID")
+        if started_at is not None and ended_at is not None and ended_at < started_at:
+            blockers.append("ENDED_BEFORE_STARTED")
+
+        local_feedback = feedback.get(session_id) or {
+            "rows": 0,
+            "guidance_rows": 0,
+            "silence_rows": 0,
+            "continue_labels": {},
+            "outcome_labels": {},
+        }
+        continue_labels = local_feedback["continue_labels"]
+        outcome_labels = local_feedback["outcome_labels"]
+        quick_fields = {
+            "continue_accuracy": isinstance(continue_labels.get("writeback_accurate"), bool),
+            "space_reuse_intent": isinstance(outcome_labels.get("would_reuse_space"), bool),
+            "cognitive_load_delta": (
+                type(outcome_labels.get("cognitive_load_delta")) in (int, float)
+                and math.isfinite(float(outcome_labels["cognitive_load_delta"]))
+                and -2 <= float(outcome_labels["cognitive_load_delta"]) <= 2
+            ),
+        }
+        quick_completed = sum(1 for value in quick_fields.values() if value)
+
+        item = {
+            "session_id": session_id,
+            "space_id": str(row["space_id"] or ""),
+            "profile": profile,
+            "status": status,
+            "started_at": _iso_optional(started_at),
+            "ended_at": _iso_optional(ended_at),
+            "consent_ack_recorded": consent_ack_recorded,
+            "frozen_pack_verified": frozen_pack_verified,
+            "structurally_selectable": not blockers,
+            "structural_blockers": blockers,
+            "local_self_report": {
+                "explicit_rows": int(local_feedback["rows"]),
+                "quick_debrief": {
+                    **quick_fields,
+                    "completed": quick_completed,
+                    "total": 3,
+                    "complete": quick_completed == 3,
+                },
+                "guidance_feedback_rows": int(local_feedback["guidance_rows"]),
+                "silence_feedback_rows": int(local_feedback["silence_rows"]),
+            },
+        }
+        sessions.append(item)
+
+        if profile in profile_summary:
+            profile_summary[profile]["sessions"] += 1
+            if item["structurally_selectable"]:
+                profile_summary[profile]["structurally_selectable"] += 1
+            if item["local_self_report"]["quick_debrief"]["complete"]:
+                profile_summary[profile]["quick_debrief_complete"] += 1
+
+    return {
+        "contract_version": WORKSPACE_CONTRACT,
+        "inspection_type": "LOCAL_PRIVACY_MINIMIZED_PILOT_SESSION_INVENTORY",
+        "product_schema_version": schema,
+        "sessions": sessions,
+        "summary": {
+            "sessions": len(sessions),
+            "structurally_selectable": sum(1 for row in sessions if row["structurally_selectable"]),
+            "quick_debrief_complete": sum(
+                1 for row in sessions
+                if row["local_self_report"]["quick_debrief"]["complete"]
+            ),
+            "profiles": profile_summary,
+        },
+        "privacy": {
+            "session_titles_exported": False,
+            "space_titles_exported": False,
+            "participants_exported": False,
+            "transcript_text_exported": False,
+            "guidance_text_exported": False,
+            "source_excerpts_exported": False,
+            "user_refs_assigned": False,
+            "remote_upload": False,
+        },
+        "claims": {
+            "STRUCTURALLY_SELECTABLE_IS_AUTHORIZED_REAL_USE": False,
+            "REAL_USER_IDENTITY_SYSTEM_VERIFIED": False,
+            "REAL_WORLD_AUTHORIZATION_SYSTEM_VERIFIED": False,
+            "PARTICIPANT_CONSENT_SYSTEM_VERIFIED": False,
+            "REAL_USER_VALIDATED": False,
+            "V2_STABLE_RELEASE": False,
+            "PMF_PROVEN": False,
+        },
+        "interpretation": (
+            "This inventory exposes machine-verifiable local Session structure only. "
+            "structurally_selectable means the manifest builder can accept the Session "
+            "after the operator explicitly supplies a local pseudonymous user_ref; it "
+            "does not prove identity, authorization, participant consent, real-world use or PMF."
+        ),
+    }
 
 
 def _require_hash(path: Path, expected: str, label: str) -> None:
@@ -477,6 +699,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
 
+    inspect = sub.add_parser(
+        "inspect",
+        help="list privacy-minimized local Session structure for explicit cohort selection",
+    )
+    inspect.add_argument("--db", required=True)
+    inspect.add_argument(
+        "--eligible-only",
+        action="store_true",
+        help="show only Sessions that pass machine-verifiable structural selection checks",
+    )
+
     init = sub.add_parser("init", help="create a new local pilot workspace")
     init.add_argument("--db", required=True)
     init.add_argument("--session", action="append", default=[], metavar="SESSION_ID=USER_REF")
@@ -500,6 +733,23 @@ def main() -> int:
 
     args = parser.parse_args()
     try:
+        if args.command == "inspect":
+            result = inspect_pilot_sessions(Path(args.db))
+            if args.eligible_only:
+                result = {
+                    **result,
+                    "sessions": [
+                        row for row in result["sessions"]
+                        if row["structurally_selectable"]
+                    ],
+                }
+                result["summary"] = {
+                    **result["summary"],
+                    "displayed_sessions": len(result["sessions"]),
+                }
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+
         if args.command == "init":
             result = init_workspace(
                 Path(args.db),

@@ -176,3 +176,18 @@ Conversation v2 当前真正缺少的 write capability 是 `Task Draft → real 
     → one explicit side effect
 
 后续如果增加 Outlook Calendar / Mail / OneDrive / Planner，必须分别建立最小权限、read/write、snapshot/provenance、failure semantics 和真实 runtime evidence，不能因为 provider_id 都叫 Microsoft Graph 就默认继承。
+
+
+## Real-account product replay
+
+Source-side operator harness:
+
+`scripts/v2_real_provider_account_replay.py --provider microsoft-todo ...`
+
+The default run verifies the real Microsoft account/task-list capability and creates only a local reviewed Draft. It does not create a provider task.
+
+A real task side effect requires both `--execute-write` and `--confirm-write CREATE_TASK`. Only a provider `SUCCEEDED` result may be recorded as `PASS_REAL_ACCOUNT_WRITE_PRODUCT_REPLAY`.
+
+Provider-side create idempotency is not claimed; the harness deliberately performs at most one external execute.
+
+Runbook: `docs/evidence/V2_REAL_PROVIDER_ACCOUNT_REPLAY_RUNBOOK.md`.

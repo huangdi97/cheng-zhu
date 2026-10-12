@@ -239,6 +239,33 @@ prediction_unavailable = true
 
 宁可从 precision 分母中排除，也禁止把 post-review truth 倒灌成模型 prediction。Decision / Commitment state 的独立 reviewer 应标注“在该 prediction 时刻、按 Truth Boundary 应输出的类型/状态”，而不是事后拿最终长期状态倒推当时预测。
 
+## 10.2 Human-report cohort contract v4
+
+`v2_conversation_human_eval.py` 现在输出：
+
+```text
+report_contract_version = v2.0-R1-human-eval-4
+cohort.status
+cohort.sessions[] = {session_id, profile, space_id}
+metrics_by_profile_and_label_source
+```
+
+同一 `session_id` 如果在标签文件中出现不一致的 profile / space，report 必须标记 `cohort.status=INCOMPLETE`。Stable evaluator v4 会 fail closed。
+
+Stable metric 不再读取“全 profile 总分”作为 promotion 分数，而只读取：
+
+```text
+PROJECT_SYNC + DESIGN_REVIEW
+×
+metric.allowed_label_sources
+```
+
+这意味着其它 Conversation Profile 的标签可以用于研发分析，但不能替首发验证楔子抬高 Stable Gate。
+
+对应 pilot manifest contract = `v2.0-R1-pilot-cohort-2`。manifest 逐场记录 `session_id / space_id / local pseudonymous user_ref`；Stable evaluator 自动推导 profile session 数、distinct pseudonymous users 与 cross-session Spaces，并验证 human-report Session 全部属于授权 cohort。
+
+原始 label / report / manifest 都可能包含私人会议标识，继续保持本地受控存储，不应上传公开仓库或 CI artifact。
+
 ## 11. 状态升级边界
 
 human-label report 本身只证明存在人工标签；它不能验证 reviewer 是否是真实外部用户，也不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。

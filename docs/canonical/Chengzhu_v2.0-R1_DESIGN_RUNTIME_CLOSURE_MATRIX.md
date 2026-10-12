@@ -930,7 +930,7 @@ V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS
                                   clean-install replay，PATH 中无 Python/Node)
 V2_CONNECTOR_RUNTIME    = PARTIAL (GitHub 真实账号 replay PASS；Google Calendar / Drive /
                                   Gmail / Microsoft To Do = BLOCKED_ACCOUNT，本机无凭据)
-V2_PUBLIC_BETA           = v2.0.0-beta.4 @ 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+V2_PUBLIC_BETA           = v2.0.0-beta.5 @ 3c29112b6256d78f26c7d70670b558c6c24d6a3b
 V2_PRODUCTIZED_RELEASE  = FALSE  (只有 prerelease；stable promotion 需要真实用户证据)
 REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 ```
@@ -939,7 +939,7 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
-公开 Beta 已推进到 `v2.0.0-beta.4` prerelease；beta.4 已把 schema v10–v12 的 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT evidence 带入可安装 Windows 包。下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
+公开 Beta 已推进到 `v2.0.0-beta.5` prerelease；beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT evidence，并进一步打包 dependency-security hardening 与 Stable Promotion Policy v4 authorized-cohort binding。下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
 
 ---
 
@@ -983,7 +983,7 @@ Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_s
 因此当前状态仍为：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.4
+V2_PUBLIC_BETA = v2.0.0-beta.5
 PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -1194,12 +1194,12 @@ PMF_PROVEN = FALSE
 
 manifest 的 `user_ref` 只是本地匿名代号；这条链提高的是 evidence consistency / auditability，不把 Chengzhu 变成身份认证系统，也不替代 `AUTHORIZED_REAL_USE` attestation。
 
-公开 `v2.0.0-beta.4` 的 publication provenance 仍然正确记录其发布时的 Stable Promotion Policy v3。policy v4 是 **post-beta.4 evaluator hardening**：可以用于评估 beta.4 采出的本地 pilot 数据，但不得倒写成 beta.4 binary/source 已包含的能力。
+公开 `v2.0.0-beta.4` 的 publication provenance 仍然正确记录其发布时的 Stable Promotion Policy v3。policy v4 最初是 **post-beta.4 evaluator hardening**，现已随 `v2.0.0-beta.5` 进入公开 packaged prerelease；仍不得倒写成 beta.4 binary/source 已包含的能力。
 
 因此成熟度仍保持：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.4
+V2_PUBLIC_BETA = v2.0.0-beta.5
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
@@ -1209,16 +1209,25 @@ PMF_PROVEN = FALSE
 
 ---
 
-## Post-beta.4 current-main hardening candidate · 2026-10-12
+## Beta.5 publication closure · 2026-10-12
 
-在 beta.4 publication 后，main 又完成了两类不扩大 Conversation 用户功能面的 hardening：
+beta.4 publication 后完成的 dependency-security 与 Stable evaluator cohort-binding hardening 已经通过新的 exact-SHA release cycle 进入公开 Beta：
 
 ```text
-PUBLISHED_BETA = v2.0.0-beta.4
-PUBLISHED_BETA_SOURCE = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+PUBLIC_BETA_TAG = v2.0.0-beta.5
+PUBLIC_BETA_SOURCE_SHA = 3c29112b6256d78f26c7d70670b558c6c24d6a3b
+PUBLIC_BETA_PRERELEASE = TRUE
+PUBLIC_BETA_DRAFT = FALSE
+STABLE_LATEST = v1.4.2
 
-NEXT_BETA_CANDIDATE = v2.0.0-beta.5
-CANDIDATE_SCOPE = DEPENDENCY_SECURITY + STABLE_EVIDENCE_COHORT_BINDING
+MAIN_CI_923 = SUCCESS
+RELEASE_RUN_316 = SUCCESS
+TAG_SOURCE_INVARIANT = PASS
+DOWNLOAD_BACK_SHA256 = PASS
+DOWNLOADED_INSTALLER_REPLAY = PASS
+PACKAGED_SMOKE = PASS
+POST_PUBLISH_METADATA_REGRESSION = PASS
+DOWNLOAD_BACK_VERIFICATION_ARTIFACT = PASS
 
 FRONTEND_PRODUCTION_HIGH_CRITICAL = 0
 DESKTOP_FULL_HIGH_CRITICAL = 0
@@ -1234,11 +1243,16 @@ AUTHORIZED_COHORT_SESSION_BINDING = REQUIRED
 OUT_OF_SCOPE_PROFILE_SCORE_INFLATION = FORBIDDEN
 
 PRODUCT_FEATURE_SCOPE_CHANGE = NONE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-beta.5 的作用是让后续真实 Project Sync / Design Review pilot 使用与 **当前 hardened runtime + 当前 Stable evaluator contract** 一致的 Windows prerelease。它不是通过继续加功能替代真实验证。
+Publication provenance:
+[`docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`](../releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md).
 
-在 beta.5 完成新的 exact-SHA release cycle 前，公开 Beta truth 仍保持 beta.4；beta.4 tag/source/provenance 不得移动或回写 post-beta.4 hardening。
+beta.5 的目的已经完成：后续真实 Project Sync / Design Review pilot 可以使用与当前 hardened runtime、scope-aware dependency-security gate 和 Stable Promotion Policy v4 cohort contract 一致的 Windows prerelease。
+
+从这里开始，**新增 Beta 功能不是主线**。没有新的真实 pilot 证据、real-account connector evidence 或明确 runtime defect 时，不应继续通过版本号递增制造“进展”。beta.5 tag/source/provenance 必须保持不可变；后续源码提交若改变可下载代码，必须使用新的版本和全新的 exact-SHA release cycle。
+

@@ -82,6 +82,9 @@ def main() -> int:
         "--latest=false",
         "release channel mismatch",
         "prerelease $tag incorrectly replaced the stable Latest release",
+        "scripts/render_published_release_body.py",
+        "--notes-file $publishedBody",
+        "CHENGZHU_PUBLISHED_STATUS_BEGIN",
     ):
         if token not in release_workflow:
             errors.append(f"release workflow missing provenance invariant: {token}")
@@ -89,6 +92,8 @@ def main() -> int:
         "github.event.workflow_run.head_sha",
         'gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"',
         "RELEASE_NOTES_v$version.md",
+        "scripts/render_published_release_body.py",
+        "display truth normalized; nothing to dispatch",
     ):
         if token not in publisher_workflow:
             errors.append(f"current-version publisher missing exact-SHA invariant: {token}")

@@ -29,13 +29,14 @@ Current channel truth:
 Stable Latest = v1.4.2
 Conversation Beta Published = v2.0.0-beta.4
 Published Beta tag/source SHA = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+Next Conversation Beta Candidate = v2.0.0-beta.5
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.4 provenance is recorded in `docs/releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md`. beta.4 was published from exact green main SHA `0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc` through Release run #304 after the Windows build/test, clean-install, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel, Stable-Latest-preservation, tag/source and post-publish verification-metadata regression gates all completed successfully. The earlier beta.3 post-publish PowerShell defect remains documented in its own provenance file as historical release evidence.
+Published beta.4 provenance is recorded in `docs/releases/V2_0_0_BETA_4_PUBLICATION_PROVENANCE.md`. The beta.5 candidate is a security-hardening rebuild only: scope-aware npm security gating, electron-builder 26.17.0 and Vite 6.4.4. It must not replace the published-beta truth until a new exact-SHA Release run completes all Windows build, clean-install, download-back, reinstall, packaged-smoke, prerelease-channel and tag/source gates. beta.4 was published from exact green main SHA `0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc` through Release run #304 after the Windows build/test, clean-install, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel, Stable-Latest-preservation, tag/source and post-publish verification-metadata regression gates all completed successfully. The earlier beta.3 post-publish PowerShell defect remains documented in its own provenance file as historical release evidence.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

@@ -118,6 +118,15 @@ def build_manifest(
 
     by_session: dict[str, str] = {}
     for session_id, user_ref in pairs:
+        session_id = str(session_id or "").strip()
+        user_ref = str(user_ref or "").strip()
+        if not session_id:
+            raise ValueError("session_id 不能为空")
+        if not _USER_REF.fullmatch(user_ref):
+            raise ValueError(
+                "user_ref 必须是 1-80 位本地匿名 token，仅允许字母/数字/._-；"
+                "不要填写姓名、邮箱或空格"
+            )
         if session_id in by_session:
             raise ValueError(f"重复 session_id: {session_id}")
         by_session[session_id] = user_ref

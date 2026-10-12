@@ -310,7 +310,7 @@ def test_stable_readiness_ignores_unspecified_labels_even_when_aggregate_looks_g
     assert f"metric:{metric}:sample_size" in failed
 
 
-def test_old_count_only_manifest_cannot_pass_policy_v4():
+def test_old_count_only_manifest_cannot_pass_current_policy():
     module = _module()
     policy = _policy()
     pilot = _pilot()

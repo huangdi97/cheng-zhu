@@ -33,6 +33,7 @@ def _finite_number(value: Any) -> float | None:
 
 
 _PLACEHOLDERS = {"", "REPLACE", "TBD", "PLACEHOLDER"}
+CROSS_SESSION_SPACE_USER_BINDING = "SINGLE_PSEUDONYMOUS_USER_REF"
 
 
 def _clean_token(value: Any) -> str:
@@ -80,6 +81,7 @@ def _manifest_cohort(
         users: set[str] = set()
         session_ids: set[str] = set()
         space_sessions: dict[str, set[str]] = {}
+        space_users: dict[str, set[str]] = {}
 
         for index, raw in enumerate(entries, start=1):
             if not isinstance(raw, dict):
@@ -109,16 +111,31 @@ def _manifest_cohort(
 
             session_index[session_id] = current
             session_ids.add(session_id)
-            users.add(user_ref.casefold())
+            normalized_user_ref = user_ref.casefold()
+            users.add(normalized_user_ref)
             space_sessions.setdefault(space_id, set()).add(session_id)
+            space_users.setdefault(space_id, set()).add(normalized_user_ref)
+
+        mixed_user_spaces = sorted(
+            space_id for space_id, refs in space_users.items()
+            if len(refs) > 1
+        )
+        for space_id in mixed_user_spaces:
+            errors.append(
+                f"{profile} space {space_id}: one Conversation Space must bind to exactly "
+                "one pseudonymous user_ref across authorized pilot Sessions"
+            )
 
         stats[profile] = {
             "distinct_users": len(users),
             "sessions": len(session_ids),
             "cross_session_spaces": sum(
                 1
-                for ids in space_sessions.values()
-                if len(ids) >= cross_session_space_min_sessions
+                for space_id, ids in space_sessions.items()
+                if (
+                    len(ids) >= cross_session_space_min_sessions
+                    and len(space_users.get(space_id) or set()) == 1
+                )
             ),
         }
 
@@ -235,6 +252,19 @@ def evaluate(
         isinstance(raw_cross_session_min, int)
         and not isinstance(raw_cross_session_min, bool)
         and raw_cross_session_min >= 3
+    )
+    cross_session_user_binding = str(
+        policy.get("cross_session_space_user_binding") or ""
+    )
+    add(
+        "cross_session_space_user_binding_contract",
+        cross_session_user_binding == CROSS_SESSION_SPACE_USER_BINDING,
+        actual=cross_session_user_binding,
+        required=CROSS_SESSION_SPACE_USER_BINDING,
+        reason=(
+            "A cross-session Space is longitudinal evidence for one Chengzhu user. "
+            "Sessions from different pseudonymous users cannot be combined to manufacture continuity."
+        ),
     )
     add(
         "cross_session_space_min_sessions_contract",
@@ -418,6 +448,7 @@ def evaluate(
             "human_labeled_sessions": len(human_sessions),
             "metric_profiles": metric_profiles,
             "cross_session_space_min_sessions": cross_session_space_min_sessions,
+            "cross_session_space_user_binding": cross_session_user_binding,
         },
         "checks_total": len(checks),
         "checks_failed": len(failed),
@@ -431,7 +462,8 @@ def evaluate(
         "interpretation": (
             "PASS only permits a stable-release review. Stable min_n counts unique product event × metric observations, not reviewer annotations. Human-label sessions must match the authorized pilot "
             "manifest by session/profile/space; profile floors are derived from enumerated pseudonymous cohort entries, "
-            f"a cross-session Space requires at least {cross_session_space_min_sessions} authorized Sessions in that same Space, "
+            f"a cross-session Space requires at least {cross_session_space_min_sessions} authorized Sessions in that same Space "
+            "and every selected Session in that Space must bind to one identical pseudonymous user_ref, "
             "and Stable metrics count only target profiles plus label sources explicitly allowed by policy. "
             "user_ref is a local pseudonym and not identity proof. Packaging/signing/release gates remain independent, "
             "and this tool does not establish PMF or universal user value."
@@ -450,6 +482,7 @@ def markdown(report: dict[str, Any]) -> str:
         f"- Human-labeled Sessions: **{cohort.get('human_labeled_sessions', 0)}**",
         f"- Metric Profiles: **{', '.join(cohort.get('metric_profiles') or []) or 'none'}**",
         f"- Cross-session Space minimum Sessions: **{cohort.get('cross_session_space_min_sessions', 'unknown')}**",
+        f"- Cross-session Space user binding: **{cohort.get('cross_session_space_user_binding', 'unknown')}**",
         f"- Failed checks: **{report['checks_failed']} / {report['checks_total']}**",
         "- V2_STABLE_RELEASE: **FALSE**",
         "- PMF_PROVEN: **FALSE**",

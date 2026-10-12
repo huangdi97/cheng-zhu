@@ -203,7 +203,7 @@ def test_pilot_manifest_requires_consent_ack_and_frozen_pack_provenance(product_
     _space, session = _ended_session("PROJECT_SYNC", "Pilot provenance", monkeypatch, clock)
 
     store.update("conversation_session", session["id"], {"consent_ack": False})
-    with pytest.raises(ValueError, match="consent acknowledgement"):
+    with pytest.raises(ValueError, match="consent_ack"):
         module.build_manifest(
             Path(store.DB_PATH),
             [(session["id"], "pilot-user-01")],
@@ -215,6 +215,57 @@ def test_pilot_manifest_requires_consent_ack_and_frozen_pack_provenance(product_
             Path(store.DB_PATH),
             [(session["id"], "pilot-user-01")],
         )
+
+
+def test_pilot_manifest_verifies_pack_content_and_frozen_session_context(product_env, monkeypatch):
+    module = _module()
+    clock = [1_800_375_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+
+    _space, session = _ended_session("PROJECT_SYNC", "Frozen provenance", monkeypatch, clock)
+    session = conversations.require_session(session["id"])
+    pack = store.get("conversation_session_pack", session["pack_id"])
+    assert pack is not None
+
+    original_payload = pack["payload"]
+    original_digest = pack["digest"]
+
+    # Stored digest alone is not trusted: payload bytes/structure must hash to it.
+    store.update(
+        "conversation_session_pack",
+        pack["id"],
+        {"payload": {**original_payload, "_tampered_for_test": True}},
+    )
+    with pytest.raises(ValueError, match="payload digest mismatch"):
+        module.build_manifest(
+            Path(store.DB_PATH),
+            [(session["id"], "pilot-user-01")],
+        )
+    store.update("conversation_session_pack", pack["id"], {"payload": original_payload})
+
+    store.update("conversation_session_pack", pack["id"], {"digest": "fake-digest"})
+    with pytest.raises(ValueError, match="payload digest mismatch"):
+        module.build_manifest(
+            Path(store.DB_PATH),
+            [(session["id"], "pilot-user-01")],
+        )
+    store.update("conversation_session_pack", pack["id"], {"digest": original_digest})
+
+    # The mutable Session row cannot silently redefine the profile that was
+    # frozen at Start Session.
+    store.update("conversation_session", session["id"], {"template": "DESIGN_REVIEW"})
+    with pytest.raises(ValueError, match="profile"):
+        module.build_manifest(
+            Path(store.DB_PATH),
+            [(session["id"], "pilot-user-01")],
+        )
+    store.update("conversation_session", session["id"], {"template": "PROJECT_SYNC"})
+
+    manifest, _summary = module.build_manifest(
+        Path(store.DB_PATH),
+        [(session["id"], "pilot-user-01")],
+    )
+    assert manifest["profiles"]["PROJECT_SYNC"]["sessions"][0]["session_id"] == session["id"]
 
 
 def test_pilot_manifest_user_ref_is_pseudonym_shaped_not_email_or_free_text():

@@ -312,6 +312,8 @@ def _validate_cli(spec: ProviderSpec, args: argparse.Namespace) -> str:
     if not args.token_env or not args.token_env.replace("_", "A").isalnum() or args.token_env[0].isdigit():
         raise ValueError("--token-env must be an environment-variable name")
     target = str(args.target or spec.default_target).strip()
+    if not 1 <= int(args.limit) <= 500:
+        raise ValueError("--limit must be between 1 and 500")
     if spec.mode == "READ" and args.execute_write:
         raise ValueError(f"{spec.key} is read-only; --execute-write is invalid")
     if spec.mode == "WRITE" and args.execute_write:
@@ -348,7 +350,9 @@ def _blocked_report(spec: ProviderSpec, source_sha: str, token_env: str) -> dict
         "token_env_name": token_env,
         "external_write_attempted": False,
         "claims": {
-            "REAL_ACCOUNT_VALIDATED": False,
+            "REAL_ACCOUNT_AUTH_VALIDATED": False,
+            "REAL_PROVIDER_READ_REPLAY_VALIDATED": False,
+            "REAL_PROVIDER_WRITE_REPLAY_VALIDATED": False,
             "V2_STABLE_RELEASE": False,
             "REAL_USER_VALIDATED": False,
             "PMF_PROVEN": False,
@@ -577,7 +581,9 @@ def run_replay(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         "credential_ref_format": spec.credential_prefix + "<ENV_VAR>",
         "assertions": [],
         "claims": {
-            "REAL_ACCOUNT_VALIDATED": False,
+            "REAL_ACCOUNT_AUTH_VALIDATED": False,
+            "REAL_PROVIDER_READ_REPLAY_VALIDATED": False,
+            "REAL_PROVIDER_WRITE_REPLAY_VALIDATED": False,
             "GOOGLE_OAUTH_PUBLICATION_VERIFIED": False,
             "V2_STABLE_RELEASE": False,
             "REAL_USER_VALIDATED": False,
@@ -699,7 +705,9 @@ def run_replay(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         report["status"] = "FAILED"
         report["error_class"] = type(exc).__name__
         report["error"] = message
-        report["claims"]["REAL_ACCOUNT_VALIDATED"] = False
+        report["claims"]["REAL_ACCOUNT_AUTH_VALIDATED"] = False
+        report["claims"]["REAL_PROVIDER_READ_REPLAY_VALIDATED"] = False
+        report["claims"]["REAL_PROVIDER_WRITE_REPLAY_VALIDATED"] = False
         return report, 1
     finally:
         fake.shutdown()
@@ -708,7 +716,11 @@ def run_replay(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     report["passed"] = passed
     if passed:
         report["status"] = str((report.get("real_account_replay") or {}).get("result") or "PASS")
-        report["claims"]["REAL_ACCOUNT_VALIDATED"] = True
+        report["claims"]["REAL_ACCOUNT_AUTH_VALIDATED"] = True
+        report["claims"]["REAL_PROVIDER_READ_REPLAY_VALIDATED"] = spec.mode == "READ"
+        report["claims"]["REAL_PROVIDER_WRITE_REPLAY_VALIDATED"] = bool(
+            spec.mode == "WRITE" and args.execute_write
+        )
     serialized = json.dumps(report, ensure_ascii=False)
     if token and token in serialized:
         raise ReplayFailure("credential token leaked into replay report serialization")
@@ -734,7 +746,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Calendar id / Drive folder id / Gmail recipient / To Do list id or default",
     )
-    parser.add_argument("--limit", type=int, default=500, choices=range(1, 501))
+    parser.add_argument("--limit", type=int, default=500)
     parser.add_argument("--execute-write", action="store_true")
     parser.add_argument("--confirm-write", default="")
     parser.add_argument(

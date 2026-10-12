@@ -360,11 +360,15 @@ def aggregate(
 
 
 def markdown(report: dict[str, Any]) -> str:
+    cohort = report.get("cohort") or {}
     lines = [
         "# Chengzhu v2 Conversation Human-label Evaluation",
         "",
+        f"- Report contract: **{report.get('report_contract_version') or 'unknown'}**",
         f"- Status: **{report['status']}**",
         f"- Human-labeled rows: **{report['rows']}**",
+        f"- Cohort status: **{cohort.get('status') or 'UNKNOWN'}**",
+        f"- Labeled Sessions: **{len(cohort.get('sessions') or [])}**",
         "- PMF_PROVEN: **FALSE**",
         "",
         "| Metric | Value | n |",

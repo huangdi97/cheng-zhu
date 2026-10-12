@@ -56,7 +56,56 @@ Stable release != PMF
 
 Raw review material may contain transcript/source excerpts and must stay local.
 
-## 3. Select the pilot cohort
+## 3. Inspect machine-verifiable Session structure
+
+Before choosing a cohort, first inspect the local database without opening transcript text or manually querying SQLite:
+
+```bash
+python scripts/v2_conversation_pilot_workspace.py inspect \
+  --db <CHENGZHU_HOME>/data/product.db
+```
+
+To show only rows that pass the manifest builder's machine-verifiable structural checks:
+
+```bash
+python scripts/v2_conversation_pilot_workspace.py inspect \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --eligible-only
+```
+
+The inventory intentionally exposes only:
+
+- `session_id`;
+- `space_id`;
+- frozen profile;
+- Session status and UTC start/end time;
+- whether Session consent acknowledgement is recorded;
+- whether the matching Frozen Session Pack is verifiable;
+- structural blockers;
+- explicit local self-report counts and 3-field Quick Debrief completion.
+
+It intentionally does **not** export:
+
+- Session / Space titles;
+- participant names;
+- transcript text;
+- Guidance text;
+- source excerpts;
+- user pseudonyms.
+
+Important:
+
+```text
+structurally_selectable
+!= authorized real use
+!= verified identity
+!= independently verified participant consent
+!= real-user validation
+```
+
+The inventory never assigns `user_ref`; that mapping remains an explicit operator action.
+
+## 4. Select the pilot cohort
 
 Only select real, ended Project Sync / Design Review Sessions that you are authorized to use for evaluation.
 
@@ -77,7 +126,7 @@ A Session may be selected only when the local database confirms:
 - Session consent acknowledgement exists;
 - Frozen Session Pack exists and belongs to that Session.
 
-## 4. Initialize a frozen workspace
+## 5. Initialize a frozen workspace
 
 Recommended command:
 
@@ -114,7 +163,7 @@ Important properties:
 - self-report remains explicit local self-report only;
 - `REAL_USER_VALIDATED`, `V2_STABLE_RELEASE` and `PMF_PROVEN` remain false.
 
-## 5. Independent review
+## 6. Independent review
 
 Never edit `independent-review.seed.jsonl` in place.
 
@@ -139,7 +188,7 @@ Direct Question metrics use only v11 capture-time frozen predictions.
 
 Reviewed post-hoc truth must never be copied back into prediction fields.
 
-## 6. Finalize the authorized cohort
+## 7. Finalize the authorized cohort
 
 Review the draft cohort locally first.
 
@@ -178,7 +227,7 @@ If any frozen policy/draft hash has changed, finalization fails closed.
 
 If cohort membership or attestations must change, create a new workspace instead of rewriting the old one.
 
-## 7. Run the evidence gate
+## 8. Run the evidence gate
 
 After independent review files are complete:
 
@@ -215,7 +264,7 @@ The evaluation directory is immutable-by-convention: the tool refuses to overwri
 
 To rerun with changed labels/cohort/rules, preserve the old workspace and create a new one.
 
-## 8. Hash and mutation rules
+## 9. Hash and mutation rules
 
 Workspace provenance protects against accidental evidence drift.
 
@@ -230,7 +279,7 @@ Independent reviewer files are external inputs and their SHA256 values are recor
 
 This is tamper-evident local provenance, not a cryptographic identity/authorization system.
 
-## 9. Retention interaction
+## 10. Retention interaction
 
 Guidance/Silence feedback follows its Guidance target lifecycle.
 
@@ -244,7 +293,7 @@ Pilot operators should export/review privacy-sensitive transcript-dependent evid
 
 Do not disable privacy retention merely to increase metric sample size.
 
-## 10. Interpreting NO_GO
+## 11. Interpreting NO_GO
 
 `NO_GO` is the expected result until the real pilot is large and strong enough.
 
@@ -260,7 +309,7 @@ Do not respond to NO_GO by:
 
 Fix the product or gather more legitimate evidence.
 
-## 11. Interpreting PASS
+## 12. Interpreting PASS
 
 A PASS means only:
 
@@ -278,7 +327,7 @@ REAL_USER_VALUE_UNIVERSALLY_PROVEN = TRUE
 
 A separate release review must still verify current main, current packaged artifacts, privacy/security incidents, installer provenance, rollback and release notes.
 
-## 12. Current product truth
+## 13. Current product truth
 
 As of the source state introducing this orchestrator:
 
@@ -288,6 +337,7 @@ PILOT_RUNTIME_AVAILABLE = TRUE
 PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = SOURCE_SIDE
+PILOT_SESSION_INVENTORY = SOURCE_SIDE_PRIVACY_MINIMIZED
 STABLE_POLICY = v2.0-R1-stable-promotion-5
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE

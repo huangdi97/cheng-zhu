@@ -111,3 +111,17 @@ adapter/unit/E2E engineering evidence
 仓库内可证明：GMAIL_ADAPTER_CODE、GMAIL_SEND_ONLY_CONTRACT、OIDC_IDENTITY_CONTRACT、REVIEWED_TWO_STEP_SEND、UNKNOWN_OUTCOME_PROTECTION 均成立，MAILBOX_READ=false。
 
 在没有真实 Google OAuth/account replay 前，不得声明 GMAIL_ACCOUNT_CONNECTED、REAL_GMAIL_SEND_PROVEN 或 REAL_RECIPIENT_DELIVERY_PROVEN。Provider accepted send 与真实 delivery 也不是同一个事实。
+
+## Real-account product replay
+
+Source-side operator harness:
+
+`scripts/v2_real_provider_account_replay.py --provider google-mail ...`
+
+The default run performs real account/UserInfo verification and a local reviewed Draft but **does not send email**.
+
+A real Gmail side effect requires both `--execute-write` and `--confirm-write SEND_EMAIL` plus an explicit recipient. Only a provider `SUCCEEDED` result may be recorded as `PASS_REAL_ACCOUNT_WRITE_PRODUCT_REPLAY`.
+
+Because Gmail has no provider-side idempotency primitive in this adapter, an ambiguous write outcome must not be automatically replayed. Real-account replay also does not prove Google's external OAuth sensitive-scope/publication approval.
+
+Runbook: `docs/evidence/V2_REAL_PROVIDER_ACCOUNT_REPLAY_RUNBOOK.md`.

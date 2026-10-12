@@ -30,7 +30,7 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-1"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-2"
 MIN_PRODUCT_SCHEMA = 12
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
@@ -85,6 +85,84 @@ def _iso_optional(value: float | None) -> str | None:
     if value is None:
         return None
     return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+SELECTED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-1"
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _selected_cohort_snapshot(
+    db: Path,
+    assignments: Iterable[tuple[str, str]],
+) -> dict[str, Any]:
+    """Freeze privacy-minimized logical facts for selected pilot Sessions.
+
+    product.db uses SQLite WAL, so hashing only the main database file is not a
+    complete logical-state fingerprint.  This snapshot is intentionally narrow:
+    it captures only machine-verifiable cohort structure and Frozen Session Pack
+    identity/digest, never transcript, participant, Guidance or source content.
+    """
+    pairs = [(str(session_id), str(user_ref)) for session_id, user_ref in assignments]
+    if not pairs:
+        raise ValueError("selected cohort snapshot requires at least one Session")
+    ids = [session_id for session_id, _ in pairs]
+    if len(ids) != len(set(ids)):
+        raise ValueError("selected cohort snapshot contains duplicate session_id")
+
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    try:
+        placeholders = ",".join("?" for _ in ids)
+        rows = conn.execute(
+            "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
+            "s.consent_ack, s.pack_id, "
+            "p.id AS frozen_pack_id, p.digest AS frozen_pack_digest "
+            "FROM conversation_session s "
+            "LEFT JOIN conversation_session_pack p "
+            "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
+            f"WHERE s.id IN ({placeholders})",
+            tuple(ids),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    by_id = {str(row["id"]): dict(row) for row in rows}
+    missing = sorted(set(ids) - set(by_id))
+    if missing:
+        raise ValueError(
+            "selected cohort snapshot missing Session(s): " + ", ".join(missing)
+        )
+
+    sessions: list[dict[str, Any]] = []
+    for session_id, user_ref in pairs:
+        row = by_id[session_id]
+        sessions.append({
+            "session_id": session_id,
+            "user_ref": user_ref,
+            "space_id": str(row.get("space_id") or ""),
+            "profile": str(row.get("template") or "").upper(),
+            "status": str(row.get("status") or "").upper(),
+            "started_at": row.get("started_at"),
+            "ended_at": row.get("ended_at"),
+            "consent_ack_recorded": bool(row.get("consent_ack")),
+            "pack_id": str(row.get("pack_id") or ""),
+            "frozen_pack_id": str(row.get("frozen_pack_id") or ""),
+            "frozen_pack_digest": str(row.get("frozen_pack_digest") or ""),
+        })
+    sessions.sort(key=lambda row: row["session_id"])
+    return {
+        "contract_version": SELECTED_COHORT_SNAPSHOT_CONTRACT,
+        "sessions": sessions,
+    }
 
 
 def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
@@ -362,6 +440,7 @@ This directory is **local evidence workspace**, not a release artifact and not p
 ## Files
 
 - `workspace.json`: provenance for this workspace; contains hashes, counts and claim boundaries.
+- `selected-cohort.snapshot.json`: privacy-minimized logical snapshot of selected Session structure + Frozen Session Pack identity/digest.
 - `stable-promotion-policy.json`: the exact policy snapshot frozen when the workspace was initialized.
 - `pilot-manifest.draft.json`: DB-derived cohort structure. It is intentionally not Stable-eligible.
 - `independent-review.seed.jsonl`: privacy-sensitive review queue. It may contain transcript/source excerpts.
@@ -410,6 +489,7 @@ def init_workspace(
         pairs,
         finalize=False,
     )
+    selected_snapshot = _selected_cohort_snapshot(db, pairs)
     selected_ids = {session_id for session_id, _ in pairs}
 
     seed_rows = [
@@ -433,6 +513,8 @@ def init_workspace(
         shutil.copyfile(policy_path, policy_out)
         draft_out = temp_dir / "pilot-manifest.draft.json"
         _write_json(draft_out, draft_manifest)
+        cohort_snapshot_out = temp_dir / "selected-cohort.snapshot.json"
+        _write_json(cohort_snapshot_out, selected_snapshot)
         seed_out = temp_dir / "independent-review.seed.jsonl"
         seed_count = _write_jsonl(
             seed_out,
@@ -459,7 +541,9 @@ def init_workspace(
             "evidence_type": "LOCAL_OPERATOR_WORKSPACE_NOT_EVIDENCE",
             "source": {
                 "database_filename": db.name,
-                "database_sha256": _sha256(db),
+                "database_file_sha256_advisory": _sha256(db),
+                "database_file_sha256_includes_wal": False,
+                "logical_state_anchor": "selected-cohort.snapshot.json",
                 "product_schema_version": schema,
             },
             "policy": {
@@ -470,6 +554,12 @@ def init_workspace(
             "cohort": cohort_summary,
             "selected_session_ids": sorted(selected_ids),
             "outputs": {
+                "selected_cohort_snapshot": {
+                    "path": cohort_snapshot_out.name,
+                    "sha256": _sha256(cohort_snapshot_out),
+                    "logical_sha256": _canonical_json_sha256(selected_snapshot),
+                    "sessions": len(selected_snapshot["sessions"]),
+                },
                 "pilot_manifest_draft": {
                     "path": draft_out.name,
                     "sha256": _sha256(draft_out),
@@ -540,6 +630,26 @@ def finalize_workspace(
         raise ValueError("workspace draft manifest is not fail-closed")
     assignments = _assignments_from_manifest(draft)
 
+    cohort_snapshot_path = workspace / "selected-cohort.snapshot.json"
+    cohort_snapshot_meta = (metadata.get("outputs") or {}).get("selected_cohort_snapshot") or {}
+    _require_hash(
+        cohort_snapshot_path,
+        str(cohort_snapshot_meta.get("sha256") or ""),
+        "selected-cohort.snapshot.json",
+    )
+    frozen_cohort_snapshot = _json_load(cohort_snapshot_path)
+    if (
+        frozen_cohort_snapshot.get("contract_version")
+        != SELECTED_COHORT_SNAPSHOT_CONTRACT
+    ):
+        raise ValueError("unsupported selected cohort snapshot contract")
+    live_cohort_snapshot = _selected_cohort_snapshot(db, assignments)
+    if live_cohort_snapshot != frozen_cohort_snapshot:
+        raise ValueError(
+            "selected cohort structural drift detected; preserve the old workspace "
+            "and create a new one instead of finalizing changed Session/Pack facts"
+        )
+
     final_path = workspace / "pilot-manifest.final.json"
     finalization_path = workspace / "finalization.json"
     if final_path.exists() or finalization_path.exists():
@@ -557,7 +667,9 @@ def finalize_workspace(
         "contract_version": WORKSPACE_CONTRACT,
         "finalized_at": _utc_now(),
         "source_database_filename": db.name,
-        "source_database_sha256": _sha256(db),
+        "source_database_file_sha256_advisory": _sha256(db),
+        "selected_cohort_snapshot_sha256": _sha256(cohort_snapshot_path),
+        "selected_cohort_logical_sha256": _canonical_json_sha256(frozen_cohort_snapshot),
         "draft_manifest_sha256": _sha256(draft_path),
         "final_manifest_sha256": _sha256(final_path),
         "policy_sha256": _sha256(workspace / "stable-promotion-policy.json"),
@@ -593,7 +705,19 @@ def evaluate_workspace(
     policy_path = workspace / "stable-promotion-policy.json"
     self_report_path = workspace / "self-report.jsonl"
     seed_path = workspace / "independent-review.seed.jsonl"
+    cohort_snapshot_path = workspace / "selected-cohort.snapshot.json"
 
+    cohort_snapshot_meta = (metadata.get("outputs") or {}).get("selected_cohort_snapshot") or {}
+    _require_hash(
+        cohort_snapshot_path,
+        str(cohort_snapshot_meta.get("sha256") or ""),
+        "selected-cohort.snapshot.json",
+    )
+    _require_hash(
+        cohort_snapshot_path,
+        str(finalization.get("selected_cohort_snapshot_sha256") or ""),
+        "selected-cohort.snapshot.json finalization provenance",
+    )
     _require_hash(
         policy_path,
         str((metadata.get("policy") or {}).get("sha256") or ""),
@@ -660,6 +784,10 @@ def evaluate_workspace(
             "contract_version": WORKSPACE_CONTRACT,
             "evaluated_at": _utc_now(),
             "inputs": {
+                "selected_cohort_snapshot_sha256": _sha256(cohort_snapshot_path),
+                "selected_cohort_logical_sha256": _canonical_json_sha256(
+                    _json_load(cohort_snapshot_path)
+                ),
                 "pilot_manifest_final_sha256": _sha256(final_manifest_path),
                 "policy_sha256": _sha256(policy_path),
                 "self_report_sha256": _sha256(self_report_path) if self_report_path.is_file() else None,

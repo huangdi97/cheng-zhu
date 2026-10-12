@@ -900,6 +900,14 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByText('Decision 1', { exact: true })).toBeVisible()
     await expect(page.getByText(/not a meeting-quality or success score/)).toBeVisible()
     await expect(page.getByText('Next Focus · rollback owner 还没有明确')).toBeVisible()
+    const debrief = page.getByTestId('conversation-post-session-debrief')
+    await expect(debrief).toBeVisible()
+    await expect(debrief.getByText('这场刚结束，先留 20 秒反馈')).toBeVisible()
+    await expect(debrief.getByText('会后快速回顾')).toBeVisible()
+    await expect(debrief.getByText('LOCAL ONLY')).toBeVisible()
+    await expect(debrief.getByText('NO TELEMETRY')).toBeVisible()
+    await expect(debrief.getByRole('button', { name: '准确', exact: true })).toBeVisible()
+    await expect(debrief.getByRole('button', { name: '愿意', exact: true })).toBeVisible()
   })
 
   test('Live exposes explicit Talking Point and Delivery planner lanes', async ({ context, page }) => {

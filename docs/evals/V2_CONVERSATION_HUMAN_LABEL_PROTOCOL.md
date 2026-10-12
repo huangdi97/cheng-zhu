@@ -349,6 +349,27 @@ DB session membership verified
 
 五项 attestation 是 operator declaration，不是 Chengzhu 的身份认证或法律证明。manifest / labels / report 均应保存在本地受控路径，不上传公开仓库或 CI artifact。
 
+## 10.2 Real Pilot Workspace
+
+真实 pilot 推荐通过：
+
+`docs/evals/V2_CONVERSATION_REAL_PILOT_RUNBOOK.md`
+
+和：
+
+`scripts/v2_conversation_pilot_workspace.py`
+
+组织证据。Workspace 只编排既有 seed / self-report / manifest / human-eval / stable-readiness 语义，不创造新的 label source，也不改变本协议中的人工标注定义。
+
+关键保护：
+
+- 只导出显式选择的 Session；
+- policy / draft manifest / self-report / final manifest 使用 SHA256 检测冻结输入漂移；
+- unlabeled seed 不能直接作为 human evidence；
+- existing workspace/evaluation 不覆盖；
+- raw review material 继续只留本机。
+
+
 ## 11. 状态升级边界
 
 human-label report 本身只证明存在人工标签；它不能验证 reviewer 是否是真实外部用户，也不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。

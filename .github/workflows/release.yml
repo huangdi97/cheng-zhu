@@ -494,6 +494,35 @@ jobs:
           Write-Host "published release tag/source invariant: $tag -> $tagSha"
 
 
+      - name: Published Release body regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP "chengzhu-release-body-fixture.md"
+          $rendered = Join-Path $env:RUNNER_TEMP "chengzhu-release-body-rendered.md"
+          @"
+# Candidate notes
+
+This candidate is pre-publication wording.
+"@ | Set-Content $fixture -Encoding utf8
+
+          $renderArgs = @(
+            "scripts/render_published_release_body.py",
+            "--input", $fixture,
+            "--output", $rendered,
+            "--tag", "v0.0.0-test",
+            "--source-sha", "0123456789abcdef0123456789abcdef01234567",
+            "--channel", "PRERELEASE",
+            "--stable-latest", "v0.0.0"
+          )
+          python @renderArgs
+          if ($LASTEXITCODE -ne 0) { throw "published body renderer regression failed" }
+          $body = Get-Content $rendered -Raw
+          if (-not $body.Contains("CHENGZHU_PUBLISHED_STATUS_BEGIN")) { throw "published body marker missing" }
+          if (-not $body.Contains("Channel: **PRERELEASE**")) { throw "published body channel missing" }
+          if (-not $body.Contains("0123456789abcdef0123456789abcdef01234567")) { throw "published body source SHA missing" }
+          if (-not $body.Contains("This candidate is pre-publication wording.")) { throw "underlying notes were not preserved" }
+
       - name: Release verification metadata regression
         shell: pwsh
         run: |

@@ -98,7 +98,7 @@ Reasons:
 - Chengzhu's Windows release target is x64 NSIS + zip; it does not build AppImage and does not integrate `electron-updater` / `autoUpdater`.
 - Windows x64 packaged smoke remains mandatory because target applicability does not replace real packaging validation.
 
-The npm lock-refresh runner reported the desktop graph dropping from `12 high + 1 critical` to `8 moderate` immediately after resolving electron-builder 26.16.1. That observation is provisional until the normal scope-aware CI audit on the committed final lockfiles confirms it.
+The normal scope-aware CI audit on the committed upgraded lockfiles confirmed the desktop graph dropping from `12 high + 1 critical` to `8 moderate`, with `high=0`, `critical=0`, and no Electron-runtime blocking advisory. The frontend production graph remains at `0` vulnerabilities; the remaining frontend `2 moderate + 6 high` findings are confined to the documented Tailwind 3 dev/build graph.
 
 ## Release truth boundary
 

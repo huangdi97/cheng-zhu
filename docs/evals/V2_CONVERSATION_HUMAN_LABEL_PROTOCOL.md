@@ -185,12 +185,30 @@ cognitive_load_delta 建议使用 -2 到 +2：-2 明显降低，-1 略有降低�
 
 ## 10.1 产品内 Pilot Evidence Bridge（beta.3 后）
 
-Conversation Continue 允许用户在会后显式填写本机反馈：
+Conversation Continue 允许用户在会后显式填写本机反馈。当前产品把这条链分成两层：
+
+**第一层：结束 Session 后原地出现的 Quick Debrief**
+
+- Continue：`writeback_accurate`；
+- Session Outcome：`would_reuse_space`；
+- Session Outcome：`cognitive_load_delta`。
+
+这三项应直接出现在 Live → End → Continue 的会后结果区，不要求用户先返回 Space、重新找到 Session 或展开评估工具。它们代表用户刚结束真实会话时的显式自报，不等同于自动 telemetry。
+
+**第二层：详细事件级 Review**
 
 - shown Guidance：`useful`、`interruption_regret`、`source_correct`；RECALL 额外允许 `recall_correct`；
-- SILENT / suppressed decision：`silence_correct`；
-- Continue：`writeback_accurate`；
-- Session Outcome：`cognitive_load_delta`、`would_reuse_space`。
+- SILENT / suppressed decision：`silence_correct`。
+
+详细 Review 仍保留在同一会后入口和 Space 历史回看入口，但不应阻塞用户完成 Continue，也不应为了提高样本量强迫逐条标完整场事件。
+
+设计原则：
+
+1. 优先在事件刚结束时采集少量主观结果，降低延迟回忆造成的失真；
+2. Quick Debrief 只保留 3 个最小必要问题，避免评估本身增加认知负担、降低长期填写率；
+3. 事件级 Guidance / SILENT 标注采用 progressive disclosure，可稍后补；
+4. Quick Debrief 完成度和详细标注完成度可显示为本机进度，但**不是** quality score、meeting score 或 Stable readiness score；
+5. 不因为 UI 更容易填写而改变任何 Stable Promotion threshold、label source 或 cohort 口径。
 
 硬边界：
 

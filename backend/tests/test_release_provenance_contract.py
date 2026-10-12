@@ -47,8 +47,8 @@ def test_publication_materializes_and_verifies_the_exact_tag_sha() -> None:
         "- name: Upload download-back verification",
     )
 
-    assert "gh release edit $tag --draft=false --latest --target $sourceSha" in publish
-    edit_i = publish.index("gh release edit $tag --draft=false --latest --target $sourceSha")
+    assert "gh release edit $tag --notes-file $publishedBody --draft=false --latest --target $sourceSha" in publish
+    edit_i = publish.index("gh release edit $tag --notes-file $publishedBody --draft=false --latest --target $sourceSha")
     tag_i = publish.index('git/ref/tags/$tag')
     assert edit_i < tag_i
     assert "if ($tagSha -ne $sourceSha)" in publish
@@ -56,6 +56,56 @@ def test_publication_materializes_and_verifies_the_exact_tag_sha() -> None:
     assert "-TagSha $tagSha" in publish
     assert "-ReleaseChannel $releaseChannel" in publish
     assert "-IsPrerelease $isPrerelease" in publish
+
+
+def test_release_display_body_is_authoritative_before_publish() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    publish = _section(
+        text,
+        "- name: Publish verified GitHub Release",
+        "- name: Upload download-back verification",
+    )
+
+    render_i = publish.index("scripts/render_published_release_body.py")
+    edit_i = publish.index("gh release edit $tag --notes-file $publishedBody")
+    state_i = publish.index("CHENGZHU_PUBLISHED_STATUS_BEGIN")
+    assert render_i < edit_i < state_i
+    assert "--source-sha" in publish
+    assert "$sourceSha" in publish
+    assert "--stable-latest" in publish
+    assert "published Release body is missing authoritative publication truth" in publish
+
+
+def test_existing_published_version_repairs_display_only_without_moving_tag() -> None:
+    text = PUBLISHER.read_text(encoding="utf-8")
+    published = _section(
+        text,
+        'if [ "$is_draft" = "false" ]; then',
+        'echo "$tag exists only as a draft',
+    )
+
+    assert "release_target=" in published
+    assert "tag_sha=" in published
+    assert 'if [ "$release_target" != "$tag_sha" ]; then' in published
+    assert "scripts/render_published_release_body.py" in published
+    assert 'gh release edit "$tag" --notes-file "$published_body"' in published
+    assert "gh workflow run release.yml" not in published
+    assert "--target" not in published
+    assert "isImmutable" in published
+    assert "display truth normalized; nothing to dispatch" in published
+
+
+def test_release_workflow_executes_published_body_renderer_regression_on_windows() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    regression = _section(
+        text,
+        "- name: Published Release body regression",
+        "- name: Release verification metadata regression",
+    )
+    assert "python @renderArgs" in regression
+    assert "CHENGZHU_PUBLISHED_STATUS_BEGIN" in regression
+    assert "Channel: **PRERELEASE**" in regression
+    assert "underlying notes were not preserved" in regression
 
 
 def test_release_verification_enrichment_supports_missing_publication_fields() -> None:
@@ -88,6 +138,7 @@ def test_download_back_evidence_is_uploaded_only_after_public_tag_verification()
 def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     text = PUBLISHER.read_text(encoding="utf-8")
 
+    assert "contents: write" in text
     assert "current_main=\"$(gh api \"repos/$GITHUB_REPOSITORY/git/ref/heads/main\" --jq '.object.sha')\"" in text
     assert 'if [ "$current_main" != "$SOURCE_SHA" ]; then' in text
     assert "stale green main" in text

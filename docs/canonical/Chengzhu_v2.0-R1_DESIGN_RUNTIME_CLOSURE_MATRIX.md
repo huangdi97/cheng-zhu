@@ -1364,3 +1364,52 @@ PMF_PROVEN = FALSE
 静态 manifest template 同步改为 DRAFT / 空 attestations / `critical_incidents=null`，避免复制模板本身就携带授权与零事故结论。
 
 这项工具只减少 pilot operator 的抄录错误并把 DB 可验证 runtime provenance 与人为 attestation 分开；它不是新的 Conversation 用户功能，也不构成 beta.6 的理由。只有未来真实 pilot 结果、外部 provider evidence 或 runtime defect 需要改变可下载产品时，才进入新的 release cycle。
+
+
+---
+
+## Real Pilot operator-workspace closure · 2026-10-12
+
+After the policy-v5 authorized cohort builder landed, the remaining source-side operator gap was procedural: real pilot evidence still required manually coordinating label seed, self-report export, cohort manifest, human aggregation and Stable readiness.
+
+Current source adds a fail-closed orchestration layer:
+
+```text
+PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-1
+SELECTED_SESSION_ONLY_EXPORT = TRUE
+FROZEN_POLICY_SNAPSHOT = TRUE
+SOURCE_DB_SHA256_RECORDED = TRUE
+FROZEN_INPUT_HASH_DRIFT = FAIL_CLOSED
+DRAFT_MANIFEST_DEFAULT = TRUE
+FINALIZE_REQUIRES_EXPLICIT_ATTESTATIONS = TRUE
+UNLABELED_SEED_AS_EVIDENCE = FORBIDDEN
+EXISTING_WORKSPACE_OVERWRITE = FORBIDDEN
+EXISTING_EVALUATION_OVERWRITE = FORBIDDEN
+REMOTE_UPLOAD = FALSE
+REAL_USER_IDENTITY_SYSTEM_VERIFIED = FALSE
+REAL_WORLD_AUTHORIZATION_SYSTEM_VERIFIED = FALSE
+PARTICIPANT_CONSENT_SYSTEM_VERIFIED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Recommended flow:
+
+```text
+init workspace
+→ independent review
+→ explicit finalize
+→ aggregate self-report + reviewer labels
+→ policy-v5 stable readiness
+```
+
+This is post-beta.5 source-side operator tooling. It does not change the already-published beta.5 binaries and does not justify beta.6 by itself. Its purpose is to make the first real Project Sync / Design Review pilot reproducible without manual JSON assembly.
+
+Current truth remains:
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.5
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

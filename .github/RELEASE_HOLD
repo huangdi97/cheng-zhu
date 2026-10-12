@@ -1,0 +1,20 @@
+# v2.0.0-beta.6 release hold
+
+Status: BLOCKED_BY_EVIDENCE_PROVENANCE
+
+Reason:
+The real-pilot workspace currently verifies reviewer rows only at the authorized
+Session/profile/Space cohort level. It does not yet bind every independent-review
+row to the immutable event/prediction row frozen in independent-review.seed.jsonl,
+and evaluate does not re-verify the seed hash before aggregation.
+
+Without event-level binding, a synthetically added reviewer row for an authorized
+Session could inflate Stable metric sample counts or scores.
+
+Do not publish v2.0.0-beta.6 until:
+1. review rows are fail-closed against the frozen seed event identity + immutable
+   prediction/runtime provenance;
+2. the frozen seed hash is revalidated during evaluate;
+3. regressions prove invented events and modified predictions/origin are rejected;
+4. the exact merged main SHA passes full CI;
+5. this hold is removed in a separate final unhold change.

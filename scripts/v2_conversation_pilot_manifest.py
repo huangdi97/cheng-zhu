@@ -71,7 +71,7 @@ def _canonical_json_sha256(value: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _validated_session_fact(row: dict[str, Any], session_id: str) -> dict[str, Any]:
+def validated_session_fact(row: dict[str, Any], session_id: str) -> dict[str, Any]:
     pack_id = str(row.get("pack_id") or "").strip()
     frozen_pack_id = str(row.get("frozen_pack_id") or "").strip()
     stored_digest = str(row.get("frozen_pack_digest") or "").strip()
@@ -211,7 +211,7 @@ def validated_session_facts(
     if missing:
         raise ValueError(f"product.db 中不存在 Session: {', '.join(missing)}")
     return {
-        session_id: _validated_session_fact(rows[session_id], session_id)
+        session_id: validated_session_fact(rows[session_id], session_id)
         for session_id in ids
     }
 

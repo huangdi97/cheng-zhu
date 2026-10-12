@@ -498,6 +498,12 @@ def _assignments_from_manifest(manifest: dict[str, Any]) -> list[tuple[str, str]
 def _policy_contract_check(policy: dict[str, Any]) -> None:
     if str(policy.get("pilot_manifest_contract_version") or "") != pilot_manifest.CONTRACT_VERSION:
         raise ValueError("pilot manifest builder contract does not match the frozen workspace policy")
+    if str(policy.get("human_report_contract_version") or "") != human_eval.REPORT_CONTRACT_VERSION:
+        raise ValueError("human-eval report contract does not match the frozen workspace policy")
+    if str(policy.get("metric_sample_unit") or "") != "UNIQUE_EVENT_PER_METRIC":
+        raise ValueError("Stable policy metric sample unit must be UNIQUE_EVENT_PER_METRIC")
+    if str(policy.get("duplicate_event_metric_policy") or "") != "FAIL_CLOSED":
+        raise ValueError("Stable policy duplicate event/metric handling must be FAIL_CLOSED")
     if int(policy.get("cross_session_space_min_sessions") or 0) != pilot_manifest.CROSS_SESSION_SPACE_MIN_SESSIONS:
         raise ValueError("cross-session Space minimum does not match the frozen workspace policy")
     required = tuple(str(value) for value in (policy.get("required_attestations") or []))

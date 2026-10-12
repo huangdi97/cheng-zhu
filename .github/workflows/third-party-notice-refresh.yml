@@ -1,0 +1,55 @@
+name: Third Party Notice Refresh
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.head_ref == 'chore/dependency-security-upgrades'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate npm notice sections from final lockfiles
+        run: |
+          cp THIRD_PARTY_NOTICES.md "$RUNNER_TEMP/THIRD_PARTY_NOTICES.old.md"
+          python scripts/generate_third_party_notices.py
+          python - <<'PY'
+          from pathlib import Path
+          new_path = Path("THIRD_PARTY_NOTICES.md")
+          old_path = Path(__import__("os").environ["RUNNER_TEMP"]) / "THIRD_PARTY_NOTICES.old.md"
+          new = new_path.read_text(encoding="utf-8")
+          old = old_path.read_text(encoding="utf-8")
+          marker = "## Backend"
+          if marker not in new or marker not in old:
+              raise SystemExit("backend notice marker missing")
+          # npm sections are deterministic from lockfiles. Preserve the
+          # already-reviewed Python/backend suffix so this refresh does not
+          # rewrite package metadata merely because this small generator job
+          # intentionally does not install the full sidecar environment.
+          combined = new.split(marker, 1)[0] + marker + old.split(marker, 1)[1]
+          new_path.write_text(combined, encoding="utf-8")
+          PY
+          python scripts/generate_third_party_notices.py --check
+
+      - name: Commit generated notice and remove this temporary workflow
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add THIRD_PARTY_NOTICES.md
+          git rm .github/workflows/third-party-notice-refresh.yml
+          git commit -m "chore(security): refresh third-party notices after dependency upgrades"
+          git push origin HEAD:"$HEAD_BRANCH"

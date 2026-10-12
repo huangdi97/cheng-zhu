@@ -268,3 +268,14 @@ def test_pilot_manifest_summary_derives_profile_counts_from_selected_sessions(pr
         "distinct_pseudonymous_users": 0,
         "cross_session_spaces": 0,
     }
+
+
+def test_static_pilot_manifest_template_is_fail_closed():
+    template = json.loads(
+        (ROOT / "docs" / "evals" / "v2_conversation_real_pilot_manifest.template.json")
+        .read_text(encoding="utf-8")
+    )
+    assert template["contract_version"] == "v2.0-R1-pilot-cohort-2"
+    assert template["evidence_type"] == "DRAFT_AUTHORIZED_REAL_CONVERSATION_PILOT"
+    assert template["critical_incidents"] is None
+    assert template["attestations"] == []

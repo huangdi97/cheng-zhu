@@ -321,6 +321,24 @@ def test_human_report_space_must_match_authorized_session_space():
     )
 
 
+def test_one_launch_profile_cannot_supply_all_metric_evidence():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    metric = "opportunity_precision"
+    source = _source_for(policy, metric)
+
+    project = human["metrics_by_profile_and_label_source"]["PROJECT_SYNC"][source][metric]
+    design = human["metrics_by_profile_and_label_source"]["DESIGN_REVIEW"][source][metric]
+    project["n"] += design["n"]
+    design["n"] = 0
+
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    failed = {item["name"] for item in report["failed_checks"]}
+    assert f"metric:{metric}:profile_coverage" in failed
+
+
 def test_out_of_scope_profile_metrics_cannot_inflate_stable_gate():
     module = _module()
     policy = _policy()

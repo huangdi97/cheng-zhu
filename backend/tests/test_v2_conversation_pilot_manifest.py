@@ -30,8 +30,8 @@ def _ended_session(profile: str, title: str, monkeypatch, clock: list[float]):
     session = conversations.create_session(space["id"], consent_ack=True)
     conversations.start_session(session["id"])
     clock[0] += 60
-    ended = conversations.end_session(session["id"])
-    return space, ended
+    conversations.end_session(session["id"])
+    return space, conversations.require_session(session["id"])
 
 
 def _required_attestations(module):
@@ -248,7 +248,8 @@ def test_pilot_manifest_summary_derives_profile_counts_from_selected_sessions(pr
         session = conversations.create_session(space["id"], consent_ack=True)
         conversations.start_session(session["id"])
         clock[0] += 30
-        sessions.append(conversations.end_session(session["id"]))
+        conversations.end_session(session["id"])
+        sessions.append(conversations.require_session(session["id"]))
         clock[0] += 30
 
     _manifest, summary = module.build_manifest(
@@ -268,7 +269,8 @@ def test_pilot_manifest_summary_derives_profile_counts_from_selected_sessions(pr
     third = conversations.create_session(space["id"], consent_ack=True)
     conversations.start_session(third["id"])
     clock[0] += 30
-    third = conversations.end_session(third["id"])
+    conversations.end_session(third["id"])
+    third = conversations.require_session(third["id"])
     _manifest3, summary3 = module.build_manifest(
         Path(store.DB_PATH),
         [

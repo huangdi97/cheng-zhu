@@ -1448,3 +1448,44 @@ PMF_PROVEN = FALSE
 reviewer 只允许修改 reviewer、label_source、notes 与 kind-specific human label 字段。Stable evaluator 在 event-level binding 通过后才允许 aggregation。
 
 该修复关闭的是 **review evidence injection / provenance** 缺口，不把人工 reviewer 身份、独立性或授权从 operator/human boundary 转成系统事实。beta.6 release hold 必须保持，直到该修复合并、exact main 全量 CI 通过，再由独立 unhold 提交解除。
+
+
+---
+
+## Unique-event Stable sample-unit closure · 2026-10-12
+
+beta.6 release hold 下继续审计发现第二个 Stable evidence inflation 面：Human Eval 会阻止“同一 reviewer 重复同一 event”，但允许不同 reviewer 或不同 allowed label source 对同一 product event 的同一 metric 分别贡献 annotation row。旧聚合器按 row 计 `n`，因此：
+
+```text
+1 real event
+× 20 reviewer annotations
+→ could appear as n=20
+```
+
+这不符合 Stable Gate 的产品样本语义。
+
+当前候选收口为：
+
+```text
+HUMAN_REPORT_CONTRACT = v2.0-R1-human-eval-5
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-6
+METRIC_SAMPLE_UNIT = UNIQUE_EVENT_PER_METRIC
+DUPLICATE_EVENT_METRIC_POLICY = FAIL_CLOSED
+CROSS_REVIEWER_DUPLICATE = REJECT
+CROSS_LABEL_SOURCE_DUPLICATE = REJECT
+SAME_EVENT_DIFFERENT_METRIC_DIMENSIONS = ALLOWED
+NUMERICAL_THRESHOLDS_CHANGED = FALSE
+MIN_N_NUMBERS_CHANGED = FALSE
+PROFILE_FLOORS_CHANGED = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+含义：
+
+- 多 reviewer 可以用于独立的一致性研究，但 Stable aggregate 不能把 reviewer 数当产品事件数；
+- 同一事件的同一 metric 若存在多个有效 label，必须先由 operator 在 Stable 聚合之外完成仲裁/选择；
+- 同一 Guidance event 的不同 metric 维度（例如用户 usefulness 与独立 reviewer source correctness）可以分别由不同来源标注；
+- Stable `min_n` 现在明确是 **unique product event × metric observations**。
+
+该修复与 event-level frozen seed binding 一起构成 beta.6 的 evidence-integrity release blocker。release hold 必须保持，直到两项修复合并、exact main 全量 CI 通过、再通过独立 unhold 流程解除。

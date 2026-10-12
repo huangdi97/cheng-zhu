@@ -289,7 +289,7 @@ def test_workspace_finalize_fails_closed_on_selected_session_or_pack_drift(produ
     assert pack is not None
     original_digest = pack["digest"]
     store.update("conversation_session_pack", pack_id, {"digest": "drifted-pack-digest"})
-    with pytest.raises(ValueError, match="selected cohort structural drift"):
+    with pytest.raises(ValueError, match="payload digest mismatch"):
         mod.finalize_workspace(
             Path(store.DB_PATH),
             workspace,

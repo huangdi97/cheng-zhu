@@ -252,9 +252,19 @@ This is evidence consistency, not cryptographic identity attestation and not PMF
 python scripts/v2_conversation_human_eval.py labels.jsonl --out human-report.json
 ```
 
-4. Fill:
+4. Generate a **draft** pilot manifest from exact local Session ids plus operator-supplied pseudonymous user refs:
 
-`docs/evals/v2_conversation_real_pilot_manifest.template.json`
+```bash
+python scripts/v2_conversation_pilot_manifest.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --session cv_project_01=pilot-user-01 \
+  --session cv_design_01=pilot-user-02 \
+  --out pilot-manifest.draft.json
+```
+
+The draft deliberately cannot satisfy this gate. Review it locally, then rerun with the same authorized Session mapping plus `--finalize`, explicit `--critical-incidents`, and **all five** required `--attest` values. The builder revalidates ENDED status, launch profile, consent acknowledgement, Frozen Session Pack, exact Space/Profile mapping and timestamps from `product.db`; it does not verify identity or real-world authorization.
+
+The static template `docs/evals/v2_conversation_real_pilot_manifest.template.json` is also fail-closed by default and should be treated as structure documentation, not a pre-attested manifest.
 
 5. Evaluate:
 

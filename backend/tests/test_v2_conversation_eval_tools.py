@@ -283,8 +283,8 @@ def test_human_eval_rejects_non_rubric_or_nonfinite_cognitive_labels(tmp_path):
         {**base, "cognitive_load_delta": True},
         {**base, "cognitive_load_delta": 99},
         {**base, "cognitive_load_delta": float("nan")},
-        {**base, "cognitive_load_delta": -2},
-        {**base, "cognitive_load_delta": 2},
+        {**base, "session_id": "cs_valid_1", "cognitive_load_delta": -2},
+        {**base, "session_id": "cs_valid_2", "cognitive_load_delta": 2},
     ]
     assert human_eval.aggregate(rows)["metrics"]["mean_cognitive_load_delta"] == {"value": 0.0, "n": 2}
 
@@ -836,7 +836,7 @@ def test_human_eval_marks_conflicting_session_profile_or_space_as_incomplete():
             "profile": "PROJECT_SYNC",
             "reviewer": "r1",
             "label_source": "INDEPENDENT_HUMAN_REVIEW",
-            "writeback_accurate": True,
+            "writeback_accurate": None,
         },
         {
             "kind": "continue",
@@ -845,7 +845,7 @@ def test_human_eval_marks_conflicting_session_profile_or_space_as_incomplete():
             "profile": "DESIGN_REVIEW",
             "reviewer": "r2",
             "label_source": "INDEPENDENT_HUMAN_REVIEW",
-            "writeback_accurate": True,
+            "writeback_accurate": None,
         },
     ]
     report = human_eval.aggregate(rows)

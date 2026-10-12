@@ -319,6 +319,57 @@ def test_workspace_finalize_fails_closed_on_selected_session_or_pack_drift(produ
     assert finalization["selected_cohort_snapshot_sha256"]
 
 
+def test_finalize_rechecks_selected_cohort_after_final_manifest_live_db_read(product_env, tmp_path, monkeypatch):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    workspace = data["workspace"]
+    mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
+
+    selected_id = data["project_session"]["id"]
+    original = conversations.require_session(selected_id)
+    original_ended_at = original["ended_at"]
+    real_build = mod.pilot_manifest.build_manifest
+
+    def build_then_drift(*args, **kwargs):
+        manifest, summary = real_build(*args, **kwargs)
+        # Simulate a selected-cohort mutation after build_manifest has consumed
+        # its independent live DB read but before finalize persists evidence.
+        store.update(
+            "conversation_session",
+            selected_id,
+            {"ended_at": float(original_ended_at) + 1.0},
+        )
+        return manifest, summary
+
+    monkeypatch.setattr(mod.pilot_manifest, "build_manifest", build_then_drift)
+    with pytest.raises(ValueError, match="during final manifest build"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            workspace,
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+
+    assert not (workspace / "pilot-manifest.final.json").exists()
+    assert not (workspace / "finalization.json").exists()
+
+    # Restore the selected cohort and the canonical builder; a clean retry can
+    # then finalize the exact frozen workspace.
+    store.update(
+        "conversation_session",
+        selected_id,
+        {"ended_at": original_ended_at},
+    )
+    monkeypatch.setattr(mod.pilot_manifest, "build_manifest", real_build)
+    finalization = mod.finalize_workspace(
+        Path(store.DB_PATH),
+        workspace,
+        attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+        critical_incidents=0,
+    )
+    assert finalization["selected_cohort_snapshot_sha256"]
+
+
 def test_inspect_marks_corrupt_or_context_drifted_pack_ineligible(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)

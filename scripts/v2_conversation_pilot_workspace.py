@@ -634,6 +634,19 @@ def finalize_workspace(
         attestations=attestations,
         critical_incidents=critical_incidents,
     )
+
+    # Close the check-then-use window between the pre-finalization cohort
+    # revalidation above and build_manifest()'s independent live-DB read.
+    # If any selected Session/Frozen Pack changed while the final manifest was
+    # being built, do not persist a manifest from a different logical cohort
+    # than selected-cohort.snapshot.json.
+    post_manifest_cohort_snapshot = _selected_cohort_snapshot(db, assignments)
+    if post_manifest_cohort_snapshot != frozen_cohort_snapshot:
+        raise ValueError(
+            "selected cohort structural drift detected during final manifest build; "
+            "no final evidence was written"
+        )
+
     _write_json(final_path, final_manifest)
     finalization = {
         "contract_version": WORKSPACE_CONTRACT,

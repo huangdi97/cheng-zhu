@@ -428,7 +428,7 @@ If you are the author of upstream code and believe it is included here under dif
 | `util-deprecate` | 1.0.2 | MIT | dev |
 | `vfile` | 6.0.3 | MIT | runtime |
 | `vfile-message` | 4.0.3 | MIT | runtime |
-| `vite` | 6.4.3 | MIT | dev |
+| `vite` | 6.4.4 | MIT | dev |
 | `vitest` | 4.1.11 | MIT | dev |
 | `w3c-xmlserializer` | 5.0.0 | MIT | dev |
 | `webidl-conversions` | 7.0.0 | BSD-2-Clause | dev |

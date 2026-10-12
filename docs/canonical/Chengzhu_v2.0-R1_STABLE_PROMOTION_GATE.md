@@ -264,7 +264,30 @@ policy value < 3 = fail closed
 
 No quality threshold, user floor, total Session floor or required cross-session-Space count is lowered. This is a denominator/cohort-definition correction, not a post-hoc attempt to create a PASS.
 
+## 5.6 Recommended operator workflow
+
+The low-level scripts remain canonical building blocks, but the recommended real-pilot path is now the fail-closed Pilot Workspace orchestrator:
+
+```text
+v2_conversation_pilot_workspace.py init
+→ independent review
+→ v2_conversation_pilot_workspace.py finalize
+→ v2_conversation_pilot_workspace.py evaluate
+```
+
+It freezes the exact policy snapshot, limits exports to explicitly selected Sessions, records local source/evidence hashes, refuses frozen-input drift and refuses overwrite of an existing workspace/evaluation. It does not create new evidence semantics and does not verify identity, real-world authorization, participant consent or PMF.
+
+Full operator procedure:
+
+`docs/evals/V2_CONVERSATION_REAL_PILOT_RUNBOOK.md`
+
 ## 6. Tooling
+
+### Recommended
+
+Use `scripts/v2_conversation_pilot_workspace.py` and the Real Pilot Runbook for end-to-end operator execution.
+
+### Low-level / audit path
 
 1. Export local label seed.
 2. Human reviewers label real sessions.

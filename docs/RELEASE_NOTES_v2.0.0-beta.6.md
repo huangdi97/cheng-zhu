@@ -121,6 +121,7 @@ explicit Session/user_ref assignments
 - 冻结 `selected-cohort.snapshot.json`、Stable policy、manifest/self-report 等输入并记录 hashes；
 - selected-cohort snapshot 只包含 selected Session 结构 + 本地匿名 `user_ref` + Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest），不含 transcript / participant / Guidance / source text；
 - finalize 时从当前 SQLite 逻辑状态重新计算 selected cohort，对任何 selected Session/Pack drift fail-closed；
+- final manifest 生成后、任何 final evidence 落盘前，再次重算 selected cohort；若 build_manifest 的独立 live-DB 读取窗口内发生结构漂移，同样 fail-closed，避免 check-then-use provenance race；
 - 允许与 cohort 无关的新 Session / WAL-backed 数据库变化，不把整库文件变化误判成 cohort drift；
 - SQLite 主 `product.db` 文件 SHA256 仅作为 advisory，因为 WAL 可能包含尚未 checkpoint 的逻辑状态；
 - 只把显式选择的 Session 放入 workspace。

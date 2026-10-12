@@ -88,7 +88,7 @@ def test_download_back_evidence_is_uploaded_only_after_public_tag_verification()
 def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     text = PUBLISHER.read_text(encoding="utf-8")
 
-    assert 'current_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"' in text
+    assert "current_main=\"$(gh api \"repos/$GITHUB_REPOSITORY/git/ref/heads/main\" --jq '.object.sha')\"" in text
     assert 'if [ "$current_main" != "$SOURCE_SHA" ]; then' in text
     assert "stale green main" in text
     assert 'if [ -f ".github/RELEASE_HOLD" ]; then' in text

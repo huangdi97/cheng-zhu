@@ -162,6 +162,36 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
         mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
 
 
+def test_workspace_rejects_policy_that_allows_annotation_count_inflation(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+
+    weak_sample = dict(policy)
+    weak_sample["metric_sample_unit"] = "ANNOTATION_ROWS"
+    weak_path = tmp_path / "weak-sample-policy.json"
+    weak_path.write_text(json.dumps(weak_sample), encoding="utf-8")
+    with pytest.raises(ValueError, match="UNIQUE_EVENT_PER_METRIC"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            data["assignments"],
+            tmp_path / "weak-sample-workspace",
+            policy_path=weak_path,
+        )
+
+    weak_duplicate = dict(policy)
+    weak_duplicate["duplicate_event_metric_policy"] = "ALLOW"
+    weak_duplicate_path = tmp_path / "weak-duplicate-policy.json"
+    weak_duplicate_path.write_text(json.dumps(weak_duplicate), encoding="utf-8")
+    with pytest.raises(ValueError, match="FAIL_CLOSED"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            data["assignments"],
+            tmp_path / "weak-duplicate-workspace",
+            policy_path=weak_duplicate_path,
+        )
+
+
 def test_inspect_pilot_sessions_is_privacy_minimized_and_reports_quick_debrief(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)

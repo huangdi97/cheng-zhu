@@ -290,3 +290,16 @@ GOOGLE_DRIVE_ACCOUNT_CONNECTED = TRUE
 REAL_DRIVE_DOCUMENT_SYNC_PROVEN = TRUE
 REAL_GOOGLE_OAUTH_LIFECYCLE_COMPLETE = TRUE
 ```
+
+
+## Real-account product replay
+
+Source-side operator harness:
+
+`scripts/v2_real_provider_account_replay.py --provider google-drive ...`
+
+Use a small explicit test folder. The replay verifies real account health, complete target-scoped `docs.read`, immutable snapshots, frozen Session Pack provenance, and credential non-persistence. Empty/oversized/incomplete targets fail closed rather than being called a successful content replay.
+
+A passing harness result may prove `PASS_REAL_ACCOUNT_READ_PRODUCT_REPLAY`; tool availability alone is not provider evidence.
+
+Runbook: `docs/evidence/V2_REAL_PROVIDER_ACCOUNT_REPLAY_RUNBOOK.md`.

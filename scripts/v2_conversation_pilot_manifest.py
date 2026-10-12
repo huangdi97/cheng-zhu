@@ -34,6 +34,7 @@ FINAL_EVIDENCE_TYPE = "AUTHORIZED_REAL_CONVERSATION_PILOT"
 DRAFT_EVIDENCE_TYPE = "DRAFT_AUTHORIZED_REAL_CONVERSATION_PILOT"
 REQUIRED_PROFILES = ("PROJECT_SYNC", "DESIGN_REVIEW")
 CROSS_SESSION_SPACE_MIN_SESSIONS = 3
+CROSS_SESSION_SPACE_USER_BINDING = "SINGLE_PSEUDONYMOUS_USER_REF"
 REQUIRED_ATTESTATIONS = (
     "AUTHORIZED_REAL_USE",
     "NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
@@ -273,6 +274,21 @@ def build_manifest(
     if any(not row["space_id"] for row in selected):
         raise ValueError("存在缺少 space_id 的 Session")
 
+    space_user_refs: dict[str, set[str]] = {}
+    for row in selected:
+        space_user_refs.setdefault(row["space_id"], set()).add(
+            row["user_ref"].casefold()
+        )
+    mixed_user_spaces = sorted(
+        space_id for space_id, refs in space_user_refs.items()
+        if len(refs) > 1
+    )
+    if mixed_user_spaces:
+        raise ValueError(
+            "同一 Conversation Space 的 pilot Sessions 必须绑定同一个 user_ref；"
+            "存在混合用户 Space: " + ", ".join(mixed_user_spaces)
+        )
+
     selected.sort(key=lambda row: (row["started_at"], row["session_id"]))
     supplied_attestations = [str(value or "").strip() for value in attestations]
     if len(supplied_attestations) != len(set(supplied_attestations)):
@@ -326,7 +342,9 @@ def build_manifest(
         "notes": (
             "Generated from local product.db Session identifiers only. "
             "user_ref values were supplied explicitly by the operator and are "
-            "local pseudonyms, not identity proof. Authorization/real-use/"
+            "local pseudonyms, not identity proof. Every selected Space is bound "
+            "to exactly one pseudonymous user_ref for longitudinal evidence. "
+            "Authorization/real-use/"
             "incident attestations are operator declarations, not system verification."
         ),
     }
@@ -336,6 +354,7 @@ def build_manifest(
         "sessions": len(selected),
         "profiles": {},
         "cross_session_space_min_sessions": CROSS_SESSION_SPACE_MIN_SESSIONS,
+        "cross_session_space_user_binding": CROSS_SESSION_SPACE_USER_BINDING,
         "real_user_identity_system_verified": False,
         "authorization_system_verified": False,
         "pmf_proven": False,

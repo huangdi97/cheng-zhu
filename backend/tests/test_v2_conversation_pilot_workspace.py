@@ -141,6 +141,83 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
         mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
 
 
+def test_inspect_pilot_sessions_is_privacy_minimized_and_reports_quick_debrief(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+
+    conversation_feedback.upsert_feedback(
+        data["project_session"]["id"],
+        kind="CONTINUE",
+        labels={"writeback_accurate": True},
+    )
+
+    report = mod.inspect_pilot_sessions(Path(store.DB_PATH))
+    by_id = {row["session_id"]: row for row in report["sessions"]}
+    project = by_id[data["project_session"]["id"]]
+
+    assert report["inspection_type"] == "LOCAL_PRIVACY_MINIMIZED_PILOT_SESSION_INVENTORY"
+    assert project["profile"] == "PROJECT_SYNC"
+    assert project["structurally_selectable"] is True
+    assert project["structural_blockers"] == []
+    assert project["consent_ack_recorded"] is True
+    assert project["frozen_pack_verified"] is True
+    assert project["local_self_report"]["quick_debrief"] == {
+        "continue_accuracy": True,
+        "space_reuse_intent": True,
+        "cognitive_load_delta": True,
+        "completed": 3,
+        "total": 3,
+        "complete": True,
+    }
+    assert report["claims"]["STRUCTURALLY_SELECTABLE_IS_AUTHORIZED_REAL_USE"] is False
+    assert report["claims"]["REAL_USER_IDENTITY_SYSTEM_VERIFIED"] is False
+    assert report["claims"]["REAL_USER_VALIDATED"] is False
+    assert report["claims"]["PMF_PROVEN"] is False
+
+    serialized = json.dumps(report, ensure_ascii=False)
+    assert "Pilot Project" not in serialized
+    assert "Pilot Design" not in serialized
+    assert "Do Not Export" not in serialized
+    assert "Project selected" not in serialized
+    assert "Private unselected" not in serialized
+    assert "为什么采用 v2?" not in serialized
+    assert "UNSELECTED_PRIVATE_TRANSCRIPT" not in serialized
+    assert "private review context" not in serialized
+    assert report["privacy"]["transcript_text_exported"] is False
+    assert report["privacy"]["participants_exported"] is False
+    assert report["privacy"]["user_refs_assigned"] is False
+
+
+def test_inspect_pilot_sessions_explains_structural_blockers_without_authorizing_sessions(product_env):
+    mod = _load()
+
+    active_space = conversations.create_space("Active private title", "PROJECT_SYNC")
+    active = conversations.create_session(active_space["id"], consent_ack=True)
+    conversations.start_session(active["id"])
+
+    client_space = conversations.create_space("Client private title", "CLIENT_CALL")
+    client = _ended_session(client_space["id"], title="Client private session")
+
+    blocked_space = conversations.create_space("Missing consent private title", "DESIGN_REVIEW")
+    blocked = _ended_session(blocked_space["id"], title="Blocked private session")
+    store.update("conversation_session", blocked["id"], {"consent_ack": False})
+
+    report = mod.inspect_pilot_sessions(Path(store.DB_PATH))
+    by_id = {row["session_id"]: row for row in report["sessions"]}
+
+    assert by_id[active["id"]]["structurally_selectable"] is False
+    assert "SESSION_NOT_ENDED" in by_id[active["id"]]["structural_blockers"]
+
+    assert by_id[client["id"]]["structurally_selectable"] is False
+    assert "PROFILE_NOT_LAUNCH_COHORT" in by_id[client["id"]]["structural_blockers"]
+
+    assert by_id[blocked["id"]]["structurally_selectable"] is False
+    assert "CONSENT_ACK_NOT_RECORDED" in by_id[blocked["id"]]["structural_blockers"]
+
+    assert report["claims"]["REAL_WORLD_AUTHORIZATION_SYSTEM_VERIFIED"] is False
+    assert report["claims"]["PARTICIPANT_CONSENT_SYSTEM_VERIFIED"] is False
+
+
 def test_finalize_workspace_requires_explicit_attestations_and_revalidates_db(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)

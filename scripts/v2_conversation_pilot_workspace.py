@@ -107,9 +107,9 @@ def _selected_cohort_snapshot(
     """Freeze privacy-minimized logical facts for selected pilot Sessions.
 
     product.db uses SQLite WAL, so hashing only the main database file is not a
-    complete logical-state fingerprint.  This snapshot is intentionally narrow:
-    it captures only machine-verifiable cohort structure and Frozen Session Pack
-    identity/digest, never transcript, participant, Guidance or source content.
+    complete logical-state fingerprint.  The shared manifest validator proves
+    Session/Pack structural consistency and pack content digest without
+    exporting private Pack payload.
     """
     pairs = [(str(session_id), str(user_ref)) for session_id, user_ref in assignments]
     if not pairs:
@@ -118,67 +118,18 @@ def _selected_cohort_snapshot(
     if len(ids) != len(set(ids)):
         raise ValueError("selected cohort snapshot contains duplicate session_id")
 
-    conn = sqlite3.connect(str(db))
-    conn.row_factory = sqlite3.Row
-    try:
-        placeholders = ",".join("?" for _ in ids)
-        rows = conn.execute(
-            "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
-            "s.consent_ack, s.pack_id, "
-            "p.id AS frozen_pack_id, p.digest AS frozen_pack_digest, "
-            "p.payload_json AS frozen_pack_payload_json "
-            "FROM conversation_session s "
-            "LEFT JOIN conversation_session_pack p "
-            "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
-            f"WHERE s.id IN ({placeholders})",
-            tuple(ids),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    by_id = {str(row["id"]): dict(row) for row in rows}
-    missing = sorted(set(ids) - set(by_id))
-    if missing:
-        raise ValueError(
-            "selected cohort snapshot missing Session(s): " + ", ".join(missing)
-        )
-
+    facts = pilot_manifest.validated_session_facts(db, ids)
     sessions: list[dict[str, Any]] = []
     for session_id, user_ref in pairs:
-        row = by_id[session_id]
-        stored_pack_digest = str(row.get("frozen_pack_digest") or "")
-        payload_text = str(row.get("frozen_pack_payload_json") or "")
-        if not stored_pack_digest or not payload_text:
-            raise ValueError(f"{session_id}: Frozen Session Pack payload/digest is missing")
-        try:
-            pack_payload = json.loads(payload_text)
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise ValueError(f"{session_id}: Frozen Session Pack payload is invalid JSON") from exc
-        calculated_pack_digest = _canonical_json_sha256(pack_payload)
-        if calculated_pack_digest != stored_pack_digest:
-            raise ValueError(
-                f"{session_id}: Frozen Session Pack payload digest mismatch"
-            )
         sessions.append({
-            "session_id": session_id,
+            **facts[session_id],
             "user_ref": user_ref,
-            "space_id": str(row.get("space_id") or ""),
-            "profile": str(row.get("template") or "").upper(),
-            "status": str(row.get("status") or "").upper(),
-            "started_at": row.get("started_at"),
-            "ended_at": row.get("ended_at"),
-            "consent_ack_recorded": bool(row.get("consent_ack")),
-            "pack_id": str(row.get("pack_id") or ""),
-            "frozen_pack_id": str(row.get("frozen_pack_id") or ""),
-            "frozen_pack_digest": stored_pack_digest,
-            "frozen_pack_payload_digest_verified": True,
         })
     sessions.sort(key=lambda row: row["session_id"])
     return {
         "contract_version": SELECTED_COHORT_SNAPSHOT_CONTRACT,
         "sessions": sessions,
     }
-
 
 def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
     """Return privacy-minimized structural inventory for pilot cohort selection.
@@ -216,7 +167,9 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
 
         session_rows = conn.execute(
             "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
-            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id "
+            "s.capture_mode, s.processing_mode, s.assistance_mode, "
+            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id, "
+            "p.digest AS frozen_pack_digest, p.payload_json AS frozen_pack_payload_json "
             "FROM conversation_session s "
             "LEFT JOIN conversation_session_pack p "
             "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
@@ -275,9 +228,13 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
         ended_at = _finite_optional_timestamp(row["ended_at"])
         consent_ack_recorded = bool(row["consent_ack"])
         pack_id = str(row["pack_id"] or "").strip()
-        frozen_pack_verified = bool(
-            pack_id and str(row["frozen_pack_id"] or "").strip() == pack_id
-        )
+        frozen_pack_verified = False
+        try:
+            frozen_fact = pilot_manifest.validated_session_fact(dict(row), session_id)
+            frozen_pack_verified = True
+            profile = str(frozen_fact.get("profile") or profile).upper()
+        except ValueError:
+            frozen_fact = {}
         blockers: list[str] = []
         if profile not in pilot_manifest.REQUIRED_PROFILES:
             blockers.append("PROFILE_NOT_LAUNCH_COHORT")
@@ -286,7 +243,7 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
         if not consent_ack_recorded:
             blockers.append("CONSENT_ACK_NOT_RECORDED")
         if not frozen_pack_verified:
-            blockers.append("FROZEN_SESSION_PACK_NOT_VERIFIED")
+            blockers.append("FROZEN_SESSION_PACK_INTEGRITY_FAILED")
         if started_at is None:
             blockers.append("STARTED_AT_INVALID")
         if ended_at is None:

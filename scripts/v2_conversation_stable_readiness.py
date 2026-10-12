@@ -303,6 +303,20 @@ def evaluate(
                 "other Conversation profiles cannot inflate the denominator or score."
             ),
         )
+        profile_coverage = {
+            profile: sum(population_counts.get(profile, {}).values())
+            for profile in metric_profiles
+        }
+        add(
+            f"metric:{name}:profile_coverage",
+            all(value > 0 for value in profile_coverage.values()),
+            actual=profile_coverage,
+            required={profile: ">=1 allowed-source sample" for profile in metric_profiles},
+            reason=(
+                "Each launch-wedge profile must contribute real metric evidence; a strong score from one profile "
+                "cannot stand in for an entirely unmeasured Project Sync or Design Review experience."
+            ),
+        )
         min_n = int(rule.get("min_n") or 0)
         add(
             f"metric:{name}:sample_size",

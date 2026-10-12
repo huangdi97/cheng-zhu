@@ -262,7 +262,7 @@ metric.allowed_label_sources
 
 这意味着其它 Conversation Profile 的标签可以用于研发分析，但不能替首发验证楔子抬高 Stable Gate。
 
-对应 pilot manifest contract = `v2.0-R1-pilot-cohort-2`。manifest 逐场记录 `session_id / space_id / local pseudonymous user_ref`；Stable evaluator 自动推导 profile session 数、distinct pseudonymous users 与 cross-session Spaces，并验证 human-report Session 全部属于授权 cohort。
+对应 pilot manifest contract = `v2.0-R1-pilot-cohort-2`。manifest 逐场记录 `session_id / space_id / local pseudonymous user_ref`；Stable evaluator 自动推导 profile session 数、distinct pseudonymous users 与 cross-session Spaces，并验证 human-report Session 全部属于授权 cohort。policy v5 规定一个 Space 只有在 manifest 中枚举 **至少 3 个授权 Session** 时才计为 cross-session Space；该资格不能由 2 场重复使用、手填 aggregate count 或后处理推断替代。
 
 原始 label / report / manifest 都可能包含私人会议标识，继续保持本地受控存储，不应上传公开仓库或 CI artifact。
 
@@ -361,7 +361,7 @@ python scripts/v2_conversation_stable_readiness.py \
   real-pilot.json
 ```
 
-稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。policy v3 同时冻结 `allowed_label_sources` 与 metric population contract：用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源替代该指标所需证据。即使全部通过，也只允许：
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。当前源码 policy v5 继承 v4 的 authorized-cohort binding、`allowed_label_sources` 与 metric population contract，并把 canonical 的 cross-session Space 定义机器化为“同一 Space 至少 3 个授权 Session”；2 场重复使用不能计入 Stable cross-session Space。用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源、错误 cohort 或 2-Session Space 替代该指标所需证据。即使全部通过，也只允许：
 
 ```text
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE

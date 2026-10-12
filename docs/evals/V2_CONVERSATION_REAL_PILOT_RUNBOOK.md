@@ -194,6 +194,15 @@ At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.js
 
 The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
 
+Stable Policy v6 also freezes the sample unit:
+
+```text
+min_n = unique product event × metric observations
+not reviewer annotation rows
+```
+
+Different reviewers may annotate the same event for inter-rater analysis, but the same event cannot contribute the same Stable metric twice. Duplicate event/metric labels across reviewers or label sources fail closed and must be resolved/selected before Stable aggregation. Different metric dimensions on the same event may still be reviewed separately.
+
 Stable live-guidance metrics use only v12 TRANSCRIPT_AUTO provenance.
 
 Direct Question metrics use only v11 capture-time frozen predictions.
@@ -259,7 +268,7 @@ explicit local self-report
 +
 independent human review
 → human-label report
-→ frozen Stable policy v5
+→ frozen Stable policy v6
 → stable-readiness report
 ```
 
@@ -358,7 +367,7 @@ PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = SOURCE_SIDE
 PILOT_SESSION_INVENTORY = SOURCE_SIDE_PRIVACY_MINIMIZED
-STABLE_POLICY = v2.0-R1-stable-promotion-5
+STABLE_POLICY = v2.0-R1-stable-promotion-6
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE

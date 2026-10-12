@@ -350,6 +350,32 @@ Pins
 
 AI_EXTRACTED item 明确标“待确认”。
 
+在真实 Beta / pilot 中，结束 Session 后同一 Continue 屏增加一个轻量 Quick Debrief：
+
+```text
+这场刚结束，先留 20 秒反馈
+
+Continue 是否准确？
+[准确] [有错误]
+
+还愿意继续用这个 Space 吗？
+[愿意] [不愿意]
+
+相比没有成竹，这场认知负担怎样？
+[-2] [-1] [0] [+1] [+2]
+
+详细回看 Guidance / SILENT
+[展开]
+```
+
+边界：
+
+- Quick Debrief 默认直接可见，事件级 Guidance / SILENT review 默认折叠；
+- 只写入本机显式 self-report，不做远程 telemetry；
+- 不把是否填写、填写多少或正向比例渲染成 meeting quality score；
+- 返回 Space 后仍允许继续补标，不能因为离开 Live 页丢失反馈；
+- 详细 review 不阻塞 Continue truth review / write-back。
+
 # 14. Decision Review
 
 逐项 review：

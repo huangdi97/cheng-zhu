@@ -15,5 +15,5 @@
   },
   "critical_incidents": null,
   "attestations": [],
-  "notes": "DRAFT ONLY. Prefer scripts/v2_conversation_pilot_manifest.py so session_id/space_id/profile/period are derived from local product.db. user_ref must be supplied explicitly as a stable local pseudonym, not a name/email. Final evidence_type, critical_incidents and all required attestations must be explicit operator declarations; the system does not verify identity, authorization or PMF."
+  "notes": "DRAFT ONLY. Prefer scripts/v2_conversation_pilot_manifest.py so session_id/space_id/profile/period are derived from local product.db. user_ref must be supplied explicitly as a stable local pseudonym, not a name/email. Final evidence_type, critical_incidents and all required attestations must be explicit operator declarations; the system does not verify identity, real-world authorization, participant consent or PMF. Under Stable Promotion Policy v5, one Space counts as cross-session only when at least 3 authorized Sessions in that same Space are enumerated."
 }

@@ -930,7 +930,7 @@ V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS
                                   clean-install replay，PATH 中无 Python/Node)
 V2_CONNECTOR_RUNTIME    = PARTIAL (GitHub 真实账号 replay PASS；Google Calendar / Drive /
                                   Gmail / Microsoft To Do = BLOCKED_ACCOUNT，本机无凭据)
-V2_PUBLIC_BETA           = v2.0.0-beta.5 @ 3c29112b6256d78f26c7d70670b558c6c24d6a3b
+V2_PUBLIC_BETA           = v2.0.0-beta.6 @ 38a70b719b2d5b0c9e8273e6a908fed9229ab706
 V2_PRODUCTIZED_RELEASE  = FALSE  (只有 prerelease；stable promotion 需要真实用户证据)
 REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 ```
@@ -939,7 +939,7 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
-公开 Beta 已推进到 `v2.0.0-beta.5` prerelease；beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity 与 auto-runtime Guidance/SILENT evidence，并进一步打包 dependency-security hardening 与 Stable Promotion Policy v4 authorized-cohort binding。下一阶段不再通过继续堆 Beta 功能冒充验证，而应优先获取 Project Sync / Design Review 真实用户证据与 Google / Microsoft real-account evidence。仍不声明 stable。
+公开 Beta 已推进到 `v2.0.0-beta.6` prerelease；beta.6 继承 beta.5 已发布的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity、auto-runtime Guidance/SILENT evidence、dependency-security hardening，并进一步把 Quick Debrief 与当前 real-pilot operationalization/evidence-integrity contract 纳入公开 prerelease，包括 Stable Policy v6、authorized pilot workspace、privacy-minimized Session inventory、WAL/TOCTOU selected-cohort provenance、frozen independent-review seed binding 与 unique-event-per-metric sample enforcement。下一阶段不再通过继续堆 Beta 功能冒充验证，而应执行 Project Sync / Design Review 授权真实 pilot 与独立 review，同时补 Google / Microsoft real-account evidence。仍不声明 stable。
 
 ---
 
@@ -983,7 +983,7 @@ Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_s
 因此当前状态仍为：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.5
+V2_PUBLIC_BETA = v2.0.0-beta.6
 PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE

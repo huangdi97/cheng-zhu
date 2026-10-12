@@ -367,14 +367,30 @@ def evaluate(
 
 
 def markdown(report: dict[str, Any]) -> str:
+    cohort = report.get("pilot_cohort") or {}
     lines = [
         "# Chengzhu v2 Stable Promotion Evidence Gate",
         "",
         f"- Status: **{report['status']}**",
         f"- Policy: **{report.get('policy_version') or 'unknown'}**",
+        f"- Authorized manifest Sessions: **{cohort.get('authorized_sessions', 0)}**",
+        f"- Human-labeled Sessions: **{cohort.get('human_labeled_sessions', 0)}**",
+        f"- Metric Profiles: **{', '.join(cohort.get('metric_profiles') or []) or 'none'}**",
         f"- Failed checks: **{report['checks_failed']} / {report['checks_total']}**",
         "- V2_STABLE_RELEASE: **FALSE**",
         "- PMF_PROVEN: **FALSE**",
+        "",
+        "## Derived pilot profile counts",
+        "",
+        "| Profile | Distinct pseudonymous users | Sessions | Cross-session Spaces |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for profile, stats in (cohort.get("profile_stats") or {}).items():
+        lines.append(
+            f"| {profile} | {stats.get('distinct_users', 0)} | "
+            f"{stats.get('sessions', 0)} | {stats.get('cross_session_spaces', 0)} |"
+        )
+    lines += [
         "",
         "| Check | Pass | Actual | Required |",
         "| --- | :---: | --- | --- |",

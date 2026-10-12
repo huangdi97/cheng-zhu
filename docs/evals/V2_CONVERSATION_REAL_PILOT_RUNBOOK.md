@@ -158,7 +158,7 @@ Important properties:
 - only explicitly selected Sessions enter the seed/export;
 - unrelated Sessions are not copied;
 - the absolute product.db path is not recorded;
-- `selected-cohort.snapshot.json` freezes selected Session structure + local pseudonymous `user_ref` + Frozen Session Pack identity/digest, without transcript / participant / Guidance / source text;
+- `selected-cohort.snapshot.json` freezes selected Session structure + local pseudonymous `user_ref` + Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest）, without transcript / participant / Guidance / source text;
 - the SQLite main-file SHA256 is advisory only; Chengzhu uses WAL, so the main file alone is not the logical database-state anchor;
 - the exact Stable Promotion policy bytes are frozen;
 - the draft manifest is deliberately not Stable-eligible;
@@ -227,7 +227,7 @@ It does not system-verify:
 
 If any frozen policy/draft/selected-cohort snapshot hash has changed, finalization fails closed.
 
-Finalization also recomputes the selected cohort's logical structure from current SQLite rows and requires exact equality with the frozen snapshot. Unrelated new Sessions or WAL activity are allowed; changes to a selected Session's Space/profile/status/start/end/consent or Frozen Session Pack identity/digest are rejected.
+Finalization also recomputes the selected cohort's logical structure from current SQLite rows and requires exact equality with the frozen snapshot. Unrelated new Sessions or WAL activity are allowed; changes to a selected Session's Space/profile/status/start/end/consent or Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest） are rejected.
 
 If cohort membership, selected Session structure or attestations must change, create a new workspace instead of rewriting the old one.
 

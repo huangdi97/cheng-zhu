@@ -1315,3 +1315,52 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+---
+
+## Post-beta.5 pilot-operator manifest tooling · 2026-10-12
+
+在 beta.5 已公开发布之后，policy v4 的最后一个纯仓库操作摩擦是：authorized pilot cohort 虽然要求逐 Session 枚举，但 operator 仍需手抄 `session_id / space_id / profile / period` 到 manifest，容易产生 cohort mismatch。
+
+当前源码增加本地、fail-closed 的：
+
+```text
+scripts/v2_conversation_pilot_manifest.py
+```
+
+边界：
+
+```text
+SOURCE_TOOLING_AFTER_BETA5 = TRUE
+PACKAGED_IN_BETA5_BINARY = FALSE
+
+DEFAULT_MANIFEST_MODE = DRAFT
+DRAFT_STABLE_EVALUATOR_ELIGIBLE = FALSE
+
+SESSION_ID = EXPLICIT_OPERATOR_SELECTION
+USER_REF = EXPLICIT_LOCAL_PSEUDONYM
+SPACE_ID / PROFILE / PERIOD = DERIVED_FROM_PRODUCT_DB
+
+SESSION_STATUS_REQUIRED = ENDED
+SESSION_CONSENT_ACK_REQUIRED = TRUE
+FROZEN_SESSION_PACK_REQUIRED = TRUE
+ALLOWED_PROFILES = PROJECT_SYNC + DESIGN_REVIEW
+
+TRANSCRIPT_CONTENT_EXPORTED = FALSE
+PARTICIPANT_NAME_EXPORTED = FALSE
+SPACE_TITLE_EXPORTED = FALSE
+
+AUTHORIZED_REAL_USE_AUTO_INFERRED = FALSE
+IDENTITY_SYSTEM_VERIFIED = FALSE
+PARTICIPANT_CONSENT_SYSTEM_VERIFIED = FALSE
+
+FINALIZE_REQUIRES_ALL_ATTESTATIONS = TRUE
+FINALIZE_REQUIRES_EXPLICIT_CRITICAL_INCIDENT_COUNT = TRUE
+
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+静态 manifest template 同步改为 DRAFT / 空 attestations / `critical_incidents=null`，避免复制模板本身就携带授权与零事故结论。
+
+这项工具只减少 pilot operator 的抄录错误并把 DB 可验证 runtime provenance 与人为 attestation 分开；它不是新的 Conversation 用户功能，也不构成 beta.6 的理由。只有未来真实 pilot 结果、外部 provider evidence 或 runtime defect 需要改变可下载产品时，才进入新的 release cycle。

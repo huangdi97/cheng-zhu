@@ -91,6 +91,9 @@ def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     assert 'current_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"' in text
     assert 'if [ "$current_main" != "$SOURCE_SHA" ]; then' in text
     assert "stale green main" in text
+    assert 'if [ -f ".github/RELEASE_HOLD" ]; then' in text
+    assert "release hold is active" in text
     stale_i = text.index('if [ "$current_main" != "$SOURCE_SHA" ]; then')
+    hold_i = text.index('if [ -f ".github/RELEASE_HOLD" ]; then')
     dispatch_i = text.index("gh workflow run release.yml")
-    assert stale_i < dispatch_i
+    assert stale_i < hold_i < dispatch_i

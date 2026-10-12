@@ -328,3 +328,31 @@ PMF_PROVEN = TRUE
 ```
 
 后两类只能来自真实用户与真实对话评测。
+
+
+---
+
+## 2026-10-12 补充：真实 Pilot 的反馈 UX 不是“另一个后台”
+
+当前工程已经具备 local self-report、independent review、authorized pilot manifest、human-eval 与 Stable Promotion evaluator。新的问题不再是“有没有评测工具”，而是 **真实 Session 结束后用户是否真的会留下低负担、低回忆偏差的显式标签**。
+
+外部证据提供两个直接约束：
+
+1. Experience Sampling Method（ESM）的价值之一就是减少长时间回溯式问卷的 memory bias，尽量在事件附近采集主观体验。参考：JMIR/PMC, *Smartphone-Based Experience Sampling in People With Mild Cognitive Impairment: Feasibility and Usability Study*：https://pmc.ncbi.nlm.nih.gov/articles/PMC7600012/
+2. ESM 研究也显示，评估/通知负担与更慢响应、更多漏答相关，因此不能把完整 reviewer protocol 直接塞给普通用户。参考：*A Novel Experience Sampling Method Tool Integrating Momentary Assessments of Cognitive Biases*：https://pubmed.ncbi.nlm.nih.gov/35343900/
+3. 当前 meeting assistant 产品也越来越强调“会议结束立即得到 action-ready output”。Granola 的公开产品页明确把 post-meeting admin 作为会议结束后的直接结果面，而不是独立分析后台：https://www.granola.ai/
+
+因此 Chengzhu 的 pilot feedback UX 采用：
+
+```text
+End Session
+→ Continue truth / next focus
+→ 20-second Quick Debrief
+   ├─ Continue accurate?
+   ├─ Would reuse this Space?
+   └─ Cognitive-load delta
+→ optional detailed Guidance / SILENT review
+→ later independent reviewer workflow
+```
+
+这只是反馈时机与 progressive disclosure 的 UX 设计，不改变任何 Stable Promotion 数值门槛。Vendor 页面只作为产品形态参考，不作为 Chengzhu 指标阈值或效果结论的证据。

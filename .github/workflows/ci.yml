@@ -338,12 +338,53 @@ jobs:
           path: packaged-smoke.json
           if-no-files-found: ignore
 
+  # ── Dependency security: separate shipped/runtime risk from build tooling ──
+  dependency-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Audit frontend production and full dependency graphs
+        working-directory: frontend
+        run: |
+          npm ci
+          mkdir -p ../artifacts/npm-audit
+          npm audit --omit=dev --json > ../artifacts/npm-audit/frontend-production.json || true
+          npm audit --json > ../artifacts/npm-audit/frontend-full.json || true
+
+      - name: Audit desktop dependency graph without Electron binary download
+        working-directory: desktop
+        run: |
+          npm ci --ignore-scripts
+          npm audit --json > ../artifacts/npm-audit/desktop-full.json || true
+
+      - name: Classify runtime-blocking vs build-only findings
+        run: |
+          node scripts/npm_security_audit.mjs \
+            --frontend-production artifacts/npm-audit/frontend-production.json \
+            --frontend-full artifacts/npm-audit/frontend-full.json \
+            --desktop-full artifacts/npm-audit/desktop-full.json \
+            --out artifacts/npm-audit/SUMMARY.md
+
+      - name: Upload npm audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-dependency-security-audit
+          path: artifacts/npm-audit
+          retention-days: 14
+          if-no-files-found: error
   # ── Aggregate gate so PR can require a single status check ──
   # All required jobs must succeed; nothing is skipped by path filters.
   # When this gate fails on visual diff, regenerate baselines on the
   # branch via the `update-visual-snapshots` workflow.
   ci-gate:
-    needs: [backend, frontend, desktop, e2e-playwright, e2e-smoke, e2e-visual, packaged-smoke]
+    needs: [backend, frontend, desktop, dependency-security, e2e-playwright, e2e-smoke, e2e-visual, packaged-smoke]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -353,6 +394,7 @@ jobs:
           for r in "${{ needs.backend.result }}" \
                    "${{ needs.frontend.result }}" \
                    "${{ needs.desktop.result }}" \
+                   "${{ needs.dependency-security.result }}" \
                    "${{ needs.e2e-playwright.result }}" \
                    "${{ needs.e2e-smoke.result }}" \
                    "${{ needs.e2e-visual.result }}" \

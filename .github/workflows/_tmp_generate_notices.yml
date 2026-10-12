@@ -1,0 +1,48 @@
+name: Temporary third-party notices generator
+
+on:
+  push:
+    branches:
+      - chore/vite-6-4-4-security-patch
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: ${{ !contains(github.event.head_commit.message, '[notices-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore/vite-6-4-4-security-patch
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend notice-generation environment
+        working-directory: backend
+        run: |
+          sudo apt-get update && sudo apt-get install -y libportaudio2
+          pip install --upgrade pip
+          grep -vE '^faster-whisper' requirements.txt > requirements-ci.txt
+          pip install -r requirements-ci.txt
+
+      - name: Regenerate third-party notices
+        run: python scripts/generate_third_party_notices.py
+
+      - name: Commit generated notices
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add THIRD_PARTY_NOTICES.md
+          if git diff --cached --quiet; then
+            echo "No notices change produced"
+            exit 0
+          fi
+          git commit -m "docs(license): regenerate notices for Vite 6.4.4 [notices-generated]"
+          git push origin HEAD:chore/vite-6-4-4-security-patch

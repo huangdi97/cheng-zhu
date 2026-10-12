@@ -338,6 +338,39 @@ def test_pilot_manifest_summary_derives_profile_counts_from_selected_sessions(pr
     }
 
 
+def test_pilot_manifest_rejects_mixed_user_refs_inside_one_space(product_env, monkeypatch):
+    module = _module()
+    clock = [1_800_500_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+
+    space = conversations.create_space("Longitudinal Space", "PROJECT_SYNC")
+    sessions = []
+    for _ in range(3):
+        session = conversations.create_session(space["id"], consent_ack=True)
+        conversations.start_session(session["id"])
+        clock[0] += 30
+        conversations.end_session(session["id"])
+        sessions.append(conversations.require_session(session["id"]))
+        clock[0] += 30
+
+    with pytest.raises(ValueError, match="同一 Conversation Space.*同一个 user_ref"):
+        module.build_manifest(
+            Path(store.DB_PATH),
+            [
+                (sessions[0]["id"], "pilot-user-01"),
+                (sessions[1]["id"], "pilot-user-02"),
+                (sessions[2]["id"], "pilot-user-01"),
+            ],
+        )
+
+    _manifest, summary = module.build_manifest(
+        Path(store.DB_PATH),
+        [(session["id"], "pilot-user-01") for session in sessions],
+    )
+    assert summary["cross_session_space_user_binding"] == "SINGLE_PSEUDONYMOUS_USER_REF"
+    assert summary["profiles"]["PROJECT_SYNC"]["cross_session_spaces"] == 1
+
+
 def test_static_pilot_manifest_template_is_fail_closed():
     template = json.loads(
         (ROOT / "docs" / "evals" / "v2_conversation_real_pilot_manifest.template.json")
@@ -355,7 +388,7 @@ def test_pilot_builder_contract_tracks_machine_readable_stable_policy():
         (ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json")
         .read_text(encoding="utf-8")
     )
-    assert policy["policy_version"] == "v2.0-R1-stable-promotion-6"
+    assert policy["policy_version"] == "v2.0-R1-stable-promotion-7"
     assert module.CONTRACT_VERSION == policy["pilot_manifest_contract_version"]
     assert list(module.REQUIRED_PROFILES) == policy["metric_profiles"]
     assert list(module.REQUIRED_ATTESTATIONS) == policy["required_attestations"]
@@ -363,4 +396,9 @@ def test_pilot_builder_contract_tracks_machine_readable_stable_policy():
         module.CROSS_SESSION_SPACE_MIN_SESSIONS
         == policy["cross_session_space_min_sessions"]
         == 3
+    )
+    assert (
+        module.CROSS_SESSION_SPACE_USER_BINDING
+        == policy["cross_session_space_user_binding"]
+        == "SINGLE_PSEUDONYMOUS_USER_REF"
     )

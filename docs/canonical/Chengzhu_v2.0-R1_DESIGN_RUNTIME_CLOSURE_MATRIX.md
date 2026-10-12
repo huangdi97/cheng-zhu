@@ -1205,3 +1205,40 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+---
+
+## Post-beta.4 current-main hardening candidate · 2026-10-12
+
+在 beta.4 publication 后，main 又完成了两类不扩大 Conversation 用户功能面的 hardening：
+
+```text
+PUBLISHED_BETA = v2.0.0-beta.4
+PUBLISHED_BETA_SOURCE = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+
+NEXT_BETA_CANDIDATE = v2.0.0-beta.5
+CANDIDATE_SCOPE = DEPENDENCY_SECURITY + STABLE_EVIDENCE_COHORT_BINDING
+
+FRONTEND_PRODUCTION_HIGH_CRITICAL = 0
+DESKTOP_FULL_HIGH_CRITICAL = 0
+ELECTRON_RUNTIME_BLOCKING = 0
+ELECTRON_BUILDER = 26.17.0
+VITE = 6.4.4
+
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-4
+HUMAN_REPORT_CONTRACT = v2.0-R1-human-eval-4
+PILOT_MANIFEST_CONTRACT = v2.0-R1-pilot-cohort-2
+HAND_ENTERED_PROFILE_COUNTS = FORBIDDEN
+AUTHORIZED_COHORT_SESSION_BINDING = REQUIRED
+OUT_OF_SCOPE_PROFILE_SCORE_INFLATION = FORBIDDEN
+
+PRODUCT_FEATURE_SCOPE_CHANGE = NONE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+beta.5 的作用是让后续真实 Project Sync / Design Review pilot 使用与 **当前 hardened runtime + 当前 Stable evaluator contract** 一致的 Windows prerelease。它不是通过继续加功能替代真实验证。
+
+在 beta.5 完成新的 exact-SHA release cycle 前，公开 Beta truth 仍保持 beta.4；beta.4 tag/source/provenance 不得移动或回写 post-beta.4 hardening。

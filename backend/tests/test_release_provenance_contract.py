@@ -95,6 +95,19 @@ def test_existing_published_version_repairs_display_only_without_moving_tag() ->
     assert "display truth normalized; nothing to dispatch" in published
 
 
+def test_release_workflow_executes_published_body_renderer_regression_on_windows() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    regression = _section(
+        text,
+        "- name: Published Release body regression",
+        "- name: Release verification metadata regression",
+    )
+    assert "python @renderArgs" in regression
+    assert "CHENGZHU_PUBLISHED_STATUS_BEGIN" in regression
+    assert "Channel: **PRERELEASE**" in regression
+    assert "underlying notes were not preserved" in regression
+
+
 def test_release_verification_enrichment_supports_missing_publication_fields() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     helper = (ROOT / "scripts" / "enrich_release_verification.ps1").read_text(encoding="utf-8")

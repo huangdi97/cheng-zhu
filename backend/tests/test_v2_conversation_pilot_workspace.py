@@ -298,6 +298,18 @@ def test_workspace_finalize_fails_closed_on_selected_session_or_pack_drift(produ
         )
     store.update("conversation_session_pack", pack_id, {"digest": original_digest})
 
+    original_payload = pack["payload"]
+    tampered_payload = {**original_payload, "_tampered_for_test": True}
+    store.update("conversation_session_pack", pack_id, {"payload": tampered_payload})
+    with pytest.raises(ValueError, match="payload digest mismatch"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            workspace,
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+    store.update("conversation_session_pack", pack_id, {"payload": original_payload})
+
     finalization = mod.finalize_workspace(
         Path(store.DB_PATH),
         workspace,

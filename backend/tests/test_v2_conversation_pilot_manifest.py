@@ -294,3 +294,20 @@ def test_static_pilot_manifest_template_is_fail_closed():
     assert template["evidence_type"] == "DRAFT_AUTHORIZED_REAL_CONVERSATION_PILOT"
     assert template["critical_incidents"] is None
     assert template["attestations"] == []
+
+
+def test_pilot_builder_contract_tracks_machine_readable_stable_policy():
+    module = _module()
+    policy = json.loads(
+        (ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json")
+        .read_text(encoding="utf-8")
+    )
+    assert policy["policy_version"] == "v2.0-R1-stable-promotion-5"
+    assert module.CONTRACT_VERSION == policy["pilot_manifest_contract_version"]
+    assert list(module.REQUIRED_PROFILES) == policy["metric_profiles"]
+    assert list(module.REQUIRED_ATTESTATIONS) == policy["required_attestations"]
+    assert (
+        module.CROSS_SESSION_SPACE_MIN_SESSIONS
+        == policy["cross_session_space_min_sessions"]
+        == 3
+    )

@@ -7,7 +7,7 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 jobs:
   dispatch-release:
@@ -68,7 +68,64 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             is_draft="$(gh release view "$tag" --json isDraft --jq '.isDraft')"
             if [ "$is_draft" = "false" ]; then
-              echo "$tag is already published; nothing to do"
+              # Never move an already-published tag to this later green main
+              # SHA. Verify the public Release's own tag/target/channel, then
+              # repair only its display body if mutable.
+              release_target="$(gh release view "$tag" --json targetCommitish --jq '.targetCommitish')"
+              tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')"
+              if [ "$release_target" != "$tag_sha" ]; then
+                echo "published release provenance mismatch: target=$release_target tag=$tag_sha" >&2
+                exit 1
+              fi
+
+              is_prerelease="$(gh release view "$tag" --json isPrerelease --jq '.isPrerelease')"
+              expected_prerelease="false"
+              channel="STABLE"
+              stable_latest=""
+              if [[ "$version" == *-* ]]; then
+                expected_prerelease="true"
+                channel="PRERELEASE"
+                stable_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')"
+                if [ "$stable_latest" = "$tag" ]; then
+                  echo "prerelease $tag incorrectly replaced Stable Latest" >&2
+                  exit 1
+                fi
+              fi
+              if [ "$is_prerelease" != "$expected_prerelease" ]; then
+                echo "published release channel mismatch for $tag" >&2
+                exit 1
+              fi
+
+              is_immutable="$(gh release view "$tag" --json isImmutable --jq '.isImmutable')"
+              if [ "$is_immutable" = "true" ]; then
+                echo "$tag is already published and immutable; display-body repair is not permitted"
+                exit 0
+              fi
+
+              current_body="$RUNNER_TEMP/chengzhu-current-release-body.md"
+              published_body="$RUNNER_TEMP/chengzhu-published-release-body.md"
+              gh release view "$tag" --json body --jq '.body' > "$current_body"
+              render_args=(
+                --input "$current_body"
+                --output "$published_body"
+                --tag "$tag"
+                --source-sha "$tag_sha"
+                --channel "$channel"
+              )
+              if [ "$channel" = "PRERELEASE" ]; then
+                render_args+=(--stable-latest "$stable_latest")
+              fi
+              python3 scripts/render_published_release_body.py "${render_args[@]}"
+              gh release edit "$tag" --notes-file "$published_body"
+
+              repaired_body="$(gh release view "$tag" --json body --jq '.body')"
+              if [[ "$repaired_body" != *"CHENGZHU_PUBLISHED_STATUS_BEGIN"* ]] ||
+                 [[ "$repaired_body" != *"$tag_sha"* ]] ||
+                 [[ "$repaired_body" != *"Channel: **$channel**"* ]]; then
+                echo "published Release body truth repair did not verify" >&2
+                exit 1
+              fi
+              echo "$tag is already published; display truth normalized; nothing to dispatch"
               exit 0
             fi
             echo "$tag exists only as a draft; release.yml will replace the draft after rebuilding from $SOURCE_SHA"

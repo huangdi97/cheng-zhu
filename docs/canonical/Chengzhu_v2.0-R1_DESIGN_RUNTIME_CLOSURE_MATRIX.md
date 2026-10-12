@@ -1413,3 +1413,85 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+---
+
+## Real provider account replay tooling closure · 2026-10-12
+
+After the Real Pilot operator workspace was closed, the remaining connector evidence gap was operational rather than architectural: GitHub had a real-account replay harness, while Google Calendar / Drive / Gmail / Microsoft To Do had concrete adapters and fake-transport/product tests but no uniform real-account product replay command.
+
+Current source adds:
+
+`scripts/v2_real_provider_account_replay.py`
+
+with the following fail-closed contract:
+
+```text
+ISOLATED_TEMP_CHENGZHU_HOME = TRUE
+LOCAL_FAKE_MODEL_PROVIDER = TRUE
+ONLY_SELECTED_CONNECTOR_EXTERNAL_TRAFFIC_INTENDED = TRUE
+
+CONNECTOR_EXPLICIT_ENABLE_NEGATIVE_GATE = TRUE
+OPAQUE_CREDENTIAL_REF = REQUIRED
+TOKEN_IN_PRODUCT_DB = FORBIDDEN
+TOKEN_IN_SPACE_EXPORT = FORBIDDEN
+RAW_TOKEN_IN_REPORT = FORBIDDEN
+RAW_ACCOUNT_IDENTITY_IN_REPORT = FORBIDDEN
+
+GOOGLE_CALENDAR_REAL_READ_REPLAY = OPERATOR_READY_PENDING_ACCOUNT
+GOOGLE_DRIVE_REAL_READ_REPLAY = OPERATOR_READY_PENDING_ACCOUNT
+
+GMAIL_DEFAULT_REPLAY = AUTH_ONLY_NO_SEND
+GMAIL_REAL_SEND_REQUIRES = --execute-write + --confirm-write SEND_EMAIL
+
+MICROSOFT_TODO_DEFAULT_REPLAY = AUTH_ONLY_NO_CREATE
+MICROSOFT_TODO_REAL_CREATE_REQUIRES = --execute-write + --confirm-write CREATE_TASK
+
+REAL_ACCOUNT_AUTH_VALIDATED = ONLY_AFTER_REAL_VERIFY_PASS
+REAL_PROVIDER_READ_REPLAY_VALIDATED = ONLY_AFTER_REAL_READ_PRODUCT_REPLAY_PASS
+REAL_PROVIDER_WRITE_REPLAY_VALIDATED = ONLY_AFTER_REAL_PROVIDER_SUCCEEDED
+GOOGLE_OAUTH_PUBLICATION_VERIFIED = FALSE_BY_THIS_TOOL
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Read providers replay the full product boundary:
+
+```text
+opt-in adapter
+→ Connection
+→ real verify
+→ real provider sync
+→ immutable Connector Snapshot
+→ Space selection
+→ frozen Session Pack
+→ credential absence checks
+```
+
+Write providers default to:
+
+```text
+real verify
+→ local Draft
+→ explicit APPROVE
+→ STOP (no external side effect)
+```
+
+Only the exact write-confirmation flags allow one provider execution. Gmail / Microsoft To Do provider-side create idempotency is not claimed, so the harness deliberately does not auto-repeat a write.
+
+Runbook:
+
+`docs/evidence/V2_REAL_PROVIDER_ACCOUNT_REPLAY_RUNBOOK.md`
+
+This tooling closes **operator readiness**, not the account evidence itself. Until a real account run produces a PASS artifact:
+
+```text
+GOOGLE_CALENDAR_REAL_ACCOUNT_EVIDENCE = PENDING
+GOOGLE_DRIVE_REAL_ACCOUNT_EVIDENCE = PENDING
+GMAIL_REAL_ACCOUNT_EVIDENCE = PENDING
+MICROSOFT_TODO_REAL_ACCOUNT_EVIDENCE = PENDING
+```
+
+No new public Beta is justified by adding this source-side harness alone.

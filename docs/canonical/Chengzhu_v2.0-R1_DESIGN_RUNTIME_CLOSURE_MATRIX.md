@@ -1413,3 +1413,38 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+---
+
+## Independent-review seed binding closure · 2026-10-12
+
+继续审计 beta.6 real-pilot workspace 后发现：旧 evaluator 只验证 human-report 中的 Session/profile/Space 属于 authorized pilot cohort，但没有证明每条独立 reviewer event 真正来自 workspace 初始化时冻结的 `independent-review.seed.jsonl`。这会留下一个 evidence injection 面：
+
+```text
+authorized Session
++ fabricated reviewer event
++ INDEPENDENT_HUMAN_REVIEW
+→ aggregate n / score can be inflated
+```
+
+当前 beta.6 候选源码改为：
+
+```text
+PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-3
+FROZEN_REVIEW_SEED_HASH_RECHECK = TRUE
+REVIEW_EVENT_IDENTITY_BINDING = session_id + kind + event_id
+IMMUTABLE_PREDICTION_BINDING = TRUE
+IMMUTABLE_RUNTIME_ORIGIN_BINDING = TRUE
+IMMUTABLE_PROFILE_SPACE_BINDING = TRUE
+INVENTED_REVIEW_EVENT = FAIL_CLOSED
+MUTATED_PREDICTION_OR_ORIGIN = FAIL_CLOSED
+UNKNOWN_IMMUTABLE_FIELD = FAIL_CLOSED
+REVIEWER_IDENTITY_SYSTEM_VERIFIED = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+reviewer 只允许修改 reviewer、label_source、notes 与 kind-specific human label 字段。Stable evaluator 在 event-level binding 通过后才允许 aggregation。
+
+该修复关闭的是 **review evidence injection / provenance** 缺口，不把人工 reviewer 身份、独立性或授权从 operator/human boundary 转成系统事实。beta.6 release hold 必须保持，直到该修复合并、exact main 全量 CI 通过，再由独立 unhold 提交解除。

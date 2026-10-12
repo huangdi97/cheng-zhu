@@ -195,6 +195,28 @@ def test_pilot_manifest_rejects_active_unknown_duplicate_and_non_launch_sessions
         )
 
 
+def test_pilot_manifest_requires_consent_ack_and_frozen_pack_provenance(product_env, monkeypatch):
+    module = _module()
+    clock = [1_800_350_000.0]
+    monkeypatch.setattr(store, "now", lambda: clock[0])
+
+    _space, session = _ended_session("PROJECT_SYNC", "Pilot provenance", monkeypatch, clock)
+
+    store.update("conversation_session", session["id"], {"consent_ack": False})
+    with pytest.raises(ValueError, match="consent acknowledgement"):
+        module.build_manifest(
+            Path(store.DB_PATH),
+            [(session["id"], "pilot-user-01")],
+        )
+
+    store.update("conversation_session", session["id"], {"consent_ack": True, "pack_id": ""})
+    with pytest.raises(ValueError, match="Frozen Session Pack"):
+        module.build_manifest(
+            Path(store.DB_PATH),
+            [(session["id"], "pilot-user-01")],
+        )
+
+
 def test_pilot_manifest_user_ref_is_pseudonym_shaped_not_email_or_free_text():
     module = _module()
     assert module.parse_assignment("cv_123=pilot-user_01") == ("cv_123", "pilot-user_01")
@@ -207,6 +229,12 @@ def test_pilot_manifest_user_ref_is_pseudonym_shaped_not_email_or_free_text():
     ):
         with pytest.raises(ValueError):
             module.parse_assignment(invalid)
+
+    with pytest.raises(ValueError, match="user_ref"):
+        module.build_manifest(
+            Path("/definitely/not-used.db"),
+            [("cv_123", "user@example.com")],
+        )
 
 
 def test_pilot_manifest_summary_derives_profile_counts_from_selected_sessions(product_env, monkeypatch):

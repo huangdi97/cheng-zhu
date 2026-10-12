@@ -1,5 +1,5 @@
 # Chengzhu v2 Stable Promotion Evidence Gate
-## From public beta.3 to stable-review eligibility
+## From public beta.5 to stable-review eligibility
 
 **Status**: CANONICAL ACCEPTANCE POLICY  
 **Scope**: Project Sync + Design Review first  
@@ -9,7 +9,7 @@
 
 ## 1. Why a separate gate is required
 
-beta.3 already proves:
+beta.5 already proves:
 
 - public downloadable prerelease;
 - exact-SHA release provenance;
@@ -97,7 +97,7 @@ Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current repository evaluator policy = `v2.0-R1-stable-promotion-4`. Its numerical thresholds are unchanged from policy v3. v4 adds **pilot cohort binding** before real pilot evidence is accepted: hand-entered aggregate usage counts no longer satisfy the profile floor, every human-label Session must belong to the authorized manifest, and Stable metric aggregation is restricted to Project Sync / Design Review plus the frozen allowed label sources. Published beta.4 provenance remains correctly bound to policy v3; v4 is post-beta.4 evaluation-tool hardening and must not be back-attributed to that binary. Thresholds must not be lowered, and sample populations must not be broadened, after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-5`. Numerical quality thresholds and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v4. v5 fixes one **pre-pilot cohort-semantics bug**: canonical always defined a cross-session Space as at least 3 authorized Sessions in that same Space, while the v4 evaluator implementation incorrectly counted 2-Session Spaces. v5 makes `cross_session_space_min_sessions = 3` machine-readable and fail-closed against lowering below 3. Published beta.5 provenance remains correctly bound to the packaged policy-v4 evaluator; this v5 correction is post-beta.5 source truth and must not be back-attributed to beta.5 binaries. Thresholds must not be lowered, and sample populations must not be broadened, after seeing a failing pilot merely to create a PASS.
 
 ---
 
@@ -113,7 +113,7 @@ The local pilot manifest must attest:
 
 Critical incidents must equal zero.
 
-Policy v4 also requires manifest contract `v2.0-R1-pilot-cohort-2`. Instead of hand-entering `distinct_users / sessions / cross_session_spaces`, each required profile enumerates authorized real sessions:
+Policy v5 continues to require manifest contract `v2.0-R1-pilot-cohort-2`. Instead of hand-entering `distinct_users / sessions / cross_session_spaces`, each required profile enumerates authorized real sessions:
 
 ```json
 {
@@ -205,7 +205,7 @@ No threshold was lowered by this correction. Historical events are not reclassif
 
 ## 5.4 Authorized cohort + metric-profile binding
 
-Policy v4 closes an evidence-stitching gap that existed in the count-only manifest.
+Policy v4 introduced authorized cohort + metric-profile binding; policy v5 preserves that contract and fixes the cross-session Space qualification bug before real pilot evidence is accepted.
 
 Old failure mode:
 
@@ -234,13 +234,35 @@ Hard rules:
 
 - the same `session_id` cannot map to two profiles or Spaces;
 - every human-report Session must match one enumerated manifest Session by `session_id + profile + space_id`;
-- profile floors are derived from unique manifest Sessions, local pseudonymous `user_ref` values, and Spaces containing at least two authorized Sessions;
+- profile floors are derived from unique manifest Sessions, local pseudonymous `user_ref` values, and Spaces containing at least three authorized Sessions;
 - labels from Presentation/Q&A, 1:1, Client Call, Negotiation or any other non-target profile cannot inflate the v2 Stable metric score;
 - every Stable metric must have at least one policy-allowed sample from **both** Project Sync and Design Review; one launch profile cannot stand in for an entirely unmeasured other profile;
 - a timezone-aware pilot period is mandatory;
-- old count-only manifests fail closed under policy v4.
+- old count-only manifests fail closed under policy v4+; policy v5 additionally fails closed if `cross_session_space_min_sessions < 3`.
 
 This is evidence consistency, not cryptographic identity attestation and not PMF proof.
+
+## 5.5 Cross-session Space qualification integrity
+
+Canonical pilot floor has always meant:
+
+```text
+cross-session Space
+= one authorized Space with >= 3 authorized Sessions
+```
+
+The policy-v4 evaluator implementation accidentally used `len(session_ids) >= 2`. That could let three 2-Session Spaces satisfy `cross_session_spaces >= 3`, even though the canonical requirement was not met.
+
+Policy v5 closes this before real pilot evidence is accepted:
+
+```text
+cross_session_space_min_sessions = 3
+2-Session Space = NOT cross-session for Stable Gate
+3+ Session Space = eligible
+policy value < 3 = fail closed
+```
+
+No quality threshold, user floor, total Session floor or required cross-session-Space count is lowered. This is a denominator/cohort-definition correction, not a post-hoc attempt to create a PASS.
 
 ## 6. Tooling
 
@@ -262,7 +284,18 @@ python scripts/v2_conversation_pilot_manifest.py \
   --out pilot-manifest.draft.json
 ```
 
-The draft deliberately cannot satisfy this gate. Review it locally, then rerun with the same authorized Session mapping plus `--finalize`, explicit `--critical-incidents`, and **all five** required `--attest` values. The builder revalidates ENDED status, launch profile, consent acknowledgement, Frozen Session Pack, exact Space/Profile mapping and timestamps from `product.db`; it does not verify identity or real-world authorization.
+The draft deliberately cannot satisfy this gate. Review it locally, then rerun with the same authorized Session mapping plus `--finalize`, explicit `--critical-incidents`, and **all five** required `--attest` values.
+
+The builder revalidates from `product.db`:
+
+- `ENDED` status;
+- Project Sync / Design Review launch profile;
+- Session consent acknowledgement;
+- matching Frozen Session Pack;
+- exact Session → Space / Profile mapping;
+- timezone-aware Session period.
+
+It derives the operator progress summary using the same canonical policy-v5 cross-session rule: one Space counts only with **at least 3 selected authorized Sessions**. It does not verify human identity, real-world authorization, participant consent or PMF.
 
 The static template `docs/evals/v2_conversation_real_pilot_manifest.template.json` is also fail-closed by default and should be treated as structure documentation, not a pre-attested manifest.
 

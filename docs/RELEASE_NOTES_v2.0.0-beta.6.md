@@ -78,12 +78,12 @@ Continue 是否准确？
 - Live → End → Continue 的即时 Debrief；
 - Space → Continue 的后续补标。
 
-### 3. Stable Promotion Policy v5：跨 Session Space 下限统一为 3
+### 3. Stable Promotion Policy v6：cohort 与样本单位同时 fail-closed
 
 beta.5 发布后继续审计 Stable cohort contract，冻结为：
 
 ```text
-STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-5
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-6
 PROJECT_SYNC:
   >= 5 pseudonymous users
   >= 20 authorized real Sessions
@@ -162,6 +162,18 @@ re-verify independent-review.seed.jsonl SHA256
 `evaluation-manifest.json` 记录 frozen seed SHA、seed row 数、verified review row 数和 event-level binding 状态。
 
 这仍然不系统验证 reviewer 身份或是否真的独立；它关闭的是**事件级证据来源完整性**，不是身份认证。
+
+同一审计还发现，旧 human-eval 虽阻止“同一 reviewer 重复同一 event”，却允许多个 reviewer 对同一 event 的同一 metric 分别贡献一行，导致 Stable `min_n` 可能退化为 annotation count。Policy v6 / Human Eval v5 现在冻结：
+
+```text
+METRIC_SAMPLE_UNIT = UNIQUE_EVENT_PER_METRIC
+DUPLICATE_EVENT_METRIC = FAIL_CLOSED
+NUMERICAL_THRESHOLDS_CHANGED = FALSE
+MIN_N_NUMBERS_CHANGED = FALSE
+PROFILE_FLOORS_CHANGED = FALSE
+```
+
+因此 20 个 reviewer 重复标 1 个真实 event 仍然只能算 1 个产品事件样本；self-report 与 independent review 也不能对同一 metric/event 双计。多 reviewer 的原始标签可用于独立的一致性分析，但 Stable 聚合前必须先得到单一 resolved observation。
 
 ### 6. Privacy-minimized pilot Session inventory
 
@@ -265,7 +277,7 @@ beta.6 的目的就是停止继续用“工程能力”替代真实验证。
 4. operator 用 privacy-minimized inventory 显式选择 Session；
 5. 建立 frozen pilot workspace；
 6. independent human review；
-7. 用 frozen Stable Policy v5 跑 readiness；
+7. 用 frozen Stable Policy v6 跑 readiness；
 8. 不足就修产品/继续收合法证据，不降阈值。
 
 没有真实 pilot evidence 时，不升级 stable。

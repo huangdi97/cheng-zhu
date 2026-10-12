@@ -21,5 +21,5 @@
     "NO_CRITICAL_PRIVACY_INCIDENT",
     "NO_KNOWN_DATA_LOSS"
   ],
-  "notes": "Add one object per authorized real session: {session_id, space_id, user_ref}. user_ref must be a stable local pseudonym, not a name/email. Stable-readiness derives distinct_users, sessions and cross_session_spaces from these entries; do not hand-enter aggregate counts."
+  "notes": "Add one object per authorized real session: {session_id, space_id, user_ref}. user_ref must be a stable local pseudonym, not a name/email. Stable-readiness derives distinct_users, sessions and cross_session_spaces from these entries; do not hand-enter aggregate counts. Under Stable Promotion Policy v5, one Space counts as cross-session only when this manifest enumerates at least 3 authorized Sessions in that same Space."
 }

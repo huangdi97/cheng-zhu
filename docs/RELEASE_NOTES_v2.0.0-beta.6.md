@@ -134,7 +134,36 @@ explicit Session/user_ref assignments
 - operator attestation 的真实性；
 - PMF。
 
-### 5. Privacy-minimized pilot Session inventory
+### 5. Independent-review rows are event-bound to the frozen seed
+
+继续审计真实 pilot Stable evidence 链时发现：仅把 human-report 的 Session/profile/Space 绑定到 authorized cohort 还不够。如果 reviewer JSONL 可以自行增加一个不存在于 `independent-review.seed.jsonl` 的 event，或者改写 frozen prediction/runtime origin，再标成 `INDEPENDENT_HUMAN_REVIEW`，就可能人为放大 Stable metric 的样本数或分数。
+
+beta.6 因此把 pilot workspace contract 升级，并要求 `evaluate` 在 aggregation 前：
+
+```text
+re-verify independent-review.seed.jsonl SHA256
+→ index frozen seed by session_id + kind + event_id
+→ require every reviewer row to exist in the frozen seed
+→ compare all immutable fields exactly
+→ permit only reviewer / label_source / notes / human label fields to change
+→ then aggregate
+```
+
+明确 fail-closed：
+
+- invented event；
+- changed prediction / predicted state；
+- changed profile / Space；
+- changed transcript/runtime origin；
+- changed source refs / detector provenance；
+- unknown extra immutable field；
+- tampered seed bytes。
+
+`evaluation-manifest.json` 记录 frozen seed SHA、seed row 数、verified review row 数和 event-level binding 状态。
+
+这仍然不系统验证 reviewer 身份或是否真的独立；它关闭的是**事件级证据来源完整性**，不是身份认证。
+
+### 6. Privacy-minimized pilot Session inventory
 
 为避免 operator 为了找 Session ID 而打开私密内容，source-side workspace CLI 新增：
 

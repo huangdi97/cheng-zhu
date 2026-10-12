@@ -54,6 +54,8 @@ def _parse_iso8601(value: Any) -> datetime | None:
 def _manifest_cohort(
     pilot_manifest: dict[str, Any],
     required_profiles: list[str],
+    *,
+    cross_session_space_min_sessions: int,
 ) -> dict[str, Any]:
     profiles = pilot_manifest.get("profiles")
     errors: list[str] = []
@@ -114,7 +116,9 @@ def _manifest_cohort(
             "distinct_users": len(users),
             "sessions": len(session_ids),
             "cross_session_spaces": sum(
-                1 for ids in space_sessions.values() if len(ids) >= 2
+                1
+                for ids in space_sessions.values()
+                if len(ids) >= cross_session_space_min_sessions
             ),
         }
 
@@ -198,7 +202,32 @@ def evaluate(
     )
 
     required_profiles = [str(value) for value in (policy.get("profiles_required") or {})]
-    manifest_cohort = _manifest_cohort(pilot_manifest, required_profiles)
+    raw_cross_session_min = policy.get("cross_session_space_min_sessions")
+    cross_session_min_valid = (
+        isinstance(raw_cross_session_min, int)
+        and not isinstance(raw_cross_session_min, bool)
+        and raw_cross_session_min >= 3
+    )
+    add(
+        "cross_session_space_min_sessions_contract",
+        cross_session_min_valid,
+        actual=raw_cross_session_min,
+        required="integer >= 3",
+        reason=(
+            "Canonical Stable Gate defines a cross-session Space as at least 3 authorized Sessions "
+            "in that same Space. Policy may become stricter, but must not silently lower this floor."
+        ),
+    )
+    # Invalid policy must fail closed. Use a sentinel larger than any practical
+    # pilot rather than falling back to the historical buggy >=2 behavior.
+    cross_session_space_min_sessions = (
+        int(raw_cross_session_min) if cross_session_min_valid else 10**9
+    )
+    manifest_cohort = _manifest_cohort(
+        pilot_manifest,
+        required_profiles,
+        cross_session_space_min_sessions=cross_session_space_min_sessions,
+    )
     add(
         "pilot_manifest_cohort_integrity",
         not manifest_cohort["errors"],
@@ -360,6 +389,7 @@ def evaluate(
             "authorized_sessions": len(manifest_cohort["session_index"]),
             "human_labeled_sessions": len(human_sessions),
             "metric_profiles": metric_profiles,
+            "cross_session_space_min_sessions": cross_session_space_min_sessions,
         },
         "checks_total": len(checks),
         "checks_failed": len(failed),
@@ -373,6 +403,7 @@ def evaluate(
         "interpretation": (
             "PASS only permits a stable-release review. Human-label sessions must match the authorized pilot "
             "manifest by session/profile/space; profile floors are derived from enumerated pseudonymous cohort entries, "
+            f"a cross-session Space requires at least {cross_session_space_min_sessions} authorized Sessions in that same Space, "
             "and Stable metrics count only target profiles plus label sources explicitly allowed by policy. "
             "user_ref is a local pseudonym and not identity proof. Packaging/signing/release gates remain independent, "
             "and this tool does not establish PMF or universal user value."
@@ -390,6 +421,7 @@ def markdown(report: dict[str, Any]) -> str:
         f"- Authorized manifest Sessions: **{cohort.get('authorized_sessions', 0)}**",
         f"- Human-labeled Sessions: **{cohort.get('human_labeled_sessions', 0)}**",
         f"- Metric Profiles: **{', '.join(cohort.get('metric_profiles') or []) or 'none'}**",
+        f"- Cross-session Space minimum Sessions: **{cohort.get('cross_session_space_min_sessions', 'unknown')}**",
         f"- Failed checks: **{report['checks_failed']} / {report['checks_total']}**",
         "- V2_STABLE_RELEASE: **FALSE**",
         "- PMF_PROVEN: **FALSE**",

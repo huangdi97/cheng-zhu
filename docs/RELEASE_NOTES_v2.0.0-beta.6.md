@@ -118,9 +118,12 @@ explicit Session/user_ref assignments
 它会：
 
 - 拒绝静默覆盖旧 workspace；
-- 记录 source DB / policy / manifest hashes；
-- 只把显式选择的 Session 放入 workspace；
-- 对 frozen inputs 发生 drift 时 fail-closed。
+- 冻结 `selected-cohort.snapshot.json`、Stable policy、manifest/self-report 等输入并记录 hashes；
+- selected-cohort snapshot 只包含 selected Session 结构 + 本地匿名 `user_ref` + Frozen Session Pack identity/digest，不含 transcript / participant / Guidance / source text；
+- finalize 时从当前 SQLite 逻辑状态重新计算 selected cohort，对任何 selected Session/Pack drift fail-closed；
+- 允许与 cohort 无关的新 Session / WAL-backed 数据库变化，不把整库文件变化误判成 cohort drift；
+- SQLite 主 `product.db` 文件 SHA256 仅作为 advisory，因为 WAL 可能包含尚未 checkpoint 的逻辑状态；
+- 只把显式选择的 Session 放入 workspace。
 
 它不会系统验证：
 
@@ -240,6 +243,8 @@ beta.6 的目的就是停止继续用“工程能力”替代真实验证。
 ---
 
 ## Release gate
+
+beta.6 的 generic publisher 还要求：完成 CI 的 SHA 在 dispatch 时仍然是 **当前 main tip**。如果 main 已前进，旧绿色 CI 必须 no-op，不能把过时 SHA 发布成同一 prerelease 版本。
 
 beta.6 必须完整通过现有 exact-SHA Windows release path：
 

@@ -236,6 +236,7 @@ Hard rules:
 - every human-report Session must match one enumerated manifest Session by `session_id + profile + space_id`;
 - profile floors are derived from unique manifest Sessions, local pseudonymous `user_ref` values, and Spaces containing at least two authorized Sessions;
 - labels from Presentation/Q&A, 1:1, Client Call, Negotiation or any other non-target profile cannot inflate the v2 Stable metric score;
+- every Stable metric must have at least one policy-allowed sample from **both** Project Sync and Design Review; one launch profile cannot stand in for an entirely unmeasured other profile;
 - a timezone-aware pilot period is mandatory;
 - old count-only manifests fail closed under policy v4.
 

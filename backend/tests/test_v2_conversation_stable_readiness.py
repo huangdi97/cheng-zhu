@@ -16,22 +16,75 @@ def _module():
     return module
 
 
+def _policy():
+    return json.loads(POLICY.read_text(encoding="utf-8"))
+
+
+def _session_id(profile: str, index: int) -> str:
+    prefix = "project" if profile == "PROJECT_SYNC" else "design"
+    return f"cv-{prefix}-{index:02d}"
+
+
+def _space_id(profile: str, index: int) -> str:
+    prefix = "project" if profile == "PROJECT_SYNC" else "design"
+    return f"cs-{prefix}-{index}"
+
+
 def _human_report():
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     metrics = {}
-    metrics_by_source = {}
+    nested = {"PROJECT_SYNC": {}, "DESIGN_REVIEW": {}}
+
     for name, rule in policy["metrics"].items():
         threshold = rule["threshold"]
-        value = threshold
-        entry = {"value": value, "n": rule["min_n"]}
-        metrics[name] = dict(entry)
+        total_n = int(rule["min_n"])
+        project_n = max(1, total_n // 2)
+        design_n = max(0, total_n - project_n)
         source = rule["allowed_label_sources"][0]
-        metrics_by_source.setdefault(source, {})[name] = dict(entry)
+
+        metrics[name] = {"value": threshold, "n": total_n}
+        nested["PROJECT_SYNC"].setdefault(source, {})[name] = {
+            "value": threshold,
+            "n": project_n,
+        }
+        nested["DESIGN_REVIEW"].setdefault(source, {})[name] = {
+            "value": threshold,
+            "n": design_n,
+        }
+
+    sessions = [
+        {
+            "session_id": _session_id("PROJECT_SYNC", 0),
+            "profile": "PROJECT_SYNC",
+            "space_id": _space_id("PROJECT_SYNC", 0),
+        },
+        {
+            "session_id": _session_id("DESIGN_REVIEW", 0),
+            "profile": "DESIGN_REVIEW",
+            "space_id": _space_id("DESIGN_REVIEW", 0),
+        },
+    ]
     return {
+        "report_contract_version": policy["human_report_contract_version"],
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "claims": {"HUMAN_LABELS_AVAILABLE": True, "PMF_PROVEN": False},
+        "cohort": {
+            "status": "COMPLETE",
+            "sessions": sessions,
+            "profiles": {
+                "PROJECT_SYNC": {
+                    "session_ids": [_session_id("PROJECT_SYNC", 0)],
+                    "space_ids": [_space_id("PROJECT_SYNC", 0)],
+                },
+                "DESIGN_REVIEW": {
+                    "session_ids": [_session_id("DESIGN_REVIEW", 0)],
+                    "space_ids": [_space_id("DESIGN_REVIEW", 0)],
+                },
+            },
+            "errors": [],
+        },
         "metrics": metrics,
-        "metrics_by_label_source": metrics_by_source,
+        "metrics_by_profile_and_label_source": nested,
     }
 
 
@@ -39,9 +92,30 @@ def _source_for(policy, metric: str) -> str:
     return policy["metrics"][metric]["allowed_label_sources"][0]
 
 
+def _profile_sessions(profile: str, policy: dict):
+    requirements = policy["profiles_required"][profile]
+    count = int(requirements["sessions"])
+    distinct_users = int(requirements["distinct_users"])
+    cross_spaces = int(requirements["cross_session_spaces"])
+    return [
+        {
+            "session_id": _session_id(profile, index),
+            "space_id": _space_id(profile, index % cross_spaces),
+            "user_ref": f"{profile.lower()}-user-{index % distinct_users}",
+        }
+        for index in range(count)
+    ]
+
+
 def _pilot():
+    policy = _policy()
     return {
+        "contract_version": policy["pilot_manifest_contract_version"],
         "evidence_type": "AUTHORIZED_REAL_CONVERSATION_PILOT",
+        "period": {
+            "started_at": "2026-10-01T09:00:00+08:00",
+            "ended_at": "2026-10-11T18:00:00+08:00",
+        },
         "attestations": [
             "AUTHORIZED_REAL_USE",
             "NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
@@ -50,36 +124,43 @@ def _pilot():
             "NO_KNOWN_DATA_LOSS",
         ],
         "profiles": {
-            "PROJECT_SYNC": {
-                "distinct_users": 5,
-                "sessions": 20,
-                "cross_session_spaces": 3,
-            },
-            "DESIGN_REVIEW": {
-                "distinct_users": 5,
-                "sessions": 20,
-                "cross_session_spaces": 3,
-            },
+            profile: {"sessions": _profile_sessions(profile, policy)}
+            for profile in policy["profiles_required"]
         },
         "critical_incidents": 0,
     }
 
 
+def _metric_entries(human: dict, policy: dict, metric: str):
+    source = _source_for(policy, metric)
+    return [
+        human["metrics_by_profile_and_label_source"][profile][source][metric]
+        for profile in policy["metric_profiles"]
+    ]
+
+
 def test_stable_readiness_pass_only_grants_release_review():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     report = module.evaluate(_human_report(), _pilot(), policy)
     assert report["status"] == "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
     assert report["claims"]["PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"] is True
     assert report["claims"]["V2_STABLE_RELEASE"] is False
     assert report["claims"]["PMF_PROVEN"] is False
+    assert report["pilot_cohort"]["profile_stats"]["PROJECT_SYNC"] == {
+        "distinct_users": 5,
+        "sessions": 20,
+        "cross_session_spaces": 3,
+    }
 
 
 def test_stable_readiness_fails_when_sample_size_is_insufficient():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     human = _human_report()
-    human["metrics_by_label_source"][_source_for(policy, "opportunity_precision")]["opportunity_precision"]["n"] = 1
+    entries = _metric_entries(human, policy, "opportunity_precision")
+    entries[0]["n"] = 1
+    entries[1]["n"] = 0
     report = module.evaluate(human, _pilot(), policy)
     assert report["status"] == "NO_GO"
     assert any(
@@ -90,9 +171,10 @@ def test_stable_readiness_fails_when_sample_size_is_insufficient():
 
 def test_stable_readiness_fails_on_bad_quality_even_with_large_n():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     human = _human_report()
-    human["metrics_by_label_source"][_source_for(policy, "interruption_regret")]["interruption_regret"] = {"value": 0.5, "n": 100}
+    for entry in _metric_entries(human, policy, "interruption_regret"):
+        entry.update({"value": 0.5, "n": 100})
     report = module.evaluate(human, _pilot(), policy)
     assert report["status"] == "NO_GO"
     assert any(
@@ -103,7 +185,7 @@ def test_stable_readiness_fails_on_bad_quality_even_with_large_n():
 
 def test_stable_readiness_fails_without_real_use_attestation():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     pilot = _pilot()
     pilot["attestations"].remove("AUTHORIZED_REAL_USE")
     report = module.evaluate(_human_report(), pilot, policy)
@@ -114,11 +196,11 @@ def test_stable_readiness_fails_without_real_use_attestation():
     )
 
 
-def test_stable_readiness_fails_when_profile_floor_is_missing():
+def test_stable_readiness_derives_profile_floor_from_enumerated_sessions():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     pilot = _pilot()
-    pilot["profiles"]["PROJECT_SYNC"]["sessions"] = 2
+    pilot["profiles"]["PROJECT_SYNC"]["sessions"] = pilot["profiles"]["PROJECT_SYNC"]["sessions"][:2]
     report = module.evaluate(_human_report(), pilot, policy)
     assert report["status"] == "NO_GO"
     assert any(
@@ -127,9 +209,23 @@ def test_stable_readiness_fails_when_profile_floor_is_missing():
     )
 
 
+def test_stable_readiness_derives_distinct_users_instead_of_trusting_a_count():
+    module = _module()
+    policy = _policy()
+    pilot = _pilot()
+    for entry in pilot["profiles"]["PROJECT_SYNC"]["sessions"]:
+        entry["user_ref"] = "same-local-pseudonym"
+    report = module.evaluate(_human_report(), pilot, policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "profile:PROJECT_SYNC:distinct_users"
+        for item in report["failed_checks"]
+    )
+
+
 def test_stable_readiness_fails_on_critical_incident():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     pilot = _pilot()
     pilot["critical_incidents"] = 1
     report = module.evaluate(_human_report(), pilot, policy)
@@ -139,33 +235,135 @@ def test_stable_readiness_fails_on_critical_incident():
 
 def test_stable_readiness_self_report_cannot_satisfy_independent_review_metric():
     module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    policy = _policy()
     human = _human_report()
     metric = "recall_precision"
     independent = "INDEPENDENT_HUMAN_REVIEW"
     self_report = "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
-    entry = human["metrics_by_label_source"][independent].pop(metric)
-    human["metrics_by_label_source"].setdefault(self_report, {})[metric] = entry
 
-    report = module.evaluate(human, _pilot(), policy)
-    assert report["status"] == "NO_GO"
-    assert any(
-        item["name"] == f"metric:{metric}:label_source"
-        for item in report["failed_checks"]
-    )
-
-
-def test_stable_readiness_ignores_unspecified_labels_even_when_aggregate_looks_good():
-    module = _module()
-    policy = json.loads(POLICY.read_text(encoding="utf-8"))
-    human = _human_report()
-    metric = "source_attribution_accuracy"
-    independent = "INDEPENDENT_HUMAN_REVIEW"
-    entry = human["metrics_by_label_source"][independent].pop(metric)
-    human["metrics_by_label_source"].setdefault("UNSPECIFIED", {})[metric] = entry
+    for profile in policy["metric_profiles"]:
+        entry = human["metrics_by_profile_and_label_source"][profile][independent].pop(metric)
+        human["metrics_by_profile_and_label_source"][profile].setdefault(self_report, {})[metric] = entry
 
     report = module.evaluate(human, _pilot(), policy)
     assert report["status"] == "NO_GO"
     failed = {item["name"] for item in report["failed_checks"]}
-    assert f"metric:{metric}:label_source" in failed
+    assert f"metric:{metric}:population" in failed
     assert f"metric:{metric}:sample_size" in failed
+
+
+def test_stable_readiness_ignores_unspecified_labels_even_when_aggregate_looks_good():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    metric = "source_attribution_accuracy"
+    independent = "INDEPENDENT_HUMAN_REVIEW"
+
+    for profile in policy["metric_profiles"]:
+        entry = human["metrics_by_profile_and_label_source"][profile][independent].pop(metric)
+        human["metrics_by_profile_and_label_source"][profile].setdefault("UNSPECIFIED", {})[metric] = entry
+
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    failed = {item["name"] for item in report["failed_checks"]}
+    assert f"metric:{metric}:population" in failed
+    assert f"metric:{metric}:sample_size" in failed
+
+
+def test_old_count_only_manifest_cannot_pass_policy_v4():
+    module = _module()
+    policy = _policy()
+    pilot = _pilot()
+    pilot["contract_version"] = "v2.0-R1-pilot-counts-legacy"
+    pilot["profiles"] = {
+        "PROJECT_SYNC": {
+            "distinct_users": 999,
+            "sessions": 999,
+            "cross_session_spaces": 999,
+        },
+        "DESIGN_REVIEW": {
+            "distinct_users": 999,
+            "sessions": 999,
+            "cross_session_spaces": 999,
+        },
+    }
+    report = module.evaluate(_human_report(), pilot, policy)
+    assert report["status"] == "NO_GO"
+    failed = {item["name"] for item in report["failed_checks"]}
+    assert "pilot_manifest_contract_version" in failed
+    assert "pilot_manifest_cohort_integrity" in failed
+    assert "profile:PROJECT_SYNC:sessions" in failed
+
+
+def test_human_report_session_must_belong_to_authorized_manifest_cohort():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    human["cohort"]["sessions"][0]["session_id"] = "cv-not-authorized"
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "human_report_sessions_authorized"
+        for item in report["failed_checks"]
+    )
+
+
+def test_human_report_space_must_match_authorized_session_space():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    human["cohort"]["sessions"][0]["space_id"] = "cs-wrong-space"
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "human_report_sessions_authorized"
+        for item in report["failed_checks"]
+    )
+
+
+def test_out_of_scope_profile_metrics_cannot_inflate_stable_gate():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    metric = "opportunity_precision"
+    source = _source_for(policy, metric)
+
+    for profile in policy["metric_profiles"]:
+        human["metrics_by_profile_and_label_source"][profile][source].pop(metric)
+
+    human["metrics_by_profile_and_label_source"]["CLIENT_CALL"] = {
+        source: {metric: {"value": 1.0, "n": 1000}}
+    }
+
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    failed = {item["name"] for item in report["failed_checks"]}
+    assert f"metric:{metric}:population" in failed
+    assert f"metric:{metric}:sample_size" in failed
+
+
+def test_duplicate_manifest_session_id_fails_cohort_integrity():
+    module = _module()
+    policy = _policy()
+    pilot = _pilot()
+    duplicate = dict(pilot["profiles"]["PROJECT_SYNC"]["sessions"][0])
+    pilot["profiles"]["PROJECT_SYNC"]["sessions"].append(duplicate)
+    report = module.evaluate(_human_report(), pilot, policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "pilot_manifest_cohort_integrity"
+        for item in report["failed_checks"]
+    )
+
+
+def test_pilot_period_requires_timezone_aware_iso8601():
+    module = _module()
+    policy = _policy()
+    pilot = _pilot()
+    pilot["period"] = {
+        "started_at": "2026-10-01T09:00:00",
+        "ended_at": "2026-10-11T18:00:00",
+    }
+    report = module.evaluate(_human_report(), pilot, policy)
+    assert report["status"] == "NO_GO"
+    assert any(item["name"] == "pilot_period_valid" for item in report["failed_checks"])

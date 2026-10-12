@@ -1,6 +1,6 @@
 {
-  "policy_version": "v2.0-R1-stable-promotion-5",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical quality/profile floors remain unchanged from policy v4. Policy v5 fixes the cross-session Space qualification contract to the canonical definition: a Space counts as cross-session only when the authorized pilot manifest enumerates at least 3 Sessions in that same Space. This closes a pre-pilot evaluator bug that incorrectly counted 2-Session Spaces.",
+  "policy_version": "v2.0-R1-stable-promotion-6",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical quality thresholds and profile floors remain unchanged from policy v5. Policy v6 closes a pre-pilot sample-unit ambiguity: Stable min_n counts unique product event × metric observations, never reviewer annotation rows. Duplicate labels for the same event/metric across reviewers or label sources must be resolved before aggregation and fail closed otherwise.",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -120,7 +120,7 @@
       "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
     ]
   },
-  "change_control": "Numerical quality thresholds and required profile floors are unchanged from policy v4. Policy v5 is a pre-pilot cohort-semantics correction: canonical documentation already required >=3 Sessions in the same Space, while the v4 evaluator incorrectly counted >=2. Do not lower cross_session_space_min_sessions, broaden populations, mix manual-lab events, count forced silence, or lower a quality threshold merely to make a failing pilot pass.",
+  "change_control": "Numerical quality thresholds, min_n numbers, required profile floors and the >=3 Sessions cross-session Space definition are unchanged from policy v5. Policy v6 is a pre-pilot evidence-semantics correction: min_n is explicitly UNIQUE_EVENT_PER_METRIC, not annotation count. Do not lower thresholds/floors, broaden populations, duplicate one event across reviewers/sources, mix manual-lab events, count forced silence, or lower a quality threshold merely to make a failing pilot pass.",
   "label_source_policy": {
     "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT": "Explicit post-session labels entered in Chengzhu on the local device. Valid for user-perception/outcome measures only where a metric explicitly allows it; not verified identity proof.",
     "INDEPENDENT_HUMAN_REVIEW": "Explicit human review performed independently from the in-product self-report surface under the human-label protocol.",
@@ -173,13 +173,19 @@
     "direct_question": {
       "source": "v11 capture-time conversation_transcript_segment.analysis.direct_question",
       "historical_reclassification": "FORBIDDEN"
+    },
+    "sample_unit": {
+      "value": "UNIQUE_EVENT_PER_METRIC",
+      "interpretation": "Each product event can contribute at most one resolved observation to a given Stable metric. Multiple reviewer/source annotations of the same event+metric must be resolved or selected outside the Stable aggregate; they cannot increase min_n."
     }
   },
-  "human_report_contract_version": "v2.0-R1-human-eval-4",
+  "human_report_contract_version": "v2.0-R1-human-eval-5",
   "pilot_manifest_contract_version": "v2.0-R1-pilot-cohort-2",
   "metric_profiles": [
     "PROJECT_SYNC",
     "DESIGN_REVIEW"
   ],
-  "cross_session_space_min_sessions": 3
+  "cross_session_space_min_sessions": 3,
+  "metric_sample_unit": "UNIQUE_EVENT_PER_METRIC",
+  "duplicate_event_metric_policy": "FAIL_CLOSED"
 }

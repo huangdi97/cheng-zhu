@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 
-REPORT_CONTRACT_VERSION = "v2.0-R1-human-eval-4"
+REPORT_CONTRACT_VERSION = "v2.0-R1-human-eval-5"
 
 
 ALLOWED_KINDS = {
@@ -130,6 +130,100 @@ def _is_auto_runtime(row: dict[str, Any]) -> bool:
     )
 
 
+def _metric_event_identity(row: dict[str, Any]) -> str:
+    """Return the product-event identity used for Stable sample counting."""
+    event_id = str(row.get("event_id") or "").strip()
+    if event_id:
+        return event_id
+    if str(row.get("kind") or "") in {"continue", "session_outcome"}:
+        return "<session>"
+    origin = _runtime_origin(row)
+    segment_id = str(origin.get("transcript_segment_id") or "").strip()
+    return segment_id or "<unidentified-event>"
+
+
+def _metric_observation_names(row: dict[str, Any]) -> list[str]:
+    """List Stable metric dimensions this row would actually contribute to."""
+    kind = str(row.get("kind") or "")
+    names: list[str] = []
+
+    if kind == "guidance" and _is_auto_runtime(row):
+        guidance_class = str(row.get("guidance_class") or "")
+        if guidance_class == "PROACTIVE":
+            if _boolean(row, "useful") is not None:
+                names.append("opportunity_precision")
+            if _boolean(row, "interruption_regret") is not None:
+                names.append("interruption_regret")
+        if _boolean(row, "source_correct") is not None:
+            names.append("source_attribution_accuracy")
+        if guidance_class == "RECALL" and _boolean(row, "recall_correct") is not None:
+            names.append("recall_precision")
+
+    elif (
+        kind == "silence"
+        and _is_auto_runtime(row)
+        and str(_runtime_origin(row).get("decision_class") or "") == "ARBITER"
+        and _boolean(row, "silence_correct") is not None
+    ):
+        names.append("useful_silence_rate")
+
+    elif kind == "direct_question":
+        if isinstance(row.get("predicted"), bool) and isinstance(row.get("actual"), bool):
+            names.extend(("direct_question_precision", "direct_question_recall"))
+
+    elif kind == "truth_item":
+        if (
+            str(row.get("predicted_type") or "") in DECISION_COMMITMENT_PREDICTED_TYPES
+            and str(row.get("predicted_state") or "")
+            and str(row.get("actual_type") or "")
+            and str(row.get("actual_state") or "")
+        ):
+            names.append("decision_commitment_state_precision")
+
+    elif kind == "continue" and _boolean(row, "writeback_accurate") is not None:
+        names.append("continue_writeback_accuracy")
+
+    elif kind == "session_outcome":
+        if _cognitive_delta(row) is not None:
+            names.append("mean_cognitive_load_delta")
+        if _boolean(row, "would_reuse_space") is not None:
+            names.append("space_reuse_intent_rate")
+
+    return names
+
+
+def _assert_unique_metric_observations(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Fail closed if reviewer/source multiplicity inflates Stable sample n.
+
+    Multiple annotations can be useful for inter-rater analysis, but Stable
+    min_n is a product-event floor. A single event may contribute at most one
+    resolved observation to each metric.
+    """
+    seen: dict[tuple[str, str, str], tuple[str, str]] = {}
+    counts: Counter[str] = Counter()
+    for row in rows:
+        session_id = str(row.get("session_id") or "").strip()
+        identity = _metric_event_identity(row)
+        reviewer = str(row.get("reviewer") or "").strip()
+        source = _label_source(row)
+        for metric in _metric_observation_names(row):
+            key = (session_id, identity, metric)
+            previous = seen.get(key)
+            if previous is not None:
+                prev_reviewer, prev_source = previous
+                raise ValueError(
+                    "duplicate Stable metric observation for one product event: "
+                    f"session={session_id} event={identity} metric={metric}; "
+                    f"first={prev_reviewer or '<unknown>'}/{prev_source}, "
+                    f"second={reviewer or '<unknown>'}/{source}. "
+                    "Resolve reviewer/source duplication before aggregation; "
+                    "min_n counts unique events, not annotations."
+                )
+            seen[key] = (reviewer, source)
+            counts[metric] += 1
+    return dict(sorted(counts.items()))
+
+
 def _cohort_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Describe which local Session/Profile/Space each label row belongs to.
 
@@ -186,6 +280,7 @@ def aggregate(
     *,
     include_source_breakdown: bool = True,
 ) -> dict[str, Any]:
+    unique_metric_observations = _assert_unique_metric_observations(rows)
     by_kind = Counter(str(row["kind"]) for row in rows)
 
     all_guidance_rows = [r for r in rows if r["kind"] == "guidance"]
@@ -298,6 +393,9 @@ def aggregate(
         "cohort": _cohort_summary(rows),
         "rows_by_kind": dict(sorted(by_kind.items())),
         "metric_population": {
+            "sample_unit": "UNIQUE_EVENT_PER_METRIC",
+            "unique_metric_observations": unique_metric_observations,
+            "duplicate_event_metric_policy": "FAIL_CLOSED",
             "auto_guidance_rows": len(guidance_rows),
             "excluded_non_auto_guidance_rows": len(all_guidance_rows) - len(guidance_rows),
             "arbiter_silence_rows": len(silence_rows),
@@ -313,7 +411,7 @@ def aggregate(
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "Stable live-guidance metrics use only v12 capture-time TRANSCRIPT_AUTO provenance; manual Guidance Lab and pre-v12 Guidance rows are excluded. Useful Silence counts only ARBITER decisions, not policy/profile/provenance-forced silence. Decision/Commitment State Precision is scoped to predictions of Decision/Commitment/Task. Human labels still do not verify external-user identity, and no threshold here upgrades PMF or release status."
+            "Stable min_n counts unique product event × metric observations, never reviewer annotation rows; duplicate event/metric labels fail closed before aggregation. Stable live-guidance metrics use only v12 capture-time TRANSCRIPT_AUTO provenance; manual Guidance Lab and pre-v12 Guidance rows are excluded. Useful Silence counts only ARBITER decisions, not policy/profile/provenance-forced silence. Decision/Commitment State Precision is scoped to predictions of Decision/Commitment/Task. Human labels still do not verify external-user identity, and no threshold here upgrades PMF or release status."
         ),
     }
     if include_source_breakdown:
@@ -369,6 +467,7 @@ def markdown(report: dict[str, Any]) -> str:
         f"- Human-labeled rows: **{report['rows']}**",
         f"- Cohort status: **{cohort.get('status') or 'UNKNOWN'}**",
         f"- Labeled Sessions: **{len(cohort.get('sessions') or [])}**",
+        f"- Stable sample unit: **{(report.get('metric_population') or {}).get('sample_unit') or 'UNKNOWN'}**",
         "- PMF_PROVEN: **FALSE**",
         "",
         "| Metric | Value | n |",

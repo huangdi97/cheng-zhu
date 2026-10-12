@@ -152,6 +152,34 @@ def evaluate(
         actual=human_report.get("report_contract_version"),
         required=required_report_contract,
     )
+    required_sample_unit = str(policy.get("metric_sample_unit") or "")
+    human_sample_unit = str(
+        ((human_report.get("metric_population") or {}).get("sample_unit") or "")
+    )
+    add(
+        "metric_sample_unit_contract",
+        required_sample_unit == "UNIQUE_EVENT_PER_METRIC"
+        and str(policy.get("duplicate_event_metric_policy") or "") == "FAIL_CLOSED",
+        actual={
+            "metric_sample_unit": required_sample_unit,
+            "duplicate_event_metric_policy": policy.get("duplicate_event_metric_policy"),
+        },
+        required={
+            "metric_sample_unit": "UNIQUE_EVENT_PER_METRIC",
+            "duplicate_event_metric_policy": "FAIL_CLOSED",
+        },
+        reason=(
+            "Stable min_n is a unique product event × metric floor. Reviewer/source annotation "
+            "multiplicity must never increase sample size."
+        ),
+    )
+    add(
+        "human_report_sample_unit",
+        human_sample_unit == required_sample_unit == "UNIQUE_EVENT_PER_METRIC",
+        actual=human_sample_unit,
+        required=required_sample_unit or "UNIQUE_EVENT_PER_METRIC",
+    )
+
     add(
         "human_report_evidence_type",
         human_report.get("evidence_type") == "HUMAN_LABELED_CONVERSATION_EVAL",
@@ -401,7 +429,7 @@ def evaluate(
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "PASS only permits a stable-release review. Human-label sessions must match the authorized pilot "
+            "PASS only permits a stable-release review. Stable min_n counts unique product event × metric observations, not reviewer annotations. Human-label sessions must match the authorized pilot "
             "manifest by session/profile/space; profile floors are derived from enumerated pseudonymous cohort entries, "
             f"a cross-session Space requires at least {cross_session_space_min_sessions} authorized Sessions in that same Space, "
             "and Stable metrics count only target profiles plus label sources explicitly allowed by policy. "

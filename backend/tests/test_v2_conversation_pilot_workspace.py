@@ -156,10 +156,40 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert snapshot_meta["logical_sha256"]
     assert json.loads((workspace / "stable-promotion-policy.json").read_text(encoding="utf-8"))[
         "policy_version"
-    ] == "v2.0-R1-stable-promotion-5"
+    ] == "v2.0-R1-stable-promotion-6"
 
     with pytest.raises(FileExistsError, match="workspace already exists"):
         mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
+
+
+def test_workspace_rejects_policy_that_allows_annotation_count_inflation(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+
+    weak_sample = dict(policy)
+    weak_sample["metric_sample_unit"] = "ANNOTATION_ROWS"
+    weak_path = tmp_path / "weak-sample-policy.json"
+    weak_path.write_text(json.dumps(weak_sample), encoding="utf-8")
+    with pytest.raises(ValueError, match="UNIQUE_EVENT_PER_METRIC"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            data["assignments"],
+            tmp_path / "weak-sample-workspace",
+            policy_path=weak_path,
+        )
+
+    weak_duplicate = dict(policy)
+    weak_duplicate["duplicate_event_metric_policy"] = "ALLOW"
+    weak_duplicate_path = tmp_path / "weak-duplicate-policy.json"
+    weak_duplicate_path.write_text(json.dumps(weak_duplicate), encoding="utf-8")
+    with pytest.raises(ValueError, match="FAIL_CLOSED"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            data["assignments"],
+            tmp_path / "weak-duplicate-workspace",
+            policy_path=weak_duplicate_path,
+        )
 
 
 def test_inspect_pilot_sessions_is_privacy_minimized_and_reports_quick_debrief(product_env, tmp_path):
@@ -445,6 +475,94 @@ def test_finalize_workspace_requires_explicit_attestations_and_revalidates_db(pr
         )
 
 
+def test_evaluate_workspace_rejects_invented_or_mutated_independent_review_rows(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    mod.init_workspace(Path(store.DB_PATH), data["assignments"], data["workspace"])
+    mod.finalize_workspace(
+        Path(store.DB_PATH),
+        data["workspace"],
+        attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+        critical_incidents=0,
+    )
+
+    invented = tmp_path / "invented-event.jsonl"
+    invented.write_text(
+        json.dumps({
+            "kind": "direct_question",
+            "session_id": data["project_session"]["id"],
+            "space_id": data["project"]["id"],
+            "profile": "PROJECT_SYNC",
+            "event_id": "seg-never-existed",
+            "timestamp": 1.0,
+            "reviewer": "independent-reviewer-a",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "predicted": True,
+            "actual": True,
+            "prediction_unavailable": False,
+            "system": {
+                "channel": "PRIMARY_AUDIO",
+                "provider": "fake",
+                "source": "fake",
+                "text": "fabricated",
+                "direct_question_prediction": {
+                    "eligible": True,
+                    "predicted": True,
+                    "detector_version": "heuristic-v1",
+                    "channel": "PRIMARY_AUDIO",
+                    "ai_assistance": "AI_ALLOWED",
+                },
+            },
+            "notes": "",
+        }, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="not present in frozen independent-review seed"):
+        mod.evaluate_workspace(data["workspace"], [invented])
+    assert not (data["workspace"] / "evaluation").exists()
+
+    seed_rows = [
+        json.loads(line)
+        for line in (data["workspace"] / "independent-review.seed.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    frozen = next(
+        row for row in seed_rows
+        if row["kind"] == "direct_question"
+        and row["event_id"] == "seg-selected-project"
+    )
+    mutated = dict(frozen)
+    mutated["reviewer"] = "independent-reviewer-b"
+    mutated["label_source"] = "INDEPENDENT_HUMAN_REVIEW"
+    mutated["actual"] = True
+    mutated["predicted"] = not frozen["predicted"]
+
+    mutated_path = tmp_path / "mutated-prediction.jsonl"
+    mutated_path.write_text(
+        json.dumps(mutated, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="immutable seed provenance mismatch"):
+        mod.evaluate_workspace(data["workspace"], [mutated_path])
+    assert not (data["workspace"] / "evaluation").exists()
+
+    mutated_origin = dict(frozen)
+    mutated_origin["reviewer"] = "independent-reviewer-c"
+    mutated_origin["label_source"] = "INDEPENDENT_HUMAN_REVIEW"
+    mutated_origin["actual"] = True
+    mutated_origin["system"] = dict(frozen["system"])
+    mutated_origin["system"]["text"] = "rewritten transcript provenance"
+
+    mutated_origin_path = tmp_path / "mutated-origin.jsonl"
+    mutated_origin_path.write_text(
+        json.dumps(mutated_origin, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="immutable seed provenance mismatch"):
+        mod.evaluate_workspace(data["workspace"], [mutated_origin_path])
+    assert not (data["workspace"] / "evaluation").exists()
+
+
 def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)
@@ -459,6 +577,26 @@ def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_pa
     seed = data["workspace"] / "independent-review.seed.jsonl"
     with pytest.raises(ValueError, match="unlabeled seed"):
         mod.evaluate_workspace(data["workspace"], [seed])
+
+    original_seed = seed.read_bytes()
+    seed.write_bytes(original_seed + b"\n")
+    seed_hash_review = tmp_path / "seed-hash-review.jsonl"
+    seed_hash_review.write_text(
+        json.dumps({
+            "kind": "continue",
+            "session_id": data["project_session"]["id"],
+            "space_id": data["project"]["id"],
+            "profile": "PROJECT_SYNC",
+            "reviewer": "independent-seed-hash-check",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "writeback_accurate": True,
+            "notes": "",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="independent-review.seed.jsonl hash drift"):
+        mod.evaluate_workspace(data["workspace"], [seed_hash_review])
+    seed.write_bytes(original_seed)
 
     cohort_snapshot_path = data["workspace"] / "selected-cohort.snapshot.json"
     original_cohort_snapshot = cohort_snapshot_path.read_bytes()
@@ -526,6 +664,11 @@ def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_pa
     assert (evaluation / "stable-readiness.json").is_file()
     manifest = json.loads((evaluation / "evaluation-manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "NO_GO"
+    assert manifest["contract_version"] == mod.WORKSPACE_CONTRACT
+    assert manifest["inputs"]["independent_review_seed_sha256"] == mod._sha256(seed)
+    assert manifest["inputs"]["independent_review_seed_rows"] > 0
+    assert manifest["inputs"]["verified_independent_review_rows"] == 1
+    assert manifest["inputs"]["review_seed_binding"] == "EVENT_LEVEL_IMMUTABLE_PROVENANCE_VERIFIED"
     assert manifest["inputs"]["independent_reviews"][0]["filename"] == review.name
     assert str(review.resolve()) not in json.dumps(manifest)
 

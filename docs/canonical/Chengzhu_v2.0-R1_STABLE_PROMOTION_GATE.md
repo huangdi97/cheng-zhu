@@ -93,11 +93,13 @@ Synthetic, CI, mock and Dry Run sessions do not count.
 
 A metric below its sample floor is failure, not “N/A but okay”. Sample size and threshold are computed only from that metric's frozen `allowed_label_sources`; `UNSPECIFIED` rows and disallowed sources are ignored for Stable promotion even when the overall aggregate looks good.
 
+Under policy v6, `n` is the number of **unique product event × metric observations**, not the number of reviewer annotations. If Alice and Bob both label the same Guidance event's usefulness, that is still one product event, not two samples. The Stable aggregate fails closed on duplicate event/metric observations until the operator resolves/selects a single label. This applies across reviewers **and** across allowed label sources, preventing self-report + independent review of the same metric/event from double-counting.
+
 Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current repository evaluator policy = `v2.0-R1-stable-promotion-5`. Numerical quality thresholds and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v4. v5 fixes one **pre-pilot cohort-semantics bug**: canonical always defined a cross-session Space as at least 3 authorized Sessions in that same Space, while the v4 evaluator implementation incorrectly counted 2-Session Spaces. v5 makes `cross_session_space_min_sessions = 3` machine-readable and fail-closed against lowering below 3. Published beta.5 provenance remains correctly bound to the packaged policy-v4 evaluator; this v5 correction is post-beta.5 source truth and must not be back-attributed to beta.5 binaries. Thresholds must not be lowered, and sample populations must not be broadened, after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-6`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v5. v5 fixed the pre-pilot cross-session Space qualification bug; v6 closes a second pre-pilot evidence-semantics gap by freezing `metric_sample_unit = UNIQUE_EVENT_PER_METRIC` and `duplicate_event_metric_policy = FAIL_CLOSED`. One product event may contribute at most one resolved observation to a given Stable metric, regardless of how many reviewers or allowed label sources annotate it. Published beta.5 provenance remains correctly bound to the packaged policy-v4 evaluator; v5/v6 are post-beta.5 source truth and must not be back-attributed to beta.5 binaries. Thresholds/floors must not be lowered, and sample populations must not be broadened or duplicated, after seeing a failing pilot merely to create a PASS.
 
 ---
 

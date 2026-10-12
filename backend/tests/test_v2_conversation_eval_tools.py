@@ -209,6 +209,60 @@ def test_human_eval_rejects_duplicate_reviewer_event(tmp_path):
     assert len(human_eval.load_rows(labels)) == 2
 
 
+def test_human_eval_stable_sample_unit_rejects_duplicate_event_metric_across_reviewers_or_sources():
+    import pytest
+
+    human_eval = _load("v2_human_eval_unique_event_metric", "scripts/v2_conversation_human_eval.py")
+    base = {
+        "kind": "guidance",
+        "session_id": "cv-1",
+        "space_id": "cs-1",
+        "profile": "PROJECT_SYNC",
+        "event_id": "g-1",
+        "guidance_class": "PROACTIVE",
+        "system": _auto_system("seg-1"),
+        "useful": True,
+    }
+
+    with pytest.raises(ValueError, match="unique events, not annotations"):
+        human_eval.aggregate([
+            {**base, "reviewer": "reviewer-a", "label_source": "INDEPENDENT_HUMAN_REVIEW"},
+            {**base, "reviewer": "reviewer-b", "label_source": "INDEPENDENT_HUMAN_REVIEW"},
+        ])
+
+    with pytest.raises(ValueError, match="unique events, not annotations"):
+        human_eval.aggregate([
+            {**base, "reviewer": "IN_PRODUCT_SELF_REPORT", "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"},
+            {**base, "reviewer": "reviewer-a", "label_source": "INDEPENDENT_HUMAN_REVIEW"},
+        ])
+
+    # Two reviewers may still annotate different metric dimensions of the same
+    # event; sample inflation is blocked per event × metric, not per event.
+    report = human_eval.aggregate([
+        {
+            **base,
+            "reviewer": "reviewer-a",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "useful": True,
+            "interruption_regret": None,
+        },
+        {
+            **base,
+            "reviewer": "reviewer-b",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "useful": None,
+            "interruption_regret": False,
+        },
+    ])
+    assert report["metric_population"]["sample_unit"] == "UNIQUE_EVENT_PER_METRIC"
+    assert report["metric_population"]["unique_metric_observations"] == {
+        "interruption_regret": 1,
+        "opportunity_precision": 1,
+    }
+    assert report["metrics"]["opportunity_precision"]["n"] == 1
+    assert report["metrics"]["interruption_regret"]["n"] == 1
+
+
 def test_human_eval_rejects_non_rubric_or_nonfinite_cognitive_labels(tmp_path):
     import json
 
@@ -229,8 +283,8 @@ def test_human_eval_rejects_non_rubric_or_nonfinite_cognitive_labels(tmp_path):
         {**base, "cognitive_load_delta": True},
         {**base, "cognitive_load_delta": 99},
         {**base, "cognitive_load_delta": float("nan")},
-        {**base, "cognitive_load_delta": -2},
-        {**base, "cognitive_load_delta": 2},
+        {**base, "session_id": "cs_valid_1", "cognitive_load_delta": -2},
+        {**base, "session_id": "cs_valid_2", "cognitive_load_delta": 2},
     ]
     assert human_eval.aggregate(rows)["metrics"]["mean_cognitive_load_delta"] == {"value": 0.0, "n": 2}
 
@@ -746,7 +800,7 @@ def test_human_eval_emits_cohort_binding_and_profile_source_metrics():
         },
     ]
     report = human_eval.aggregate(rows)
-    assert report["report_contract_version"] == "v2.0-R1-human-eval-4"
+    assert report["report_contract_version"] == "v2.0-R1-human-eval-5"
     assert report["cohort"]["status"] == "COMPLETE"
     assert report["cohort"]["sessions"] == [
         {
@@ -782,7 +836,7 @@ def test_human_eval_marks_conflicting_session_profile_or_space_as_incomplete():
             "profile": "PROJECT_SYNC",
             "reviewer": "r1",
             "label_source": "INDEPENDENT_HUMAN_REVIEW",
-            "writeback_accurate": True,
+            "writeback_accurate": None,
         },
         {
             "kind": "continue",
@@ -791,7 +845,7 @@ def test_human_eval_marks_conflicting_session_profile_or_space_as_incomplete():
             "profile": "DESIGN_REVIEW",
             "reviewer": "r2",
             "label_source": "INDEPENDENT_HUMAN_REVIEW",
-            "writeback_accurate": True,
+            "writeback_accurate": None,
         },
     ]
     report = human_eval.aggregate(rows)

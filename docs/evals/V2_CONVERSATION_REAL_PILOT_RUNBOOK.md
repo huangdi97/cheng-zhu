@@ -180,9 +180,28 @@ The reviewer must fill:
 
 - `reviewer`;
 - `label_source=INDEPENDENT_HUMAN_REVIEW` where policy requires it;
-- the metric-specific actual/quality labels.
+- the metric-specific actual/quality labels;
+- optional human `notes`.
 
-The seed is not evidence until reviewed.
+The reviewer must **not** change or invent any frozen seed provenance. In particular, keep unchanged:
+
+- `session_id / space_id / profile / event_id / timestamp`;
+- `predicted / predicted_type / predicted_state / prediction_unavailable`;
+- Guidance class and all `system` provenance, including transcript/runtime origin;
+- source refs, detector version and frozen prediction payloads.
+
+At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.jsonl`, binds every independent-review row to the exact frozen `(session_id, kind, event_id)` seed row, and compares every non-human field. An invented event, altered prediction, altered runtime origin, unknown extra field, changed profile/Space, or edited source provenance fails closed before aggregation.
+
+The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
+
+Stable Policy v6 also freezes the sample unit:
+
+```text
+min_n = unique product event × metric observations
+not reviewer annotation rows
+```
+
+Different reviewers may annotate the same event for inter-rater analysis, but the same event cannot contribute the same Stable metric twice. Duplicate event/metric labels across reviewers or label sources fail closed and must be resolved/selected before Stable aggregation. Different metric dimensions on the same event may still be reviewed separately.
 
 Stable live-guidance metrics use only v12 TRANSCRIPT_AUTO provenance.
 
@@ -249,7 +268,7 @@ explicit local self-report
 +
 independent human review
 → human-label report
-→ frozen Stable policy v5
+→ frozen Stable policy v6
 → stable-readiness report
 ```
 
@@ -277,12 +296,15 @@ The workflow refuses to continue when any frozen input hash changes:
 - `selected-cohort.snapshot.json`;
 - `stable-promotion-policy.json`;
 - `pilot-manifest.draft.json`;
+- `independent-review.seed.jsonl`;
 - `self-report.jsonl`;
 - `pilot-manifest.final.json`.
 
 The selected-cohort snapshot is additionally recomputed from logical SQLite rows at finalization. This avoids false drift from unrelated WAL-backed database changes while still failing closed on selected Session/Pack drift.
 
-Independent reviewer files are external inputs and their SHA256 values are recorded in `evaluation-manifest.json`.
+Independent reviewer files are external inputs and their SHA256 values are recorded in `evaluation-manifest.json`. The manifest also records the frozen seed SHA256, seed row count, verified independent-review row count, and `EVENT_LEVEL_IMMUTABLE_PROVENANCE_VERIFIED`.
+
+The reviewer binding proves only that the human label is attached to a real frozen local review event/prediction. It does **not** prove the reviewer's identity, independence, competence, authorization, or honesty.
 
 This is tamper-evident local provenance, not a cryptographic identity/authorization system.
 
@@ -345,7 +367,7 @@ PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = SOURCE_SIDE
 PILOT_SESSION_INVENTORY = SOURCE_SIDE_PRIVACY_MINIMIZED
-STABLE_POLICY = v2.0-R1-stable-promotion-5
+STABLE_POLICY = v2.0-R1-stable-promotion-6
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE

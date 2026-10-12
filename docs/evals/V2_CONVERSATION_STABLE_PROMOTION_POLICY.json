@@ -1,6 +1,6 @@
 {
-  "policy_version": "v2.0-R1-stable-promotion-3",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Thresholds are unchanged from policy v2, but metric populations are now bound to immutable runtime provenance so manual/dogfood events and forced silence cannot inflate Stable evidence. This is an acceptance gate, not a scientific universal benchmark and not a PMF claim.",
+  "policy_version": "v2.0-R1-stable-promotion-4",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical thresholds remain unchanged from policy v3. Policy v4 binds every human-label session to an authorized pilot cohort, derives profile floors from enumerated pseudonymous session entries instead of hand-entered counts, and restricts Stable metric aggregation to the required Project Sync / Design Review profiles.",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -174,5 +174,11 @@
       "source": "v11 capture-time conversation_transcript_segment.analysis.direct_question",
       "historical_reclassification": "FORBIDDEN"
     }
-  }
+  },
+  "human_report_contract_version": "v2.0-R1-human-eval-4",
+  "pilot_manifest_contract_version": "v2.0-R1-pilot-cohort-2",
+  "metric_profiles": [
+    "PROJECT_SYNC",
+    "DESIGN_REVIEW"
+  ]
 }

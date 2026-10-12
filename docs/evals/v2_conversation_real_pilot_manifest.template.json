@@ -1,4 +1,5 @@
 {
+  "contract_version": "v2.0-R1-pilot-cohort-2",
   "evidence_type": "AUTHORIZED_REAL_CONVERSATION_PILOT",
   "period": {
     "started_at": "",
@@ -6,14 +7,10 @@
   },
   "profiles": {
     "PROJECT_SYNC": {
-      "distinct_users": 0,
-      "sessions": 0,
-      "cross_session_spaces": 0
+      "sessions": []
     },
     "DESIGN_REVIEW": {
-      "distinct_users": 0,
-      "sessions": 0,
-      "cross_session_spaces": 0
+      "sessions": []
     }
   },
   "critical_incidents": 0,
@@ -24,5 +21,5 @@
     "NO_CRITICAL_PRIVACY_INCIDENT",
     "NO_KNOWN_DATA_LOSS"
   ],
-  "notes": "Fill with real pilot counts only. Do not use synthetic or CI sessions."
+  "notes": "Add one object per authorized real session: {session_id, space_id, user_ref}. user_ref must be a stable local pseudonym, not a name/email. Stable-readiness derives distinct_users, sessions and cross_session_spaces from these entries; do not hand-enter aggregate counts."
 }

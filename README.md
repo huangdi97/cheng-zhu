@@ -341,16 +341,17 @@ python scripts/v2_conversation_human_eval.py ./reviewed-labels.jsonl --out ./loc
 
 模板与说明见 [Conversation Human-label Evaluation Protocol](docs/evals/V2_CONVERSATION_HUMAN_LABEL_PROTOCOL.md)。
 
-当 Project Sync / Design Review 已有授权真实 pilot 后，可进一步运行 stable-review evidence gate：
+当 Project Sync / Design Review 已有授权真实 pilot 后，可进一步运行 stable-review evidence gate。当前仓库 evaluator 使用 **policy v4 cohort binding**：先复制 [real pilot manifest template](docs/evals/v2_conversation_real_pilot_manifest.template.json)，按场填写 `session_id / space_id / user_ref`；`user_ref` 只使用本地稳定匿名代号，不填写姓名/邮箱，也不要手填 `5 users / 20 sessions` 这类汇总数字——这些计数会由 evaluator 从逐场 cohort 自动推导。
 
 ```bash
 python scripts/v2_conversation_stable_readiness.py \
   human-report.json \
   real-pilot.json \
-  --out stable-readiness.json
+  --out stable-readiness.json \
+  --markdown-out stable-readiness.md
 ```
 
-该脚本 PASS 只表示 **PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW**，不会自动发布 stable，也不会把 PMF 置为 true。阈值见 [Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)。原始标签可能含私人会议事实，请勿上传到公开仓库或 CI。缺少标签的指标保持 N/A；有人工标签也**不自动代表**真实外部用户验证、稳定发布或 PMF。
+policy v4 还要求 human-report 的每个 Session 与 manifest 的 `session_id + profile + space_id` 精确匹配，并只用 Project Sync / Design Review × 该指标允许的 label sources 计算 Stable 指标；其它 Conversation Profile 的漂亮分数不能抬高首发 Stable Gate。该脚本 PASS 仍只表示 **PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW**，不会自动发布 stable，也不会把 PMF 置为 true。beta.4 发布 provenance 仍正确对应其发布时的 policy v3；v4 是 post-beta.4 evaluator hardening，不属于 beta.4 二进制。阈值见 [Stable Promotion Evidence Gate](docs/canonical/Chengzhu_v2.0-R1_STABLE_PROMOTION_GATE.md)。原始标签/manifest 可能含私人会议标识，请勿上传到公开仓库或 CI。
 
 ## 文档
 

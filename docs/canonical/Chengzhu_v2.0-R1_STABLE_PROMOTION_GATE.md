@@ -97,7 +97,7 @@ Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current policy = `v2.0-R1-stable-promotion-3`. Its numerical thresholds are unchanged from policy v2; v3 is a **pre-pilot provenance/population correction made before any real pilot result exists**. Thresholds must not be lowered, and sample populations must not be broadened, after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-4`. Its numerical thresholds are unchanged from policy v3. v4 adds **pilot cohort binding** before real pilot evidence is accepted: hand-entered aggregate usage counts no longer satisfy the profile floor, every human-label Session must belong to the authorized manifest, and Stable metric aggregation is restricted to Project Sync / Design Review plus the frozen allowed label sources. Published beta.4 provenance remains correctly bound to policy v3; v4 is post-beta.4 evaluation-tool hardening and must not be back-attributed to that binary. Thresholds must not be lowered, and sample populations must not be broadened, after seeing a failing pilot merely to create a PASS.
 
 ---
 
@@ -112,6 +112,18 @@ The local pilot manifest must attest:
 - NO_KNOWN_DATA_LOSS.
 
 Critical incidents must equal zero.
+
+Policy v4 also requires manifest contract `v2.0-R1-pilot-cohort-2`. Instead of hand-entering `distinct_users / sessions / cross_session_spaces`, each required profile enumerates authorized real sessions:
+
+```json
+{
+  "session_id": "cv_...",
+  "space_id": "cs_...",
+  "user_ref": "local-pseudonym-01"
+}
+```
+
+The evaluator derives all three profile-floor counts from those rows. `user_ref` must be a stable **local pseudonym**, not a name/email and not a claim that Chengzhu verified identity. `AUTHORIZED_REAL_USE` remains the user/operator attestation that these rows actually came from authorized real conversations.
 
 This remains a local/user-operated attestation boundary; the script does not verify human identity.
 
@@ -190,6 +202,45 @@ Stable population rules:
 - Decision/Commitment State Precision denominator = immutable predictions whose `predicted_type` is `Decision / Commitment / Task`; other predicted truth types cannot dilute the metric.
 
 No threshold was lowered by this correction. Historical events are not reclassified from reason strings.
+
+## 5.4 Authorized cohort + metric-profile binding
+
+Policy v4 closes an evidence-stitching gap that existed in the count-only manifest.
+
+Old failure mode:
+
+```text
+human-report from cohort A
++
+manifest says "20 sessions / 5 users" for cohort B
++
+good labels from an unrelated Conversation profile
+→ structurally possible to satisfy independent checks
+```
+
+Current gate:
+
+```text
+human-label row
+→ session_id + profile + space_id
+→ HUMAN_EVAL report cohort contract v4
+→ exact membership in authorized pilot manifest v2
+→ only PROJECT_SYNC / DESIGN_REVIEW
+→ only metric.allowed_label_sources
+→ policy threshold
+```
+
+Hard rules:
+
+- the same `session_id` cannot map to two profiles or Spaces;
+- every human-report Session must match one enumerated manifest Session by `session_id + profile + space_id`;
+- profile floors are derived from unique manifest Sessions, local pseudonymous `user_ref` values, and Spaces containing at least two authorized Sessions;
+- labels from Presentation/Q&A, 1:1, Client Call, Negotiation or any other non-target profile cannot inflate the v2 Stable metric score;
+- every Stable metric must have at least one policy-allowed sample from **both** Project Sync and Design Review; one launch profile cannot stand in for an entirely unmeasured other profile;
+- a timezone-aware pilot period is mandatory;
+- old count-only manifests fail closed under policy v4.
+
+This is evidence consistency, not cryptographic identity attestation and not PMF proof.
 
 ## 6. Tooling
 

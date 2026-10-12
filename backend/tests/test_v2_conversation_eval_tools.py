@@ -719,3 +719,81 @@ def test_label_seed_uses_frozen_direct_question_prediction_and_marks_legacy_unav
     assert by_id["cts-dq-true"]["reviewer"] == ""
     assert by_id["cts-dq-true"]["label_source"] == ""
     assert by_id["cts-dq-true"]["system"]["direct_question_prediction"]["detector_version"] == "heuristic-v1"
+
+
+def test_human_eval_emits_cohort_binding_and_profile_source_metrics():
+    human_eval = _load("v2_human_eval_cohort_binding", "scripts/v2_conversation_human_eval.py")
+    rows = [
+        {
+            "kind": "session_outcome",
+            "session_id": "cv-project-real",
+            "space_id": "cs-project-real",
+            "profile": "PROJECT_SYNC",
+            "reviewer": "IN_PRODUCT_SELF_REPORT",
+            "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+            "cognitive_load_delta": -1,
+            "would_reuse_space": True,
+        },
+        {
+            "kind": "session_outcome",
+            "session_id": "cv-design-real",
+            "space_id": "cs-design-real",
+            "profile": "DESIGN_REVIEW",
+            "reviewer": "IN_PRODUCT_SELF_REPORT",
+            "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+            "cognitive_load_delta": 0,
+            "would_reuse_space": False,
+        },
+    ]
+    report = human_eval.aggregate(rows)
+    assert report["report_contract_version"] == "v2.0-R1-human-eval-4"
+    assert report["cohort"]["status"] == "COMPLETE"
+    assert report["cohort"]["sessions"] == [
+        {
+            "session_id": "cv-design-real",
+            "profile": "DESIGN_REVIEW",
+            "space_id": "cs-design-real",
+        },
+        {
+            "session_id": "cv-project-real",
+            "profile": "PROJECT_SYNC",
+            "space_id": "cs-project-real",
+        },
+    ]
+    project = report["metrics_by_profile_and_label_source"]["PROJECT_SYNC"][
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+    ]
+    design = report["metrics_by_profile_and_label_source"]["DESIGN_REVIEW"][
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+    ]
+    assert project["mean_cognitive_load_delta"] == {"value": -1.0, "n": 1}
+    assert project["space_reuse_intent_rate"] == {"value": 1.0, "n": 1}
+    assert design["mean_cognitive_load_delta"] == {"value": 0.0, "n": 1}
+    assert design["space_reuse_intent_rate"] == {"value": 0.0, "n": 1}
+
+
+def test_human_eval_marks_conflicting_session_profile_or_space_as_incomplete():
+    human_eval = _load("v2_human_eval_cohort_conflict", "scripts/v2_conversation_human_eval.py")
+    rows = [
+        {
+            "kind": "continue",
+            "session_id": "cv-same",
+            "space_id": "cs-one",
+            "profile": "PROJECT_SYNC",
+            "reviewer": "r1",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "writeback_accurate": True,
+        },
+        {
+            "kind": "continue",
+            "session_id": "cv-same",
+            "space_id": "cs-two",
+            "profile": "DESIGN_REVIEW",
+            "reviewer": "r2",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "writeback_accurate": True,
+        },
+    ]
+    report = human_eval.aggregate(rows)
+    assert report["cohort"]["status"] == "INCOMPLETE"
+    assert any("inconsistent profile/space" in value for value in report["cohort"]["errors"])

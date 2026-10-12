@@ -26,6 +26,9 @@ from pathlib import Path
 from typing import Any
 
 
+REPORT_CONTRACT_VERSION = "v2.0-R1-human-eval-4"
+
+
 ALLOWED_KINDS = {
     "guidance",
     "silence",
@@ -125,6 +128,57 @@ def _is_auto_runtime(row: dict[str, Any]) -> bool:
         origin.get("kind") == "TRANSCRIPT_AUTO"
         and str(origin.get("transcript_segment_id") or "").strip()
     )
+
+
+def _cohort_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Describe which local Session/Profile/Space each label row belongs to.
+
+    This is consistency provenance, not identity proof. Stable-readiness binds
+    these session tuples to an authorized pilot manifest rather than accepting
+    an unrelated human-report beside unrelated pilot counts.
+    """
+    sessions: dict[str, dict[str, str]] = {}
+    errors: list[str] = []
+    for index, row in enumerate(rows, start=1):
+        session_id = str(row.get("session_id") or "").strip()
+        profile = str(row.get("profile") or "").strip().upper()
+        space_id = str(row.get("space_id") or "").strip()
+        if not session_id:
+            errors.append(f"row {index}: missing session_id")
+            continue
+        if not profile:
+            errors.append(f"session {session_id}: missing profile")
+        if not space_id:
+            errors.append(f"session {session_id}: missing space_id")
+        if not profile or not space_id:
+            continue
+        current = {"session_id": session_id, "profile": profile, "space_id": space_id}
+        previous = sessions.get(session_id)
+        if previous and previous != current:
+            errors.append(
+                f"session {session_id}: inconsistent profile/space "
+                f"({previous['profile']}/{previous['space_id']} vs {profile}/{space_id})"
+            )
+            continue
+        sessions[session_id] = current
+
+    ordered = [sessions[key] for key in sorted(sessions)]
+    profiles: dict[str, dict[str, list[str]]] = {}
+    for entry in ordered:
+        profile = entry["profile"]
+        bucket = profiles.setdefault(profile, {"session_ids": [], "space_ids": []})
+        bucket["session_ids"].append(entry["session_id"])
+        if entry["space_id"] not in bucket["space_ids"]:
+            bucket["space_ids"].append(entry["space_id"])
+    for bucket in profiles.values():
+        bucket["space_ids"].sort()
+
+    return {
+        "status": "COMPLETE" if not errors and len(ordered) > 0 else "INCOMPLETE",
+        "sessions": ordered,
+        "profiles": dict(sorted(profiles.items())),
+        "errors": errors,
+    }
 
 
 def aggregate(
@@ -238,8 +292,10 @@ def aggregate(
 
     labeled_metric_count = sum(1 for value in metrics.values() if value["n"] > 0)
     report = {
+        "report_contract_version": REPORT_CONTRACT_VERSION,
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "rows": len(rows),
+        "cohort": _cohort_summary(rows),
         "rows_by_kind": dict(sorted(by_kind.items())),
         "metric_population": {
             "auto_guidance_rows": len(guidance_rows),
@@ -270,15 +326,49 @@ def aggregate(
             )["metrics"]
             for source in sorted(by_source)
         }
+
+        profiles = sorted({
+            str(row.get("profile") or "").strip().upper()
+            for row in rows
+            if str(row.get("profile") or "").strip()
+        })
+        report["metrics_by_profile"] = {
+            profile: aggregate(
+                [
+                    row for row in rows
+                    if str(row.get("profile") or "").strip().upper() == profile
+                ],
+                include_source_breakdown=False,
+            )["metrics"]
+            for profile in profiles
+        }
+        report["metrics_by_profile_and_label_source"] = {
+            profile: {
+                source: aggregate(
+                    [
+                        row for row in rows
+                        if str(row.get("profile") or "").strip().upper() == profile
+                        and _label_source(row) == source
+                    ],
+                    include_source_breakdown=False,
+                )["metrics"]
+                for source in sorted(by_source)
+            }
+            for profile in profiles
+        }
     return report
 
 
 def markdown(report: dict[str, Any]) -> str:
+    cohort = report.get("cohort") or {}
     lines = [
         "# Chengzhu v2 Conversation Human-label Evaluation",
         "",
+        f"- Report contract: **{report.get('report_contract_version') or 'unknown'}**",
         f"- Status: **{report['status']}**",
         f"- Human-labeled rows: **{report['rows']}**",
+        f"- Cohort status: **{cohort.get('status') or 'UNKNOWN'}**",
+        f"- Labeled Sessions: **{len(cohort.get('sessions') or [])}**",
         "- PMF_PROVEN: **FALSE**",
         "",
         "| Metric | Value | n |",

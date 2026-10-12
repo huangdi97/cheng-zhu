@@ -266,6 +266,89 @@ metric.allowed_label_sources
 
 原始 label / report / manifest 都可能包含私人会议标识，继续保持本地受控存储，不应上传公开仓库或 CI artifact。
 
+## 10.3 Authorized pilot manifest builder
+
+Policy v4 不再建议手抄 `session_id / space_id / profile / period`。仓库提供本地 builder：
+
+```text
+scripts/v2_conversation_pilot_manifest.py
+```
+
+它只读取 `product.db` 中这些 Session 事实：
+
+- `session_id`；
+- `space_id`；
+- frozen Session `template/profile`；
+- `status`；
+- `started_at / ended_at`；
+- `consent_ack`；
+- matching Frozen Session Pack provenance。
+
+它**不会**读取或复制 transcript、参与者姓名、Space 标题、Guidance 内容、资料正文，也不会从数据库猜“这个人是谁”或“这场是否获得真实授权”。
+
+每个入选 Session 的 `user_ref` 必须由 pilot operator 显式提供本地匿名 token：
+
+```bash
+python scripts/v2_conversation_pilot_manifest.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --session cv_project_01=pilot-user-01 \
+  --session cv_design_01=pilot-user-02 \
+  --out pilot-manifest.draft.json
+```
+
+默认输出故意是：
+
+```text
+evidence_type = DRAFT_AUTHORIZED_REAL_CONVERSATION_PILOT
+critical_incidents = null
+attestations = []
+```
+
+因此不能直接通过 Stable evaluator。
+
+Builder 会 fail closed：
+
+- 只允许 `ENDED` Session；
+- 只允许 `PROJECT_SYNC / DESIGN_REVIEW`；
+- 要求 Session consent acknowledgement；
+- 要求可验证 Frozen Session Pack；
+- 重复 / 不存在 Session 拒绝；
+- `user_ref` 只允许本地 pseudonym token 形状，不允许 email / free-text name；
+- period 从入选 Session 的真实时间自动推导为 timezone-aware UTC；
+- 输出文件已存在时拒绝覆盖。
+
+确认 draft 与真实授权 pilot 范围完全一致后，operator 必须重新显式 finalize，并逐项声明：
+
+```bash
+python scripts/v2_conversation_pilot_manifest.py \
+  --db <CHENGZHU_HOME>/data/product.db \
+  --session cv_project_01=pilot-user-01 \
+  --session cv_design_01=pilot-user-02 \
+  --finalize \
+  --critical-incidents 0 \
+  --attest AUTHORIZED_REAL_USE \
+  --attest NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL \
+  --attest RAW_LABELS_KEPT_LOCAL \
+  --attest NO_CRITICAL_PRIVACY_INCIDENT \
+  --attest NO_KNOWN_DATA_LOSS \
+  --out real-pilot.json
+```
+
+少任意一项 attestation 或不显式提供 incident count，都不能 finalize。
+
+边界仍然是：
+
+```text
+DB session membership verified
+!= human identity verified
+!= authorization verified by system
+!= participant consent independently verified
+!= REAL_USER_VALIDATED
+!= PMF_PROVEN
+```
+
+五项 attestation 是 operator declaration，不是 Chengzhu 的身份认证或法律证明。manifest / labels / report 均应保存在本地受控路径，不上传公开仓库或 CI artifact。
+
 ## 11. 状态升级边界
 
 human-label report 本身只证明存在人工标签；它不能验证 reviewer 是否是真实外部用户，也不能单独支持 PMF_PROVEN = TRUE 或 V2_PRODUCTIZED_RELEASE = TRUE。

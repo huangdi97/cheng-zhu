@@ -789,10 +789,11 @@ PR 合并后至少要有：
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 PUBLISHED_BETA_TAG = v2.0.0-beta.5
 PUBLISHED_BETA_SOURCE_SHA = 3c29112b6256d78f26c7d70670b558c6c24d6a3b
+NEXT_BETA_CANDIDATE = v2.0.0-beta.6
 STABLE_LATEST = v1.4.2
 ```
 
-beta.5 已于 2026-10-12 从 exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` 公开为 GitHub Prerelease。Main CI #923 与 Release run #316 均 SUCCESS；Release 完成 Windows build/test、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant、post-publish verification regression 与 verification artifact upload。beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge / retention / auto-runtime provenance，并进一步打包 scope-aware dependency-security hardening、electron-builder 26.17.0、Vite 6.4.4 与 Stable Promotion Policy v4 authorized-cohort binding。详见 `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`。beta.4 / beta.3 继续作为不可变历史发布 provenance 保留。
+beta.5 已于 2026-10-12 从 exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` 公开为 GitHub Prerelease。当前 source 正在准备 `v2.0.0-beta.6` real-pilot operationalization candidate；beta.6 只有在 exact main CI、Windows build/clean-install、draft download-back、downloaded installer replay、tag/source 与 prerelease-channel gate 全部完成后才允许成为 published truth。Main CI #923 与 Release run #316 均 SUCCESS；Release 完成 Windows build/test、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant、post-publish verification regression 与 verification artifact upload。beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge / retention / auto-runtime provenance，并进一步打包 scope-aware dependency-security hardening、electron-builder 26.17.0、Vite 6.4.4 与 Stable Promotion Policy v4 authorized-cohort binding。详见 `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`。beta.4 / beta.3 继续作为不可变历史发布 provenance 保留。
 
 仍不允许：
 

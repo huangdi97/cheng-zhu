@@ -29,13 +29,14 @@ Current channel truth:
 Stable Latest = v1.4.2
 Conversation Beta Published = v2.0.0-beta.5
 Published Beta tag/source SHA = 3c29112b6256d78f26c7d70670b558c6c24d6a3b
+Next Conversation Beta Candidate = v2.0.0-beta.6
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.5 provenance is recorded in `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`. beta.5 is the **post-beta.4 hardening rebuild** that packages the scope-aware npm security gate, electron-builder 26.17.0, Vite 6.4.4, and Stable Promotion evaluator policy v4 authorized-cohort binding. It was published from exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` through main CI #923 and Release run #316 after Windows build/test, clean-install, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel, Stable-Latest-preservation, tag/source and post-publish verification-metadata regression all completed successfully. beta.4 remains immutable at its original source SHA and must not be rewritten as containing beta.5 hardening. The earlier beta.3 post-publish PowerShell defect remains documented in its own provenance file as historical release evidence.
+Published beta.5 provenance is recorded in `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`. Current source is preparing `v2.0.0-beta.6` as the **real-pilot operationalization** candidate: it packages the immediate post-Session Quick Debrief and current Stable Policy v5 runtime/source truth, while the new privacy-minimized pilot inventory remains source-side operator tooling. Do not rewrite published Beta truth to beta.6 until its exact green main SHA completes the full release/download-back/provenance gate. beta.5 is the **post-beta.4 hardening rebuild** that packages the scope-aware npm security gate, electron-builder 26.17.0, Vite 6.4.4, and Stable Promotion evaluator policy v4 authorized-cohort binding. It was published from exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` through main CI #923 and Release run #316 after Windows build/test, clean-install, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel, Stable-Latest-preservation, tag/source and post-publish verification-metadata regression all completed successfully. beta.4 remains immutable at its original source SHA and must not be rewritten as containing beta.5 hardening. The earlier beta.3 post-publish PowerShell defect remains documented in its own provenance file as historical release evidence.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

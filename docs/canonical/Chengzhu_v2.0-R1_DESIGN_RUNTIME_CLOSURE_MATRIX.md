@@ -1157,3 +1157,35 @@ authorized Project Sync / Design Review pilot
 同时继续补齐 Google Calendar / Drive / Gmail / Microsoft To Do 的适用 real-account evidence，以及 Gmail OAuth sensitive-scope/publication external gate。GitHub provider 的真实账号 replay evidence 保持独立记录。
 
 任何 beta.4 之后的源码提交都不得移动或重写 `v2.0.0-beta.4` tag；新的可下载代码必须使用新的版本和全新的 exact-SHA release cycle。
+
+
+---
+
+## Post-beta.4 dependency security hardening candidate · 2026-10-12
+
+beta.4 已经把 Pilot Evidence Bridge / schema v10–v12 / retention integrity / Stable Promotion Policy v3 带入公开 packaged prerelease。其后的 main 变更不再扩大 Conversation 功能，而是收口 build/release dependency security：
+
+```text
+PUBLISHED_BETA = v2.0.0-beta.4
+PUBLISHED_BETA_SOURCE = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+
+NEXT_BETA_CANDIDATE = v2.0.0-beta.5
+CANDIDATE_PURPOSE = SECURITY_HARDENING_ONLY
+
+FRONTEND_PRODUCTION_HIGH_CRITICAL = 0
+DESKTOP_FULL_HIGH_CRITICAL = 0
+ELECTRON_RUNTIME_BLOCKING = 0
+
+ELECTRON_BUILDER = 26.17.0
+VITE = 6.4.4
+
+TAILWIND3_DEV_BUILD_FINDINGS = TRACKED_NOT_RECLASSIFIED_AS_RUNTIME
+PRODUCT_FEATURE_SCOPE_CHANGE = NONE
+STABLE_V2 = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+beta.5 的作用是让后续真实 Project Sync / Design Review pilot 使用与 hardened main 一致的 Windows 二进制。它不是通过增加功能来替代真实验证。
+
+在 beta.5 真正完成 exact-SHA release 之前，公开 Beta truth 仍保持 beta.4。

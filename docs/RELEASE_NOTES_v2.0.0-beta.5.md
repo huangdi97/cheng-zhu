@@ -209,7 +209,7 @@ beta.5 之后停止继续通过“更多 Beta 功能”替代真实验证。
 2. 授权真实 Design Review pilot；
 3. in-product explicit self-report；
 4. independent human review；
-5. frozen Stable Promotion Policy v3；
+5. frozen Stable Promotion Policy v4 cohort binding；
 6. real-account connector replay（有账号/凭据时）；
 7. critical privacy / data-loss incident = 0；
 8. Stable review only after evidence thresholds pass。

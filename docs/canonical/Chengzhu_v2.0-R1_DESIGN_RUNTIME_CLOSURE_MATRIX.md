@@ -1205,3 +1205,47 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+---
+
+## Beta.5 pre-pilot hardening candidate · 2026-10-12
+
+公开 beta.4 已经把 schema v10–v12、Pilot Feedback Bridge、runtime-faithful Guidance/SILENT provenance、retention integrity 与 Stable Promotion Policy v3 带入 Windows packaged prerelease。
+
+beta.4 之后继续审计得到两组 **pre-pilot hardening**，当前冻结为全新的 beta.5 candidate：
+
+```text
+PUBLISHED_BETA = v2.0.0-beta.4
+PUBLISHED_BETA_SOURCE = 0e1d89ad381a93c1dcd9725418d9cbd5b3c71fcc
+
+NEXT_BETA_CANDIDATE = v2.0.0-beta.5
+CANDIDATE_PURPOSE = PRE_PILOT_SECURITY_AND_EVIDENCE_HARDENING
+
+SECURITY:
+  FRONTEND_PRODUCTION_HIGH_CRITICAL = 0
+  DESKTOP_FULL_HIGH_CRITICAL = 0
+  ELECTRON_RUNTIME_BLOCKING = 0
+  ELECTRON_BUILDER = 26.17.0
+  VITE = 6.4.4
+
+EVIDENCE:
+  STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-4
+  NUMERICAL_THRESHOLDS_CHANGED_FROM_V3 = FALSE
+  HUMAN_REPORT_CONTRACT = v2.0-R1-human-eval-4
+  PILOT_MANIFEST_CONTRACT = v2.0-R1-pilot-cohort-2
+  HAND_ENTERED_PROFILE_COUNTS = FORBIDDEN
+  AUTHORIZED_COHORT_SESSION_BINDING = REQUIRED
+  STABLE_METRIC_PROFILES = PROJECT_SYNC + DESIGN_REVIEW
+  BOTH_LAUNCH_PROFILES_REQUIRED_PER_METRIC = TRUE
+
+PRODUCT_FEATURE_SCOPE_CHANGE = NONE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+STABLE_V2 = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+beta.5 的目标不是继续增加产品功能，而是让下一阶段真实 pilot 使用一个同时包含 **hardened dependency/release surface + cohort-bound Stable evaluator** 的统一基线。
+
+在 beta.5 真正完成新的 exact-SHA release cycle 之前，公开 Beta truth 继续保持 beta.4。

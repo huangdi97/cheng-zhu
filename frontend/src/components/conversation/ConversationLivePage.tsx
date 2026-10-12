@@ -9,6 +9,7 @@ import { navigate, paths } from '@/lib/router'
 import { ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, inputCls, useAsync } from '@/components/os/ui'
 import CoachPanel from '@/components/coach/CoachPanel'
 import CoachCues from '@/components/coach/CoachCues'
+import ConversationPilotFeedbackPanel from './ConversationPilotFeedbackPanel'
 
 type AudioDevice = { id: number; name: string; is_loopback?: boolean }
 type DevicePayload = { devices?: AudioDevice[] }
@@ -667,6 +668,7 @@ export default function ConversationLivePage({ sessionId }: { sessionId: string 
           <p className="mt-2 text-[10px] text-text-muted">{summary.profile_outcome.interpretation}</p>
         </div> : null}
         {summary.next_focus ? <p className="mt-4 text-sm text-text-primary">Next Focus · {summary.next_focus.title}</p> : null}
+        <ConversationPilotFeedbackPanel sessionId={summary.session.id} presentation="POST_SESSION" />
         <div className="mt-4"><PrimaryButton onClick={() => navigate(paths.conversationSpace(s.space_id, 'sessions'))}>回到 Space · Continue</PrimaryButton></div>
       </div> : null}
     </Page>

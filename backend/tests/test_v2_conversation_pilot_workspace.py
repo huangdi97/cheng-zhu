@@ -154,6 +154,18 @@ def test_finalize_workspace_requires_explicit_attestations_and_revalidates_db(pr
             critical_incidents=0,
         )
 
+    policy_path = data["workspace"] / "stable-promotion-policy.json"
+    original_policy = policy_path.read_bytes()
+    policy_path.write_bytes(original_policy + b"\n")
+    with pytest.raises(ValueError, match="hash drift"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            data["workspace"],
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+    policy_path.write_bytes(original_policy)
+
     finalization = mod.finalize_workspace(
         Path(store.DB_PATH),
         data["workspace"],
@@ -194,6 +206,26 @@ def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_pa
     seed = data["workspace"] / "independent-review.seed.jsonl"
     with pytest.raises(ValueError, match="unlabeled seed"):
         mod.evaluate_workspace(data["workspace"], [seed])
+
+    final_manifest_path = data["workspace"] / "pilot-manifest.final.json"
+    original_final_manifest = final_manifest_path.read_bytes()
+    final_manifest_path.write_bytes(original_final_manifest + b"\n")
+    dummy_review = tmp_path / "dummy-review.jsonl"
+    dummy_review.write_text(
+        json.dumps({
+            "kind": "continue",
+            "session_id": data["project_session"]["id"],
+            "space_id": data["project"]["id"],
+            "profile": "PROJECT_SYNC",
+            "reviewer": "independent-dummy",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "writeback_accurate": True,
+        }) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="hash drift"):
+        mod.evaluate_workspace(data["workspace"], [dummy_review])
+    final_manifest_path.write_bytes(original_final_manifest)
 
     review = tmp_path / "reviewer-a.jsonl"
     review.write_text(

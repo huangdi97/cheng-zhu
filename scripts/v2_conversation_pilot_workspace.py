@@ -125,7 +125,8 @@ def _selected_cohort_snapshot(
         rows = conn.execute(
             "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
             "s.consent_ack, s.pack_id, "
-            "p.id AS frozen_pack_id, p.digest AS frozen_pack_digest "
+            "p.id AS frozen_pack_id, p.digest AS frozen_pack_digest, "
+            "p.payload_json AS frozen_pack_payload_json "
             "FROM conversation_session s "
             "LEFT JOIN conversation_session_pack p "
             "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
@@ -145,6 +146,19 @@ def _selected_cohort_snapshot(
     sessions: list[dict[str, Any]] = []
     for session_id, user_ref in pairs:
         row = by_id[session_id]
+        stored_pack_digest = str(row.get("frozen_pack_digest") or "")
+        payload_text = str(row.get("frozen_pack_payload_json") or "")
+        if not stored_pack_digest or not payload_text:
+            raise ValueError(f"{session_id}: Frozen Session Pack payload/digest is missing")
+        try:
+            pack_payload = json.loads(payload_text)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{session_id}: Frozen Session Pack payload is invalid JSON") from exc
+        calculated_pack_digest = _canonical_json_sha256(pack_payload)
+        if calculated_pack_digest != stored_pack_digest:
+            raise ValueError(
+                f"{session_id}: Frozen Session Pack payload digest mismatch"
+            )
         sessions.append({
             "session_id": session_id,
             "user_ref": user_ref,
@@ -156,7 +170,8 @@ def _selected_cohort_snapshot(
             "consent_ack_recorded": bool(row.get("consent_ack")),
             "pack_id": str(row.get("pack_id") or ""),
             "frozen_pack_id": str(row.get("frozen_pack_id") or ""),
-            "frozen_pack_digest": str(row.get("frozen_pack_digest") or ""),
+            "frozen_pack_digest": stored_pack_digest,
+            "frozen_pack_payload_digest_verified": True,
         })
     sessions.sort(key=lambda row: row["session_id"])
     return {

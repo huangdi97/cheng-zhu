@@ -1,6 +1,6 @@
 {
   "contract_version": "v2.0-R1-pilot-cohort-2",
-  "evidence_type": "AUTHORIZED_REAL_CONVERSATION_PILOT",
+  "evidence_type": "DRAFT_AUTHORIZED_REAL_CONVERSATION_PILOT",
   "period": {
     "started_at": "",
     "ended_at": ""
@@ -13,13 +13,7 @@
       "sessions": []
     }
   },
-  "critical_incidents": 0,
-  "attestations": [
-    "AUTHORIZED_REAL_USE",
-    "NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
-    "RAW_LABELS_KEPT_LOCAL",
-    "NO_CRITICAL_PRIVACY_INCIDENT",
-    "NO_KNOWN_DATA_LOSS"
-  ],
-  "notes": "Add one object per authorized real session: {session_id, space_id, user_ref}. user_ref must be a stable local pseudonym, not a name/email. Stable-readiness derives distinct_users, sessions and cross_session_spaces from these entries; do not hand-enter aggregate counts."
+  "critical_incidents": null,
+  "attestations": [],
+  "notes": "DRAFT ONLY. Prefer scripts/v2_conversation_pilot_manifest.py so session_id/space_id/profile/period are derived from local product.db. user_ref must be supplied explicitly as a stable local pseudonym, not a name/email. Final evidence_type, critical_incidents and all required attestations must be explicit operator declarations; the system does not verify identity, authorization or PMF."
 }

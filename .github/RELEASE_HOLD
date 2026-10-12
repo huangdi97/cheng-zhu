@@ -1,0 +1,10 @@
+Release publication is intentionally held while PR #97 closes the beta.6
+pilot-workspace selected-cohort provenance gap.
+
+Do not remove this file until:
+- PR #97 is merged;
+- its merge SHA has completed main CI successfully;
+- the release candidate truth still points at v2.0.0-beta.6;
+- no release-blocking review thread remains.
+
+The generic publisher treats the presence of this file as a fail-closed no-op.

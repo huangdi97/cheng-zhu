@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   refresh:
     if: github.head_ref == 'chore/dependency-security-upgrades'
@@ -42,3 +45,14 @@ jobs:
           path: dependency-lock-refresh
           retention-days: 3
           if-no-files-found: error
+
+      - name: Commit npm-resolved dependency files and remove this temporary workflow
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json frontend/package-lock.json desktop/package.json desktop/package-lock.json
+          git rm .github/workflows/dependency-lock-preview.yml
+          git commit -m "chore(security): apply npm-resolved dependency upgrades"
+          git push origin HEAD:"$HEAD_BRANCH"

@@ -450,29 +450,30 @@ If you are the author of upstream code and believe it is included here under dif
 
 ## Desktop (npm)
 
-331 packages. `dev` = build/test only, not shipped in the app bundle.
+268 packages. `dev` = build/test only, not shipped in the app bundle.
 
 | Package | Version | License | Scope |
 |---|---|---|---|
-| `7zip-bin` | 5.2.0 | MIT | dev |
-| `@develar/schema-utils` | 2.6.5 | MIT | dev |
 | `@electron-internal/extract-zip` | 1.0.5 | BSD-2-Clause | dev |
 | `@electron/asar` | 3.4.1 | MIT | dev |
+| `@electron/fuses` | 1.8.0 | MIT | dev |
+| `@electron/get` | 3.1.0 | MIT | dev |
 | `@electron/get` | 5.1.0 | MIT | dev |
 | `@electron/notarize` | 2.5.0 | MIT | dev |
-| `@electron/osx-sign` | 1.3.1 | BSD-2-Clause | dev |
-| `@electron/rebuild` | 3.6.1 | MIT | dev |
-| `@electron/universal` | 2.0.1 | MIT | dev |
-| `@gar/promisify` | 1.1.3 | MIT | dev |
-| `@isaacs/cliui` | 8.0.2 | ISC | dev |
+| `@electron/osx-sign` | 1.3.3 | BSD-2-Clause | dev |
+| `@electron/rebuild` | 4.2.1 | MIT | dev |
+| `@electron/universal` | 2.0.3 | MIT | dev |
+| `@electron/windows-sign` | 1.2.2 | BSD-2-Clause | dev |
+| `@isaacs/fs-minipass` | 4.0.1 | ISC | dev |
 | `@malept/cross-spawn-promise` | 2.0.0 | Apache-2.0 | dev |
 | `@malept/flatpak-bundler` | 0.4.0 | MIT | dev |
-| `@npmcli/fs` | 2.1.2 | ISC | dev |
-| `@npmcli/move-file` | 2.0.1 | MIT | dev |
-| `@pkgjs/parseargs` | 0.11.0 | MIT | dev |
+| `@noble/hashes` | 1.8.0 | MIT | dev |
+| `@peculiar/asn1-schema` | 2.10.0 | MIT | dev |
+| `@peculiar/json-schema` | 1.1.12 | MIT | dev |
+| `@peculiar/utils` | 2.0.3 | MIT | dev |
+| `@peculiar/webcrypto` | 1.7.1 | MIT | dev |
 | `@sindresorhus/is` | 4.6.0 | MIT | dev |
 | `@szmarczak/http-timer` | 4.0.6 | MIT | dev |
-| `@tootallnate/once` | 2.0.1 | MIT | dev |
 | `@types/cacheable-request` | 6.0.3 | MIT | dev |
 | `@types/debug` | 4.1.13 | MIT | dev |
 | `@types/fs-extra` | 9.0.13 | MIT | dev |
@@ -480,101 +481,73 @@ If you are the author of upstream code and believe it is included here under dif
 | `@types/keyv` | 3.1.4 | MIT | dev |
 | `@types/ms` | 2.1.0 | MIT | dev |
 | `@types/node` | 24.13.5 | MIT | dev |
-| `@types/plist` | 3.0.5 | MIT | dev |
 | `@types/responselike` | 1.0.3 | MIT | dev |
-| `@types/verror` | 1.10.11 | MIT | dev |
-| `@xmldom/xmldom` | 0.9.12 | MIT | dev |
-| `abbrev` | 1.1.1 | ISC | dev |
-| `agent-base` | 6.0.2 | MIT | dev |
+| `@xmldom/xmldom` | 0.8.15 | MIT | dev |
+| `abbrev` | 4.0.0 | ISC | dev |
 | `agent-base` | 7.1.4 | MIT | dev |
-| `agentkeepalive` | 4.6.0 | MIT | dev |
-| `aggregate-error` | 3.1.0 | MIT | dev |
-| `ajv` | 6.15.0 | MIT | dev |
-| `ajv-keywords` | 3.5.2 | MIT | dev |
+| `ajv` | 8.20.0 | MIT | dev |
 | `ansi-regex` | 5.0.1 | MIT | dev |
-| `ansi-regex` | 6.4.0 | MIT | dev |
 | `ansi-styles` | 4.3.0 | MIT | dev |
-| `ansi-styles` | 6.2.3 | MIT | dev |
-| `app-builder-bin` | 5.0.0-alpha.10 | MIT | dev |
-| `app-builder-lib` | 25.1.8 | MIT | dev |
-| `aproba` | 2.1.0 | ISC | dev |
-| `archiver` | 5.3.2 | MIT | dev |
-| `archiver-utils` | 2.1.0 | MIT | dev |
-| `archiver-utils` | 3.0.4 | MIT | dev |
-| `are-we-there-yet` | 3.0.1 | ISC | dev |
+| `app-builder-lib` | 26.17.0 | MIT | dev |
 | `argparse` | 2.0.1 | Python-2.0 | dev |
-| `assert-plus` | 1.0.0 | MIT | dev |
-| `astral-regex` | 2.0.0 | MIT | dev |
+| `asn1js` | 3.0.10 | BSD-3-Clause | dev |
 | `async` | 3.2.6 | MIT | dev |
 | `async-exit-hook` | 2.0.1 | MIT | dev |
 | `asynckit` | 0.4.0 | MIT | dev |
 | `at-least-node` | 1.0.0 | ISC | dev |
+| `aws4` | 1.13.2 | MIT | dev |
 | `balanced-match` | 1.0.2 | MIT | dev |
 | `balanced-match` | 4.0.4 | MIT | dev |
 | `base64-js` | 1.5.1 | MIT | dev |
-| `bl` | 4.1.0 | MIT | dev |
 | `bluebird` | 3.7.2 | MIT | dev |
-| `bluebird-lst` | 1.0.9 | MIT | dev |
+| `boolean` | 3.2.0 | MIT | dev |
 | `brace-expansion` | 1.1.21 | MIT | dev |
 | `brace-expansion` | 2.1.7 | MIT | dev |
 | `brace-expansion` | 5.0.12 | MIT | dev |
-| `buffer` | 5.7.1 | MIT | dev |
-| `buffer-crc32` | 0.2.13 | MIT | dev |
 | `buffer-from` | 1.1.2 | MIT | dev |
-| `builder-util` | 25.1.7 | MIT | dev |
-| `builder-util-runtime` | 9.2.10 | MIT | dev |
-| `cacache` | 16.1.3 | ISC | dev |
+| `builder-util` | 26.16.0 | MIT | dev |
+| `builder-util-runtime` | 9.7.0 | MIT | dev |
+| `bytestreamjs` | 2.0.1 | BSD-3-Clause | dev |
 | `cacheable-lookup` | 5.0.4 | MIT | dev |
 | `cacheable-request` | 7.0.4 | MIT | dev |
 | `call-bind-apply-helpers` | 1.0.2 | MIT | dev |
 | `chalk` | 4.1.2 | MIT | dev |
-| `chownr` | 2.0.0 | ISC | dev |
+| `chownr` | 3.0.0 | BlueOak-1.0.0 | dev |
 | `chromium-pickle-js` | 0.2.0 | MIT | dev |
-| `ci-info` | 3.9.0 | MIT | dev |
-| `clean-stack` | 2.2.0 | MIT | dev |
-| `cli-cursor` | 3.1.0 | MIT | dev |
-| `cli-spinners` | 2.9.2 | MIT | dev |
-| `cli-truncate` | 2.1.0 | MIT | dev |
+| `ci-info` | 4.3.1 | MIT | dev |
+| `ci-info` | 4.4.0 | MIT | dev |
 | `cliui` | 8.0.1 | ISC | dev |
-| `clone` | 1.0.4 | MIT | dev |
 | `clone-response` | 1.0.3 | MIT | dev |
 | `color-convert` | 2.0.1 | MIT | dev |
 | `color-name` | 1.1.4 | MIT | dev |
-| `color-support` | 1.1.3 | ISC | dev |
 | `combined-stream` | 1.0.8 | MIT | dev |
 | `commander` | 5.1.0 | MIT | dev |
+| `commander` | 9.5.0 | MIT | dev |
 | `compare-version` | 0.1.2 | MIT | dev |
-| `compress-commons` | 4.1.2 | MIT | dev |
 | `concat-map` | 0.0.1 | MIT | dev |
-| `config-file-ts` | 0.2.8-rc1 | MIT | dev |
-| `console-control-strings` | 1.1.0 | ISC | dev |
-| `core-util-is` | 1.0.2 | MIT | dev |
-| `crc` | 3.8.0 | MIT | dev |
-| `crc-32` | 1.2.2 | Apache-2.0 | dev |
-| `crc32-stream` | 4.0.3 | MIT | dev |
+| `core-util-is` | 1.0.3 | MIT | dev |
+| `cross-dirname` | 0.1.0 | MIT | dev |
 | `cross-spawn` | 7.0.6 | MIT | dev |
 | `debug` | 4.4.3 | MIT | dev |
 | `decompress-response` | 6.0.0 | MIT | dev |
-| `defaults` | 1.0.4 | MIT | dev |
 | `defer-to-connect` | 2.0.1 | MIT | dev |
+| `define-data-property` | 1.1.4 | MIT | dev |
+| `define-properties` | 1.2.1 | MIT | dev |
 | `delayed-stream` | 1.0.0 | MIT | dev |
-| `delegates` | 1.0.0 | MIT | dev |
-| `detect-libc` | 2.1.2 | Apache-2.0 | dev |
+| `detect-node` | 2.1.0 | MIT | dev |
 | `dir-compare` | 4.2.0 | MIT | dev |
-| `dmg-builder` | 25.1.8 | MIT | dev |
-| `dmg-license` | 1.0.11 | MIT | dev |
+| `dmg-builder` | 26.17.0 | MIT | dev |
 | `dotenv` | 16.6.1 | BSD-2-Clause | dev |
 | `dotenv-expand` | 11.0.7 | BSD-2-Clause | dev |
 | `dunder-proto` | 1.0.1 | MIT | dev |
-| `eastasianwidth` | 0.2.0 | MIT | dev |
+| `duplexer2` | 0.1.4 | BSD-3-Clause | dev |
 | `ejs` | 3.1.10 | Apache-2.0 | dev |
 | `electron` | 41.10.7 | MIT | dev |
-| `electron-builder` | 25.1.8 | MIT | dev |
-| `electron-builder-squirrel-windows` | 25.1.8 | MIT | dev |
-| `electron-publish` | 25.1.7 | MIT | dev |
+| `electron-builder` | 26.17.0 | MIT | dev |
+| `electron-builder-squirrel-windows` | 26.17.0 | MIT | dev |
+| `electron-publish` | 26.16.0 | MIT | dev |
+| `electron-winstaller` | 5.4.0 | MIT | dev |
 | `emoji-regex` | 8.0.0 | MIT | dev |
-| `emoji-regex` | 9.2.2 | MIT | dev |
-| `encoding` | 0.1.13 | MIT | dev |
 | `end-of-stream` | 1.4.5 | MIT | dev |
 | `env-paths` | 2.2.1 | MIT | dev |
 | `env-paths` | 3.0.0 | MIT | dev |
@@ -583,90 +556,71 @@ If you are the author of upstream code and believe it is included here under dif
 | `es-errors` | 1.3.0 | MIT | dev |
 | `es-object-atoms` | 1.1.2 | MIT | dev |
 | `es-set-tostringtag` | 2.1.0 | MIT | dev |
+| `es6-error` | 4.1.1 | MIT | dev |
 | `escalade` | 3.2.0 | MIT | dev |
+| `escape-string-regexp` | 4.0.0 | MIT | dev |
 | `exponential-backoff` | 3.1.3 | Apache-2.0 | dev |
-| `extsprintf` | 1.4.1 | MIT | dev |
 | `fast-deep-equal` | 3.1.3 | MIT | dev |
-| `fast-json-stable-stringify` | 2.1.0 | MIT | dev |
+| `fast-uri` | 3.1.8 | BSD-3-Clause | dev |
+| `fdir` | 6.5.0 | MIT | dev |
 | `filelist` | 1.0.6 | Apache-2.0 | dev |
-| `foreground-child` | 3.3.1 | ISC | dev |
 | `form-data` | 4.0.6 | MIT | dev |
-| `fs-constants` | 1.0.0 | MIT | dev |
 | `fs-extra` | 10.1.0 | MIT | dev |
+| `fs-extra` | 11.3.1 | MIT | dev |
 | `fs-extra` | 11.4.1 | MIT | dev |
+| `fs-extra` | 7.0.1 | MIT | dev |
+| `fs-extra` | 8.1.0 | MIT | dev |
 | `fs-extra` | 9.1.0 | MIT | dev |
-| `fs-minipass` | 2.1.0 | ISC | dev |
 | `fs.realpath` | 1.0.0 | ISC | dev |
 | `function-bind` | 1.1.2 | MIT | dev |
-| `gauge` | 4.0.4 | ISC | dev |
 | `get-caller-file` | 2.0.5 | ISC | dev |
 | `get-intrinsic` | 1.3.0 | MIT | dev |
 | `get-proto` | 1.0.1 | MIT | dev |
 | `get-stream` | 5.2.0 | MIT | dev |
-| `glob` | 10.5.0 | ISC | dev |
 | `glob` | 7.2.3 | ISC | dev |
-| `glob` | 8.1.0 | ISC | dev |
+| `global-agent` | 3.0.0 | BSD-3-Clause | dev |
+| `globalthis` | 1.0.4 | MIT | dev |
 | `gopd` | 1.2.0 | MIT | dev |
 | `got` | 11.8.6 | MIT | dev |
 | `graceful-fs` | 4.2.11 | ISC | dev |
 | `has-flag` | 4.0.0 | MIT | dev |
+| `has-property-descriptors` | 1.0.2 | MIT | dev |
 | `has-symbols` | 1.1.0 | MIT | dev |
 | `has-tostringtag` | 1.0.2 | MIT | dev |
-| `has-unicode` | 2.0.1 | ISC | dev |
 | `hasown` | 2.0.4 | MIT | dev |
 | `hosted-git-info` | 4.1.0 | ISC | dev |
-| `http-cache-semantics` | 4.2.0 | BSD-2-Clause | dev |
-| `http-proxy-agent` | 5.0.0 | MIT | dev |
+| `http-cache-semantics` | 4.3.0 | BSD-2-Clause | dev |
 | `http-proxy-agent` | 7.0.2 | MIT | dev |
 | `http2-wrapper` | 1.0.3 | MIT | dev |
-| `https-proxy-agent` | 5.0.1 | MIT | dev |
 | `https-proxy-agent` | 7.0.6 | MIT | dev |
-| `humanize-ms` | 1.2.1 | MIT | dev |
-| `iconv-corefoundation` | 1.1.7 | MIT | dev |
-| `iconv-lite` | 0.6.3 | MIT | dev |
-| `ieee754` | 1.2.1 | BSD-3-Clause | dev |
-| `imurmurhash` | 0.1.4 | MIT | dev |
-| `indent-string` | 4.0.0 | MIT | dev |
-| `infer-owner` | 1.0.4 | ISC | dev |
 | `inflight` | 1.0.6 | ISC | dev |
 | `inherits` | 2.0.4 | ISC | dev |
-| `ip-address` | 10.7.2 | MIT | dev |
-| `is-ci` | 3.0.1 | MIT | dev |
 | `is-fullwidth-code-point` | 3.0.0 | MIT | dev |
-| `is-interactive` | 1.0.0 | MIT | dev |
-| `is-lambda` | 1.0.1 | MIT | dev |
-| `is-unicode-supported` | 0.1.0 | MIT | dev |
 | `isarray` | 1.0.0 | MIT | dev |
 | `isbinaryfile` | 4.0.10 | MIT | dev |
 | `isbinaryfile` | 5.0.7 | MIT | dev |
 | `isexe` | 2.0.0 | ISC | dev |
-| `jackspeak` | 3.4.3 | BlueOak-1.0.0 | dev |
+| `isexe` | 3.1.5 | BlueOak-1.0.0 | dev |
+| `isexe` | 4.0.0 | BlueOak-1.0.0 | dev |
 | `jake` | 10.9.4 | Apache-2.0 | dev |
+| `jiti` | 2.7.0 | MIT | dev |
 | `js-yaml` | 4.3.2 | MIT | dev |
 | `json-buffer` | 3.0.1 | MIT | dev |
-| `json-schema-traverse` | 0.4.1 | MIT | dev |
+| `json-schema-traverse` | 1.0.0 | MIT | dev |
+| `json-stringify-safe` | 5.0.1 | ISC | dev |
 | `json5` | 2.2.3 | MIT | dev |
+| `jsonfile` | 4.0.0 | MIT | dev |
 | `jsonfile` | 6.2.1 | MIT | dev |
 | `keyv` | 4.5.4 | MIT | dev |
 | `lazy-val` | 1.0.5 | MIT | dev |
-| `lazystream` | 1.0.1 | MIT | dev |
 | `lodash` | 4.18.1 | MIT | dev |
-| `lodash.defaults` | 4.2.0 | MIT | dev |
-| `lodash.difference` | 4.5.0 | MIT | dev |
-| `lodash.flatten` | 4.4.0 | MIT | dev |
-| `lodash.isplainobject` | 4.0.6 | MIT | dev |
-| `lodash.union` | 4.6.0 | MIT | dev |
-| `log-symbols` | 4.1.0 | MIT | dev |
 | `lowercase-keys` | 2.0.0 | MIT | dev |
-| `lru-cache` | 10.4.3 | ISC | dev |
 | `lru-cache` | 6.0.0 | ISC | dev |
-| `lru-cache` | 7.18.3 | ISC | dev |
-| `make-fetch-happen` | 10.2.1 | ISC | dev |
+| `matcher` | 3.0.0 | MIT | dev |
 | `math-intrinsics` | 1.1.0 | MIT | dev |
 | `mime` | 2.6.0 | MIT | dev |
 | `mime-db` | 1.52.0 | MIT | dev |
 | `mime-types` | 2.1.35 | MIT | dev |
-| `mimic-fn` | 2.1.0 | MIT | dev |
 | `mimic-response` | 1.0.1 | MIT | dev |
 | `mimic-response` | 3.1.0 | MIT | dev |
 | `minimatch` | 10.2.6 | BlueOak-1.0.0 | dev |
@@ -674,142 +628,126 @@ If you are the author of upstream code and believe it is included here under dif
 | `minimatch` | 5.1.9 | ISC | dev |
 | `minimatch` | 9.0.9 | ISC | dev |
 | `minimist` | 1.2.8 | MIT | dev |
-| `minipass` | 3.3.6 | ISC | dev |
-| `minipass` | 5.0.0 | ISC | dev |
 | `minipass` | 7.1.3 | BlueOak-1.0.0 | dev |
-| `minipass-collect` | 1.0.2 | ISC | dev |
-| `minipass-fetch` | 2.1.2 | MIT | dev |
-| `minipass-flush` | 1.0.7 | BlueOak-1.0.0 | dev |
-| `minipass-pipeline` | 1.2.4 | ISC | dev |
-| `minipass-sized` | 1.0.3 | ISC | dev |
-| `minizlib` | 2.1.2 | MIT | dev |
-| `mkdirp` | 1.0.4 | MIT | dev |
+| `minizlib` | 3.1.0 | MIT | dev |
+| `mkdirp` | 0.5.6 | MIT | dev |
 | `ms` | 2.1.3 | MIT | dev |
-| `negotiator` | 0.6.4 | MIT | dev |
-| `node-abi` | 3.96.0 | MIT | dev |
-| `node-addon-api` | 1.7.2 | MIT | dev |
+| `node-abi` | 4.37.0 | MIT | dev |
 | `node-api-version` | 0.2.1 | MIT | dev |
-| `node-gyp` | 9.4.1 | MIT | dev |
-| `nopt` | 6.0.0 | ISC | dev |
-| `normalize-path` | 3.0.0 | MIT | dev |
+| `node-gyp` | 12.4.0 | MIT | dev |
+| `node-int64` | 0.4.0 | MIT | dev |
+| `nopt` | 9.0.0 | ISC | dev |
 | `normalize-url` | 6.1.0 | MIT | dev |
-| `npmlog` | 6.0.2 | ISC | dev |
+| `object-keys` | 1.1.1 | MIT | dev |
 | `once` | 1.4.0 | ISC | dev |
-| `onetime` | 5.1.2 | MIT | dev |
-| `ora` | 5.4.1 | MIT | dev |
 | `p-cancelable` | 2.1.1 | MIT | dev |
 | `p-limit` | 3.1.0 | MIT | dev |
-| `p-map` | 4.0.0 | MIT | dev |
-| `package-json-from-dist` | 1.0.1 | BlueOak-1.0.0 | dev |
 | `path-is-absolute` | 1.0.1 | MIT | dev |
 | `path-key` | 3.1.1 | MIT | dev |
-| `path-scurry` | 1.11.1 | BlueOak-1.0.0 | dev |
 | `pe-library` | 0.4.1 | MIT | dev |
 | `picocolors` | 1.1.1 | ISC | dev |
-| `plist` | 3.1.1 | MIT | dev |
+| `picomatch` | 4.0.7 | MIT | dev |
+| `pkijs` | 3.4.1 | BSD-3-Clause | dev |
+| `plist` | 3.1.0 | MIT | dev |
+| `postject` | 1.0.0-alpha.6 | MIT | dev |
+| `proc-log` | 6.1.0 | ISC | dev |
 | `process-nextick-args` | 2.0.1 | MIT | dev |
 | `progress` | 2.0.3 | MIT | dev |
-| `promise-inflight` | 1.0.1 | ISC | dev |
 | `promise-retry` | 2.0.1 | MIT | dev |
+| `proper-lockfile` | 4.1.2 | MIT | dev |
 | `pump` | 3.0.4 | MIT | dev |
-| `punycode` | 2.3.1 | MIT | dev |
+| `pvtsutils` | 1.3.6 | MIT | dev |
+| `pvutils` | 1.2.0 | MIT | dev |
 | `quick-lru` | 5.1.1 | MIT | dev |
 | `read-binary-file-arch` | 1.0.6 | MIT | dev |
 | `readable-stream` | 2.3.8 | MIT | dev |
-| `readable-stream` | 3.6.2 | MIT | dev |
-| `readdir-glob` | 1.1.3 | Apache-2.0 | dev |
 | `require-directory` | 2.1.1 | MIT | dev |
+| `require-from-string` | 2.0.2 | MIT | dev |
 | `resedit` | 1.7.2 | MIT | dev |
 | `resolve-alpn` | 1.2.1 | MIT | dev |
 | `responselike` | 2.0.1 | MIT | dev |
-| `restore-cursor` | 3.1.0 | MIT | dev |
 | `retry` | 0.12.0 | MIT | dev |
-| `rimraf` | 3.0.2 | ISC | dev |
+| `rimraf` | 2.6.3 | ISC | dev |
+| `roarr` | 2.15.4 | BSD-3-Clause | dev |
 | `safe-buffer` | 5.1.2 | MIT | dev |
-| `safe-buffer` | 5.2.1 | MIT | dev |
-| `safer-buffer` | 2.1.2 | MIT | dev |
 | `sanitize-filename` | 1.6.4 | WTFPL OR ISC | dev |
 | `sax` | 1.6.1 | BlueOak-1.0.0 | dev |
+| `semver` | 5.7.2 | ISC | dev |
+| `semver` | 6.3.1 | ISC | dev |
+| `semver` | 7.7.4 | ISC | dev |
 | `semver` | 7.8.5 | ISC | dev |
-| `set-blocking` | 2.0.0 | ISC | dev |
+| `semver-compare` | 1.0.0 | MIT | dev |
+| `serialize-error` | 7.0.1 | MIT | dev |
 | `shebang-command` | 2.0.0 | MIT | dev |
 | `shebang-regex` | 3.0.0 | MIT | dev |
 | `signal-exit` | 3.0.7 | ISC | dev |
-| `signal-exit` | 4.1.0 | ISC | dev |
 | `simple-update-notifier` | 2.0.0 | MIT | dev |
-| `slice-ansi` | 3.0.0 | MIT | dev |
-| `smart-buffer` | 4.2.0 | MIT | dev |
-| `socks` | 2.8.10 | MIT | dev |
-| `socks-proxy-agent` | 7.0.0 | MIT | dev |
 | `source-map` | 0.6.1 | BSD-3-Clause | dev |
 | `source-map-support` | 0.5.21 | MIT | dev |
-| `ssri` | 9.0.1 | ISC | dev |
+| `sprintf-js` | 1.1.3 | BSD-3-Clause | dev |
 | `stat-mode` | 1.0.0 | MIT | dev |
 | `string-width` | 4.2.3 | MIT | dev |
-| `string-width` | 5.1.2 | MIT | dev |
-| `string-width-cjs` | 4.2.3 | MIT | dev |
 | `string_decoder` | 1.1.1 | MIT | dev |
-| `string_decoder` | 1.3.0 | MIT | dev |
 | `strip-ansi` | 6.0.1 | MIT | dev |
-| `strip-ansi` | 7.2.0 | MIT | dev |
-| `strip-ansi-cjs` | 6.0.1 | MIT | dev |
 | `sumchecker` | 3.0.1 | Apache-2.0 | dev |
 | `supports-color` | 7.2.0 | MIT | dev |
-| `tar` | 6.2.1 | ISC | dev |
-| `tar-stream` | 2.2.0 | MIT | dev |
+| `tar` | 7.5.22 | BlueOak-1.0.0 | dev |
+| `temp` | 0.9.4 | MIT | dev |
 | `temp-file` | 3.4.0 | MIT | dev |
+| `tiny-async-pool` | 1.3.0 | MIT | dev |
+| `tinyglobby` | 0.2.17 | MIT | dev |
 | `tmp` | 0.2.7 | MIT | dev |
 | `tmp-promise` | 3.0.3 | MIT | dev |
 | `truncate-utf8-bytes` | 1.0.2 | WTFPL | dev |
-| `typescript` | 5.9.3 | Apache-2.0 | dev |
+| `tslib` | 2.8.1 | 0BSD | dev |
+| `type-fest` | 0.13.1 | (MIT OR CC0-1.0) | dev |
+| `undici` | 6.29.0 | MIT | dev |
 | `undici` | 7.29.1 | MIT | dev |
 | `undici-types` | 7.18.2 | MIT | dev |
-| `unique-filename` | 2.0.1 | ISC | dev |
-| `unique-slug` | 3.0.0 | ISC | dev |
+| `universalify` | 0.1.2 | MIT | dev |
 | `universalify` | 2.0.1 | MIT | dev |
-| `uri-js` | 4.4.1 | BSD-2-Clause | dev |
+| `unzipper` | 0.12.5 | MIT | dev |
 | `utf8-byte-length` | 1.0.5 | (WTFPL OR MIT) | dev |
 | `util-deprecate` | 1.0.2 | MIT | dev |
-| `verror` | 1.10.1 | MIT | dev |
-| `wcwidth` | 1.0.1 | MIT | dev |
+| `webcrypto-core` | 1.9.2 | MIT | dev |
 | `which` | 2.0.2 | ISC | dev |
-| `wide-align` | 1.1.5 | ISC | dev |
+| `which` | 5.0.0 | ISC | dev |
+| `which` | 6.0.1 | ISC | dev |
 | `wrap-ansi` | 7.0.0 | MIT | dev |
-| `wrap-ansi` | 8.1.0 | MIT | dev |
-| `wrap-ansi-cjs` | 7.0.0 | MIT | dev |
 | `wrappy` | 1.0.2 | ISC | dev |
 | `xmlbuilder` | 15.1.1 | MIT | dev |
 | `y18n` | 5.0.8 | ISC | dev |
 | `yallist` | 4.0.0 | ISC | dev |
+| `yallist` | 5.0.0 | BlueOak-1.0.0 | dev |
 | `yargs` | 17.7.3 | MIT | dev |
 | `yargs-parser` | 21.1.1 | ISC | dev |
 | `yocto-queue` | 0.1.0 | MIT | dev |
-| `zip-stream` | 4.1.1 | MIT | dev |
 
 ## Backend (Python, bundled into the sidecar)
 
 | Package | Version | License |
 |---|---|---|
-| `fastapi` | 0.136.1 | MIT |
-| `uvicorn` | 0.46.0 | BSD-3-Clause |
+| `fastapi` | 0.143.0 | MIT |
+| `uvicorn` | 0.54.0 | BSD-3-Clause |
 | `websockets` | 14.2 | BSD License |
-| `python-multipart` | 0.0.27 | Apache-2.0 |
+| `python-multipart` | 0.0.32 | Apache-2.0 |
 | `openai` | 1.109.1 | Apache Software License |
-| `requests` | 2.33.1 | Apache Software License |
-| `websocket-client` | 1.9.0 | Apache Software License |
-| `aiohttp` | 3.14.3 | Apache-2.0 AND MIT |
-| `pypdfium2` | 5.13.0 | BSD-3-Clause, Apache-2.0, dependency licenses |
-| `sounddevice` | 0.5.5 | MIT |
-| `soundcard` | 0.4.6 | BSD License |
-| `numpy` | 2.2.4 | BSD License |
-| `faster-whisper` | 1.2.1 | MIT License |
-| `pydantic` | 2.13.3 | MIT |
+| `requests` | 2.34.2 | Apache Software License |
+| `websocket-client` | 1.9.2 | Apache-2.0 |
+| `aiohttp` | 3.14.5 | Apache-2.0 AND MIT |
+| `pypdfium2` | 5.14.0 | BSD-3-Clause, Apache-2.0, dependency licenses |
+| `sounddevice` | 0.5.6 | MIT |
+| `soundcard` | (not installed) | UNKNOWN |
+| `numpy` | 2.4.6 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 |
+| `faster-whisper` | (not installed) | UNKNOWN |
+| `pydantic` | 2.14.1 | MIT |
 | `qrcode` | 7.4.2 | BSD License |
 | `mss` | 9.0.2 | MIT License |
-| `Pillow` | 11.1.0 | CMU License (MIT-CMU) |
+| `Pillow` | 11.3.0 | MIT-CMU |
 | `opencc-python-reimplemented` | 0.1.7 | Apache Software License |
 | `python-docx` | 1.2.0 | MIT License |
 | `pypdf` | 5.9.0 | BSD-3-Clause |
+| `tzdata` | 2026.5 | Apache-2.0 |
 
 ## Copyleft components shipped in the Windows build
 

@@ -467,6 +467,7 @@ def markdown(report: dict[str, Any]) -> str:
         f"- Human-labeled rows: **{report['rows']}**",
         f"- Cohort status: **{cohort.get('status') or 'UNKNOWN'}**",
         f"- Labeled Sessions: **{len(cohort.get('sessions') or [])}**",
+        f"- Stable sample unit: **{(report.get('metric_population') or {}).get('sample_unit') or 'UNKNOWN'}**",
         "- PMF_PROVEN: **FALSE**",
         "",
         "| Metric | Value | n |",

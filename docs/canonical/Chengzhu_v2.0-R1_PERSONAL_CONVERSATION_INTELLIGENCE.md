@@ -592,6 +592,24 @@ Source / Confidence / Warning
 - Follow-up；
 - Next Focus。
 
+真实 pilot / Beta 期间，结束 Session 后同一屏还应出现 **Quick Debrief**，但不能抢占 Continue 主体：
+
+```text
+Continue accuracy
+Would reuse this Space
+Cognitive load delta
+```
+
+规则：
+
+- 三项均为用户显式本机 self-report；
+- 结束 Session 后原地出现，避免要求用户返回 Space 再寻找评估入口；
+- Guidance / SILENT 的事件级质量标注作为折叠的第二层，可稍后补；
+- 不从 Pin / ignore / click-through 推断答案；
+- 不显示 productivity / meeting quality / readiness percentage；
+- Quick Debrief 完成度只是“已填写几项”，不是质量分；
+- 任何 self-report 都不能单独升级 `REAL_USER_VALIDATED`、Stable v2 或 PMF。
+
 全文 transcript / summary 是第二层。
 
 ---

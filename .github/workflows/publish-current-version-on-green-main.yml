@@ -34,6 +34,16 @@ jobs:
             exit 1
           fi
 
+          # Do not publish a stale green main commit after main has already
+          # advanced. Exact-SHA reproducibility is necessary but not sufficient:
+          # for an unpublished version, the releasing SHA must still be the
+          # current main tip when dispatch occurs.
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$current_main" != "$SOURCE_SHA" ]; then
+            echo "stale green main: CI proved $SOURCE_SHA but current main is $current_main; nothing to publish"
+            exit 0
+          fi
+
           version="$(node -p "require('./desktop/package.json').version")"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "unsupported release version: $version" >&2

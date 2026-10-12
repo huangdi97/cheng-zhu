@@ -319,7 +319,7 @@ def test_workspace_finalize_fails_closed_on_selected_session_or_pack_drift(produ
     assert finalization["selected_cohort_snapshot_sha256"]
 
 
-def test_inspect_marks_corrupt_or_context-drifted_pack_ineligible(product_env, tmp_path):
+def test_inspect_marks_corrupt_or_context_drifted_pack_ineligible(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)
 

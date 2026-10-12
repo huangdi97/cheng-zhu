@@ -500,11 +500,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $fixture = Join-Path $env:RUNNER_TEMP "chengzhu-release-body-fixture.md"
           $rendered = Join-Path $env:RUNNER_TEMP "chengzhu-release-body-rendered.md"
-          @"
-# Candidate notes
-
-This candidate is pre-publication wording.
-"@ | Set-Content $fixture -Encoding utf8
+          @(
+            "# Candidate notes",
+            "",
+            "This candidate is pre-publication wording."
+          ) | Set-Content $fixture -Encoding utf8
 
           $renderArgs = @(
             "scripts/render_published_release_body.py",

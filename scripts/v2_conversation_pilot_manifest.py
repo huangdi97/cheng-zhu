@@ -9,7 +9,7 @@ A final AUTHORIZED_REAL_CONVERSATION_PILOT manifest requires:
 - explicit --finalize;
 - every required --attest value supplied by the operator;
 - explicit --critical-incidents;
-- only ended PROJECT_SYNC / DESIGN_REVIEW sessions selected from product.db.
+- only ended PROJECT_SYNC / DESIGN_REVIEW sessions selected from product.db;\n- each selected Session has consent acknowledgement and a matching Frozen Session Pack.
 
 No transcript text, participant names, Space titles, or other content is copied
 into the manifest. user_ref is a local pseudonymous cohort key, not identity
@@ -88,14 +88,21 @@ def _session_rows(db: Path, session_ids: Iterable[str]) -> dict[str, dict[str, A
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
-        required = {"conversation_session", "conversation_space"}
+        required = {
+            "conversation_session",
+            "conversation_space",
+            "conversation_session_pack",
+        }
         if not required <= tables:
             raise ValueError("product.db 缺少 Conversation schema")
 
         placeholders = ",".join("?" for _ in ids)
         rows = conn.execute(
-            "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at "
+            "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
+            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id "
             "FROM conversation_session s "
+            "LEFT JOIN conversation_session_pack p "
+            "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
             f"WHERE s.id IN ({placeholders})",
             tuple(ids),
         ).fetchall()
@@ -146,6 +153,13 @@ def build_manifest(
             )
         if str(row.get("status") or "").upper() != "ENDED":
             raise ValueError(f"{session_id}: 只有 ENDED Session 可进入 pilot cohort")
+        if not bool(row.get("consent_ack")):
+            raise ValueError(f"{session_id}: 缺少 Session consent acknowledgement")
+        if (
+            not str(row.get("pack_id") or "").strip()
+            or str(row.get("frozen_pack_id") or "") != str(row.get("pack_id") or "")
+        ):
+            raise ValueError(f"{session_id}: 缺少可验证的 Frozen Session Pack")
         started_at = _finite_timestamp(row.get("started_at"), "started_at", session_id)
         ended_at = _finite_timestamp(row.get("ended_at"), "ended_at", session_id)
         if ended_at < started_at:

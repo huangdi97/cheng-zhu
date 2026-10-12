@@ -767,7 +767,7 @@ PR 合并后至少要有：
 
 ## Public Conversation Beta Prerelease Gate
 
-`v2.0.0-beta.2`、`v2.0.0-beta.3`、`v2.0.0-beta.4` 与 `v2.0.0-beta.5` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
+`v2.0.0-beta.2`、`v2.0.0-beta.3`、`v2.0.0-beta.4`、`v2.0.0-beta.5` 与 `v2.0.0-beta.6` 均按同一 exact-SHA / clean-install / download-back / provenance 门禁公开为 prerelease；后续 Beta 不能因为版本递增而降低门禁：
 
 - exact green main SHA；
 - Windows installer + portable；
@@ -787,13 +787,12 @@ PR 合并后至少要有：
 
 ```text
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
-PUBLISHED_BETA_TAG = v2.0.0-beta.5
-PUBLISHED_BETA_SOURCE_SHA = 3c29112b6256d78f26c7d70670b558c6c24d6a3b
-NEXT_BETA_CANDIDATE = v2.0.0-beta.6
+PUBLISHED_BETA_TAG = v2.0.0-beta.6
+PUBLISHED_BETA_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
 STABLE_LATEST = v1.4.2
 ```
 
-beta.5 已于 2026-10-12 从 exact green main SHA `3c29112b6256d78f26c7d70670b558c6c24d6a3b` 公开为 GitHub Prerelease。当前 source 正在准备 `v2.0.0-beta.6` real-pilot operationalization candidate；beta.6 只有在 exact main CI、Windows build/clean-install、draft download-back、downloaded installer replay、tag/source 与 prerelease-channel gate 全部完成后才允许成为 published truth。Main CI #923 与 Release run #316 均 SUCCESS；Release 完成 Windows build/test、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant、post-publish verification regression 与 verification artifact upload。beta.5 继承 beta.4 已发布的 schema v10–v12 Pilot Evidence Bridge / retention / auto-runtime provenance，并进一步打包 scope-aware dependency-security hardening、electron-builder 26.17.0、Vite 6.4.4 与 Stable Promotion Policy v4 authorized-cohort binding。详见 `docs/releases/V2_0_0_BETA_5_PUBLICATION_PROVENANCE.md`。beta.4 / beta.3 继续作为不可变历史发布 provenance 保留。
+beta.6 已于 2026-10-12 从 exact green main/tag SHA `38a70b719b2d5b0c9e8273e6a908fed9229ab706` 公开为 GitHub Prerelease。Main CI #980 与 Release run #318 均 SUCCESS；Release 完成 Backend/Frontend/Desktop、Windows build、packaged UI evidence、clean-install、draft download-back、downloaded asset SHA256、downloaded installer replay、packaged smoke、prerelease channel、Stable Latest 保持、tag/source invariant、post-publish verification regression 与 verification artifact upload。beta.6 继承 beta.5 已发布的 schema v10–v12 Pilot Evidence Bridge、retention/auto-runtime provenance、dependency-security hardening，并进一步将 Quick Debrief、Stable Promotion Policy v6、authorized pilot workspace、privacy-minimized Session inventory、WAL/TOCTOU selected-cohort provenance、frozen independent-review seed binding 与 unique-event-per-metric sample unit enforcement纳入当前公开 prerelease。详见 `docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`。这些能力使真实 pilot 更可执行/可审计，但仍不证明真实用户价值、reviewer 身份/独立性或 PMF。beta.5 / beta.4 / beta.3 继续作为不可变历史发布 provenance 保留。
 
 仍不允许：
 
@@ -898,7 +897,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 使用当前公开发布的 `v2.0.0-beta.5` 进行授权 local dogfood / real pilot，优先 Project Sync / Design Review；
+1. 使用当前公开发布的 `v2.0.0-beta.6` 进行授权 local dogfood / real pilot，优先 Project Sync / Design Review；
 2. 进行真实 Project Sync / Design Review 小规模使用；
 3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；

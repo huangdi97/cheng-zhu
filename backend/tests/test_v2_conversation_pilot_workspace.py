@@ -156,7 +156,7 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert snapshot_meta["logical_sha256"]
     assert json.loads((workspace / "stable-promotion-policy.json").read_text(encoding="utf-8"))[
         "policy_version"
-    ] == "v2.0-R1-stable-promotion-5"
+    ] == "v2.0-R1-stable-promotion-6"
 
     with pytest.raises(FileExistsError, match="workspace already exists"):
         mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)

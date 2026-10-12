@@ -258,11 +258,26 @@ def test_pilot_manifest_summary_derives_profile_counts_from_selected_sessions(pr
             (sessions[1]["id"], "pilot-user-01"),
         ],
     )
+    assert summary["cross_session_space_min_sessions"] == 3
     assert summary["profiles"]["PROJECT_SYNC"] == {
         "sessions": 2,
         "distinct_pseudonymous_users": 1,
-        "cross_session_spaces": 1,
+        "cross_session_spaces": 0,
     }
+
+    third = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(third["id"])
+    clock[0] += 30
+    third = conversations.end_session(third["id"])
+    _manifest3, summary3 = module.build_manifest(
+        Path(store.DB_PATH),
+        [
+            (sessions[0]["id"], "pilot-user-01"),
+            (sessions[1]["id"], "pilot-user-01"),
+            (third["id"], "pilot-user-01"),
+        ],
+    )
+    assert summary3["profiles"]["PROJECT_SYNC"]["cross_session_spaces"] == 1
     assert summary["profiles"]["DESIGN_REVIEW"] == {
         "sessions": 0,
         "distinct_pseudonymous_users": 0,

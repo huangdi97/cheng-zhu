@@ -132,7 +132,28 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
 
     metadata_text = (workspace / "workspace.json").read_text(encoding="utf-8")
     assert str(Path(store.DB_PATH).resolve()) not in metadata_text
-    assert result["source"]["database_sha256"]
+    assert result["source"]["database_file_sha256_advisory"]
+    assert result["source"]["database_file_sha256_includes_wal"] is False
+    assert result["source"]["logical_state_anchor"] == "selected-cohort.snapshot.json"
+
+    snapshot = json.loads(
+        (workspace / "selected-cohort.snapshot.json").read_text(encoding="utf-8")
+    )
+    assert snapshot["contract_version"] == mod.SELECTED_COHORT_SNAPSHOT_CONTRACT
+    assert {row["session_id"] for row in snapshot["sessions"]} == {
+        session_id for session_id, _ in data["assignments"]
+    }
+    assert all(row["frozen_pack_digest"] for row in snapshot["sessions"])
+    snapshot_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "Pilot Project" not in snapshot_text
+    assert "Pilot Design" not in snapshot_text
+    assert "为什么采用 v2?" not in snapshot_text
+    assert "private review context" not in snapshot_text
+
+    snapshot_meta = result["outputs"]["selected_cohort_snapshot"]
+    assert snapshot_meta["sessions"] == 2
+    assert snapshot_meta["sha256"]
+    assert snapshot_meta["logical_sha256"]
     assert json.loads((workspace / "stable-promotion-policy.json").read_text(encoding="utf-8"))[
         "policy_version"
     ] == "v2.0-R1-stable-promotion-5"
@@ -218,6 +239,110 @@ def test_inspect_pilot_sessions_explains_structural_blockers_without_authorizing
     assert report["claims"]["PARTICIPANT_CONSENT_SYSTEM_VERIFIED"] is False
 
 
+def test_workspace_cohort_snapshot_ignores_unrelated_db_growth_but_blocks_selected_session_drift(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    mod.init_workspace(Path(store.DB_PATH), data["assignments"], data["workspace"])
+
+    # Unrelated local activity is allowed. The workspace freezes only the
+    # selected cohort, not the entire WAL-backed product.db file.
+    unrelated = conversations.create_space("Unrelated after init", "PROJECT_SYNC")
+    _ended_session(unrelated["id"], title="Unrelated Session")
+    finalization = mod.finalize_workspace(
+        Path(store.DB_PATH),
+        data["workspace"],
+        attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+        critical_incidents=0,
+    )
+    assert finalization["selected_cohort_snapshot_sha256"]
+    assert finalization["selected_cohort_logical_sha256"]
+
+
+def test_workspace_finalize_fails_closed_on_selected_session_or_pack_drift(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    workspace = data["workspace"]
+    mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
+
+    selected = conversations.require_session(data["project_session"]["id"])
+    original_ended_at = selected["ended_at"]
+    store.update(
+        "conversation_session",
+        selected["id"],
+        {"ended_at": float(original_ended_at) + 1.0},
+    )
+    with pytest.raises(ValueError, match="selected cohort structural drift"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            workspace,
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+    store.update(
+        "conversation_session",
+        selected["id"],
+        {"ended_at": original_ended_at},
+    )
+
+    pack_id = conversations.require_session(selected["id"])["pack_id"]
+    pack = store.get("conversation_session_pack", pack_id)
+    assert pack is not None
+    original_digest = pack["digest"]
+    store.update("conversation_session_pack", pack_id, {"digest": "drifted-pack-digest"})
+    with pytest.raises(ValueError, match="payload digest mismatch"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            workspace,
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+    store.update("conversation_session_pack", pack_id, {"digest": original_digest})
+
+    original_payload = pack["payload"]
+    tampered_payload = {**original_payload, "_tampered_for_test": True}
+    store.update("conversation_session_pack", pack_id, {"payload": tampered_payload})
+    with pytest.raises(ValueError, match="payload digest mismatch"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            workspace,
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+    store.update("conversation_session_pack", pack_id, {"payload": original_payload})
+
+    finalization = mod.finalize_workspace(
+        Path(store.DB_PATH),
+        workspace,
+        attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+        critical_incidents=0,
+    )
+    assert finalization["selected_cohort_snapshot_sha256"]
+
+
+def test_inspect_marks_corrupt_or_context_drifted_pack_ineligible(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+
+    selected = conversations.require_session(data["project_session"]["id"])
+    pack = store.get("conversation_session_pack", selected["pack_id"])
+    assert pack is not None
+    original_digest = pack["digest"]
+
+    store.update("conversation_session_pack", pack["id"], {"digest": "corrupt-digest"})
+    report = mod.inspect_pilot_sessions(Path(store.DB_PATH))
+    row = next(item for item in report["sessions"] if item["session_id"] == selected["id"])
+    assert row["frozen_pack_verified"] is False
+    assert row["structurally_selectable"] is False
+    assert "FROZEN_SESSION_PACK_INTEGRITY_FAILED" in row["structural_blockers"]
+
+    store.update("conversation_session_pack", pack["id"], {"digest": original_digest})
+    store.update("conversation_session", selected["id"], {"assistance_mode": "QUIET"})
+    report2 = mod.inspect_pilot_sessions(Path(store.DB_PATH))
+    row2 = next(item for item in report2["sessions"] if item["session_id"] == selected["id"])
+    assert row2["frozen_pack_verified"] is False
+    assert "FROZEN_SESSION_PACK_INTEGRITY_FAILED" in row2["structural_blockers"]
+
+
 def test_finalize_workspace_requires_explicit_attestations_and_revalidates_db(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)
@@ -283,6 +408,26 @@ def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_pa
     seed = data["workspace"] / "independent-review.seed.jsonl"
     with pytest.raises(ValueError, match="unlabeled seed"):
         mod.evaluate_workspace(data["workspace"], [seed])
+
+    cohort_snapshot_path = data["workspace"] / "selected-cohort.snapshot.json"
+    original_cohort_snapshot = cohort_snapshot_path.read_bytes()
+    cohort_snapshot_path.write_bytes(original_cohort_snapshot + b"\n")
+    dummy_for_snapshot = tmp_path / "dummy-snapshot-review.jsonl"
+    dummy_for_snapshot.write_text(
+        json.dumps({
+            "kind": "continue",
+            "session_id": data["project_session"]["id"],
+            "space_id": data["project"]["id"],
+            "profile": "PROJECT_SYNC",
+            "reviewer": "independent-snapshot-check",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "writeback_accurate": True,
+        }) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="selected-cohort.snapshot.json"):
+        mod.evaluate_workspace(data["workspace"], [dummy_for_snapshot])
+    cohort_snapshot_path.write_bytes(original_cohort_snapshot)
 
     final_manifest_path = data["workspace"] / "pilot-manifest.final.json"
     original_final_manifest = final_manifest_path.read_bytes()

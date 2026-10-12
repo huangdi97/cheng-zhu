@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
+PUBLISHER = ROOT / ".github" / "workflows" / "publish-current-version-on-green-main.yml"
 
 
 def _section(text: str, start: str, end: str | None = None) -> str:
@@ -82,3 +83,17 @@ def test_download_back_evidence_is_uploaded_only_after_public_tag_verification()
     publish_i = text.index("- name: Publish verified GitHub Release")
     upload_i = text.index("- name: Upload download-back verification")
     assert publish_i < upload_i
+
+
+def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
+    text = PUBLISHER.read_text(encoding="utf-8")
+
+    assert "current_main=\"$(gh api \"repos/$GITHUB_REPOSITORY/git/ref/heads/main\" --jq '.object.sha')\"" in text
+    assert 'if [ "$current_main" != "$SOURCE_SHA" ]; then' in text
+    assert "stale green main" in text
+    assert 'if [ -f ".github/RELEASE_HOLD" ]; then' in text
+    assert "release hold is active" in text
+    stale_i = text.index('if [ "$current_main" != "$SOURCE_SHA" ]; then')
+    hold_i = text.index('if [ -f ".github/RELEASE_HOLD" ]; then')
+    dispatch_i = text.index("gh workflow run release.yml")
+    assert stale_i < hold_i < dispatch_i

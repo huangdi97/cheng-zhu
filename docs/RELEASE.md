@@ -40,6 +40,13 @@ Published beta.5 provenance is recorded in `docs/releases/V2_0_0_BETA_5_PUBLICAT
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 
+Two additional fail-closed controls apply before dispatch:
+
+- **current-main guard**: the green CI `head_sha` must still equal the current `main` tip. A stale green main SHA is reproducible, but it is not eligible to publish an unpublished version after main has advanced.
+- **explicit release hold**: while `.github/RELEASE_HOLD` exists in the green source SHA, the generic publisher must no-op. Removing the hold creates a new main SHA which must pass CI again before release dispatch.
+
+Use the hold for a confirmed release-blocking issue discovered after a release candidate version has already landed on main. Do not bypass it by manually dispatching an older SHA.
+
 
 ## Windows artifacts
 

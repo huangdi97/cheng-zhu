@@ -145,6 +145,7 @@ Expected files:
 
 ```text
 workspace.json
+selected-cohort.snapshot.json
 stable-promotion-policy.json
 pilot-manifest.draft.json
 independent-review.seed.jsonl
@@ -157,7 +158,8 @@ Important properties:
 - only explicitly selected Sessions enter the seed/export;
 - unrelated Sessions are not copied;
 - the absolute product.db path is not recorded;
-- source DB SHA256 is recorded;
+- `selected-cohort.snapshot.json` freezes selected Session structure + local pseudonymous `user_ref` + Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest）, without transcript / participant / Guidance / source text;
+- the SQLite main-file SHA256 is advisory only; Chengzhu uses WAL, so the main file alone is not the logical database-state anchor;
 - the exact Stable Promotion policy bytes are frozen;
 - the draft manifest is deliberately not Stable-eligible;
 - self-report remains explicit local self-report only;
@@ -223,9 +225,11 @@ It does not system-verify:
 - the truth of operator attestations;
 - PMF.
 
-If any frozen policy/draft hash has changed, finalization fails closed.
+If any frozen policy/draft/selected-cohort snapshot hash has changed, finalization fails closed.
 
-If cohort membership or attestations must change, create a new workspace instead of rewriting the old one.
+Finalization also recomputes the selected cohort's logical structure from current SQLite rows and requires exact equality with the frozen snapshot. Unrelated new Sessions or WAL activity are allowed; changes to a selected Session's Space/profile/status/start/end/consent or Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest） are rejected.
+
+If cohort membership, selected Session structure or attestations must change, create a new workspace instead of rewriting the old one.
 
 ## 8. Run the evidence gate
 
@@ -270,10 +274,13 @@ Workspace provenance protects against accidental evidence drift.
 
 The workflow refuses to continue when any frozen input hash changes:
 
+- `selected-cohort.snapshot.json`;
 - `stable-promotion-policy.json`;
 - `pilot-manifest.draft.json`;
 - `self-report.jsonl`;
 - `pilot-manifest.final.json`.
+
+The selected-cohort snapshot is additionally recomputed from logical SQLite rows at finalization. This avoids false drift from unrelated WAL-backed database changes while still failing closed on selected Session/Pack drift.
 
 Independent reviewer files are external inputs and their SHA256 values are recorded in `evaluation-manifest.json`.
 

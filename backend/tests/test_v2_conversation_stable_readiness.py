@@ -152,6 +152,7 @@ def test_stable_readiness_pass_only_grants_release_review():
         "sessions": 20,
         "cross_session_spaces": 3,
     }
+    assert report["pilot_cohort"]["cross_session_space_min_sessions"] == 3
 
 
 def test_stable_readiness_fails_when_sample_size_is_insufficient():
@@ -207,6 +208,45 @@ def test_stable_readiness_derives_profile_floor_from_enumerated_sessions():
         item["name"] == "profile:PROJECT_SYNC:sessions"
         for item in report["failed_checks"]
     )
+
+
+def test_two_session_spaces_do_not_satisfy_canonical_cross_session_floor():
+    module = _module()
+    policy = _policy()
+    pilot = _pilot()
+    sessions = pilot["profiles"]["PROJECT_SYNC"]["sessions"]
+
+    # Preserve 20 Sessions, 5 pseudonymous users and exactly three repeated
+    # Spaces, but give each repeated Space only 2 Sessions. The historical v4
+    # bug counted these as cross-session and could therefore pass this floor.
+    for index, entry in enumerate(sessions):
+        if index < 6:
+            entry["space_id"] = _space_id("PROJECT_SYNC", index // 2)
+        else:
+            entry["space_id"] = f"cs-project-single-{index}"
+
+    report = module.evaluate(_human_report(), pilot, policy)
+    assert report["status"] == "NO_GO"
+    cross = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "profile:PROJECT_SYNC:cross_session_spaces"
+    )
+    assert cross["actual"] == 0
+    assert cross["required"] == ">=3"
+
+
+def test_policy_cannot_lower_cross_session_space_qualification_below_three():
+    module = _module()
+    policy = _policy()
+    policy["cross_session_space_min_sessions"] = 2
+    report = module.evaluate(_human_report(), _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    check = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "cross_session_space_min_sessions_contract"
+    )
+    assert check["actual"] == 2
+    assert check["required"] == "integer >= 3"
 
 
 def test_stable_readiness_derives_distinct_users_instead_of_trusting_a_count():
@@ -270,7 +310,7 @@ def test_stable_readiness_ignores_unspecified_labels_even_when_aggregate_looks_g
     assert f"metric:{metric}:sample_size" in failed
 
 
-def test_old_count_only_manifest_cannot_pass_policy_v4():
+def test_old_count_only_manifest_cannot_pass_current_policy():
     module = _module()
     policy = _policy()
     pilot = _pilot()

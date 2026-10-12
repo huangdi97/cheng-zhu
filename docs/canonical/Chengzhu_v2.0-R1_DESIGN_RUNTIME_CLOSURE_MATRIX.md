@@ -1157,3 +1157,50 @@ authorized Project Sync / Design Review pilot
 同时继续补齐 Google Calendar / Drive / Gmail / Microsoft To Do 的适用 real-account evidence，以及 Gmail OAuth sensitive-scope/publication external gate。GitHub provider 的真实账号 replay evidence 保持独立记录。
 
 任何 beta.4 之后的源码提交都不得移动或重写 `v2.0.0-beta.4` tag；新的可下载代码必须使用新的版本和全新的 exact-SHA release cycle。
+
+
+---
+
+## Stable evidence cohort-binding closure · 2026-10-12
+
+继续审计 policy-v3 evaluator 后发现：旧 pilot manifest 只保存手填的 `distinct_users / sessions / cross_session_spaces` 数字，而 human-report 没有可供 Stable Gate 交叉验证的 Session cohort；同时 metrics 总分可包含首发目标之外的 Conversation Profile。两份各自“看起来有效”的证据理论上可以被错误拼接。
+
+当前源码 evaluator 收口为：
+
+```text
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-4
+NUMERICAL_THRESHOLDS_CHANGED_FROM_V3 = FALSE
+
+HUMAN_REPORT_CONTRACT = v2.0-R1-human-eval-4
+PILOT_MANIFEST_CONTRACT = v2.0-R1-pilot-cohort-2
+
+HAND_ENTERED_PROFILE_COUNTS = FORBIDDEN
+PROFILE_COUNTS = DERIVED_FROM_ENUMERATED_SESSIONS
+LOCAL_PSEUDONYMOUS_USER_REF = REQUIRED
+TIMEZONE_AWARE_PILOT_PERIOD = REQUIRED
+
+HUMAN_LABEL_SESSION_MEMBERSHIP =
+  exact session_id + profile + space_id match
+
+STABLE_METRIC_PROFILES =
+  PROJECT_SYNC + DESIGN_REVIEW
+
+OUT_OF_SCOPE_PROFILE_SCORE_INFLATION = FORBIDDEN
+REAL_USER_IDENTITY_SYSTEM_VERIFIED = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+manifest 的 `user_ref` 只是本地匿名代号；这条链提高的是 evidence consistency / auditability，不把 Chengzhu 变成身份认证系统，也不替代 `AUTHORIZED_REAL_USE` attestation。
+
+公开 `v2.0.0-beta.4` 的 publication provenance 仍然正确记录其发布时的 Stable Promotion Policy v3。policy v4 是 **post-beta.4 evaluator hardening**：可以用于评估 beta.4 采出的本地 pilot 数据，但不得倒写成 beta.4 binary/source 已包含的能力。
+
+因此成熟度仍保持：
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.4
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

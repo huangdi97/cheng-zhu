@@ -19,6 +19,7 @@ proof.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -58,6 +59,91 @@ def _iso_utc(timestamp: float) -> str:
         .isoformat()
         .replace("+00:00", "Z")
     )
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _validated_session_fact(row: dict[str, Any], session_id: str) -> dict[str, Any]:
+    pack_id = str(row.get("pack_id") or "").strip()
+    frozen_pack_id = str(row.get("frozen_pack_id") or "").strip()
+    stored_digest = str(row.get("frozen_pack_digest") or "").strip()
+    payload_text = str(row.get("frozen_pack_payload_json") or "")
+
+    if not pack_id or frozen_pack_id != pack_id:
+        raise ValueError(f"{session_id}: 缺少可验证的 Frozen Session Pack")
+    if not stored_digest or not payload_text:
+        raise ValueError(f"{session_id}: Frozen Session Pack payload/digest 缺失")
+    try:
+        payload = json.loads(payload_text)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{session_id}: Frozen Session Pack payload 不是有效 JSON") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"{session_id}: Frozen Session Pack payload 结构无效")
+
+    calculated_digest = _canonical_json_sha256(payload)
+    if calculated_digest != stored_digest:
+        raise ValueError(f"{session_id}: Frozen Session Pack payload digest mismatch")
+
+    frozen_space = payload.get("space") if isinstance(payload.get("space"), dict) else {}
+    frozen_policy = payload.get("policy") if isinstance(payload.get("policy"), dict) else {}
+
+    row_space_id = str(row.get("space_id") or "")
+    row_profile = str(row.get("template") or "").upper()
+    row_capture = str(row.get("capture_mode") or "").upper()
+    row_processing = str(row.get("processing_mode") or "").upper()
+    row_assistance = str(row.get("assistance_mode") or "").upper()
+    row_consent = bool(row.get("consent_ack"))
+
+    frozen_space_id = str(frozen_space.get("id") or "")
+    frozen_profile = str(frozen_space.get("profile") or "").upper()
+    frozen_capture = str(frozen_policy.get("capture_mode") or "").upper()
+    frozen_processing = str(frozen_policy.get("processing_mode") or "").upper()
+    frozen_assistance = str(frozen_policy.get("assistance_mode") or "").upper()
+    frozen_consent = bool(frozen_policy.get("consent_ack"))
+
+    mismatches: list[str] = []
+    if frozen_space_id != row_space_id:
+        mismatches.append("space_id")
+    if frozen_profile != row_profile:
+        mismatches.append("profile")
+    if frozen_capture != row_capture:
+        mismatches.append("capture_mode")
+    if frozen_processing != row_processing:
+        mismatches.append("processing_mode")
+    if frozen_assistance != row_assistance:
+        mismatches.append("assistance_mode")
+    if frozen_consent != row_consent:
+        mismatches.append("consent_ack")
+    if mismatches:
+        raise ValueError(
+            f"{session_id}: Session row 与 Frozen Session Pack 不一致: "
+            + ", ".join(mismatches)
+        )
+
+    return {
+        "session_id": session_id,
+        "space_id": row_space_id,
+        "profile": frozen_profile,
+        "status": str(row.get("status") or "").upper(),
+        "started_at": row.get("started_at"),
+        "ended_at": row.get("ended_at"),
+        "consent_ack_recorded": row_consent,
+        "capture_mode": row_capture,
+        "processing_mode": row_processing,
+        "assistance_mode": row_assistance,
+        "pack_id": pack_id,
+        "frozen_pack_id": frozen_pack_id,
+        "frozen_pack_digest": stored_digest,
+        "frozen_pack_payload_digest_verified": True,
+    }
 
 
 def parse_assignment(value: str) -> tuple[str, str]:
@@ -101,7 +187,9 @@ def _session_rows(db: Path, session_ids: Iterable[str]) -> dict[str, dict[str, A
         placeholders = ",".join("?" for _ in ids)
         rows = conn.execute(
             "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
-            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id "
+            "s.capture_mode, s.processing_mode, s.assistance_mode, "
+            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id, "
+            "p.digest AS frozen_pack_digest, p.payload_json AS frozen_pack_payload_json "
             "FROM conversation_session s "
             "LEFT JOIN conversation_session_pack p "
             "ON p.id = s.pack_id AND p.session_id = s.id AND p.space_id = s.space_id "
@@ -111,6 +199,21 @@ def _session_rows(db: Path, session_ids: Iterable[str]) -> dict[str, dict[str, A
         return {str(row["id"]): dict(row) for row in rows}
     finally:
         conn.close()
+
+
+def validated_session_facts(
+    db: Path,
+    session_ids: Iterable[str],
+) -> dict[str, dict[str, Any]]:
+    ids = [str(value or "").strip() for value in session_ids]
+    rows = _session_rows(db, ids)
+    missing = sorted(set(ids) - set(rows))
+    if missing:
+        raise ValueError(f"product.db 中不存在 Session: {', '.join(missing)}")
+    return {
+        session_id: _validated_session_fact(rows[session_id], session_id)
+        for session_id in ids
+    }
 
 
 def build_manifest(
@@ -140,35 +243,27 @@ def build_manifest(
             raise ValueError(f"重复 session_id: {session_id}")
         by_session[session_id] = user_ref
 
-    rows = _session_rows(db, by_session)
-    missing = sorted(set(by_session) - set(rows))
-    if missing:
-        raise ValueError(f"product.db 中不存在 Session: {', '.join(missing)}")
+    facts = validated_session_facts(db, by_session)
 
     selected: list[dict[str, Any]] = []
     for session_id, user_ref in by_session.items():
-        row = rows[session_id]
-        profile = str(row.get("template") or "").upper()
+        fact = facts[session_id]
+        profile = str(fact.get("profile") or "").upper()
         if profile not in REQUIRED_PROFILES:
             raise ValueError(
-                f"{session_id}: profile={profile or '<empty>'} 不属于 Stable launch cohort"
+                f"{session_id}: frozen profile={profile or '<empty>'} 不属于 Stable launch cohort"
             )
-        if str(row.get("status") or "").upper() != "ENDED":
+        if str(fact.get("status") or "").upper() != "ENDED":
             raise ValueError(f"{session_id}: 只有 ENDED Session 可进入 pilot cohort")
-        if not bool(row.get("consent_ack")):
+        if not bool(fact.get("consent_ack_recorded")):
             raise ValueError(f"{session_id}: 缺少 Session consent acknowledgement")
-        if (
-            not str(row.get("pack_id") or "").strip()
-            or str(row.get("frozen_pack_id") or "") != str(row.get("pack_id") or "")
-        ):
-            raise ValueError(f"{session_id}: 缺少可验证的 Frozen Session Pack")
-        started_at = _finite_timestamp(row.get("started_at"), "started_at", session_id)
-        ended_at = _finite_timestamp(row.get("ended_at"), "ended_at", session_id)
+        started_at = _finite_timestamp(fact.get("started_at"), "started_at", session_id)
+        ended_at = _finite_timestamp(fact.get("ended_at"), "ended_at", session_id)
         if ended_at < started_at:
             raise ValueError(f"{session_id}: ended_at 早于 started_at")
         selected.append({
             "session_id": session_id,
-            "space_id": str(row.get("space_id") or ""),
+            "space_id": str(fact.get("space_id") or ""),
             "profile": profile,
             "user_ref": user_ref,
             "started_at": started_at,

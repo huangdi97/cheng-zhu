@@ -319,6 +319,30 @@ def test_workspace_finalize_fails_closed_on_selected_session_or_pack_drift(produ
     assert finalization["selected_cohort_snapshot_sha256"]
 
 
+def test_inspect_marks_corrupt_or_context-drifted_pack_ineligible(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+
+    selected = conversations.require_session(data["project_session"]["id"])
+    pack = store.get("conversation_session_pack", selected["pack_id"])
+    assert pack is not None
+    original_digest = pack["digest"]
+
+    store.update("conversation_session_pack", pack["id"], {"digest": "corrupt-digest"})
+    report = mod.inspect_pilot_sessions(Path(store.DB_PATH))
+    row = next(item for item in report["sessions"] if item["session_id"] == selected["id"])
+    assert row["frozen_pack_verified"] is False
+    assert row["structurally_selectable"] is False
+    assert "FROZEN_SESSION_PACK_INTEGRITY_FAILED" in row["structural_blockers"]
+
+    store.update("conversation_session_pack", pack["id"], {"digest": original_digest})
+    store.update("conversation_session", selected["id"], {"assistance_mode": "QUIET"})
+    report2 = mod.inspect_pilot_sessions(Path(store.DB_PATH))
+    row2 = next(item for item in report2["sessions"] if item["session_id"] == selected["id"])
+    assert row2["frozen_pack_verified"] is False
+    assert "FROZEN_SESSION_PACK_INTEGRITY_FAILED" in row2["structural_blockers"]
+
+
 def test_finalize_workspace_requires_explicit_attestations_and_revalidates_db(product_env, tmp_path):
     mod = _load()
     data = _workspace_fixture(product_env, tmp_path)

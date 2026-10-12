@@ -32,6 +32,7 @@ CONTRACT_VERSION = "v2.0-R1-pilot-cohort-2"
 FINAL_EVIDENCE_TYPE = "AUTHORIZED_REAL_CONVERSATION_PILOT"
 DRAFT_EVIDENCE_TYPE = "DRAFT_AUTHORIZED_REAL_CONVERSATION_PILOT"
 REQUIRED_PROFILES = ("PROJECT_SYNC", "DESIGN_REVIEW")
+CROSS_SESSION_SPACE_MIN_SESSIONS = 3
 REQUIRED_ATTESTATIONS = (
     "AUTHORIZED_REAL_USE",
     "NO_SYNTHETIC_ROWS_IN_HUMAN_EVAL",
@@ -239,6 +240,7 @@ def build_manifest(
         "mode": "FINAL" if finalize else "DRAFT",
         "sessions": len(selected),
         "profiles": {},
+        "cross_session_space_min_sessions": CROSS_SESSION_SPACE_MIN_SESSIONS,
         "real_user_identity_system_verified": False,
         "authorization_system_verified": False,
         "pmf_proven": False,
@@ -253,7 +255,10 @@ def build_manifest(
         summary["profiles"][profile] = {
             "sessions": len(rows_for_profile),
             "distinct_pseudonymous_users": len(users),
-            "cross_session_spaces": sum(1 for count in spaces.values() if count >= 2),
+            "cross_session_spaces": sum(
+                1 for count in spaces.values()
+                if count >= CROSS_SESSION_SPACE_MIN_SESSIONS
+            ),
         }
     return manifest, summary
 

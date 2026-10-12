@@ -61,6 +61,17 @@ class ProviderSpec:
     confirm_marker: str = ""
 
 
+RESERVED_TOKEN_ENV_NAMES = {
+    "PATH",
+    "HOME",
+    "USERPROFILE",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "CHENGZHU_HOME",
+    "PYTHONIOENCODING",
+}
+
+
 PROVIDERS: dict[str, ProviderSpec] = {
     "google-calendar": ProviderSpec(
         key="google-calendar",
@@ -311,6 +322,8 @@ def _public_connection(connection: dict[str, Any]) -> dict[str, Any]:
 def _validate_cli(spec: ProviderSpec, args: argparse.Namespace) -> str:
     if not args.token_env or not args.token_env.replace("_", "A").isalnum() or args.token_env[0].isdigit():
         raise ValueError("--token-env must be an environment-variable name")
+    if args.token_env in RESERVED_TOKEN_ENV_NAMES or args.token_env == spec.enable_env:
+        raise ValueError("--token-env cannot reuse a process/runtime control environment variable")
     target = str(args.target or spec.default_target).strip()
     if not 1 <= int(args.limit) <= 500:
         raise ValueError("--limit must be between 1 and 500")

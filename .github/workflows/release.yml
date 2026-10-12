@@ -16,6 +16,7 @@ on:
       - "packaging/**"
       - "scripts/build_sidecar.py"
       - "scripts/packaged_smoke.py"
+      - "scripts/render_published_release_body.py"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
       - "frontend/scripts/capture-v20-conversation-packaged-evidence.mjs"
@@ -421,18 +422,51 @@ jobs:
             throw "refusing to publish: draft $tag targets $draftTarget but binaries were built from $sourceSha"
           }
 
+          # Render authoritative publication metadata before the draft becomes
+          # public. The uploaded RELEASE_NOTES asset stays byte-for-byte
+          # unchanged; only the GitHub Release display body gets a generated
+          # status block. Doing this pre-publication also works with repositories
+          # that enable immutable Releases after publish.
+          $isPrerelease = $version.Contains('-')
+          $releaseChannel = $(if ($isPrerelease) { "PRERELEASE" } else { "STABLE" })
+          $publishedBody = "dist/release/published-release-body.md"
+          $renderArgs = @(
+            "scripts/render_published_release_body.py",
+            "--input", "dist/release/RELEASE_NOTES_v$version.md",
+            "--output", $publishedBody,
+            "--tag", $tag,
+            "--source-sha", $sourceSha,
+            "--channel", $releaseChannel
+          )
+          if ($isPrerelease) {
+            $latestStableBeforePublish = (gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq '.tag_name').Trim()
+            if ($latestStableBeforePublish -eq $tag) {
+              throw "prerelease draft $tag unexpectedly equals Stable Latest before publish"
+            }
+            $renderArgs += @("--stable-latest", $latestStableBeforePublish)
+          }
+          python @renderArgs
+          if ($LASTEXITCODE -ne 0) { throw "failed to render published Release body" }
+
           # Publishing the draft is the operation that materializes the git tag.
           # SemVer prereleases are public Beta artifacts, never the stable Latest.
-          $isPrerelease = $version.Contains('-')
           if ($isPrerelease) {
-            gh release edit $tag --draft=false --prerelease --latest=false --target $sourceSha
+            gh release edit $tag --notes-file $publishedBody --draft=false --prerelease --latest=false --target $sourceSha
           } else {
-            gh release edit $tag --draft=false --latest --target $sourceSha
+            gh release edit $tag --notes-file $publishedBody --draft=false --latest --target $sourceSha
           }
-          $releaseState = gh release view $tag --json isDraft,isPrerelease --jq '{isDraft: .isDraft, isPrerelease: .isPrerelease}' | ConvertFrom-Json
+          $releaseState = gh release view $tag --json isDraft,isPrerelease,body --jq '{isDraft: .isDraft, isPrerelease: .isPrerelease, body: .body}' | ConvertFrom-Json
           if ($releaseState.isDraft) { throw "verified release $tag did not publish" }
           if ([bool]$releaseState.isPrerelease -ne $isPrerelease) {
             throw "release channel mismatch for ${tag}: expected prerelease=$isPrerelease"
+          }
+          if (
+            -not [string]$releaseState.body -or
+            -not ([string]$releaseState.body).Contains("CHENGZHU_PUBLISHED_STATUS_BEGIN") -or
+            -not ([string]$releaseState.body).Contains($sourceSha) -or
+            -not ([string]$releaseState.body).Contains("Channel: **$releaseChannel**")
+          ) {
+            throw "published Release body is missing authoritative publication truth"
           }
           if ($isPrerelease) {
             $latestStable = (gh api "repos/${{ github.repository }}/releases/latest" --jq '.tag_name').Trim()
@@ -451,7 +485,6 @@ jobs:
           # public tag SHA so downstream provenance can be audited directly.
           $verificationPath = "dist/release/download-back-verification.json"
           if (Test-Path $verificationPath) {
-            $releaseChannel = $(if ($isPrerelease) { "PRERELEASE" } else { "STABLE" })
             & scripts/enrich_release_verification.ps1 `
               -Path $verificationPath `
               -TagSha $tagSha `

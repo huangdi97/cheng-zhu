@@ -68,6 +68,10 @@ def _human_report():
         "report_contract_version": policy["human_report_contract_version"],
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "claims": {"HUMAN_LABELS_AVAILABLE": True, "PMF_PROVEN": False},
+        "metric_population": {
+            "sample_unit": "UNIQUE_EVENT_PER_METRIC",
+            "duplicate_event_metric_policy": "FAIL_CLOSED",
+        },
         "cohort": {
             "status": "COMPLETE",
             "sessions": sessions,
@@ -153,6 +157,30 @@ def test_stable_readiness_pass_only_grants_release_review():
         "cross_session_spaces": 3,
     }
     assert report["pilot_cohort"]["cross_session_space_min_sessions"] == 3
+
+
+def test_stable_readiness_requires_unique_event_metric_sample_unit_contract():
+    module = _module()
+    policy = _policy()
+
+    old_report = _human_report()
+    old_report["metric_population"]["sample_unit"] = "ANNOTATION_ROWS"
+    report = module.evaluate(old_report, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "human_report_sample_unit"
+        for item in report["failed_checks"]
+    )
+
+    weakened_policy = _policy()
+    weakened_policy["metric_sample_unit"] = "ANNOTATION_ROWS"
+    weakened_policy["duplicate_event_metric_policy"] = "ALLOW"
+    report = module.evaluate(_human_report(), _pilot(), weakened_policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "metric_sample_unit_contract"
+        for item in report["failed_checks"]
+    )
 
 
 def test_stable_readiness_fails_when_sample_size_is_insufficient():

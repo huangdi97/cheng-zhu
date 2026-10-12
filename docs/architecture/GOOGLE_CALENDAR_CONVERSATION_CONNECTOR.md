@@ -226,3 +226,16 @@ Repository tests cannot prove:
 
 Those require an explicit local/account replay and must remain separately
 labelled as external evidence.
+
+
+## Real-account product replay
+
+Source-side operator harness:
+
+`scripts/v2_real_provider_account_replay.py --provider google-calendar ...`
+
+It verifies explicit connector opt-in, opaque credential handling, a real `calendar.read` sync, immutable snapshots, Space selection, frozen Session Pack provenance, and credential absence from the isolated product.db/export.
+
+A passing harness result may prove `PASS_REAL_ACCOUNT_READ_PRODUCT_REPLAY`; merely having this script in the repository is not real-account evidence.
+
+Runbook: `docs/evidence/V2_REAL_PROVIDER_ACCOUNT_REPLAY_RUNBOOK.md`.

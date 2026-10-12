@@ -1260,6 +1260,64 @@ beta.5 的目的已经完成：后续真实 Project Sync / Design Review pilot �
 
 ---
 
+## Post-beta.5 Stable cross-session qualification correction · 2026-10-12
+
+在 beta.5 发布后继续做 pre-pilot evaluator 审计时发现一个 cohort denominator bug：
+
+```text
+Canonical:
+cross-session Space = same Space has >= 3 authorized Sessions
+
+policy-v4 evaluator implementation:
+cross-session Space = same Space has >= 2 authorized Sessions
+```
+
+这意味着一个仍未达到 canonical “跨场连续使用”定义的 2-Session Space，可能被错误计入 `cross_session_spaces`，从而放松每个 launch profile 必须至少有 3 个 cross-session Spaces 的 Stable pilot floor。
+
+当前源码修复为：
+
+```text
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-5
+NUMERICAL_QUALITY_THRESHOLDS_CHANGED_FROM_V4 = FALSE
+PROFILE_USER_FLOOR_CHANGED = FALSE
+PROFILE_SESSION_FLOOR_CHANGED = FALSE
+REQUIRED_CROSS_SESSION_SPACES_CHANGED = FALSE
+
+CROSS_SESSION_SPACE_MIN_SESSIONS = 3
+POLICY_VALUE_BELOW_3 = FAIL_CLOSED
+TWO_SESSION_SPACE_COUNTS_AS_CROSS_SESSION = FALSE
+THREE_OR_MORE_SESSION_SPACE_COUNTS_AS_CROSS_SESSION = TRUE
+
+HUMAN_REPORT_CONTRACT = v2.0-R1-human-eval-4
+PILOT_MANIFEST_CONTRACT = v2.0-R1-pilot-cohort-2
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+新增 negative regression 专门构造：
+
+```text
+20 Sessions
+5 pseudonymous users
+3 repeated Spaces
+2 Sessions in each repeated Space
+```
+
+旧实现会把它错误算成 `cross_session_spaces = 3`；policy v5 必须算成 0 并返回 `NO_GO`。
+
+该修复是 **post-beta.5 source truth**。公开 `v2.0.0-beta.5` 仍然不可变地包含发布时的 policy-v4 evaluator；不得把 policy v5 倒写进 beta.5 provenance。若要把该 evaluator 修复提供为新的可下载版本，必须使用新的版本号和全新的 exact-SHA release cycle。
+
+这仍不是用户价值证据：
+
+```text
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+---
+
 ## Post-beta.5 pilot-operator manifest tooling · 2026-10-12
 
 在 beta.5 已公开发布之后，policy v4 的最后一个纯仓库操作摩擦是：authorized pilot cohort 虽然要求逐 Session 枚举，但 operator 仍需手抄 `session_id / space_id / profile / period` 到 manifest，容易产生 cohort mismatch。

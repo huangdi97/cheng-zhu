@@ -435,6 +435,65 @@ Stable Gate PASS
 != PMF
 ```
 
+## 12.2 Freeze the human Stable release decision
+
+The handoff itself intentionally leaves every release item `PENDING_HUMAN_RELEASE_REVIEW`. It is not a publication authorization.
+
+For a future v2+ Stable candidate, first create the exact Stable candidate commit **C0**:
+
+```text
+version = 2.x.y
+release notes/version surfaces frozen
+full CI green
+no Stable approval artifact yet
+```
+
+Generate a review template against C0:
+
+```bash
+python scripts/v2_stable_release_approval.py template \
+  --handoff-dir <LOCAL_PRIVATE_PATH>/pilot-stable-review \
+  --candidate-sha <C0_FULL_SHA> \
+  --candidate-version 2.0.0 \
+  --out <LOCAL_PRIVATE_PATH>/stable-release-review-input.json
+```
+
+The human release reviewer must explicitly review all 13 checks and provide a non-empty evidence reference/summary for each.
+
+Finalize only after review:
+
+```bash
+python scripts/v2_stable_release_approval.py finalize \
+  --handoff-dir <LOCAL_PRIVATE_PATH>/pilot-stable-review \
+  --review <LOCAL_PRIVATE_PATH>/stable-release-review-input.json \
+  --candidate-sha <C0_FULL_SHA> \
+  --candidate-version 2.0.0 \
+  --out .github/stable-release-approvals/v2.0.0.json
+```
+
+If any check is rejected, the result is `NO_GO` and must **not** be committed as approval.
+
+For an approved decision, commit only the generated approval JSON as the next commit **C1**. Chengzhu's publisher requires:
+
+```text
+parent(C1) == C0
+git diff C0..C1
+  == .github/stable-release-approvals/v2.0.0.json
+candidate version at C0 == 2.0.0
+all 13 checks == APPROVED
+handoff hashes present
+STABLE_RELEASE_PUBLICATION_AUTHORIZED == TRUE
+V2_STABLE_RELEASE == FALSE
+PMF_PROVEN == FALSE
+```
+
+Any source, dependency, workflow, release-note or version change after human review invalidates that approval and requires a new candidate/review.
+
+The generic current-version publisher and the Windows Release publish path both enforce this validator. A green v2 Stable candidate without approval does **not** auto-publish. Direct tag/manual publish cannot bypass the same gate.
+
+This is repository-level tamper-evident release governance, not cryptographic reviewer identity proof. Stronger custody can additionally use protected branches, signed commits, protected GitHub Environments or external immutable archives.
+
+
 ## 13. Current product truth
 
 After beta.9 publication:

@@ -455,12 +455,26 @@ jobs:
             throw "refusing to publish: draft $tag targets $draftTarget but binaries were built from $sourceSha"
           }
 
+          $isPrerelease = $version.Contains('-')
+          if (-not $isPrerelease -and [int]($version.Split('.')[0]) -ge 2) {
+            $authorizationPath = "dist/release/RELEASE_AUTHORIZATION.json"
+            if (-not (Test-Path $authorizationPath)) {
+              throw "Stable v2+ publish refused: RELEASE_AUTHORIZATION.json is missing"
+            }
+            $authorization = Get-Content $authorizationPath -Raw | ConvertFrom-Json
+            if ($authorization.status -ne "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO") {
+              throw "Stable v2+ publish refused: human Stable release review is not GO"
+            }
+            if ($authorization.version -ne $version -or $authorization.source_sha -ne $sourceSha) {
+              throw "Stable v2+ publish refused: authorization candidate drift"
+            }
+          }
+
           # Render authoritative publication metadata before the draft becomes
           # public. The uploaded RELEASE_NOTES asset stays byte-for-byte
           # unchanged; only the GitHub Release display body gets a generated
           # status block. Doing this pre-publication also works with repositories
           # that enable immutable Releases after publish.
-          $isPrerelease = $version.Contains('-')
           $releaseChannel = $(if ($isPrerelease) { "PRERELEASE" } else { "STABLE" })
           $publishedBody = "dist/release/published-release-body.md"
           $renderArgs = @(

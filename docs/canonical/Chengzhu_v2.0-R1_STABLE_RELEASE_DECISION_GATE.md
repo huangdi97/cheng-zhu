@@ -68,9 +68,10 @@ The human reviewer fills:
 
 - `reviewer_ref` (a local reviewer reference; not identity proof);
 - timezone-aware `reviewed_at`;
-- every check state = `APPROVED` or `REJECTED`;
+- each pre-publication human-review check = `APPROVED` or `REJECTED`;
+- `release_asset_sha256_verified` and `tag_source_sha_equal` = `DELEGATED_TO_RELEASE_WORKFLOW` or `REJECTED` because those final facts do not exist until the release workflow runs;
 - a non-empty evidence reference/summary for every check;
-- the frozen four review attestations.
+- the frozen four review attestations entered explicitly by the reviewer.
 
 Finalize:
 
@@ -94,14 +95,19 @@ STABLE_RELEASE_PUBLICATION_AUTHORIZED = FALSE
 
 Do not commit a NO_GO file as an approval.
 
-Only all-APPROVED review yields:
+Only a review with all pre-publication checks APPROVED, both publication-time checks explicitly DELEGATED_TO_RELEASE_WORKFLOW, and no REJECTED check yields:
 
 ```text
 STABLE_RELEASE_APPROVED_FOR_EXACT_CANDIDATE
 STABLE_RELEASE_PUBLICATION_AUTHORIZED = TRUE
+publication_machine_checks =
+  release_asset_sha256_verified
+  tag_source_sha_equal
 V2_STABLE_RELEASE = FALSE
 PMF_PROVEN = FALSE
 ```
+
+The two delegated checks are then mandatory machine gates in `release.yml`: draft download-back verifies final asset SHA256 before publish, and the workflow verifies the materialized public tag SHA equals the exact binary source SHA immediately after publish. The immutable approval artifact is not rewritten afterward; publication provenance records those final PASS facts.
 
 Approval is authorization to enter publication; it is not proof that publication already happened.
 

@@ -17,6 +17,7 @@ on:
       - "scripts/build_sidecar.py"
       - "scripts/packaged_smoke.py"
       - "scripts/render_published_release_body.py"
+      - "scripts/v2_stable_release_approval.py"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
       - "frontend/scripts/capture-v20-conversation-packaged-evidence.mjs"

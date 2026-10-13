@@ -407,7 +407,13 @@ def validate_committed_approval(
     if existed:
         raise ValueError("approval artifact already existed in candidate commit")
 
-    parent = _git(repo_root, "rev-parse", f"{release_sha}^")
+    parents_line = _git(repo_root, "rev-list", "--parents", "-n", "1", release_sha)
+    parent_tokens = parents_line.split()
+    if len(parent_tokens) != 2:
+        raise ValueError(
+            "Stable release source must be a single-parent approval-only commit"
+        )
+    parent = parent_tokens[1]
     if parent != candidate_sha:
         raise ValueError(
             "Stable release source must be exactly one approval-only child commit of candidate_source_sha"

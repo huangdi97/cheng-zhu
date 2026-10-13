@@ -108,11 +108,13 @@ jobs:
               $approvalPath = ".github/stable-release-approvals/v$version.json"
               $approval = Get-Content $approvalPath -Raw | ConvertFrom-Json
               $candidateSha = [string]$approval.candidate_source_sha
-              $ciCount = gh api "repos/${{ github.repository }}/actions/runs?head_sha=$candidateSha&event=push&per_page=100" --jq '[.workflow_runs[] | select(.name == "CI" and .head_branch == "main" and .conclusion == "success")] | length'
-              if ([int]$ciCount -lt 1) {
-                throw "Stable candidate $candidateSha has no successful main CI push run"
+              foreach ($sha in @($candidateSha, $env:CHENGZHU_RELEASE_SOURCE_SHA)) {
+                $ciCount = gh api "repos/${{ github.repository }}/actions/runs?head_sha=$sha&event=push&per_page=100" --jq '[.workflow_runs[] | select(.name == "CI" and .head_branch == "main" and .conclusion == "success")] | length'
+                if ([int]$ciCount -lt 1) {
+                  throw "Stable release provenance SHA $sha has no successful main CI push run"
+                }
+                Write-Host "Stable main-CI invariant: $sha -> success"
               }
-              Write-Host "Stable candidate main-CI invariant: $candidateSha -> success"
             }
           }
 

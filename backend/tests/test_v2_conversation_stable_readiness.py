@@ -75,7 +75,7 @@ def _human_report():
         "stable_metric_coverage": {
             "contract_version": policy["stable_metric_coverage_contract_version"],
             "policy": policy["stable_metric_coverage_policy"],
-            "label_source": "required_event_metric_pairs": 100,
+            "required_event_metric_pairs": 100,
             "covered_event_metric_pairs": 100,
             "missing_event_metric_pairs": 0,
             "complete": True,

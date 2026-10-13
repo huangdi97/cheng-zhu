@@ -1,5 +1,5 @@
 # Chengzhu v2 Stable Promotion Evidence Gate
-## From public beta.5 to stable-review eligibility
+## From public beta.6 to stable-review eligibility
 
 **Status**: CANONICAL ACCEPTANCE POLICY  
 **Scope**: Project Sync + Design Review first  
@@ -9,7 +9,7 @@
 
 ## 1. Why a separate gate is required
 
-beta.5 already proves:
+beta.6 already proves:
 
 - public downloadable prerelease;
 - exact-SHA release provenance;
@@ -83,6 +83,7 @@ Synthetic, CI, mock and Dry Run sessions do not count.
 | Interruption Regret | <= 0.15 | 30 | local explicit self-report |
 | Source Attribution Accuracy | >= 0.95 | 30 | independent human review |
 | Recall Precision | >= 0.90 | 20 | independent human review |
+| **Longitudinal Recall Utility Rate** | **>= 0.80** | **20** | **local explicit self-report** |
 | Useful Silence Rate | >= 0.80 | 30 | self-report or independent review |
 | Direct Question Precision | >= 0.90 | 20 | independent human review |
 | Direct Question Recall | >= 0.85 | 20 | independent human review |
@@ -99,7 +100,7 @@ Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current repository evaluator policy = `v2.0-R1-stable-promotion-7`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v6. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, and v7 closes the remaining longitudinal-cohort ambiguity: one qualifying Conversation Space must bind to exactly one pseudonymous `user_ref` and contain >=3 authorized Sessions for that same user. A mixed-user Space fails cohort integrity and cannot count as continuity. Published beta.6 remains immutable and correctly contains policy v6; policy v7 is post-beta.6 source truth until a later release is explicitly justified. Thresholds/floors must not be lowered, and sample/cohort populations must not be broadened after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-8`. All pre-existing numerical quality thresholds, `min_n` values, and profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) remain unchanged. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, v7 bound each qualifying Space to exactly one pseudonymous `user_ref`, and v8 closes the remaining **longitudinal-value** ambiguity: repeated use and correct Recall are not enough; capture-time-proven prior-session auto RECALL must also be explicitly useful to the user. The new gate deliberately reuses the already-frozen Opportunity usefulness threshold (0.80) and Recall sample floor (20), and accepts only local explicit user self-report. Published beta.6 remains immutable and correctly contains policy v6; policy v8 is post-beta.6 source truth until a later prerelease packages the required runtime provenance. No old threshold/floor may be lowered or population broadened merely to create a PASS.
 
 ---
 
@@ -316,6 +317,53 @@ It freezes the exact policy snapshot, limits exports to explicitly selected Sess
 Full operator procedure:
 
 `docs/evals/V2_CONVERSATION_REAL_PILOT_RUNBOOK.md`
+
+## 5.6 Longitudinal Recall value gate
+
+Policy v7 could prove **structural continuity**:
+
+```text
+same Space
++ same pseudonymous user_ref
++ >=3 authorized Sessions
+```
+
+and the existing Recall metric could prove **correctness**. Neither proves that Chengzhu's remembered context was actually valuable in a later conversation.
+
+Policy v8 therefore requires:
+
+```text
+current Session auto RECALL
+→ primary immutable source_ref = prior Conversation Item
+→ same Space
+→ different source Session
+→ explicit user useful=true/false
+→ longitudinal_recall_utility_rate
+```
+
+Stable contract:
+
+```text
+threshold = >= 0.80
+min_n = >= 20 unique RECALL events
+label source = LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT only
+```
+
+The numbers are not newly optimized after pilot results: 0.80 reuses the existing Opportunity usefulness threshold and 20 reuses the existing Recall sample floor.
+
+Fail-closed exclusions:
+
+- same-session memory;
+- cross-Space source;
+- manual/pre-v12 Guidance;
+- pre-fix RECALL without the new `CONVERSATION_ITEM / source_session_id` provenance;
+- historical reclassification from title/text/time or current DB state;
+- independent reviewer usefulness substituted for the user's own value judgment;
+- Space reuse intent substituted for actual useful prior-session Recall.
+
+This makes “cross-session continuity” a product-value claim backed by both provenance and user-perceived utility, not merely a count of repeated Sessions. It still does not prove PMF.
+
+**Release compatibility:** public beta.6 predates this explicit Recall source-session provenance. beta.6 history remains valid for the metrics it actually captured, but its old RECALL rows must not be retroactively upgraded into Policy-v8 longitudinal samples. A later prerelease/source runtime containing this provenance is required before collecting new Stable-v8 longitudinal evidence.
 
 ## 6. Tooling
 

@@ -85,10 +85,10 @@ def _approved_review(mod, template: dict) -> dict:
     review = json.loads(json.dumps(template))
     review["reviewer_ref"] = "release-owner-01"
     review["reviewed_at"] = "2026-10-14T00:00:00+00:00"
+    review["attestations"] = list(mod.REQUIRED_ATTESTATIONS)
     for item in review["release_review_checks"]:
         item["state"] = "APPROVED"
         item["evidence"] = f"evidence:{item['id']}"
-    assert review["attestations"] == list(mod.REQUIRED_ATTESTATIONS)
     return review
 
 
@@ -98,6 +98,8 @@ def test_template_is_bound_to_verified_handoff_and_exact_stable_candidate(tmp_pa
     assert template["contract_version"] == mod.REVIEW_INPUT_CONTRACT
     assert template["candidate_source_sha"] == "a" * 40
     assert template["candidate_version"] == "2.0.0"
+    assert template["attestations"] == []
+    assert template["required_attestations"] == list(mod.REQUIRED_ATTESTATIONS)
     assert [item["id"] for item in template["release_review_checks"]] == list(mod.REQUIRED_CHECK_IDS)
     assert all(item["state"] == "PENDING" for item in template["release_review_checks"])
 

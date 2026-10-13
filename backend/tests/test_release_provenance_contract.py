@@ -150,19 +150,22 @@ def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     assert stale_i < hold_i < dispatch_i
 
 
-def test_generic_publisher_requires_committed_approval_for_v2_stable() -> None:
+def test_generic_publisher_requires_committed_approval_for_unpublished_v2_stable() -> None:
     text = PUBLISHER.read_text(encoding="utf-8")
+    tag_i = text.index('tag="v$version"')
+    published_i = text.index('if gh release view "$tag"')
     stable_i = text.index('if [[ "$version" != *-* ]]; then')
     approval_i = text.index('approval=".github/stable-release-approvals/v$version.json"')
     validate_i = text.index("scripts/v2_stable_release_approval.py validate-committed")
-    tag_i = text.index('tag="v$version"')
     dispatch_i = text.index("gh workflow run release.yml")
 
     assert 'if [ "$major" -ge 2 ]; then' in text
     assert "stable v2+ approval missing" in text
     assert "--release-source-sha" in text
     assert '"$SOURCE_SHA"' in text
-    assert stable_i < approval_i < validate_i < tag_i < dispatch_i
+    # Already-published immutable versions exit before approval validation;
+    # only a new/draft Stable publication needs the exact-candidate approval.
+    assert tag_i < published_i < stable_i < approval_i < validate_i < dispatch_i
 
 
 def test_release_publish_path_rechecks_v2_stable_approval() -> None:

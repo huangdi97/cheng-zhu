@@ -268,3 +268,22 @@ Not required for unsigned Windows engineering release:
 - real multi-hour human sessions.
 
 Unsigned Windows releases must state the SmartScreen limitation.
+
+
+### Stable v2+ source provenance gate
+
+Human Stable GO is necessary but not sufficient for publication.
+
+For every unpublished Stable version with major >= 2, `release.yml` must verify twice:
+
+```text
+authorization candidate SHA
+==
+release source SHA
+==
+current main SHA
+```
+
+and the exact source SHA must have at least one successful **main push CI** run.
+
+The first check runs before release packaging; the second runs immediately before the verified draft is published. If main advances during the Windows build/download-back window, the Stable publish fails closed and requires a new candidate/review cycle. Prereleases and legacy v1 Stable releases keep their existing paths.

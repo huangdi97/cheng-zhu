@@ -513,3 +513,10 @@ HUMAN_STABLE_RELEASE_REVIEW_GO = publication authorization
 V2_STABLE_RELEASE = only after verified public Stable Release
 PMF_PROVEN = still FALSE unless separately established
 ```
+
+
+### Stable release source invariant
+
+When the pilot/evaluation chain eventually produces a PASS handoff and a human GO authorization, do not dispatch Stable from an arbitrary checkout. The authorized SHA must already be the current `main` tip and must have a successful main push CI run.
+
+The Release workflow checks this before packaging and again immediately before publication. Any intervening main commit invalidates the release attempt; review/release must be rebound to the new exact candidate rather than publishing a stale SHA.

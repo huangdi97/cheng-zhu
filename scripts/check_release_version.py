@@ -89,6 +89,8 @@ def main() -> int:
         "scripts/verify_stable_release_authorization.py",
         "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO",
         "RELEASE_AUTHORIZATION.json",
+        "scripts/verify_stable_release_source.ps1",
+        "Stable v2+ exact green-main source gate",
     ):
         if token not in release_workflow:
             errors.append(f"release workflow missing provenance invariant: {token}")

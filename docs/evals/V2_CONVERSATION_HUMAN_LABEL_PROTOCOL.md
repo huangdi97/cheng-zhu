@@ -50,6 +50,31 @@ source_correct=true 必须同时满足：来源确实支持内容、visibility �
 
 recall_correct 仅用于 RECALL：对象正确、状态仍有效、没有被 supersede/tombstone，并且与当前话题相关。
 
+### Longitudinal Recall Utility（Policy v8）
+
+`recall_correct` 证明“记得对”，但不能证明“跨场记忆真的帮到用户”。Policy v8 因此增加 `longitudinal_recall_utility_rate`，只使用同时满足以下条件的 Guidance：
+
+```text
+origin.kind = TRANSCRIPT_AUTO
+guidance_class = RECALL
+primary source_ref.kind = CONVERSATION_ITEM
+source_ref.space_id = current space_id
+source_ref.session_id != current session_id
+explicit local self-report useful = true / false
+```
+
+新 runtime 会把被 Recall 的已确认 Conversation Item 作为 **第一主 provenance ref**，并冻结 `id / space_id / session_id / review_status / state`。底层 transcript/document ref 仍保留在后面，但不能替代这条 longitudinal provenance。
+
+边界：
+
+- 同一 Session 刚确认的 item 不算跨场价值；
+- 不同 Space 的 item 不算；
+- manual Guidance Lab / pre-v12 非自动 Guidance 不算；
+- pre-fix RECALL 没有 `CONVERSATION_ITEM + source_session_id` 时，不得根据标题、时间、底层 transcript ref 或当前数据库状态事后补造；
+- independent reviewer 可以判断 `recall_correct`，但不能替用户回答“这条长期记忆对我有没有用”；Stable 的 longitudinal utility 只接受 `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`。
+
+Policy v8 不另拍一套宽松数字：阈值 `>=0.80` 复用既有 Opportunity usefulness 门槛，`min_n>=20` 复用既有 Recall 样本底线。
+
 ## 4. silence
 
 silence_correct=true 表示这个时间窗口不主动打断是更好的动作；false 表示当时存在高价值、可溯源、时间敏感的信息且应该主动出现。
@@ -175,7 +200,7 @@ cognitive_load_delta 建议使用 -2 到 +2：-2 明显降低，-1 略有降低�
 
 ## 9. 聚合指标
 
-脚本输出 opportunity_precision、interruption_regret、source_attribution_accuracy、recall_precision、useful_silence_rate、direct_question_precision、direct_question_recall、decision_commitment_state_precision、continue_writeback_accuracy、mean_cognitive_load_delta、space_reuse_intent_rate。
+脚本输出 opportunity_precision、interruption_regret、source_attribution_accuracy、recall_precision、**longitudinal_recall_utility_rate**、useful_silence_rate、direct_question_precision、direct_question_recall、decision_commitment_state_precision、continue_writeback_accuracy、mean_cognitive_load_delta、space_reuse_intent_rate。
 
 每项同时输出 value 与 n；n=0 时 value=null，绝不填 0 或 1。
 
@@ -257,12 +282,12 @@ prediction_unavailable = true
 
 宁可从 precision 分母中排除，也禁止把 post-review truth 倒灌成模型 prediction。Decision / Commitment state 的独立 reviewer 应标注“在该 prediction 时刻、按 Truth Boundary 应输出的类型/状态”，而不是事后拿最终长期状态倒推当时预测。
 
-## 10.2 Human-report cohort contract v4
+## 10.2 Human-report cohort / metric contract v6
 
 `v2_conversation_human_eval.py` 现在输出：
 
 ```text
-report_contract_version = v2.0-R1-human-eval-4
+report_contract_version = v2.0-R1-human-eval-6
 cohort.status
 cohort.sessions[] = {session_id, profile, space_id}
 metrics_by_profile_and_label_source
@@ -280,7 +305,7 @@ metric.allowed_label_sources
 
 这意味着其它 Conversation Profile 的标签可以用于研发分析，但不能替首发验证楔子抬高 Stable Gate。
 
-对应 pilot manifest contract = `v2.0-R1-pilot-cohort-2`。manifest 逐场记录 `session_id / space_id / local pseudonymous user_ref`；Stable evaluator 自动推导 profile session 数、distinct pseudonymous users 与 cross-session Spaces，并验证 human-report Session 全部属于授权 cohort。当前 policy v7 规定：一个 Space 只有在 **全部 selected Session 绑定同一个 pseudonymous user_ref 且至少有 3 个授权 Session** 时才计为 cross-session Space；混合多个 user_ref 的同一 Space 直接 fail-closed。该资格不能由 2 场重复使用、多人共享同一 Space、手填 aggregate count 或后处理推断替代。
+对应 pilot manifest contract = `v2.0-R1-pilot-cohort-2`。manifest 逐场记录 `session_id / space_id / local pseudonymous user_ref`；Stable evaluator 自动推导 profile session 数、distinct pseudonymous users 与 cross-session Spaces，并验证 human-report Session 全部属于授权 cohort。当前 policy v8 继续规定：一个 Space 只有在 **全部 selected Session 绑定同一个 pseudonymous user_ref 且至少有 3 个授权 Session** 时才计为 cross-session Space；混合多个 user_ref 的同一 Space直接 fail-closed。除此之外，重复使用本身不再被当成长期价值的替代证据：Stable 还要求足够的、带 prior-session Conversation Item provenance 的自动 RECALL 获得用户显式 useful 自报。该资格不能由 2 场重复使用、多人共享同一 Space、手填 aggregate count、reuse intent 或后处理推断替代。
 
 原始 label / report / manifest 都可能包含私人会议标识，继续保持本地受控存储，不应上传公开仓库或 CI artifact。
 
@@ -400,7 +425,7 @@ python scripts/v2_conversation_stable_readiness.py \
   real-pilot.json
 ```
 
-稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。当前源码 policy v7 继承 v4 的 authorized-cohort binding、v5 的 >=3 Session cross-session floor 与 v6 的 UNIQUE_EVENT_PER_METRIC sample unit，并进一步把 longitudinal continuity 定义冻结为“同一 Space + 同一 pseudonymous user_ref + 至少 3 个授权 Session”。2 场重复使用或多人各用同一 Space 一次都不能计入 Stable cross-session Space。用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源、错误 cohort、混用户 Space 或不足 3 场的 Space 替代该指标所需证据。即使全部通过，也只允许：
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。当前源码 policy v8 继承 v4 的 authorized-cohort binding、v5 的 >=3 Session cross-session floor、v6 的 UNIQUE_EVENT_PER_METRIC sample unit 与 v7 的单 pseudonymous-user Space binding，并增加“**跨场记忆必须对用户有用**”的 longitudinal Recall Utility Gate。2 场重复使用、多人各用同一 Space、reuse intent 或 Recall correctness 本身都不能替代这个用户价值指标。Longitudinal Recall Utility 只接受本机显式 self-report；Recall correctness / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标仍要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源、错误 cohort、缺失 prior-session provenance 或历史回填替代该指标所需证据。即使全部通过，也只允许：
 
 ```text
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE

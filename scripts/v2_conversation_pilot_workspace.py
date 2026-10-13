@@ -30,7 +30,7 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-3"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-4"
 MIN_PRODUCT_SCHEMA = 12
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
@@ -478,6 +478,140 @@ def _bind_review_rows_to_seed(
     return bound
 
 
+INDEPENDENT_REVIEW_SOURCE = "INDEPENDENT_HUMAN_REVIEW"
+INDEPENDENT_REVIEW_COVERAGE_CONTRACT = "v2.0-R1-independent-review-coverage-1"
+
+
+def _independent_only_metrics(policy: dict[str, Any]) -> set[str]:
+    out: set[str] = set()
+    for name, raw in (policy.get("metrics") or {}).items():
+        rule = raw if isinstance(raw, dict) else {}
+        sources = {
+            str(value)
+            for value in (rule.get("allowed_label_sources") or [])
+            if str(value)
+        }
+        if sources == {INDEPENDENT_REVIEW_SOURCE}:
+            out.add(str(name))
+    return out
+
+
+def _required_independent_metric_fields(
+    seed_row: dict[str, Any],
+    policy: dict[str, Any],
+) -> dict[str, tuple[str, ...]]:
+    """Return objective Stable metrics this frozen seed row must be reviewed for.
+
+    This derives the required population from immutable seed/runtime provenance,
+    before seeing any reviewer labels, so unfavorable events cannot disappear
+    by leaving their label fields null or omitting the row entirely.
+    """
+    independent = _independent_only_metrics(policy)
+    required: dict[str, tuple[str, ...]] = {}
+    kind = str(seed_row.get("kind") or "")
+
+    if kind == "guidance" and human_eval._is_auto_runtime(seed_row):
+        if "source_attribution_accuracy" in independent:
+            required["source_attribution_accuracy"] = ("source_correct",)
+        if (
+            str(seed_row.get("guidance_class") or "") == "RECALL"
+            and "recall_precision" in independent
+        ):
+            required["recall_precision"] = ("recall_correct",)
+
+    elif kind == "direct_question" and isinstance(seed_row.get("predicted"), bool):
+        if "direct_question_precision" in independent:
+            required["direct_question_precision"] = ("actual",)
+        if "direct_question_recall" in independent:
+            required["direct_question_recall"] = ("actual",)
+
+    elif kind == "truth_item":
+        if (
+            str(seed_row.get("predicted_type") or "")
+            in human_eval.DECISION_COMMITMENT_PREDICTED_TYPES
+            and str(seed_row.get("predicted_state") or "")
+            and "decision_commitment_state_precision" in independent
+        ):
+            required["decision_commitment_state_precision"] = (
+                "actual_type",
+                "actual_state",
+            )
+
+    elif kind == "continue" and "continue_writeback_accuracy" in independent:
+        required["continue_writeback_accuracy"] = ("writeback_accurate",)
+
+    return required
+
+
+def _review_fields_complete(row: dict[str, Any], fields: tuple[str, ...]) -> bool:
+    for field in fields:
+        value = row.get(field)
+        if field in {"source_correct", "recall_correct", "actual", "writeback_accurate"}:
+            if not isinstance(value, bool):
+                return False
+        elif not str(value or "").strip():
+            return False
+    return True
+
+
+def _independent_review_coverage(
+    seed_index: dict[tuple[str, str, str], dict[str, Any]],
+    review_rows: Iterable[dict[str, Any]],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    required: dict[tuple[str, str, str, str], tuple[str, ...]] = {}
+    required_by_metric: dict[str, int] = {}
+    for seed_key, seed_row in seed_index.items():
+        session_id, kind, event_id = seed_key
+        for metric, fields in _required_independent_metric_fields(seed_row, policy).items():
+            required[(session_id, kind, event_id, metric)] = fields
+            required_by_metric[metric] = required_by_metric.get(metric, 0) + 1
+
+    covered: set[tuple[str, str, str, str]] = set()
+    for row in review_rows:
+        if str(row.get("label_source") or "") != INDEPENDENT_REVIEW_SOURCE:
+            continue
+        session_id, kind, event_id = _review_seed_key(row)
+        seed_row = seed_index.get((session_id, kind, event_id))
+        if seed_row is None:
+            continue
+        for metric, fields in _required_independent_metric_fields(seed_row, policy).items():
+            key = (session_id, kind, event_id, metric)
+            if _review_fields_complete(row, fields):
+                covered.add(key)
+
+    missing = sorted(set(required) - covered)
+    covered_by_metric: dict[str, int] = {}
+    for _session_id, _kind, _event_id, metric in covered:
+        covered_by_metric[metric] = covered_by_metric.get(metric, 0) + 1
+
+    return {
+        "contract_version": INDEPENDENT_REVIEW_COVERAGE_CONTRACT,
+        "policy": "COMPLETE_REQUIRED_OBJECTIVE_POPULATION",
+        "label_source": INDEPENDENT_REVIEW_SOURCE,
+        "required_event_metric_pairs": len(required),
+        "covered_event_metric_pairs": len(covered),
+        "missing_event_metric_pairs": len(missing),
+        "complete": not missing,
+        "required_by_metric": dict(sorted(required_by_metric.items())),
+        "covered_by_metric": dict(sorted(covered_by_metric.items())),
+        "missing_examples": [
+            {
+                "session_id": session_id,
+                "kind": kind,
+                "event_id": event_id,
+                "metric": metric,
+            }
+            for session_id, kind, event_id, metric in missing[:20]
+        ],
+        "interpretation": (
+            "Coverage is derived from the complete frozen independent-review seed before labels are observed. "
+            "Objective Stable metrics that accept only INDEPENDENT_HUMAN_REVIEW require every eligible "
+            "event×metric pair to have its required label fields completed; omitted/null/alternate-source rows fail closed."
+        ),
+    }
+
+
 def _assignments_from_manifest(manifest: dict[str, Any]) -> list[tuple[str, str]]:
     assignments: list[tuple[str, str]] = []
     for profile in pilot_manifest.REQUIRED_PROFILES:
@@ -504,6 +638,10 @@ def _policy_contract_check(policy: dict[str, Any]) -> None:
         raise ValueError("Stable policy metric sample unit must be UNIQUE_EVENT_PER_METRIC")
     if str(policy.get("duplicate_event_metric_policy") or "") != "FAIL_CLOSED":
         raise ValueError("Stable policy duplicate event/metric handling must be FAIL_CLOSED")
+    if str(policy.get("independent_review_coverage_policy") or "") != "COMPLETE_REQUIRED_OBJECTIVE_POPULATION":
+        raise ValueError("Stable policy independent-review coverage must be COMPLETE_REQUIRED_OBJECTIVE_POPULATION")
+    if str(policy.get("independent_review_coverage_contract_version") or "") != "v2.0-R1-independent-review-coverage-1":
+        raise ValueError("Stable policy independent-review coverage contract is unsupported")
     if int(policy.get("cross_session_space_min_sessions") or 0) != pilot_manifest.CROSS_SESSION_SPACE_MIN_SESSIONS:
         raise ValueError("cross-session Space minimum does not match the frozen workspace policy")
     if str(policy.get("cross_session_space_user_binding") or "") != pilot_manifest.CROSS_SESSION_SPACE_USER_BINDING:
@@ -532,11 +670,14 @@ This directory is **local evidence workspace**, not a release artifact and not p
 ## Required flow
 
 1. Review `pilot-manifest.draft.json` and the selected Session/user pseudonym mapping. Every selected Session in the same Space must use the same pseudonymous user_ref.
-2. Have independent reviewers fill a copy of `independent-review.seed.jsonl`.
+2. Have independent reviewers fill copies of `independent-review.seed.jsonl`.
    Use `label_source=INDEPENDENT_HUMAN_REVIEW` where required by policy.
    Reviewers may edit only reviewer / label_source / notes and the kind-specific
    human label fields. Event identity, prediction, profile/Space, runtime origin,
    source refs and all other frozen seed provenance must remain unchanged.
+   For objective Stable metrics whose only allowed source is independent review,
+   every eligible frozen seed event×metric must be labeled; cherry-picking a
+   favorable subset or leaving required objective labels null fails closed.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
 4. Finalize only after you can truthfully make every required operator attestation.
 5. Evaluate with the finalized manifest plus independent-review file(s).
@@ -863,6 +1004,7 @@ def evaluate_workspace(
     temp_dir.mkdir()
     try:
         rows: list[dict[str, Any]] = []
+        independent_review_rows: list[dict[str, Any]] = []
         seen: set[tuple[str, str, str, str]] = set()
         verified_review_rows = 0
         if self_report_path.is_file():
@@ -874,9 +1016,17 @@ def evaluate_workspace(
                 seed_index,
                 source_name=path.name,
             )
+            independent_review_rows.extend(review_rows)
             rows.extend(review_rows)
 
+        policy = _json_load(policy_path)
+        independent_coverage = _independent_review_coverage(
+            seed_index,
+            independent_review_rows,
+            policy,
+        )
         human_report = human_eval.aggregate(rows)
+        human_report["independent_review_coverage"] = independent_coverage
         human_json = temp_dir / "human-report.json"
         human_md = temp_dir / "human-report.md"
         _write_json(human_json, human_report)
@@ -885,7 +1035,7 @@ def evaluate_workspace(
         stable_report = stable_readiness.evaluate(
             human_report,
             _json_load(final_manifest_path),
-            _json_load(policy_path),
+            policy,
         )
         stable_json = temp_dir / "stable-readiness.json"
         stable_md = temp_dir / "stable-readiness.md"
@@ -907,6 +1057,7 @@ def evaluate_workspace(
                 "independent_review_seed_rows": len(seed_index),
                 "verified_independent_review_rows": verified_review_rows,
                 "review_seed_binding": "EVENT_LEVEL_IMMUTABLE_PROVENANCE_VERIFIED",
+                "independent_review_coverage": independent_coverage,
                 "independent_reviews": [
                     {"filename": path.name, "sha256": _sha256(path)}
                     for path in reviews

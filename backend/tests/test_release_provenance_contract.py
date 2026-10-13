@@ -188,7 +188,8 @@ def test_release_publish_path_rechecks_v2_stable_approval() -> None:
     assert "github.event.inputs.publish == 'true'" in gate
     assert "GH_TOKEN:" in gate
     assert "actions/runs?head_sha=$candidateSha&event=push" in gate
-    assert "Stable candidate main-CI invariant" in gate
+    assert "Stable main-CI invariant" in gate
+    assert "$env:CHENGZHU_RELEASE_SOURCE_SHA" in gate
     assert version_i < approval_i < build_i < publish_i
 
 

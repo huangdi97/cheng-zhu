@@ -1983,3 +1983,28 @@ PMF_PROVEN = FALSE
 ```
 
 该修复属于 post-beta.9 release-governance source hardening，不改变 beta.9 二进制/tag，也不构成新的真实用户证据。
+
+
+---
+
+## Stable v2 publication source closure · 2026-10-14
+
+Stable release governance now separates three independent gates:
+
+```text
+1. PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW
+2. HUMAN_STABLE_RELEASE_REVIEW_GO bound to exact SHA/version
+3. EXACT_CURRENT_GREEN_MAIN at build start and immediately before publish
+```
+
+A human GO for a clean branch commit is not sufficient. Stable v2+ publication requires the authorized source SHA to equal current `main` and to have a successful main push CI run; if main advances during packaging, publication fails closed.
+
+This changes release governance only. Current truth remains:
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.9
+V2_STABLE_RELEASE = FALSE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

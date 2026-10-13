@@ -85,6 +85,8 @@ def main() -> int:
         "scripts/render_published_release_body.py",
         "--notes-file $publishedBody",
         "CHENGZHU_PUBLISHED_STATUS_BEGIN",
+        "Stable v2 release approval gate",
+        "scripts/v2_stable_release_approval.py validate-committed",
     ):
         if token not in release_workflow:
             errors.append(f"release workflow missing provenance invariant: {token}")
@@ -94,6 +96,8 @@ def main() -> int:
         "RELEASE_NOTES_v$version.md",
         "scripts/render_published_release_body.py",
         "display truth normalized; nothing to dispatch",
+        "stable v2+ approval missing",
+        "scripts/v2_stable_release_approval.py validate-committed",
     ):
         if token not in publisher_workflow:
             errors.append(f"current-version publisher missing exact-SHA invariant: {token}")

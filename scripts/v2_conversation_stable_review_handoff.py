@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 
-CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-1"
+CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-2"
 READY_STATUS = "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
 
 REQUIRED_RELEASE_REVIEW_CHECKS: tuple[tuple[str, str], ...] = (
@@ -67,6 +67,21 @@ def _require_hash(path: Path, expected: str, label: str) -> None:
         raise ValueError(f"{label}: SHA256 drift; expected {expected}, got {actual}")
 
 
+def _canonical_json_sha256(value: Any) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _require_equal(actual: Any, expected: Any, label: str) -> None:
+    if actual != expected:
+        raise ValueError(f"{label}: provenance mismatch")
+
+
 def _git(repo_root: Path, *args: str) -> str:
     try:
         return subprocess.check_output(
@@ -110,6 +125,7 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     evaluation_manifest_path = evaluation_dir / "evaluation-manifest.json"
     stable_path = evaluation_dir / "stable-readiness.json"
     human_path = evaluation_dir / "human-report.json"
+    draft_manifest_path = workspace / "pilot-manifest.draft.json"
     final_manifest_path = workspace / "pilot-manifest.final.json"
     finalization_path = workspace / "finalization.json"
     policy_path = workspace / "stable-promotion-policy.json"
@@ -124,17 +140,155 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     final_manifest = _load_object(final_manifest_path)
     finalization = _load_object(finalization_path)
     workspace_meta = _load_object(workspace_meta_path)
+    policy = _load_object(policy_path)
+    cohort_snapshot = _load_object(cohort_path)
 
     outputs = evaluation_manifest.get("outputs") or {}
     inputs = evaluation_manifest.get("inputs") or {}
+    workspace_outputs = workspace_meta.get("outputs") or {}
+    workspace_policy = workspace_meta.get("policy") or {}
+
+    workspace_contract = str(workspace_meta.get("contract_version") or "")
+    if not workspace_contract:
+        raise ValueError("workspace.json: missing contract_version")
+    _require_equal(
+        str(finalization.get("contract_version") or ""),
+        workspace_contract,
+        "finalization/workspace contract",
+    )
+    _require_equal(
+        str(evaluation_manifest.get("contract_version") or ""),
+        workspace_contract,
+        "evaluation/workspace contract",
+    )
+
+    workspace_toolchain = workspace_meta.get("toolchain")
+    if not isinstance(workspace_toolchain, dict):
+        raise ValueError("workspace.json: missing frozen evaluator toolchain")
+    _require_equal(
+        finalization.get("toolchain"),
+        workspace_toolchain,
+        "finalization/workspace toolchain",
+    )
+    _require_equal(
+        evaluation_manifest.get("toolchain"),
+        workspace_toolchain,
+        "evaluation/workspace toolchain",
+    )
+
     _require_hash(stable_path, str(outputs.get("stable_readiness_sha256") or ""), "stable-readiness.json")
     _require_hash(human_path, str(outputs.get("human_report_sha256") or ""), "human-report.json")
-    _require_hash(final_manifest_path, str(inputs.get("pilot_manifest_final_sha256") or ""), "pilot-manifest.final.json")
-    _require_hash(policy_path, str(inputs.get("policy_sha256") or ""), "stable-promotion-policy.json")
-    _require_hash(cohort_path, str(inputs.get("selected_cohort_snapshot_sha256") or ""), "selected-cohort.snapshot.json")
-    _require_hash(seed_path, str(inputs.get("independent_review_seed_sha256") or ""), "independent-review.seed.jsonl")
-    if self_report_path.is_file():
-        _require_hash(self_report_path, str(inputs.get("self_report_sha256") or ""), "self-report.jsonl")
+
+    workspace_cohort_meta = workspace_outputs.get("selected_cohort_snapshot") or {}
+    _require_hash(
+        cohort_path,
+        str(workspace_cohort_meta.get("sha256") or ""),
+        "selected-cohort.snapshot.json workspace provenance",
+    )
+    _require_hash(
+        cohort_path,
+        str(finalization.get("selected_cohort_snapshot_sha256") or ""),
+        "selected-cohort.snapshot.json finalization provenance",
+    )
+    _require_hash(
+        cohort_path,
+        str(inputs.get("selected_cohort_snapshot_sha256") or ""),
+        "selected-cohort.snapshot.json evaluation provenance",
+    )
+    cohort_logical_sha = _canonical_json_sha256(cohort_snapshot)
+    _require_equal(
+        str(workspace_cohort_meta.get("logical_sha256") or ""),
+        cohort_logical_sha,
+        "selected-cohort logical workspace provenance",
+    )
+    _require_equal(
+        str(finalization.get("selected_cohort_logical_sha256") or ""),
+        cohort_logical_sha,
+        "selected-cohort logical finalization provenance",
+    )
+    _require_equal(
+        str(inputs.get("selected_cohort_logical_sha256") or ""),
+        cohort_logical_sha,
+        "selected-cohort logical evaluation provenance",
+    )
+
+    _require_hash(
+        policy_path,
+        str(workspace_policy.get("sha256") or ""),
+        "stable-promotion-policy.json workspace provenance",
+    )
+    _require_hash(
+        policy_path,
+        str(finalization.get("policy_sha256") or ""),
+        "stable-promotion-policy.json finalization provenance",
+    )
+    _require_hash(
+        policy_path,
+        str(inputs.get("policy_sha256") or ""),
+        "stable-promotion-policy.json evaluation provenance",
+    )
+
+    workspace_draft_meta = workspace_outputs.get("pilot_manifest_draft") or {}
+    _require_hash(
+        draft_manifest_path,
+        str(workspace_draft_meta.get("sha256") or ""),
+        "pilot-manifest.draft.json workspace provenance",
+    )
+    _require_hash(
+        draft_manifest_path,
+        str(finalization.get("draft_manifest_sha256") or ""),
+        "pilot-manifest.draft.json finalization provenance",
+    )
+
+    _require_hash(
+        final_manifest_path,
+        str(finalization.get("final_manifest_sha256") or ""),
+        "pilot-manifest.final.json finalization provenance",
+    )
+    _require_hash(
+        final_manifest_path,
+        str(inputs.get("pilot_manifest_final_sha256") or ""),
+        "pilot-manifest.final.json evaluation provenance",
+    )
+
+    workspace_seed_meta = workspace_outputs.get("independent_review_seed") or {}
+    _require_hash(
+        seed_path,
+        str(workspace_seed_meta.get("sha256") or ""),
+        "independent-review.seed.jsonl workspace provenance",
+    )
+    _require_hash(
+        seed_path,
+        str(inputs.get("independent_review_seed_sha256") or ""),
+        "independent-review.seed.jsonl evaluation provenance",
+    )
+
+    workspace_self_report_meta = workspace_outputs.get("self_report") or {}
+    self_report_expected = str(workspace_self_report_meta.get("sha256") or "")
+    evaluation_self_report_expected = str(inputs.get("self_report_sha256") or "")
+    if self_report_path.is_file() or self_report_expected or evaluation_self_report_expected:
+        _require_hash(
+            self_report_path,
+            self_report_expected,
+            "self-report.jsonl workspace provenance",
+        )
+        _require_hash(
+            self_report_path,
+            evaluation_self_report_expected,
+            "self-report.jsonl evaluation provenance",
+        )
+
+    policy_version = str(policy.get("policy_version") or "")
+    _require_equal(
+        str(workspace_policy.get("policy_version") or ""),
+        policy_version,
+        "workspace/policy version",
+    )
+    _require_equal(
+        str(stable.get("policy_version") or ""),
+        policy_version,
+        "stable-readiness/policy version",
+    )
 
     if str(evaluation_manifest.get("status") or "") != READY_STATUS:
         raise ValueError("evaluation-manifest is not ready for Stable release review")
@@ -148,10 +302,21 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     if claims.get("PMF_PROVEN") is not False:
         raise ValueError("Stable evaluator must not claim PMF")
 
-    if str(finalization.get("final_manifest_sha256") or "") != _sha256(final_manifest_path):
-        raise ValueError("final manifest no longer matches finalization provenance")
-    if str(finalization.get("policy_sha256") or "") != _sha256(policy_path):
-        raise ValueError("policy no longer matches finalization provenance")
+    _require_equal(
+        evaluation_manifest.get("claims"),
+        stable.get("claims"),
+        "evaluation/stable claims",
+    )
+    _require_equal(
+        str(evaluation_manifest.get("status") or ""),
+        str(stable.get("status") or ""),
+        "evaluation/stable status",
+    )
+    _require_equal(
+        inputs.get("stable_metric_coverage"),
+        human.get("stable_metric_coverage"),
+        "evaluation/human stable metric coverage",
+    )
 
     review_checks = [
         {
@@ -167,6 +332,7 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         "workspace_json": _sha256(workspace_meta_path),
         "selected_cohort_snapshot": _sha256(cohort_path),
         "stable_promotion_policy": _sha256(policy_path),
+        "pilot_manifest_draft": _sha256(draft_manifest_path),
         "pilot_manifest_final": _sha256(final_manifest_path),
         "finalization": _sha256(finalization_path),
         "independent_review_seed": _sha256(seed_path),
@@ -184,14 +350,24 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         "workspace_contract_version": workspace_meta.get("contract_version"),
         "stable_policy_version": stable.get("policy_version"),
         "pilot_manifest_contract_version": final_manifest.get("contract_version"),
-        "evaluator_toolchain": evaluation_manifest.get("toolchain"),
+        "evaluator_toolchain": workspace_toolchain,
         "pilot_cohort": stable.get("pilot_cohort"),
         "stable_gate": {
             "checks_total": stable.get("checks_total"),
             "checks_failed": stable.get("checks_failed"),
-            "stable_metric_coverage": inputs.get("stable_metric_coverage"),
+            "stable_metric_coverage": human.get("stable_metric_coverage"),
         },
         "artifact_sha256": artifact_hashes,
+        "provenance_consistency": {
+            "workspace_contract": "VERIFIED",
+            "toolchain": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+            "selected_cohort": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+            "policy": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+            "draft_and_final_manifest": "VERIFIED",
+            "review_seed_and_self_report": "VERIFIED",
+            "evaluation_claims": "MATCH_STABLE_READINESS",
+            "stable_metric_coverage": "MATCH_HUMAN_REPORT",
+        },
         "source_checkout": _source_checkout(repo_root),
         "release_review_checks": review_checks,
         "claims": {
@@ -210,7 +386,8 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         },
         "interpretation": (
             "This artifact proves only that the frozen pilot evaluation passed the evidence gate and "
-            "that its handoff inputs still match their SHA256 provenance. Every release-review check remains "
+            "that its frozen workspace/finalization/evaluation facts cross-match and its handoff inputs still "
+            "match their SHA256 provenance. Every release-review check remains "
             "PENDING_HUMAN_RELEASE_REVIEW. Creating this artifact does not publish Stable, verify identities/"
             "consent/reviewer independence, or prove PMF."
         ),

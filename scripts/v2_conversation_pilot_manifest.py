@@ -10,7 +10,8 @@ A final AUTHORIZED_REAL_CONVERSATION_PILOT manifest requires:
 - every required --attest value supplied by the operator;
 - explicit --critical-incidents;
 - only ended PROJECT_SYNC / DESIGN_REVIEW sessions selected from product.db;
-- each selected Session has consent acknowledgement and a matching Frozen Session Pack.
+- each selected Session has consent acknowledgement and a matching Frozen Session Pack;
+- every selected Session in one Conversation Space binds to the same pseudonymous user_ref.
 
 No transcript text, participant names, Space titles, or other content is copied
 into the manifest. user_ref is a local pseudonymous cohort key, not identity

@@ -27,20 +27,19 @@ Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Published = v2.0.0-beta.7
-Published Beta tag/source SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
-Published Beta packaged Stable Policy = v2.0-R1-stable-promotion-7
-Next Conversation Beta Candidate = v2.0.0-beta.8
-Candidate packaged Stable Policy = v2.0-R1-stable-promotion-8
+Conversation Beta Published = v2.0.0-beta.8
+Published Beta tag/source SHA = 9442e9891453aff3b1e482933056593b893f6288
+Published Beta packaged Stable Policy = v2.0-R1-stable-promotion-8
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.7 provenance is recorded in `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`. beta.7 is the current **Stable-evidence correctness** prerelease. Current source has advanced to Stable Policy v8 and `v2.0.0-beta.8` is the next release candidate; beta.8 remains **unpublished** until its exact green main SHA completes the full Windows release, clean-install, download-back, SHA256, public tag/source and post-publish provenance gates. Policy v8 closes favorable-subset selection bias by requiring complete coverage of the frozen eligible event×metric population before Stable metrics can pass.
+Published beta.8 provenance is recorded in `docs/releases/V2_0_0_BETA_8_PUBLICATION_PROVENANCE.md`. beta.8 is the current **Stable-evidence correctness** prerelease and the canonical packaged baseline for new Stable-readiness workspaces. It packages Stable Policy v8, which closes favorable-subset / denominator-selection bias by requiring complete coverage of the frozen eligible event×metric population before Stable metrics can pass. beta.8 was published from exact green main SHA `9442e9891453aff3b1e482933056593b893f6288` after CI #1015 and Release #326 completed successfully; Stable Latest remains `v1.4.2`.
 
-beta.7 It was published from exact green main/tag SHA `dc2188cd6b796b5dca9baf0eac2372da7be5bbf2` through main CI #992 and Release run #324 after dependency-security, Backend/Frontend/Desktop gates, Windows build, packaged UI evidence, clean-install replay, installed-layout smoke, draft download-back, SHA256 verification, final publish, Release-page truth regression, Stable-Latest preservation, public tag/source equality and post-publish verification-artifact upload all completed successfully. It retains beta.6's real-pilot operationalization stack and packages **Stable Policy v7**: a qualifying longitudinal Space must contain >=3 authorized Sessions all bound to the same pseudonymous `user_ref`; mixed-user Spaces fail closed. Numerical quality thresholds, min_n values, profile floors, label-source rules and the unique-event-per-metric sample unit remain unchanged. beta.6 / beta.5 / beta.4 / beta.3 remain immutable historical releases and must not be rewritten as containing beta.7 changes. The original beta.7 release-notes asset was authored pre-publication and remains immutable; the generated published-status block plus beta.7 publication provenance are authoritative for current publication state.
+beta.8 was published from exact green main/tag SHA `9442e9891453aff3b1e482933056593b893f6288` through main CI #1015 and Release run #326 after dependency-security, Backend/Frontend/Desktop gates, Windows build, packaged UI evidence, clean-install replay, installed-layout smoke, draft download-back, SHA256 verification, final publish, Release-page truth regression, Stable-Latest preservation, tag/source equality and post-publish verification-artifact upload all completed successfully. It retains beta.7's single-user cross-session Space binding and further packages **Stable Policy v8** complete frozen eligible-population coverage. Numerical quality thresholds, min_n values and profile floors remain unchanged. beta.7 / beta.6 / beta.5 / beta.4 / beta.3 remain immutable historical releases and must not be rewritten as containing beta.8 changes.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

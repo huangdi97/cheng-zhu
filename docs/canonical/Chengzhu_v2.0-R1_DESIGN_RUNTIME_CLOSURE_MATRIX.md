@@ -1733,3 +1733,29 @@ PMF_PROVEN = FALSE
 Policy v8 does not raise a maturity claim. It closes selection bias by requiring every eligible frozen event × metric pair in the Stable population to be completely labeled by at least one label source already allowed for that metric before thresholds and min_n are evaluated.
 
 beta.8 has now been published through the full exact-SHA Windows release path from `9442e9891453aff3b1e482933056593b893f6288`; public downloadable truth is beta.8 / Policy v8. **New** Stable-readiness workspaces should freeze Policy v8 (or later), not Policy v7. Publication provenance is recorded in `docs/releases/V2_0_0_BETA_8_PUBLICATION_PROVENANCE.md`.
+
+
+---
+
+## Stable evaluator toolchain provenance closure · 2026-10-13
+
+beta.8 publication之后继续审计 real-pilot evidence path，发现一个独立于 Policy v8 的可复现性缺口：workspace 已冻结 policy bytes / cohort / seed / self-report，但没有冻结执行 human aggregation 与 Stable-readiness 的 evaluator implementation。若未来工具实现改变，旧 workspace 可能在同一 evidence 输入上被新版代码重算，却无法从 evaluation manifest 看出 evaluator 已漂移。
+
+当前 post-beta.8 source 收口为：
+
+```text
+PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
+PILOT_TOOLCHAIN_FINGERPRINT_CONTRACT = v2.0-R1-pilot-toolchain-1
+POLICY_VERSION = v2.0-R1-stable-promotion-8
+TOOLCHAIN_FILES_FROZEN = 6
+FINALIZE_ON_TOOLCHAIN_DRIFT = FAIL_CLOSED
+EVALUATE_ON_TOOLCHAIN_DRIFT = FAIL_CLOSED
+EVALUATION_MANIFEST_RECORDS_TOOLCHAIN = TRUE
+BETA_8_CONTAINS_WORKSPACE_V5 = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+冻结文件包括 workspace orchestrator、label seed、self-report exporter、human eval、pilot manifest builder 与 stable-readiness evaluator。历史 v4 workspace 不做原地“升级”；需要按旧证据继续重放时必须使用对应历史 toolchain，或用当前源码创建一个新的 v5 workspace。
+
+该修复只关闭 evaluator implementation provenance，不修改 Policy v8 的 threshold / min_n / cohort / profile / label-source / complete-coverage 规则，也不抬高产品成熟度。公开 beta.8 仍保持 immutable；workspace v5 需要后续 prerelease 才能成为新的 packaged/operator baseline。

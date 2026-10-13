@@ -273,7 +273,12 @@ def finalize_review(
         })
 
     decision = "GO" if all(row["state"] == "PASS" for row in normalized_checks) else "NO_GO"
-    check_digest = _canonical_sha256(normalized_checks)
+    decision_check_digest = _canonical_sha256(normalized_checks)
+    authorization_checks = [
+        {"id": row["id"], "state": row["state"]}
+        for row in normalized_checks
+    ]
+    authorization_check_digest = _canonical_sha256(authorization_checks)
     claims = {
         "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": True,
         "V2_STABLE_RELEASE": False,
@@ -293,7 +298,7 @@ def finalize_review(
             "identity_system_verified": False,
         },
         "checks": normalized_checks,
-        "review_check_digest": check_digest,
+        "review_check_digest": decision_check_digest,
         "source_checkout": source,
         "claims": claims,
         "interpretation": (
@@ -310,11 +315,8 @@ def finalize_review(
         "candidate_version": version,
         "handoff_contract_version": handoff["contract_version"],
         "handoff_json_sha256": hashes["handoff_json_sha256"],
-        "review_check_digest": check_digest,
-        "checks": [
-            {"id": row["id"], "state": row["state"]}
-            for row in normalized_checks
-        ],
+        "review_check_digest": authorization_check_digest,
+        "checks": authorization_checks,
         "claims": claims,
         "boundary": "AUTHORIZATION_IS_NOT_PUBLICATION",
     }

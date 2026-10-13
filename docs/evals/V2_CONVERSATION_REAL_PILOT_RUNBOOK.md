@@ -1,6 +1,6 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: BETA.7 PUBLISHED · REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
+**Status**: BETA.7 PUBLISHED · REAL-PILOT OPERATOR WORKFLOW · CURRENT SOURCE STABLE POLICY v8  
 **Public Beta**: v2.0.0-beta.7  
 **Published source/tag SHA**: `dc2188cd6b796b5dca9baf0eac2372da7be5bbf2`  
 **Stable v2**: NOT CLAIMED  
@@ -15,7 +15,7 @@ It does not change any release or evidence claim by itself.
 
 Use the published `v2.0.0-beta.7` runtime/source with product schema >= v12.
 
-The currently published participant-facing/runtime product is `v2.0.0-beta.7`, which packages Stable Policy v7. **Post-publication audit found a material independent-review selection-bias gap in Policy v7. Therefore beta.7 remains valid for engineering/product dogfood, but it must not be the baseline for a new Stable-readiness evidence workspace.** Current source freezes Stable Policy v8, which requires complete objective independent-review seed coverage. Historical v7 workspaces remain historical evidence and must not be rewritten; create a fresh v8 workspace for Stable review. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The currently published participant-facing/runtime product is `v2.0.0-beta.7`, which packages Stable Policy v7. **Post-publication audit found a material independent-review selection-bias gap in Policy v7. Therefore beta.7 remains valid for engineering/product dogfood, but it must not be the baseline for a new Stable-readiness evidence workspace.** Current source freezes Stable Policy v8, which requires complete frozen Stable metric population coverage across self-report, independent-review, and metrics that allow either source. Historical v7 workspaces remain historical evidence and must not be rewritten; create a fresh v8 workspace for Stable review. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -151,7 +151,7 @@ python scripts/v2_conversation_pilot_workspace.py init \
 
 The command creates a new directory and refuses to overwrite an existing one.
 
-Policy is frozen into each workspace. Historical v6/v7 workspaces remain historical evidence; do **not** edit their frozen policy in place. For a new Stable-readiness pilot, create a fresh workspace using current Policy v8 source (or a later prerelease that explicitly packages v8) so both same-user Space binding and complete objective independent-review coverage are frozen from initialization onward.
+Policy is frozen into each workspace. Historical v6/v7 workspaces remain historical evidence; do **not** edit their frozen policy in place. For a new Stable-readiness pilot, create a fresh workspace using current Policy v8 source (or a later prerelease that explicitly packages v8) so both same-user Space binding and complete Stable metric population coverage are frozen from initialization onward.
 
 Expected files:
 
@@ -204,11 +204,11 @@ The reviewer must **not** change or invent any frozen seed provenance. In partic
 
 At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.jsonl`, binds every independent-review row to the exact frozen `(session_id, kind, event_id)` seed row, and compares every non-human field. An invented event, altered prediction, altered runtime origin, unknown extra field, changed profile/Space, or edited source provenance fails closed before aggregation.
 
-Policy v8 additionally computes the complete required objective event×metric population from that frozen seed **before** inspecting labels. For metrics restricted to independent review, every eligible frozen event must have its required objective label fields completed. Do not stop reviewing when a favorable subset reaches `min_n`; omitted or null objective rows make Stable readiness `NO_GO`.
+Policy v8 additionally computes the complete Stable-eligible event×metric population from that frozen seed **before** inspecting labels. Every eligible event must be covered by at least one label source already allowed for that metric. This applies to independent-review metrics, self-report-only metrics, and metrics allowing either source. Do not stop labeling when a favorable subset reaches `min_n`; omitted rows, null required fields, or disallowed sources make Stable readiness `NO_GO`.
 
 The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
 
-Stable Policy v8 preserves the v7 cohort/sample-unit rules and adds complete objective independent-review coverage:
+Stable Policy v8 preserves the v7 cohort/sample-unit rules and adds complete frozen Stable metric coverage:
 
 ```text
 min_n = unique product event × metric observations

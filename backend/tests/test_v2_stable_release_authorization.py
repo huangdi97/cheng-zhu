@@ -5,12 +5,16 @@ import base64
 import hashlib
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 
 
 def _load(name: str, relative: str):
@@ -249,3 +253,21 @@ def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monke
     ).decode("ascii")
     with pytest.raises(ValueError, match="non-PASS"):
         verify.verify_authorization(tampered, source_sha=source_sha, version="2.0.0")
+
+
+def test_release_workflows_enforce_stable_v2_human_authorization_contract():
+    release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    publisher = (ROOT / ".github" / "workflows" / "publish-current-version-on-green-main.yml").read_text(encoding="utf-8")
+
+    for token in (
+        "stable_review_authorization_b64:",
+        "scripts/verify_stable_release_authorization.py",
+        "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO",
+        "RELEASE_AUTHORIZATION.json",
+        "--pattern \"RELEASE_AUTHORIZATION.json\"",
+    ):
+        assert token in release
+
+    assert "Stable v2+" in publisher
+    assert "requires manual human release authorization" in publisher
+    assert "generic publisher will not dispatch" in publisher

@@ -85,7 +85,8 @@ def test_release_workflow_checks_green_main_before_build_and_before_publish():
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     wrapper = (ROOT / "scripts" / "verify_stable_release_source.ps1").read_text(encoding="utf-8")
 
-    assert release.count("scripts/verify_stable_release_source.ps1") >= 2
+    assert release.count("scripts/verify_stable_release_source.ps1") >= 3
+    assert "Stable green-main source wrapper regression" in release
     assert "Stable v2+ exact green-main source gate" in release
     assert "actions: read" in release
     assert "git/ref/heads/main" in wrapper

@@ -72,11 +72,10 @@ def _human_report():
             "sample_unit": "UNIQUE_EVENT_PER_METRIC",
             "duplicate_event_metric_policy": "FAIL_CLOSED",
         },
-        "independent_review_coverage": {
-            "contract_version": policy["independent_review_coverage_contract_version"],
-            "policy": policy["independent_review_coverage_policy"],
-            "label_source": "INDEPENDENT_HUMAN_REVIEW",
-            "required_event_metric_pairs": 100,
+        "stable_metric_coverage": {
+            "contract_version": policy["stable_metric_coverage_contract_version"],
+            "policy": policy["stable_metric_coverage_policy"],
+            "label_source": "required_event_metric_pairs": 100,
             "covered_event_metric_pairs": 100,
             "missing_event_metric_pairs": 0,
             "complete": True,
@@ -205,11 +204,11 @@ def test_stable_readiness_requires_unique_event_metric_sample_unit_contract():
     )
 
 
-def test_stable_readiness_rejects_incomplete_independent_review_seed_coverage():
+def test_stable_readiness_rejects_incomplete_frozen_metric_population_coverage():
     module = _module()
     policy = _policy()
     human = _human_report()
-    human["independent_review_coverage"].update({
+    human["stable_metric_coverage"].update({
         "required_event_metric_pairs": 100,
         "covered_event_metric_pairs": 99,
         "missing_event_metric_pairs": 1,
@@ -219,19 +218,19 @@ def test_stable_readiness_rejects_incomplete_independent_review_seed_coverage():
     assert report["status"] == "NO_GO"
     check = next(
         item for item in report["failed_checks"]
-        if item["name"] == "human_report_independent_review_coverage"
+        if item["name"] == "human_report_stable_metric_coverage"
     )
     assert check["actual"]["missing_event_metric_pairs"] == 1
 
 
-def test_stable_readiness_rejects_weakened_independent_review_coverage_policy():
+def test_stable_readiness_rejects_weakened_stable_metric_coverage_policy():
     module = _module()
     policy = _policy()
-    policy["independent_review_coverage_policy"] = "MIN_N_ONLY"
+    policy["stable_metric_coverage_policy"] = "MIN_N_ONLY"
     report = module.evaluate(_human_report(), _pilot(), policy)
     assert report["status"] == "NO_GO"
     assert any(
-        item["name"] == "independent_review_coverage_policy_contract"
+        item["name"] == "stable_metric_coverage_policy_contract"
         for item in report["failed_checks"]
     )
 

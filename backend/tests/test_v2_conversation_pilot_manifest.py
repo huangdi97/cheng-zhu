@@ -389,8 +389,8 @@ def test_pilot_builder_contract_tracks_machine_readable_stable_policy():
         .read_text(encoding="utf-8")
     )
     assert policy["policy_version"] == "v2.0-R1-stable-promotion-8"
-    assert policy["independent_review_coverage_policy"] == "COMPLETE_REQUIRED_OBJECTIVE_POPULATION"
-    assert policy["independent_review_coverage_contract_version"] == "v2.0-R1-independent-review-coverage-1"
+    assert policy["stable_metric_coverage_policy"] == "COMPLETE_FROZEN_ELIGIBLE_POPULATION"
+    assert policy["stable_metric_coverage_contract_version"] == "v2.0-R1-stable-metric-coverage-1"
     assert module.CONTRACT_VERSION == policy["pilot_manifest_contract_version"]
     assert list(module.REQUIRED_PROFILES) == policy["metric_profiles"]
     assert list(module.REQUIRED_ATTESTATIONS) == policy["required_attestations"]

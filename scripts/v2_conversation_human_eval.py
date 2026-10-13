@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 
-REPORT_CONTRACT_VERSION = "v2.0-R1-human-eval-5"
+REPORT_CONTRACT_VERSION = "v2.0-R1-human-eval-6"
 
 
 ALLOWED_KINDS = {
@@ -130,6 +130,46 @@ def _is_auto_runtime(row: dict[str, Any]) -> bool:
     )
 
 
+def _longitudinal_recall_source(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the primary prior-session truth ref for a Stable longitudinal Recall.
+
+    New runtime writes the recalled Conversation Item as the first source ref.
+    Historical RECALL rows without that provenance remain valid Recall history
+    but cannot be retroactively classified as longitudinal evidence.
+    """
+    if (
+        str(row.get("kind") or "") != "guidance"
+        or str(row.get("guidance_class") or "") != "RECALL"
+        or not _is_auto_runtime(row)
+    ):
+        return None
+    system = row.get("system")
+    refs = system.get("source_refs") if isinstance(system, dict) else None
+    if not isinstance(refs, list) or not refs:
+        return None
+    primary = refs[0]
+    if not isinstance(primary, dict) or str(primary.get("kind") or "") != "CONVERSATION_ITEM":
+        return None
+    current_session = str(row.get("session_id") or "").strip()
+    current_space = str(row.get("space_id") or "").strip()
+    source_session = str(primary.get("session_id") or "").strip()
+    source_space = str(primary.get("space_id") or "").strip()
+    if (
+        not current_session
+        or not current_space
+        or not source_session
+        or not source_space
+        or source_session == current_session
+        or source_space != current_space
+    ):
+        return None
+    return primary
+
+
+def _is_longitudinal_recall(row: dict[str, Any]) -> bool:
+    return _longitudinal_recall_source(row) is not None
+
+
 def _metric_event_identity(row: dict[str, Any]) -> str:
     """Return the product-event identity used for Stable sample counting."""
     event_id = str(row.get("event_id") or "").strip()
@@ -158,6 +198,12 @@ def _metric_observation_names(row: dict[str, Any]) -> list[str]:
             names.append("source_attribution_accuracy")
         if guidance_class == "RECALL" and _boolean(row, "recall_correct") is not None:
             names.append("recall_precision")
+        if (
+            guidance_class == "RECALL"
+            and _is_longitudinal_recall(row)
+            and _boolean(row, "useful") is not None
+        ):
+            names.append("longitudinal_recall_utility_rate")
 
     elif (
         kind == "silence"
@@ -292,6 +338,11 @@ def aggregate(
     interruption_labeled = [r for r in proactive if _boolean(r, "interruption_regret") is not None]
     source_labeled = [r for r in guidance_rows if _boolean(r, "source_correct") is not None]
     recall_labeled = [r for r in recall if _boolean(r, "recall_correct") is not None]
+    longitudinal_recall = [r for r in recall if _is_longitudinal_recall(r)]
+    longitudinal_recall_useful = [
+        r for r in longitudinal_recall
+        if _boolean(r, "useful") is not None
+    ]
 
     all_silence_rows = [r for r in rows if r["kind"] == "silence"]
     silence_rows = [
@@ -355,6 +406,13 @@ def aggregate(
             "value": _rate(sum(1 for r in recall_labeled if r["recall_correct"]), len(recall_labeled)),
             "n": len(recall_labeled),
         },
+        "longitudinal_recall_utility_rate": {
+            "value": _rate(
+                sum(1 for r in longitudinal_recall_useful if r["useful"]),
+                len(longitudinal_recall_useful),
+            ),
+            "n": len(longitudinal_recall_useful),
+        },
         "useful_silence_rate": {
             "value": _rate(sum(1 for r in silence_rows if r["silence_correct"]), len(silence_rows)),
             "n": len(silence_rows),
@@ -398,6 +456,9 @@ def aggregate(
             "duplicate_event_metric_policy": "FAIL_CLOSED",
             "auto_guidance_rows": len(guidance_rows),
             "excluded_non_auto_guidance_rows": len(all_guidance_rows) - len(guidance_rows),
+            "auto_recall_rows": len(recall),
+            "longitudinal_recall_rows": len(longitudinal_recall),
+            "excluded_recall_without_prior_session_item_provenance": len(recall) - len(longitudinal_recall),
             "arbiter_silence_rows": len(silence_rows),
             "excluded_non_arbiter_or_non_auto_silence_rows": len(all_silence_rows) - len(silence_rows),
             "decision_commitment_task_predicted_rows": len(decision_commitment_rows),
@@ -411,7 +472,7 @@ def aggregate(
             "PMF_PROVEN": False,
         },
         "interpretation": (
-            "Stable min_n counts unique product event × metric observations, never reviewer annotation rows; duplicate event/metric labels fail closed before aggregation. Stable live-guidance metrics use only v12 capture-time TRANSCRIPT_AUTO provenance; manual Guidance Lab and pre-v12 Guidance rows are excluded. Useful Silence counts only ARBITER decisions, not policy/profile/provenance-forced silence. Decision/Commitment State Precision is scoped to predictions of Decision/Commitment/Task. Human labels still do not verify external-user identity, and no threshold here upgrades PMF or release status."
+            "Stable min_n counts unique product event × metric observations, never reviewer annotation rows; duplicate event/metric labels fail closed before aggregation. Stable live-guidance metrics use only v12 capture-time TRANSCRIPT_AUTO provenance; manual Guidance Lab and pre-v12 Guidance rows are excluded. Longitudinal Recall Utility uses only auto RECALL whose primary immutable source ref is a Conversation Item from a different Session in the same Space; historical Recall without that provenance is excluded rather than reclassified. Useful Silence counts only ARBITER decisions, not policy/profile/provenance-forced silence. Decision/Commitment State Precision is scoped to predictions of Decision/Commitment/Task. Human labels still do not verify external-user identity, and no threshold here upgrades PMF or release status."
         ),
     }
     if include_source_breakdown:

@@ -458,7 +458,7 @@ python scripts/v2_stable_release_approval.py template \
   --out <LOCAL_PRIVATE_PATH>/stable-release-review-input.json
 ```
 
-The human release reviewer must explicitly review all 13 checks and provide a non-empty evidence reference/summary for each.
+The human release reviewer must explicitly process all 13 checks and provide a non-empty evidence reference/summary for each. Eleven pre-publication checks must be APPROVED. The two publication-time facts (`release_asset_sha256_verified`, `tag_source_sha_equal`) must be explicitly marked `DELEGATED_TO_RELEASE_WORKFLOW`, because claiming them as already true before draft download-back/tag materialization would be false.
 
 Finalize only after review:
 
@@ -480,7 +480,8 @@ parent(C1) == C0
 git diff C0..C1
   == .github/stable-release-approvals/v2.0.0.json
 candidate version at C0 == 2.0.0
-all 13 checks == APPROVED
+11 pre-publication checks == APPROVED
+2 publication-time checks == DELEGATED_TO_RELEASE_WORKFLOW
 handoff hashes present
 STABLE_RELEASE_PUBLICATION_AUTHORIZED == TRUE
 V2_STABLE_RELEASE == FALSE

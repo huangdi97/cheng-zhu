@@ -278,6 +278,7 @@ def test_committed_approval_refuses_multi_parent_merge_even_with_same_tree_delta
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "candidate")
     candidate = _git(repo, "rev-parse", "HEAD")
+    base_branch = _git(repo, "branch", "--show-current")
 
     template = mod.create_review_template(handoff, candidate, "2.0.0")
     review = _approved_review(mod, template)

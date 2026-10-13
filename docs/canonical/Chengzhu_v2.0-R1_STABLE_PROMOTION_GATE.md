@@ -99,7 +99,7 @@ Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current repository evaluator policy = `v2.0-R1-stable-promotion-7`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v6. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, and v7 closes the remaining longitudinal-cohort ambiguity: one qualifying Conversation Space must bind to exactly one pseudonymous `user_ref` and contain >=3 authorized Sessions for that same user. A mixed-user Space fails cohort integrity and cannot count as continuity. Published beta.6 remains immutable and correctly contains policy v6; policy v7 is post-beta.6 source truth until a later release is explicitly justified. Thresholds/floors must not be lowered, and sample/cohort populations must not be broadened after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-8`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v6. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, and v7 closes the remaining longitudinal-cohort ambiguity: one qualifying Conversation Space must bind to exactly one pseudonymous `user_ref` and contain >=3 authorized Sessions for that same user. A mixed-user Space fails cohort integrity and cannot count as continuity. Published beta.6 remains immutable and correctly contains policy v6; policy v7 is post-beta.6 source truth until a later release is explicitly justified. Thresholds/floors must not be lowered, and sample/cohort populations must not be broadened after seeing a failing pilot merely to create a PASS.
 
 ---
 
@@ -317,6 +317,59 @@ Full operator procedure:
 
 `docs/evals/V2_CONVERSATION_REAL_PILOT_RUNBOOK.md`
 
+## 5.4 Complete Stable metric coverage / anti-selection-bias gate
+
+Post-beta.7 attack-style audit found a material Stable-evidence correctness gap in Policy v7: frozen seed provenance and submitted-row binding were strong, but the evaluator still allowed the **labeled subset** to define a metric denominator. That leaves selection bias across both independent review and in-product self-report:
+
+- an independent reviewer could omit unfavorable objective events;
+- a user could leave high-regret Guidance unlabeled;
+- only favorable Session Outcome / Quick Debrief rows could be completed;
+- for metrics allowing either self-report or independent review, an operator could select whichever source produced the more favorable subset.
+
+Policy v8 closes this without changing any numerical threshold, `min_n`, profile floor, label-source vocabulary, cross-session requirement or unique-event sample unit.
+
+For **every Stable metric**, Chengzhu derives the full eligible event×metric population from the frozen seed **before human labels are examined**. Each required pair must then be covered by at least one label source already allowed by that metric:
+
+```text
+frozen eligible product event
+→ derive Stable metric membership from immutable prediction/runtime provenance
+→ look up that metric's allowed_label_sources
+→ require the metric-specific human label fields
+→ coverage only if one allowed source supplies a complete label
+→ all required event×metric pairs covered before threshold/min_n evaluation
+```
+
+Examples:
+
+- auto-runtime PROACTIVE Guidance → `useful` / `interruption_regret`;
+- auto-runtime Guidance → `source_correct`;
+- RECALL Guidance → `recall_correct`;
+- ARBITER SILENT decision → `silence_correct`;
+- Direct Question frozen prediction → `actual`;
+- predicted Decision / Commitment / Task → `actual_type + actual_state`;
+- Continue → `writeback_accurate`;
+- Session Outcome → `cognitive_load_delta + would_reuse_space`.
+
+A missing row, null required label, disallowed label source, or unresolved duplicate allowed-source observation remains **missing/invalid coverage**; it cannot disappear from the denominator merely because the operator stopped labeling after a favorable subset reached `min_n`.
+
+The human report must carry:
+
+```text
+stable_metric_coverage.contract_version
+= v2.0-R1-stable-metric-coverage-1
+
+stable_metric_coverage.policy
+= COMPLETE_FROZEN_ELIGIBLE_POPULATION
+
+covered_event_metric_pairs == required_event_metric_pairs
+missing_event_metric_pairs == 0
+complete == true
+```
+
+Otherwise Stable readiness is `NO_GO`.
+
+This closes denominator selection bias. It does **not** prove reviewer identity/independence, participant consent, real-world authorization, Stable release status or PMF.
+
 ## 6. Tooling
 
 ### Recommended
@@ -324,6 +377,10 @@ Full operator procedure:
 Use `scripts/v2_conversation_pilot_workspace.py` and the Real Pilot Runbook for end-to-end operator execution.
 
 ### Low-level / audit path
+
+The low-level scripts remain useful for inspection/debugging, but under Policy v8 they are **not sufficient by themselves for a Stable PASS** because `stable_metric_coverage` must be derived from the frozen workspace seed + frozen policy before aggregation. The canonical Stable-review path is the workspace orchestrator above.
+
+For audit/debug only:
 
 1. Export local label seed.
 2. Human reviewers label real sessions.

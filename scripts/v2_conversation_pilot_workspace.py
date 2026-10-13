@@ -30,7 +30,7 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-3"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-4"
 MIN_PRODUCT_SCHEMA = 12
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
@@ -478,6 +478,190 @@ def _bind_review_rows_to_seed(
     return bound
 
 
+SELF_REPORT_SOURCE = "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+INDEPENDENT_REVIEW_SOURCE = "INDEPENDENT_HUMAN_REVIEW"
+STABLE_METRIC_COVERAGE_CONTRACT = "v2.0-R1-stable-metric-coverage-1"
+
+
+def _metric_allowed_sources(policy: dict[str, Any], metric: str) -> set[str]:
+    rule = (policy.get("metrics") or {}).get(metric)
+    if not isinstance(rule, dict):
+        return set()
+    return {
+        str(value)
+        for value in (rule.get("allowed_label_sources") or [])
+        if str(value)
+    }
+
+
+def _required_stable_metric_fields(
+    seed_row: dict[str, Any],
+    policy: dict[str, Any],
+) -> dict[str, tuple[str, ...]]:
+    """Return Stable metric dimensions this frozen seed row belongs to.
+
+    Population membership is derived from immutable runtime/seed provenance
+    before any human label is inspected. This prevents both independent-review
+    and self-report cherry-picking from shrinking a denominator after outcomes
+    are visible.
+    """
+    required: dict[str, tuple[str, ...]] = {}
+    kind = str(seed_row.get("kind") or "")
+
+    def include(metric: str, fields: tuple[str, ...]) -> None:
+        if _metric_allowed_sources(policy, metric):
+            required[metric] = fields
+
+    if kind == "guidance" and human_eval._is_auto_runtime(seed_row):
+        guidance_class = str(seed_row.get("guidance_class") or "")
+        if guidance_class == "PROACTIVE":
+            include("opportunity_precision", ("useful",))
+            include("interruption_regret", ("interruption_regret",))
+        include("source_attribution_accuracy", ("source_correct",))
+        if guidance_class == "RECALL":
+            include("recall_precision", ("recall_correct",))
+
+    elif (
+        kind == "silence"
+        and human_eval._is_auto_runtime(seed_row)
+        and str(human_eval._runtime_origin(seed_row).get("decision_class") or "") == "ARBITER"
+    ):
+        include("useful_silence_rate", ("silence_correct",))
+
+    elif kind == "direct_question" and isinstance(seed_row.get("predicted"), bool):
+        include("direct_question_precision", ("actual",))
+        include("direct_question_recall", ("actual",))
+
+    elif kind == "truth_item":
+        if (
+            str(seed_row.get("predicted_type") or "")
+            in human_eval.DECISION_COMMITMENT_PREDICTED_TYPES
+            and str(seed_row.get("predicted_state") or "")
+        ):
+            include(
+                "decision_commitment_state_precision",
+                ("actual_type", "actual_state"),
+            )
+
+    elif kind == "continue":
+        include("continue_writeback_accuracy", ("writeback_accurate",))
+
+    elif kind == "session_outcome":
+        include("mean_cognitive_load_delta", ("cognitive_load_delta",))
+        include("space_reuse_intent_rate", ("would_reuse_space",))
+
+    return required
+
+
+def _stable_metric_fields_complete(row: dict[str, Any], fields: tuple[str, ...]) -> bool:
+    for field in fields:
+        value = row.get(field)
+        if field in {
+            "useful",
+            "interruption_regret",
+            "source_correct",
+            "recall_correct",
+            "silence_correct",
+            "actual",
+            "writeback_accurate",
+            "would_reuse_space",
+        }:
+            if not isinstance(value, bool):
+                return False
+        elif field == "cognitive_load_delta":
+            if type(value) not in (int, float):
+                return False
+            number = float(value)
+            if not math.isfinite(number) or not -2 <= number <= 2:
+                return False
+        elif not str(value or "").strip():
+            return False
+    return True
+
+
+def _stable_metric_coverage(
+    seed_index: dict[tuple[str, str, str], dict[str, Any]],
+    label_rows: Iterable[dict[str, Any]],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    required: dict[tuple[str, str, str, str], tuple[str, ...]] = {}
+    required_by_metric: dict[str, int] = {}
+    allowed_sources_by_key: dict[tuple[str, str, str, str], set[str]] = {}
+
+    for seed_key, seed_row in seed_index.items():
+        session_id, kind, event_id = seed_key
+        for metric, fields in _required_stable_metric_fields(seed_row, policy).items():
+            key = (session_id, kind, event_id, metric)
+            required[key] = fields
+            allowed_sources_by_key[key] = _metric_allowed_sources(policy, metric)
+            required_by_metric[metric] = required_by_metric.get(metric, 0) + 1
+
+    covered: set[tuple[str, str, str, str]] = set()
+    covered_source: dict[tuple[str, str, str, str], str] = {}
+    for row in label_rows:
+        source = human_eval._label_source(row)
+        if not source:
+            continue
+        session_id, kind, event_id = _review_seed_key(row)
+        seed_row = seed_index.get((session_id, kind, event_id))
+        if seed_row is None:
+            # In-product self-report is exported from product.db and should map
+            # to the same frozen seed identities. Unknown rows cannot satisfy
+            # Stable coverage even if they are otherwise well-formed.
+            continue
+        for metric, fields in _required_stable_metric_fields(seed_row, policy).items():
+            key = (session_id, kind, event_id, metric)
+            if source not in allowed_sources_by_key.get(key, set()):
+                continue
+            if not _stable_metric_fields_complete(row, fields):
+                continue
+            previous = covered_source.get(key)
+            if previous is not None and previous != source:
+                # human_eval also fails duplicate event×metric observations,
+                # but record this as uncovered here so coverage itself cannot
+                # bless mixed-source multiplicity.
+                covered.discard(key)
+                covered_source[key] = "DUPLICATE_ALLOWED_SOURCES"
+                continue
+            if previous == "DUPLICATE_ALLOWED_SOURCES":
+                continue
+            covered.add(key)
+            covered_source[key] = source
+
+    missing = sorted(set(required) - covered)
+    covered_by_metric: dict[str, int] = {}
+    for _session_id, _kind, _event_id, metric in covered:
+        covered_by_metric[metric] = covered_by_metric.get(metric, 0) + 1
+
+    return {
+        "contract_version": STABLE_METRIC_COVERAGE_CONTRACT,
+        "policy": "COMPLETE_FROZEN_ELIGIBLE_POPULATION",
+        "required_event_metric_pairs": len(required),
+        "covered_event_metric_pairs": len(covered),
+        "missing_event_metric_pairs": len(missing),
+        "complete": not missing,
+        "required_by_metric": dict(sorted(required_by_metric.items())),
+        "covered_by_metric": dict(sorted(covered_by_metric.items())),
+        "missing_examples": [
+            {
+                "session_id": session_id,
+                "kind": kind,
+                "event_id": event_id,
+                "metric": metric,
+                "allowed_label_sources": sorted(
+                    allowed_sources_by_key.get((session_id, kind, event_id, metric), set())
+                ),
+            }
+            for session_id, kind, event_id, metric in missing[:20]
+        ],
+        "interpretation": (
+            "Coverage is derived from the complete frozen Stable-eligible seed population before labels are observed. "
+            "Every event×metric pair must be labeled by at least one source already allowed by that metric. "
+            "Omitted rows, null required labels, disallowed sources and mixed-source duplicate observations fail closed."
+        ),
+    }
+
+
 def _assignments_from_manifest(manifest: dict[str, Any]) -> list[tuple[str, str]]:
     assignments: list[tuple[str, str]] = []
     for profile in pilot_manifest.REQUIRED_PROFILES:
@@ -504,6 +688,10 @@ def _policy_contract_check(policy: dict[str, Any]) -> None:
         raise ValueError("Stable policy metric sample unit must be UNIQUE_EVENT_PER_METRIC")
     if str(policy.get("duplicate_event_metric_policy") or "") != "FAIL_CLOSED":
         raise ValueError("Stable policy duplicate event/metric handling must be FAIL_CLOSED")
+    if str(policy.get("stable_metric_coverage_policy") or "") != "COMPLETE_FROZEN_ELIGIBLE_POPULATION":
+        raise ValueError("Stable policy metric coverage must be COMPLETE_FROZEN_ELIGIBLE_POPULATION")
+    if str(policy.get("stable_metric_coverage_contract_version") or "") != STABLE_METRIC_COVERAGE_CONTRACT:
+        raise ValueError("Stable policy metric coverage contract is unsupported")
     if int(policy.get("cross_session_space_min_sessions") or 0) != pilot_manifest.CROSS_SESSION_SPACE_MIN_SESSIONS:
         raise ValueError("cross-session Space minimum does not match the frozen workspace policy")
     if str(policy.get("cross_session_space_user_binding") or "") != pilot_manifest.CROSS_SESSION_SPACE_USER_BINDING:
@@ -532,11 +720,15 @@ This directory is **local evidence workspace**, not a release artifact and not p
 ## Required flow
 
 1. Review `pilot-manifest.draft.json` and the selected Session/user pseudonym mapping. Every selected Session in the same Space must use the same pseudonymous user_ref.
-2. Have independent reviewers fill a copy of `independent-review.seed.jsonl`.
+2. Have independent reviewers fill copies of `independent-review.seed.jsonl`.
    Use `label_source=INDEPENDENT_HUMAN_REVIEW` where required by policy.
    Reviewers may edit only reviewer / label_source / notes and the kind-specific
    human label fields. Event identity, prediction, profile/Space, runtime origin,
    source refs and all other frozen seed provenance must remain unchanged.
+   For every Stable metric, every eligible frozen seed event×metric must be
+   labeled by at least one source already allowed for that metric. Cherry-picking
+   favorable self-report or independent-review subsets, leaving required labels
+   null, or using a disallowed source fails closed before Stable evaluation.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
 4. Finalize only after you can truthfully make every required operator attestation.
 5. Evaluate with the finalized manifest plus independent-review file(s).
@@ -876,7 +1068,14 @@ def evaluate_workspace(
             )
             rows.extend(review_rows)
 
+        policy = _json_load(policy_path)
+        stable_metric_coverage = _stable_metric_coverage(
+            seed_index,
+            rows,
+            policy,
+        )
         human_report = human_eval.aggregate(rows)
+        human_report["stable_metric_coverage"] = stable_metric_coverage
         human_json = temp_dir / "human-report.json"
         human_md = temp_dir / "human-report.md"
         _write_json(human_json, human_report)
@@ -885,7 +1084,7 @@ def evaluate_workspace(
         stable_report = stable_readiness.evaluate(
             human_report,
             _json_load(final_manifest_path),
-            _json_load(policy_path),
+            policy,
         )
         stable_json = temp_dir / "stable-readiness.json"
         stable_md = temp_dir / "stable-readiness.md"
@@ -907,6 +1106,7 @@ def evaluate_workspace(
                 "independent_review_seed_rows": len(seed_index),
                 "verified_independent_review_rows": verified_review_rows,
                 "review_seed_binding": "EVENT_LEVEL_IMMUTABLE_PROVENANCE_VERIFIED",
+                "stable_metric_coverage": stable_metric_coverage,
                 "independent_reviews": [
                     {"filename": path.name, "sha256": _sha256(path)}
                     for path in reviews

@@ -1636,3 +1636,53 @@ PMF_PROVEN = FALSE
 ```
 
 This was a release-correctness freeze, not a new feature wave. beta.7 has completed the full exact-SHA release pipeline and is now the public Conversation Beta. Published beta.6 remains immutable historical provenance. beta.7 publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`.
+
+
+---
+
+## Stable Policy v8 complete Stable-metric coverage closure · 2026-10-13
+
+beta.7 发布后继续对 real-pilot evidence path 做攻击式审计，发现一个 material evidence-correctness gap：Policy v7 能证明已提交 label 的 provenance，但仍让“哪些 event 最终被标注”决定 metric denominator。
+
+因此理论上存在多种 selection-bias 路径：
+
+```text
+frozen seed = full eligible product-event population
+
+independent review:
+  omit unfavorable objective events
+  → favorable subset can reach min_n
+
+self-report:
+  omit high-regret Guidance
+  omit unfavorable Session Outcome / Quick Debrief
+  → favorable subset can reach min_n
+
+multi-source metric:
+  choose only the more favorable allowed source/subset
+```
+
+当前源码修复为 Stable Policy v8：
+
+```text
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-8
+STABLE_METRIC_COVERAGE_POLICY = COMPLETE_FROZEN_ELIGIBLE_POPULATION
+STABLE_METRIC_COVERAGE_CONTRACT = v2.0-R1-stable-metric-coverage-1
+REQUIRED_POPULATION_DERIVED_BEFORE_LABELS = TRUE
+OMITTED_REQUIRED_EVENT_METRIC = NO_GO
+NULL_REQUIRED_STABLE_LABEL = NO_GO
+DISALLOWED_LABEL_SOURCE = NO_GO
+UNRESOLVED_MULTI_SOURCE_DUPLICATE = NO_GO
+NUMERICAL_THRESHOLDS_CHANGED = FALSE
+MIN_N_CHANGED = FALSE
+PROFILE_FLOORS_CHANGED = FALSE
+CROSS_SESSION_USER_BINDING_CHANGED = FALSE
+METRIC_SAMPLE_UNIT_CHANGED = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Coverage applies to every Stable metric according to its frozen `allowed_label_sources`: self-report-only, independent-review-only, or either-source metrics all require complete frozen event×metric coverage before quality thresholds and `min_n` are evaluated.
+
+Public beta.7 remains immutable and still packages Policy v7. It remains a valid engineering/product Beta, but after this audit it is **not the canonical baseline for a new Stable-readiness evidence workspace**. New Stable evidence must use current Policy v8 source or a later prerelease explicitly packaging v8. This material evidence-correctness fix justifies the next prerelease cycle; it does not retroactively modify beta.7 assets or provenance.
+

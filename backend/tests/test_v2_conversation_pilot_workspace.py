@@ -154,9 +154,11 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert snapshot_meta["sessions"] == 2
     assert snapshot_meta["sha256"]
     assert snapshot_meta["logical_sha256"]
-    assert json.loads((workspace / "stable-promotion-policy.json").read_text(encoding="utf-8"))[
-        "policy_version"
-    ] == "v2.0-R1-stable-promotion-7"
+    frozen_policy = json.loads(
+        (workspace / "stable-promotion-policy.json").read_text(encoding="utf-8")
+    )
+    assert frozen_policy["policy_version"] == "v2.0-R1-stable-promotion-8"
+    assert frozen_policy["stable_metric_coverage_policy"] == "COMPLETE_FROZEN_ELIGIBLE_POPULATION"
     assert result["policy"]["cross_session_space_user_binding"] == "SINGLE_PSEUDONYMOUS_USER_REF"
 
     with pytest.raises(FileExistsError, match="workspace already exists"):
@@ -687,3 +689,269 @@ def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_pa
 
     with pytest.raises(FileExistsError, match="evaluation already exists"):
         mod.evaluate_workspace(data["workspace"], [review])
+
+
+def test_workspace_stable_metric_coverage_prevents_objective_cherry_picking():
+    mod = _load()
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+
+    seed_rows = [
+        {
+            "kind": "direct_question",
+            "session_id": "cv-dq",
+            "space_id": "cs-dq",
+            "profile": "PROJECT_SYNC",
+            "event_id": "cts-good",
+            "predicted": True,
+            "actual": None,
+            "reviewer": "",
+            "label_source": "",
+            "notes": "",
+        },
+        {
+            "kind": "direct_question",
+            "session_id": "cv-dq",
+            "space_id": "cs-dq",
+            "profile": "PROJECT_SYNC",
+            "event_id": "cts-bad",
+            "predicted": True,
+            "actual": None,
+            "reviewer": "",
+            "label_source": "",
+            "notes": "",
+        },
+        {
+            "kind": "continue",
+            "session_id": "cv-dq",
+            "space_id": "cs-dq",
+            "profile": "PROJECT_SYNC",
+            "reviewer": "",
+            "label_source": "",
+            "writeback_accurate": None,
+            "notes": "",
+        },
+    ]
+    seed_index = {
+        mod._review_seed_key(row): row
+        for row in seed_rows
+    }
+
+    favorable_subset = [
+        {
+            **seed_rows[0],
+            "reviewer": "independent-a",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "actual": True,
+        },
+        {
+            **seed_rows[2],
+            "reviewer": "independent-a",
+            "label_source": "INDEPENDENT_HUMAN_REVIEW",
+            "writeback_accurate": True,
+        },
+    ]
+    coverage = mod._stable_metric_coverage(seed_index, favorable_subset, policy)
+    assert coverage["complete"] is False
+    assert coverage["required_event_metric_pairs"] == 5
+    assert coverage["covered_event_metric_pairs"] == 3
+    assert coverage["missing_event_metric_pairs"] == 2
+    assert {
+        row["metric"] for row in coverage["missing_examples"]
+    } == {"direct_question_precision", "direct_question_recall"}
+
+    complete = favorable_subset + [{
+        **seed_rows[1],
+        "reviewer": "independent-b",
+        "label_source": "INDEPENDENT_HUMAN_REVIEW",
+        "actual": False,
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, complete, policy)
+    assert coverage["complete"] is True
+    assert coverage["covered_event_metric_pairs"] == coverage["required_event_metric_pairs"] == 5
+    assert coverage["missing_event_metric_pairs"] == 0
+
+
+def test_workspace_stable_metric_coverage_requires_allowed_source_and_non_null_fields():
+    mod = _load()
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+    seed = {
+        "kind": "truth_item",
+        "session_id": "cv-truth",
+        "space_id": "cs-truth",
+        "profile": "DESIGN_REVIEW",
+        "event_id": "ci-1",
+        "predicted_type": "Decision",
+        "predicted_state": "AGREED",
+        "actual_type": None,
+        "actual_state": None,
+        "reviewer": "",
+        "label_source": "",
+        "notes": "",
+    }
+    seed_index = {mod._review_seed_key(seed): seed}
+
+    wrong_source = [{
+        **seed,
+        "reviewer": "reviewer-a",
+        "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+        "actual_type": "Decision",
+        "actual_state": "AGREED",
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, wrong_source, policy)
+    assert coverage["complete"] is False
+
+    null_state = [{
+        **seed,
+        "reviewer": "reviewer-a",
+        "label_source": "INDEPENDENT_HUMAN_REVIEW",
+        "actual_type": "Decision",
+        "actual_state": None,
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, null_state, policy)
+    assert coverage["complete"] is False
+
+    valid = [{
+        **seed,
+        "reviewer": "reviewer-a",
+        "label_source": "INDEPENDENT_HUMAN_REVIEW",
+        "actual_type": "Decision",
+        "actual_state": "AGREED",
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, valid, policy)
+    assert coverage["complete"] is True
+
+
+def test_workspace_stable_metric_coverage_blocks_self_report_cherry_picking():
+    mod = _load()
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+
+    seed_rows = [
+        {
+            "kind": "guidance",
+            "session_id": "cv-self",
+            "space_id": "cs-self",
+            "profile": "PROJECT_SYNC",
+            "event_id": "g-1",
+            "guidance_class": "PROACTIVE",
+            "system": {
+                "origin": {
+                    "kind": "TRANSCRIPT_AUTO",
+                    "transcript_segment_id": "cts-1",
+                    "decision_class": "ARBITER",
+                },
+            },
+            "reviewer": "",
+            "label_source": "",
+            "useful": None,
+            "interruption_regret": None,
+            "source_correct": None,
+            "recall_correct": None,
+            "notes": "",
+        },
+        {
+            "kind": "session_outcome",
+            "session_id": "cv-self",
+            "space_id": "cs-self",
+            "profile": "PROJECT_SYNC",
+            "reviewer": "",
+            "label_source": "",
+            "cognitive_load_delta": None,
+            "would_reuse_space": None,
+            "notes": "",
+        },
+    ]
+    seed_index = {mod._review_seed_key(row): row for row in seed_rows}
+
+    favorable_only = [{
+        **seed_rows[0],
+        "reviewer": "IN_PRODUCT_SELF_REPORT",
+        "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+        "useful": True,
+        "interruption_regret": False,
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, favorable_only, policy)
+    assert coverage["complete"] is False
+    assert coverage["required_by_metric"]["interruption_regret"] == 1
+    assert coverage["required_by_metric"]["mean_cognitive_load_delta"] == 1
+    assert coverage["required_by_metric"]["space_reuse_intent_rate"] == 1
+    assert coverage["missing_event_metric_pairs"] >= 3
+
+    completed = favorable_only + [{
+        **seed_rows[1],
+        "reviewer": "IN_PRODUCT_SELF_REPORT",
+        "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+        "cognitive_load_delta": 1,
+        "would_reuse_space": False,
+    }, {
+        **seed_rows[0],
+        "reviewer": "independent-source-check",
+        "label_source": "INDEPENDENT_HUMAN_REVIEW",
+        "source_correct": False,
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, completed, policy)
+    # opportunity_precision can be satisfied by the self-report useful label,
+    # interruption_regret by self-report, source accuracy by independent review,
+    # and both session outcomes by self-report.
+    assert coverage["complete"] is True
+    assert coverage["missing_event_metric_pairs"] == 0
+
+
+def test_workspace_stable_metric_coverage_rejects_top_level_forged_runtime_origin():
+    mod = _load()
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+    forged = {
+        "kind": "guidance",
+        "session_id": "cv-forged",
+        "space_id": "cs-forged",
+        "profile": "PROJECT_SYNC",
+        "event_id": "g-forged",
+        "guidance_class": "PROACTIVE",
+        "runtime_origin": {
+            "kind": "TRANSCRIPT_AUTO",
+            "transcript_segment_id": "cts-forged",
+            "decision_class": "ARBITER",
+        },
+        "reviewer": "",
+        "label_source": "",
+        "useful": None,
+        "interruption_regret": None,
+        "source_correct": None,
+        "recall_correct": None,
+        "notes": "",
+    }
+    seed_index = {mod._review_seed_key(forged): forged}
+    assert mod._stable_metric_coverage(seed_index, [], policy)["required_event_metric_pairs"] == 0
+
+
+def test_workspace_stable_metric_coverage_accepts_one_allowed_source_for_multi_source_metric():
+    mod = _load()
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+    seed = {
+        "kind": "silence",
+        "session_id": "cv-silence",
+        "space_id": "cs-silence",
+        "profile": "DESIGN_REVIEW",
+        "event_id": "g-silent",
+        "system": {
+            "origin": {
+                "kind": "TRANSCRIPT_AUTO",
+                "transcript_segment_id": "cts-silent",
+                "decision_class": "ARBITER",
+            },
+        },
+        "reviewer": "",
+        "label_source": "",
+        "silence_correct": None,
+        "notes": "",
+    }
+    seed_index = {mod._review_seed_key(seed): seed}
+    self_report = [{
+        **seed,
+        "reviewer": "IN_PRODUCT_SELF_REPORT",
+        "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+        "silence_correct": False,
+    }]
+    coverage = mod._stable_metric_coverage(seed_index, self_report, policy)
+    assert coverage["complete"] is True
+    assert coverage["required_by_metric"] == {"useful_silence_rate": 1}
+    assert coverage["covered_by_metric"] == {"useful_silence_rate": 1}

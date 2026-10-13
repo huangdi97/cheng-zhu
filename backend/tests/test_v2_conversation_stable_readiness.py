@@ -72,6 +72,14 @@ def _human_report():
             "sample_unit": "UNIQUE_EVENT_PER_METRIC",
             "duplicate_event_metric_policy": "FAIL_CLOSED",
         },
+        "stable_metric_coverage": {
+            "contract_version": policy["stable_metric_coverage_contract_version"],
+            "policy": policy["stable_metric_coverage_policy"],
+            "required_event_metric_pairs": 100,
+            "covered_event_metric_pairs": 100,
+            "missing_event_metric_pairs": 0,
+            "complete": True,
+        },
         "cohort": {
             "status": "COMPLETE",
             "sessions": sessions,
@@ -192,6 +200,37 @@ def test_stable_readiness_requires_unique_event_metric_sample_unit_contract():
     assert report["status"] == "NO_GO"
     assert any(
         item["name"] == "metric_sample_unit_contract"
+        for item in report["failed_checks"]
+    )
+
+
+def test_stable_readiness_rejects_incomplete_frozen_metric_population_coverage():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    human["stable_metric_coverage"].update({
+        "required_event_metric_pairs": 100,
+        "covered_event_metric_pairs": 99,
+        "missing_event_metric_pairs": 1,
+        "complete": False,
+    })
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    check = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "human_report_stable_metric_coverage"
+    )
+    assert check["actual"]["missing_event_metric_pairs"] == 1
+
+
+def test_stable_readiness_rejects_weakened_stable_metric_coverage_policy():
+    module = _module()
+    policy = _policy()
+    policy["stable_metric_coverage_policy"] = "MIN_N_ONLY"
+    report = module.evaluate(_human_report(), _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "stable_metric_coverage_policy_contract"
         for item in report["failed_checks"]
     )
 

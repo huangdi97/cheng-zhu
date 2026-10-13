@@ -197,6 +197,70 @@ def evaluate(
         required=required_sample_unit or "UNIQUE_EVENT_PER_METRIC",
     )
 
+    required_coverage_contract = str(
+        policy.get("stable_metric_coverage_contract_version") or ""
+    )
+    required_coverage_policy = str(
+        policy.get("stable_metric_coverage_policy") or ""
+    )
+    coverage = human_report.get("stable_metric_coverage")
+    if not isinstance(coverage, dict):
+        coverage = {}
+    required_pairs = coverage.get("required_event_metric_pairs")
+    covered_pairs = coverage.get("covered_event_metric_pairs")
+    missing_pairs = coverage.get("missing_event_metric_pairs")
+    complete = coverage.get("complete")
+    coverage_contract_ok = (
+        required_coverage_contract == "v2.0-R1-stable-metric-coverage-1"
+        and required_coverage_policy == "COMPLETE_FROZEN_ELIGIBLE_POPULATION"
+    )
+    add(
+        "stable_metric_coverage_policy_contract",
+        coverage_contract_ok,
+        actual={
+            "contract_version": required_coverage_contract,
+            "policy": required_coverage_policy,
+        },
+        required={
+            "contract_version": "v2.0-R1-stable-metric-coverage-1",
+            "policy": "COMPLETE_FROZEN_ELIGIBLE_POPULATION",
+        },
+        reason=(
+            "Every Stable metric must cover the complete frozen eligible event population "
+            "with at least one label source already allowed for that metric."
+        ),
+    )
+    add(
+        "human_report_stable_metric_coverage",
+        coverage_contract_ok
+        and coverage.get("contract_version") == required_coverage_contract
+        and coverage.get("policy") == required_coverage_policy
+        and type(required_pairs) is int
+        and type(covered_pairs) is int
+        and type(missing_pairs) is int
+        and required_pairs >= 0
+        and covered_pairs == required_pairs
+        and missing_pairs == 0
+        and complete is True,
+        actual={
+            "contract_version": coverage.get("contract_version"),
+            "policy": coverage.get("policy"),
+            "required_event_metric_pairs": required_pairs,
+            "covered_event_metric_pairs": covered_pairs,
+            "missing_event_metric_pairs": missing_pairs,
+            "complete": complete,
+        },
+        required={
+            "contract_version": required_coverage_contract,
+            "policy": required_coverage_policy,
+            "coverage": "100% of frozen Stable-eligible event×metric pairs",
+        },
+        reason=(
+            "Omitted or null labels create selection bias whether the metric uses self-report, "
+            "independent review, or either allowed source. A favorable subset must never be enough to pass."
+        ),
+    )
+
     add(
         "human_report_evidence_type",
         human_report.get("evidence_type") == "HUMAN_LABELED_CONVERSATION_EVAL",

@@ -126,6 +126,8 @@ def _verify_handoff(handoff_dir: Path) -> dict[str, Any]:
     if claims.get("V2_STABLE_RELEASE") is not False or claims.get("PMF_PROVEN") is not False:
         raise ValueError("handoff must not already claim Stable or PMF")
 
+    if str(manifest.get("contract_version") or "") != HANDOFF_CONTRACT:
+        raise ValueError("handoff SHA256 manifest contract mismatch")
     expected_json = str(manifest.get("handoff_json_sha256") or "").lower()
     expected_md = str(manifest.get("handoff_markdown_sha256") or "").lower()
     if _sha256(handoff_path) != expected_json:
@@ -165,7 +167,8 @@ def create_review_template(
         "candidate_version": version,
         "reviewer_ref": "",
         "reviewed_at": "",
-        "attestations": list(REQUIRED_ATTESTATIONS),
+        "required_attestations": list(REQUIRED_ATTESTATIONS),
+        "attestations": [],
         "release_review_checks": [
             {
                 "id": item["id"],

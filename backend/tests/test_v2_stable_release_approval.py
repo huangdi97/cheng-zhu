@@ -22,6 +22,23 @@ def _load():
     return mod
 
 
+def _load_handoff():
+    path = ROOT / "scripts" / "v2_conversation_stable_review_handoff.py"
+    spec = importlib.util.spec_from_file_location("v2_stable_review_handoff_for_approval_test", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_approval_check_contract_matches_handoff_check_contract():
+    approval = _load()
+    handoff = _load_handoff()
+    assert list(approval.REQUIRED_CHECK_IDS) == [
+        check_id for check_id, _reason in handoff.REQUIRED_RELEASE_REVIEW_CHECKS
+    ]
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

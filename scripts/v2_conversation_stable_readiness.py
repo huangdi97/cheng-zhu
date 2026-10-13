@@ -34,6 +34,14 @@ def _finite_number(value: Any) -> float | None:
 
 _PLACEHOLDERS = {"", "REPLACE", "TBD", "PLACEHOLDER"}
 CROSS_SESSION_SPACE_USER_BINDING = "SINGLE_PSEUDONYMOUS_USER_REF"
+REQUIRED_HUMAN_REPORT_CONTRACT = "v2.0-R1-human-eval-6"
+LONGITUDINAL_RECALL_UTILITY_METRIC = "longitudinal_recall_utility_rate"
+LONGITUDINAL_RECALL_UTILITY_CONTRACT = {
+    "direction": "gte",
+    "threshold": 0.8,
+    "min_n": 20,
+    "allowed_label_sources": ["LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"],
+}
 
 
 def _clean_token(value: Any) -> str:
@@ -164,10 +172,37 @@ def evaluate(
 
     required_report_contract = str(policy.get("human_report_contract_version") or "")
     add(
+        "human_report_policy_contract",
+        required_report_contract == REQUIRED_HUMAN_REPORT_CONTRACT,
+        actual=required_report_contract,
+        required=REQUIRED_HUMAN_REPORT_CONTRACT,
+        reason=(
+            "Current Stable source requires the human-eval contract that can prove prior-session "
+            "Recall provenance; a custom policy cannot opt back into an older report schema."
+        ),
+    )
+    add(
         "human_report_contract_version",
         str(human_report.get("report_contract_version") or "") == required_report_contract,
         actual=human_report.get("report_contract_version"),
         required=required_report_contract,
+    )
+    actual_longitudinal_contract = (
+        (policy.get("metrics") or {}).get(LONGITUDINAL_RECALL_UTILITY_METRIC)
+        if isinstance(policy.get("metrics"), dict)
+        else None
+    )
+    add(
+        "longitudinal_recall_utility_contract",
+        actual_longitudinal_contract == LONGITUDINAL_RECALL_UTILITY_CONTRACT,
+        actual=actual_longitudinal_contract,
+        required=LONGITUDINAL_RECALL_UTILITY_CONTRACT,
+        reason=(
+            "Repeated use and Recall correctness do not prove longitudinal value. "
+            "The v8 source gate requires >=0.80 useful prior-session auto Recall with >=20 "
+            "unique events from explicit local user self-report; this minimum cannot be "
+            "removed, weakened, or delegated to reviewer judgment by editing policy JSON."
+        ),
     )
     required_sample_unit = str(policy.get("metric_sample_unit") or "")
     human_sample_unit = str(
@@ -464,6 +499,7 @@ def evaluate(
             "manifest by session/profile/space; profile floors are derived from enumerated pseudonymous cohort entries, "
             f"a cross-session Space requires at least {cross_session_space_min_sessions} authorized Sessions in that same Space "
             "and every selected Session in that Space must bind to one identical pseudonymous user_ref, "
+            "Stable also requires capture-time-proven prior-session auto Recall to be explicitly useful to the user, "
             "and Stable metrics count only target profiles plus label sources explicitly allowed by policy. "
             "user_ref is a local pseudonym and not identity proof. Packaging/signing/release gates remain independent, "
             "and this tool does not establish PMF or universal user value."

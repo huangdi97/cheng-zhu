@@ -30,6 +30,9 @@ Stable Latest = v1.4.2
 Conversation Beta Published = v2.0.0-beta.8
 Published Beta tag/source SHA = 9442e9891453aff3b1e482933056593b893f6288
 Published Beta packaged Stable Policy = v2.0-R1-stable-promotion-8
+Next Conversation Beta Candidate = v2.0.0-beta.9
+Candidate Pilot Workspace Contract = v2.0-R1-pilot-workspace-5
+Candidate Toolchain Fingerprint Contract = v2.0-R1-pilot-toolchain-1
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
@@ -37,7 +40,9 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.8 provenance is recorded in `docs/releases/V2_0_0_BETA_8_PUBLICATION_PROVENANCE.md`. beta.8 is the current **Stable-evidence correctness** prerelease and the canonical packaged baseline for new Stable-readiness workspaces. It packages Stable Policy v8, which closes favorable-subset / denominator-selection bias by requiring complete coverage of the frozen eligible event×metric population before Stable metrics can pass. beta.8 was published from exact green main SHA `9442e9891453aff3b1e482933056593b893f6288` after CI #1015 and Release #326 completed successfully; Stable Latest remains `v1.4.2`.
+Published beta.8 provenance is recorded in `docs/releases/V2_0_0_BETA_8_PUBLICATION_PROVENANCE.md`. beta.8 is the current **public** Stable-evidence correctness prerelease. It packages Stable Policy v8, which closes favorable-subset / denominator-selection bias by requiring complete coverage of the frozen eligible event×metric population before Stable metrics can pass. beta.8 was published from exact green main SHA `9442e9891453aff3b1e482933056593b893f6288` after CI #1015 and Release #326 completed successfully; Stable Latest remains `v1.4.2`.
+
+Post-beta.8 source has additionally closed evaluator-implementation drift by freezing SHA256 fingerprints for the real-pilot evaluator toolchain in workspace contract v5. Because beta.8 does **not** contain workspace v5, `v2.0.0-beta.9` is the next prerelease candidate. Until beta.9 completes the full exact-SHA release path, public/downloadable truth remains beta.8. New Stable-readiness workspaces intended to use toolchain provenance should wait for beta.9 or use the exact current source checkout without mislabeling it as published beta.8 capability.
 
 beta.8 was published from exact green main/tag SHA `9442e9891453aff3b1e482933056593b893f6288` through main CI #1015 and Release run #326 after dependency-security, Backend/Frontend/Desktop gates, Windows build, packaged UI evidence, clean-install replay, installed-layout smoke, draft download-back, SHA256 verification, final publish, Release-page truth regression, Stable-Latest preservation, tag/source equality and post-publish verification-artifact upload all completed successfully. It retains beta.7's single-user cross-session Space binding and further packages **Stable Policy v8** complete frozen eligible-population coverage. Numerical quality thresholds, min_n values and profile floors remain unchanged. beta.7 / beta.6 / beta.5 / beta.4 / beta.3 remain immutable historical releases and must not be rewritten as containing beta.8 changes.
 

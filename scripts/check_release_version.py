@@ -85,6 +85,10 @@ def main() -> int:
         "scripts/render_published_release_body.py",
         "--notes-file $publishedBody",
         "CHENGZHU_PUBLISHED_STATUS_BEGIN",
+        "stable_review_authorization_b64:",
+        "scripts/verify_stable_release_authorization.py",
+        "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO",
+        "RELEASE_AUTHORIZATION.json",
     ):
         if token not in release_workflow:
             errors.append(f"release workflow missing provenance invariant: {token}")
@@ -94,6 +98,8 @@ def main() -> int:
         "RELEASE_NOTES_v$version.md",
         "scripts/render_published_release_body.py",
         "display truth normalized; nothing to dispatch",
+        "requires manual human release authorization",
+        "generic publisher will not dispatch",
     ):
         if token not in publisher_workflow:
             errors.append(f"current-version publisher missing exact-SHA invariant: {token}")

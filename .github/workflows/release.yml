@@ -82,6 +82,25 @@ jobs:
       - name: Release version consistency
         run: python scripts/check_release_version.py
 
+      - name: Stable v2 release approval gate
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          if (-not $version.Contains('-')) {
+            $major = [int]($version.Split('.')[0])
+            if ($major -ge 2) {
+              python scripts/v2_stable_release_approval.py validate-committed `
+                --repo-root . `
+                --candidate-version $version `
+                --release-source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA
+              if ($LASTEXITCODE -ne 0) {
+                throw "Stable v2 release approval gate failed"
+              }
+            }
+          }
+
       - name: License gate
         run: python scripts/generate_third_party_notices.py --check
 

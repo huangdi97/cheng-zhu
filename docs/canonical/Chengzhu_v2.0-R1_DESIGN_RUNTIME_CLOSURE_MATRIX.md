@@ -1931,3 +1931,55 @@ PMF_PROVEN = FALSE
 ```
 
 This is source-side release-governance hardening after beta.9. It does not justify a feature-driven beta.10 and does not claim that a real pilot has occurred.
+
+
+---
+
+## Stable publication authorization enforcement · 2026-10-14
+
+在 beta.9 后继续审计 Stable handoff 时发现一个治理绕过面：Stable handoff 虽然把所有 release-review check 标记为 `PENDING_HUMAN_RELEASE_REVIEW`，但旧 `publish-current-version-on-green-main.yml` / `release.yml` 并不消费这条证据链。理论上只要把版本改成稳定 SemVer 并让 main CI 通过，就可能直接走 Stable `--latest` 发布。
+
+当前源码收口为：
+
+```text
+STABLE_RELEASE_REVIEW_DECISION_CONTRACT =
+  v2.0-R1-stable-release-review-decision-1
+
+STABLE_RELEASE_AUTHORIZATION_CONTRACT =
+  v2.0-R1-stable-release-authorization-1
+
+STABLE_V2_GENERIC_AUTO_PUBLISH = FORBIDDEN
+STABLE_V2_MANUAL_RELEASE_REQUIRED = TRUE
+STABLE_V2_HUMAN_GO_TOKEN_REQUIRED = TRUE
+AUTHORIZATION_EXACT_SOURCE_SHA_BINDING = TRUE
+AUTHORIZATION_EXACT_VERSION_BINDING = TRUE
+ALL_REQUIRED_RELEASE_CHECKS_EXPLICIT = TRUE
+PENDING_CHECK_FINALIZATION = FORBIDDEN
+NO_GO_RELEASE_TOKEN = FORBIDDEN
+TAG_PUSH_BYPASS = FORBIDDEN
+PRE_PUBLISH_AUTHORIZATION_RECHECK = TRUE
+RELEASE_AUTHORIZATION_ASSET = SHA256_AND_DOWNLOAD_BACK_AUDITED
+
+AUTHORIZATION_IS_NOT_PUBLICATION = TRUE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Stable review decision 由本地 privacy-minimized handoff 生成，不复制 transcript、Guidance text 或 reviewer notes。人工 reviewer 必须逐项给出 PASS/FAIL 与非敏感 evidence reference；只有所有 required checks 均 PASS 才产生 GO authorization token。
+
+generic publisher 对 Stable v2+ 明确 no-op；手动 Release workflow 才能携带 authorization token。Release workflow 仍必须完成 exact-SHA build、clean-install、download-back、SHA256、tag/source 与最终 channel 校验。GO 仅代表“允许进入发布流水线”，不能提前写成 `V2_STABLE_RELEASE=true`。
+
+当前公开下载仍是：
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.9
+PUBLIC_BETA_SOURCE_SHA = 146db913a4467e179d547b37fc006753f64655bb
+STABLE_LATEST = v1.4.2
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+该修复属于 post-beta.9 release-governance source hardening，不改变 beta.9 二进制/tag，也不构成新的真实用户证据。

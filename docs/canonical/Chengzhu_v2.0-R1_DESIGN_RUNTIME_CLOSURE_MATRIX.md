@@ -1609,3 +1609,112 @@ PMF_PROVEN = FALSE
 Pilot Manifest builder 与 Stable evaluator 双层执行同一规则：builder 在 DRAFT 阶段即拒绝一个 Space 对应多个 `user_ref`；evaluator 独立复核，不能靠手工构造 manifest 绕过。
 
 `user_ref` 仍只是本地匿名代号，不是系统验证身份。该修复关闭的是 **longitudinal cohort qualification** 漏洞，不构成真实用户价值证据，也不倒写已经公开的 beta.6 二进制/provenance。只有未来需要把 policy v7 operator tooling 固化到新的可下载 release，或真实 pilot 暴露 runtime defect 时，才进入新的 prerelease cycle。
+
+
+---
+
+## Longitudinal Recall value evidence closure · 2026-10-13
+
+继续审计 Stable Policy v7 后发现一个产品价值层缺口：
+
+```text
+same user + same Space + >=3 Sessions
+= structural continuity
+
+Recall Precision
+= memory correctness
+
+Space Reuse Intent
+= willingness to return
+```
+
+三者都不能直接证明：
+
+> **成竹从之前 Session 记住并在当前真实对话主动 Recall 的内容，是否真的对用户有帮助。**
+
+因此当前源码新增 Stable Policy v8，不把“重复使用”继续代理成“长期记忆价值”。
+
+### Runtime provenance
+
+自动 RECALL 现在为被召回的长期真值增加不可变主 provenance：
+
+```text
+source_refs[0] = {
+  kind: CONVERSATION_ITEM,
+  id,
+  space_id,
+  session_id,
+  review_status,
+  state,
+  visibility
+}
+```
+
+底层 transcript / document source refs 仍保留，但 `CONVERSATION_ITEM` ref 让评测能区分：
+
+```text
+same Space + different Session = longitudinal candidate
+same Session = not longitudinal
+different Space = not longitudinal
+missing item/session provenance = historical / unavailable for longitudinal metric
+```
+
+pre-fix 历史 RECALL 不根据标题、时间、底层 source ref 或当前数据库状态回填这条身份。
+
+### Human-eval contract v6
+
+新增：
+
+```text
+longitudinal_recall_utility_rate
+= useful=true prior-session auto RECALL
+  / all explicitly useful-labeled prior-session auto RECALL
+
+required:
+  origin.kind = TRANSCRIPT_AUTO
+  guidance_class = RECALL
+  primary source_ref.kind = CONVERSATION_ITEM
+  source_ref.space_id = current space_id
+  source_ref.session_id != current session_id
+  label_source = LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT
+```
+
+### Stable Policy v8
+
+```text
+LONGITUDINAL_RECALL_UTILITY_THRESHOLD = >= 0.80
+LONGITUDINAL_RECALL_UTILITY_MIN_N = >= 20
+LABEL_SOURCE = LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT
+```
+
+这两个数字不是看到 pilot 结果后新调出来的：
+
+- `0.80` 复用既有 Opportunity usefulness threshold；
+- `20` 复用既有 Recall sample floor。
+
+Stable evaluator 同时硬编码不可弱化 contract，不能只编辑 policy JSON 删除该指标、降低 threshold/min_n、回退 human-report contract 或改用 independent reviewer 替代用户自己的 usefulness 判断。
+
+### Release boundary
+
+公开下载仍是：
+
+```text
+V2_PUBLIC_BETA = v2.0.0-beta.6
+BETA6_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
+BETA6_PACKAGED_STABLE_POLICY = v6
+```
+
+beta.6 早于本次 Recall source-session provenance，因此旧 beta.6 RECALL **不能**被事后升级为 Policy-v8 longitudinal samples。要正式采集 v8 longitudinal evidence，需要包含本次 runtime provenance 的后续源码或下一 prerelease。
+
+当前状态：
+
+```text
+CURRENT_SOURCE_STABLE_POLICY = v8
+CURRENT_HUMAN_EVAL_CONTRACT = v2.0-R1-human-eval-6
+LONGITUDINAL_RECALL_PROVENANCE = SOURCE_READY_PENDING_RELEASE
+LONGITUDINAL_RECALL_VALUE_GATE = SOURCE_READY_PENDING_RELEASE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

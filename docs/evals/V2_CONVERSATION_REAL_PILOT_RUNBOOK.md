@@ -151,6 +151,8 @@ python scripts/v2_conversation_pilot_workspace.py init \
 
 The command creates a new directory and refuses to overwrite an existing one.
 
+Policy is frozen into each workspace. A workspace initialized under policy v6 remains historical v6 evidence; do **not** edit its frozen policy to v7. After this post-beta.6 correction, create a fresh workspace under current source so `stable-promotion-policy.json` freezes policy v7 and the same-user Space binding is auditable from initialization onward.
+
 Expected files:
 
 ```text

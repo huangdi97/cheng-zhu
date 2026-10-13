@@ -20,6 +20,8 @@ on:
       - "scripts/v2_conversation_stable_review_handoff.py"
       - "scripts/v2_stable_release_review_decision.py"
       - "scripts/verify_stable_release_authorization.py"
+      - "scripts/verify_stable_release_source.py"
+      - "scripts/verify_stable_release_source.ps1"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
       - "frontend/scripts/capture-v20-conversation-packaged-evidence.mjs"
@@ -41,6 +43,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 # A PR that changes release engineering is rebuilt on every new commit.
 # Cancel superseded PR builds so the Windows runner validates only the newest
@@ -110,6 +113,18 @@ jobs:
               throw "Stable v2+ requires VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
             }
           }
+
+      - name: Stable v2+ exact green-main source gate
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          & scripts/verify_stable_release_source.ps1 `
+            -Version $version `
+            -SourceSha $env:CHENGZHU_RELEASE_SOURCE_SHA
 
       - name: License gate
         run: python scripts/generate_third_party_notices.py --check
@@ -459,6 +474,13 @@ jobs:
           if ($draftTarget -ne $sourceSha) {
             throw "refusing to publish: draft $tag targets $draftTarget but binaries were built from $sourceSha"
           }
+
+          # Re-check immediately before publication. A Stable candidate that
+          # was current/green when the job started becomes stale if main moves
+          # during the long Windows build and download-back verification.
+          & scripts/verify_stable_release_source.ps1 `
+            -Version $version `
+            -SourceSha $sourceSha
 
           $isPrerelease = $version.Contains('-')
           if (-not $isPrerelease -and [int]($version.Split('.')[0]) -ge 2) {

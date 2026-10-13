@@ -31,29 +31,54 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _canonical_sha(value: object) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     ws = tmp_path / "pilot"
     ev = ws / "evaluation"
     ev.mkdir(parents=True)
 
-    _write_json(ws / "workspace.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-5",
-        "toolchain": {
-            "contract_version": "v2.0-R1-pilot-toolchain-1",
-            "files": [{"path": "scripts/v2_conversation_stable_readiness.py", "sha256": "a" * 64}],
-        },
-    })
-    _write_json(ws / "selected-cohort.snapshot.json", {
+    toolchain = {
+        "contract_version": "v2.0-R1-pilot-toolchain-1",
+        "files": [{"path": "scripts/v2_conversation_stable_readiness.py", "sha256": "a" * 64}],
+    }
+    cohort = {
         "contract_version": "v2.0-R1-selected-cohort-snapshot-2",
         "sessions": [{"session_id": "cv_1", "space_id": "cs_1", "user_ref": "pilot-user-01"}],
-    })
-    _write_json(ws / "stable-promotion-policy.json", {
-        "policy_version": "v2.0-R1-stable-promotion-8",
-    })
-    _write_json(ws / "pilot-manifest.final.json", {
+    }
+    policy = {"policy_version": "v2.0-R1-stable-promotion-8"}
+    draft_manifest = {
+        "contract_version": "v2.0-R1-real-pilot-manifest-3",
+        "evidence_type": "DRAFT_NOT_AUTHORIZED_REAL_USE",
+    }
+    final_manifest = {
         "contract_version": "v2.0-R1-real-pilot-manifest-3",
         "evidence_type": "AUTHORIZED_REAL_CONVERSATION_PILOT",
-    })
+    }
+    coverage = {
+        "required_event_metric_pairs": 120,
+        "covered_event_metric_pairs": 120,
+        "missing_event_metric_pairs": 0,
+        "complete": True,
+    }
+    stable_claims = {
+        "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": status == READY,
+        "V2_STABLE_RELEASE": False,
+        "PMF_PROVEN": False,
+    }
+
+    _write_json(ws / "selected-cohort.snapshot.json", cohort)
+    _write_json(ws / "stable-promotion-policy.json", policy)
+    _write_json(ws / "pilot-manifest.draft.json", draft_manifest)
+    _write_json(ws / "pilot-manifest.final.json", final_manifest)
     (ws / "independent-review.seed.jsonl").write_text(
         '# frozen seed\n{"kind":"guidance","system":{"text":"PRIVATE_TRANSCRIPT_DO_NOT_COPY"}}\n',
         encoding="utf-8",
@@ -63,12 +88,37 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
         encoding="utf-8",
     )
 
+    _write_json(ws / "workspace.json", {
+        "contract_version": "v2.0-R1-pilot-workspace-5",
+        "policy": {
+            "policy_version": policy["policy_version"],
+            "sha256": _sha(ws / "stable-promotion-policy.json"),
+        },
+        "toolchain": toolchain,
+        "outputs": {
+            "selected_cohort_snapshot": {
+                "sha256": _sha(ws / "selected-cohort.snapshot.json"),
+                "logical_sha256": _canonical_sha(cohort),
+            },
+            "pilot_manifest_draft": {
+                "sha256": _sha(ws / "pilot-manifest.draft.json"),
+            },
+            "independent_review_seed": {
+                "sha256": _sha(ws / "independent-review.seed.jsonl"),
+            },
+            "self_report": {
+                "sha256": _sha(ws / "self-report.jsonl"),
+            },
+        },
+    })
+
     _write_json(ev / "human-report.json", {
         "evidence_type": "HUMAN_LABELED_CONVERSATION_EVAL",
         "claims": {"HUMAN_LABELS_AVAILABLE": True},
+        "stable_metric_coverage": coverage,
     })
     _write_json(ev / "stable-readiness.json", {
-        "policy_version": "v2.0-R1-stable-promotion-8",
+        "policy_version": policy["policy_version"],
         "status": status,
         "pilot_cohort": {
             "authorized_sessions": 40,
@@ -80,49 +130,38 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
         },
         "checks_total": 30,
         "checks_failed": 0 if status == READY else 1,
-        "claims": {
-            "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": status == READY,
-            "V2_STABLE_RELEASE": False,
-            "PMF_PROVEN": False,
-        },
+        "claims": stable_claims,
     })
 
     _write_json(ws / "finalization.json", {
+        "contract_version": "v2.0-R1-pilot-workspace-5",
+        "selected_cohort_snapshot_sha256": _sha(ws / "selected-cohort.snapshot.json"),
+        "selected_cohort_logical_sha256": _canonical_sha(cohort),
+        "draft_manifest_sha256": _sha(ws / "pilot-manifest.draft.json"),
         "final_manifest_sha256": _sha(ws / "pilot-manifest.final.json"),
         "policy_sha256": _sha(ws / "stable-promotion-policy.json"),
+        "toolchain": toolchain,
     })
     _write_json(ev / "evaluation-manifest.json", {
         "contract_version": "v2.0-R1-pilot-workspace-5",
         "status": status,
-        "toolchain": {
-            "contract_version": "v2.0-R1-pilot-toolchain-1",
-            "files": [{"path": "scripts/v2_conversation_stable_readiness.py", "sha256": "a" * 64}],
-        },
+        "toolchain": toolchain,
         "inputs": {
             "selected_cohort_snapshot_sha256": _sha(ws / "selected-cohort.snapshot.json"),
+            "selected_cohort_logical_sha256": _canonical_sha(cohort),
             "pilot_manifest_final_sha256": _sha(ws / "pilot-manifest.final.json"),
             "policy_sha256": _sha(ws / "stable-promotion-policy.json"),
             "self_report_sha256": _sha(ws / "self-report.jsonl"),
             "independent_review_seed_sha256": _sha(ws / "independent-review.seed.jsonl"),
-            "stable_metric_coverage": {
-                "required_event_metric_pairs": 120,
-                "covered_event_metric_pairs": 120,
-                "missing_event_metric_pairs": 0,
-                "complete": True,
-            },
+            "stable_metric_coverage": coverage,
         },
         "outputs": {
             "human_report_sha256": _sha(ev / "human-report.json"),
             "stable_readiness_sha256": _sha(ev / "stable-readiness.json"),
         },
-        "claims": {
-            "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": status == READY,
-            "V2_STABLE_RELEASE": False,
-            "PMF_PROVEN": False,
-        },
+        "claims": stable_claims,
     })
     return ws
-
 
 def test_handoff_requires_pass_and_keeps_release_decision_pending(tmp_path):
     mod = _load()
@@ -147,6 +186,16 @@ def test_handoff_requires_pass_and_keeps_release_decision_pending(tmp_path):
         "guidance_text_copied": False,
         "reviewer_notes_copied": False,
         "direct_identifiers_required": False,
+    }
+    assert result["provenance_consistency"] == {
+        "workspace_contract": "VERIFIED",
+        "toolchain": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+        "selected_cohort": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+        "policy": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+        "draft_and_final_manifest": "VERIFIED",
+        "review_seed_and_self_report": "VERIFIED",
+        "evaluation_claims": "MATCH_STABLE_READINESS",
+        "stable_metric_coverage": "MATCH_HUMAN_REPORT",
     }
 
     serialized = (out / "stable-review-handoff.json").read_text(encoding="utf-8")
@@ -196,4 +245,42 @@ def test_handoff_rejects_stable_or_pmf_claim_escalation(tmp_path):
     _write_json(evaluation_path, evaluation)
 
     with pytest.raises(ValueError, match="must not publish/claim V2_STABLE_RELEASE"):
+        mod.create_handoff(workspace, tmp_path / "handoff", ROOT)
+
+
+def test_handoff_rejects_evaluation_manifest_toolchain_metadata_drift(tmp_path):
+    mod = _load()
+    workspace = _workspace(tmp_path)
+    evaluation_path = workspace / "evaluation" / "evaluation-manifest.json"
+    evaluation = json.loads(evaluation_path.read_text(encoding="utf-8"))
+    evaluation["toolchain"]["files"][0]["sha256"] = "b" * 64
+    _write_json(evaluation_path, evaluation)
+
+    with pytest.raises(ValueError, match="evaluation/workspace toolchain: provenance mismatch"):
+        mod.create_handoff(workspace, tmp_path / "handoff", ROOT)
+
+
+def test_handoff_rejects_evaluation_coverage_summary_drift(tmp_path):
+    mod = _load()
+    workspace = _workspace(tmp_path)
+    evaluation_path = workspace / "evaluation" / "evaluation-manifest.json"
+    evaluation = json.loads(evaluation_path.read_text(encoding="utf-8"))
+    evaluation["inputs"]["stable_metric_coverage"]["covered_event_metric_pairs"] = 119
+    evaluation["inputs"]["stable_metric_coverage"]["missing_event_metric_pairs"] = 1
+    evaluation["inputs"]["stable_metric_coverage"]["complete"] = False
+    _write_json(evaluation_path, evaluation)
+
+    with pytest.raises(ValueError, match="evaluation/human stable metric coverage: provenance mismatch"):
+        mod.create_handoff(workspace, tmp_path / "handoff", ROOT)
+
+
+def test_handoff_rejects_evaluation_claim_summary_drift(tmp_path):
+    mod = _load()
+    workspace = _workspace(tmp_path)
+    evaluation_path = workspace / "evaluation" / "evaluation-manifest.json"
+    evaluation = json.loads(evaluation_path.read_text(encoding="utf-8"))
+    evaluation["claims"]["PMF_PROVEN"] = True
+    _write_json(evaluation_path, evaluation)
+
+    with pytest.raises(ValueError, match="evaluation/stable claims: provenance mismatch"):
         mod.create_handoff(workspace, tmp_path / "handoff", ROOT)

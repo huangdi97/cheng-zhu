@@ -1872,3 +1872,62 @@ PMF_PROVEN = FALSE
 ```
 
 This is operator/release-governance closure, not another product feature cycle and not evidence that a real pilot has happened.
+
+
+---
+
+## Stable handoff provenance-consistency closure · source after beta.9
+
+Post-beta.9 Stable release-review handoff audit found that handoff v1 correctly re-hashed referenced evidence files, but still trusted several mutable summary fields from `evaluation-manifest.json` without cross-checking them against independent frozen artifacts. In particular, evaluator toolchain metadata, Stable claims and Stable metric coverage could be edited in the evaluation manifest alone while the referenced file hashes remained valid.
+
+Current source closes that local consistency gap with handoff contract v2:
+
+```text
+STABLE_REVIEW_HANDOFF_CONTRACT = v2.0-R1-stable-review-handoff-2
+
+WORKSPACE_CONTRACT
+  == FINALIZATION_CONTRACT
+  == EVALUATION_CONTRACT
+
+WORKSPACE_TOOLCHAIN
+  == FINALIZATION_TOOLCHAIN
+  == EVALUATION_TOOLCHAIN
+
+SELECTED_COHORT_SHA256 + CANONICAL_LOGICAL_SHA256
+  == workspace
+  == finalization
+  == evaluation
+
+POLICY_SHA256 + POLICY_VERSION
+  == workspace
+  == finalization
+  == evaluation
+  == stable-readiness
+
+EVALUATION_CLAIMS
+  == STABLE_READINESS_CLAIMS
+
+EVALUATION_STABLE_METRIC_COVERAGE
+  == HUMAN_REPORT_STABLE_METRIC_COVERAGE
+
+DRAFT / FINAL MANIFEST + REVIEW_SEED + SELF_REPORT HASHES
+  = REVERIFIED_ACROSS_AVAILABLE_FROZEN_ANCHORS
+```
+
+Handoff v2 uses the independently frozen workspace toolchain and human-report coverage after equality checks instead of treating evaluation-manifest summaries as self-authenticating provenance.
+
+Boundary remains explicit:
+
+```text
+LOCAL_PROVENANCE_CONSISTENCY = FAIL_CLOSED
+COORDINATED_REWRITE_OF_ALL_LOCAL_FILES = OUTSIDE_CRYPTOGRAPHIC_VERIFICATION_BOUNDARY
+REVIEWER_IDENTITY_SYSTEM_VERIFIED = FALSE
+REVIEWER_INDEPENDENCE_SYSTEM_VERIFIED = FALSE
+PARTICIPANT_CONSENT_SYSTEM_VERIFIED = FALSE
+PUBLIC_BETA = v2.0.0-beta.9
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+PMF_PROVEN = FALSE
+```
+
+This is source-side release-governance hardening after beta.9. It does not justify a feature-driven beta.10 and does not claim that a real pilot has occurred.

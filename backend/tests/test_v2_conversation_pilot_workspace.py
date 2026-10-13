@@ -157,6 +157,7 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert json.loads((workspace / "stable-promotion-policy.json").read_text(encoding="utf-8"))[
         "policy_version"
     ] == "v2.0-R1-stable-promotion-7"
+    assert result["policy"]["cross_session_space_user_binding"] == "SINGLE_PSEUDONYMOUS_USER_REF"
 
     with pytest.raises(FileExistsError, match="workspace already exists"):
         mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
@@ -189,6 +190,18 @@ def test_workspace_rejects_policy_that_allows_annotation_count_inflation(product
             data["assignments"],
             tmp_path / "weak-duplicate-workspace",
             policy_path=weak_duplicate_path,
+        )
+
+    weak_binding = dict(policy)
+    weak_binding["cross_session_space_user_binding"] = "ALLOW_MIXED_USERS"
+    weak_binding_path = tmp_path / "weak-space-user-policy.json"
+    weak_binding_path.write_text(json.dumps(weak_binding), encoding="utf-8")
+    with pytest.raises(ValueError, match="user binding"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            data["assignments"],
+            tmp_path / "weak-space-user-workspace",
+            policy_path=weak_binding_path,
         )
 
 

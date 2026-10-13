@@ -400,7 +400,7 @@ python scripts/v2_conversation_stable_readiness.py \
   real-pilot.json
 ```
 
-稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。当前源码 policy v7 继承 v4 的 authorized-cohort binding、v5 的 >=3 Session cross-session floor 与 v6 的 UNIQUE_EVENT_PER_METRIC sample unit，并进一步把 longitudinal continuity 定义冻结为“同一 Space + 同一 pseudonymous user_ref + 至少 3 个授权 Session”。2 场重复使用或多人各用同一 Space 一次都不能计入 Stable cross-session Space。用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用错误来源、错误 cohort、混用户 Space 或不足 3 场的 Space 替代该指标所需证据。即使全部通过，也只允许：
+稳定版产品证据阈值见 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`。当前源码与公开 beta.8 均使用 policy v8：它继承 v4 的 authorized-cohort binding、v5 的 >=3 Session cross-session floor、v6 的 UNIQUE_EVENT_PER_METRIC sample unit 与 v7 的 single-user longitudinal Space binding，并新增 **COMPLETE_FROZEN_ELIGIBLE_POPULATION** coverage gate。Stable 指标的完整 eligible event×metric population 必须在看 label 前由 frozen seed/runtime provenance 推导；遗漏 required event/metric、required label 为 null、使用不允许的 label source 或 unresolved duplicate 均 fail closed。用户感知指标可接受本机 self-report，而 Recall / Source Attribution / Direct Question / Decision-State / Continue Accuracy 等客观质量指标要求 `INDEPENDENT_HUMAN_REVIEW`。总体 aggregate 再漂亮，也不能用 favorable subset、错误来源、错误 cohort、混用户 Space 或不足 3 场的 Space 替代完整证据。即使全部通过，也只允许：
 
 ```text
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = TRUE

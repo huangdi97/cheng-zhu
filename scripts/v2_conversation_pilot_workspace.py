@@ -751,7 +751,7 @@ This directory is **local evidence workspace**, not a release artifact and not p
 
 ## Files
 
-- `workspace.json`: provenance for this workspace; contains hashes, counts and claim boundaries.
+- `workspace.json`: provenance for this workspace; contains hashes, counts, frozen evaluator-toolchain fingerprints and claim boundaries.
 - `selected-cohort.snapshot.json`: privacy-minimized logical snapshot of selected Session structure + Frozen Session Pack identity/digest.
 - `stable-promotion-policy.json`: the exact policy snapshot frozen when the workspace was initialized.
 - `pilot-manifest.draft.json`: DB-derived cohort structure. It is intentionally not Stable-eligible.
@@ -773,8 +773,9 @@ This directory is **local evidence workspace**, not a release artifact and not p
    favorable self-report or independent-review subsets, leaving required labels
    null, or using a disallowed source fails closed before Stable evaluation.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
-4. Finalize only after you can truthfully make every required operator attestation.
-5. Evaluate with the finalized manifest plus independent-review file(s).
+4. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v5 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
+5. Finalize only after you can truthfully make every required operator attestation.
+6. Evaluate with the finalized manifest plus independent-review file(s).
 
 The workspace tool never verifies human identity, real-world authorization, participant consent or PMF.
 A Stable Gate PASS only permits a separate stable-release review.

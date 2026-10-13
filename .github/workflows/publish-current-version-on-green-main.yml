@@ -64,6 +64,26 @@ jobs:
 
           python3 scripts/check_release_version.py
 
+          # Conversation v2+ Stable releases are never auto-published merely
+          # because a version bump reached green main. The stable candidate
+          # must first pass the human Stable release-review handoff, then gain
+          # exactly one approval-only child commit containing the version-
+          # scoped approval artifact.
+          if [[ "$version" != *-* ]]; then
+            major="${version%%.*}"
+            if [ "$major" -ge 2 ]; then
+              approval=".github/stable-release-approvals/v$version.json"
+              if [ ! -f "$approval" ]; then
+                echo "stable v2+ approval missing for $version; nothing to publish"
+                exit 0
+              fi
+              python3 scripts/v2_stable_release_approval.py validate-committed \
+                --repo-root . \
+                --candidate-version "$version" \
+                --release-source-sha "$SOURCE_SHA"
+            fi
+          fi
+
           tag="v$version"
           if gh release view "$tag" >/dev/null 2>&1; then
             is_draft="$(gh release view "$tag" --json isDraft --jq '.isDraft')"

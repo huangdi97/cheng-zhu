@@ -948,3 +948,35 @@ PMF_PROVEN = FALSE
 ```
 
 Publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`. Post-publication Policy v8 audit identified a material favorable-subset selection-bias defect in the Stable metric denominator, so the earlier “do not create beta.8” recommendation is superseded. `v2.0.0-beta.8` is now justified as an evidence-correctness prerelease candidate; it must complete a new exact-SHA release cycle before Policy v8 becomes packaged public truth.
+
+
+---
+
+## Post-beta.8 evaluator toolchain release step · 2026-10-13
+
+beta.8 已将 Stable Policy v8 打包为公开 prerelease；post-beta.8 source 又关闭了 evaluator implementation drift：
+
+```text
+PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
+PILOT_TOOLCHAIN_FINGERPRINT_CONTRACT = v2.0-R1-pilot-toolchain-1
+FROZEN_TOOLCHAIN_FILES = 6
+FINALIZE_ON_TOOLCHAIN_DRIFT = FAIL_CLOSED
+EVALUATE_ON_TOOLCHAIN_DRIFT = FAIL_CLOSED
+```
+
+因此新的执行顺序调整为：
+
+1. 完成 `v2.0.0-beta.9` exact-SHA prerelease，把 workspace v5 / toolchain fingerprint 变成 packaged/public source truth；
+2. 以 beta.9（或以后显式包含同等/更严格 provenance contract 的 prerelease）初始化新的 Project Sync / Design Review Stable-readiness workspace；
+3. 运行真实授权 pilot、Quick Debrief、独立人工 review 与 complete frozen eligible-population coverage；
+4. 只有 Policy v8 Stable readiness 真正 PASS 后，才进入 stable v2 人工 release review；
+5. Stable release 仍不自动等于 REAL_USER_VALIDATED 或 PMF_PROVEN。
+
+在 beta.9 发布完成前：
+
+```text
+CURRENT_PUBLIC_BETA = v2.0.0-beta.8
+NEXT_BETA_CANDIDATE = v2.0.0-beta.9
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

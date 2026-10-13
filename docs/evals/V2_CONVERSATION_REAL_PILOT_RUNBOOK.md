@@ -374,6 +374,58 @@ REAL_USER_VALUE_UNIVERSALLY_PROVEN = TRUE
 
 A separate release review must still verify current main, current packaged artifacts, privacy/security incidents, installer provenance, rollback and release notes.
 
+## 12.1 Freeze the Stable release-review handoff
+
+After and only after `evaluate` returns:
+
+```text
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW
+```
+
+create a privacy-minimized handoff bundle:
+
+```bash
+python scripts/v2_conversation_stable_review_handoff.py \
+  --workspace <LOCAL_PRIVATE_PATH>/pilot-2026-10 \
+  --out-dir <LOCAL_PRIVATE_PATH>/pilot-2026-10-stable-review
+```
+
+The tool fails closed when:
+
+- the Stable gate is `NO_GO`;
+- any frozen workspace/evaluation input no longer matches its SHA256 provenance;
+- the Stable evaluator tries to claim `V2_STABLE_RELEASE=true` or `PMF_PROVEN=true`;
+- the output directory already exists.
+
+The handoff contains only hashes, cohort/evaluation summaries, checkout context and pending release-review obligations. It does **not** copy transcript text, Guidance text, reviewer notes or direct identifiers.
+
+Expected output:
+
+```text
+stable-review-handoff.json
+stable-review-handoff.md
+SHA256.json
+```
+
+Every release item is intentionally emitted as:
+
+```text
+PENDING_HUMAN_RELEASE_REVIEW
+```
+
+The handoff does not auto-verify current main CI, packaging, download-back, privacy/security incidents, rollback, release notes or code-signing policy. Those belong to the separate human release decision.
+
+Therefore:
+
+```text
+Stable Gate PASS
+→ review handoff ready
+!= Stable release approved
+!= Stable published
+!= identity/consent independently verified
+!= PMF
+```
+
 ## 13. Current product truth
 
 After beta.9 publication:

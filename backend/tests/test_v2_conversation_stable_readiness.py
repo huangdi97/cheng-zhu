@@ -514,3 +514,84 @@ def test_pilot_period_requires_timezone_aware_iso8601():
     report = module.evaluate(_human_report(), pilot, policy)
     assert report["status"] == "NO_GO"
     assert any(item["name"] == "pilot_period_valid" for item in report["failed_checks"])
+
+
+def test_policy_v8_freezes_longitudinal_recall_utility_without_weakening_prior_gates():
+    policy = _policy()
+    assert policy["policy_version"] == "v2.0-R1-stable-promotion-8"
+    assert policy["human_report_contract_version"] == "v2.0-R1-human-eval-6"
+
+    longitudinal = policy["metrics"]["longitudinal_recall_utility_rate"]
+    assert longitudinal == {
+        "direction": "gte",
+        "threshold": policy["metrics"]["opportunity_precision"]["threshold"],
+        "min_n": policy["metrics"]["recall_precision"]["min_n"],
+        "allowed_label_sources": ["LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"],
+    }
+    assert longitudinal["threshold"] == 0.8
+    assert longitudinal["min_n"] == 20
+    assert policy["longitudinal_recall_utility_contract"] == (
+        "AUTO_RECALL_PRIOR_SESSION_CONFIRMED_ITEM_PLUS_EXPLICIT_USER_USEFULNESS"
+    )
+
+
+def test_stable_readiness_fails_closed_if_longitudinal_utility_policy_is_removed_or_weakened():
+    module = _module()
+
+    removed = _policy()
+    removed["metrics"].pop("longitudinal_recall_utility_rate")
+    report = module.evaluate(_human_report(), _pilot(), removed)
+    assert report["status"] == "NO_GO"
+    contract = next(
+        item for item in report["failed_checks"]
+        if item["name"] == "longitudinal_recall_utility_contract"
+    )
+    assert contract["actual"] is None
+
+    weakened = _policy()
+    weakened["metrics"]["longitudinal_recall_utility_rate"]["threshold"] = 0.5
+    weakened["metrics"]["longitudinal_recall_utility_rate"]["min_n"] = 3
+    weakened["metrics"]["longitudinal_recall_utility_rate"]["allowed_label_sources"] = [
+        "INDEPENDENT_HUMAN_REVIEW"
+    ]
+    report = module.evaluate(_human_report(), _pilot(), weakened)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "longitudinal_recall_utility_contract"
+        for item in report["failed_checks"]
+    )
+
+
+def test_stable_readiness_requires_current_human_eval_contract_for_longitudinal_provenance():
+    module = _module()
+    weakened = _policy()
+    weakened["human_report_contract_version"] = "v2.0-R1-human-eval-5"
+    human = _human_report()
+    human["report_contract_version"] = "v2.0-R1-human-eval-5"
+
+    report = module.evaluate(human, _pilot(), weakened)
+    assert report["status"] == "NO_GO"
+    assert any(
+        item["name"] == "human_report_policy_contract"
+        for item in report["failed_checks"]
+    )
+
+
+def test_longitudinal_recall_utility_requires_explicit_user_self_report():
+    module = _module()
+    policy = _policy()
+    human = _human_report()
+    metric = "longitudinal_recall_utility_rate"
+    self_report = "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+    independent = "INDEPENDENT_HUMAN_REVIEW"
+
+    for profile in policy["metric_profiles"]:
+        entry = human["metrics_by_profile_and_label_source"][profile][self_report].pop(metric)
+        human["metrics_by_profile_and_label_source"][profile].setdefault(independent, {})[metric] = entry
+
+    report = module.evaluate(human, _pilot(), policy)
+    assert report["status"] == "NO_GO"
+    failed = {item["name"] for item in report["failed_checks"]}
+    assert f"metric:{metric}:population" in failed
+    assert f"metric:{metric}:sample_size" in failed
+    assert f"metric:{metric}:threshold" in failed

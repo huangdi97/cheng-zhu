@@ -314,11 +314,16 @@ def validate_committed_approval(
     candidate_sha = _candidate_sha(str(approval.get("candidate_source_sha") or ""))
     if str(approval.get("approval_path") or "") != str(rel).replace("\\", "/"):
         raise ValueError("committed approval path contract mismatch")
+    if str(approval.get("approval_delta_policy") or "") != (
+        "EXACTLY_ONE_CHILD_COMMIT_AND_ONLY_VERSION_SCOPED_APPROVAL_FILE"
+    ):
+        raise ValueError("committed approval delta policy mismatch")
 
     claims = dict(approval.get("claims") or {})
     handoff = dict(approval.get("handoff") or {})
-    if not re.fullmatch(r"[0-9a-f]{64}", str(handoff.get("manifest_sha256") or "")):
-        raise ValueError("committed approval handoff manifest SHA256 missing/invalid")
+    for field in ("manifest_sha256", "handoff_json_sha256", "handoff_markdown_sha256"):
+        if not re.fullmatch(r"[0-9a-f]{64}", str(handoff.get(field) or "")):
+            raise ValueError(f"committed approval handoff {field} missing/invalid")
     if str(handoff.get("contract_version") or "") != HANDOFF_CONTRACT:
         raise ValueError("committed approval handoff contract mismatch")
     if str(handoff.get("evidence_status") or "") != EVIDENCE_READY:
@@ -327,6 +332,13 @@ def validate_committed_approval(
         raise ValueError("committed approval does not authorize Stable publication")
     if claims.get("V2_STABLE_RELEASE") is not False or claims.get("PMF_PROVEN") is not False:
         raise ValueError("approval artifact must not pre-claim Stable or PMF")
+
+    reviewer_ref = str(approval.get("reviewer_ref") or "").strip()
+    if not reviewer_ref:
+        raise ValueError("committed approval reviewer_ref missing")
+    _reviewed_at(str(approval.get("reviewed_at") or ""))
+    if approval.get("rejected_checks") not in ([], None):
+        raise ValueError("committed approval rejected_checks must be empty")
 
     checks = approval.get("release_review_checks")
     if not isinstance(checks, list):

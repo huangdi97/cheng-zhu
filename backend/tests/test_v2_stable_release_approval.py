@@ -262,3 +262,40 @@ def test_committed_approval_refuses_non_approval_delta(tmp_path):
             candidate_version="2.0.0",
             release_source_sha=source,
         )
+
+
+def test_committed_approval_refuses_multi_parent_merge_even_with_same_tree_delta(tmp_path):
+    mod, handoff = _handoff(tmp_path)
+    repo = tmp_path / "repo-merge"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "ci@example.invalid")
+    _git(repo, "config", "user.name", "CI")
+    (repo / "desktop").mkdir()
+    _write_json(repo / "desktop" / "package.json", {"version": "2.0.0"})
+    (repo / "candidate.txt").write_text("candidate\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "candidate")
+    candidate = _git(repo, "rev-parse", "HEAD")
+
+    template = mod.create_review_template(handoff, candidate, "2.0.0")
+    review = _approved_review(mod, template)
+    review_path = tmp_path / "review-merge.json"
+    _write_json(review_path, review)
+    approval = mod.finalize_approval(handoff, review_path, candidate, "2.0.0")
+
+    _git(repo, "checkout", "-b", "approval")
+    _write_json(repo / ".github" / "stable-release-approvals" / "v2.0.0.json", approval)
+    _git(repo, "add", ".github/stable-release-approvals/v2.0.0.json")
+    _git(repo, "commit", "-m", "approval side commit")
+
+    _git(repo, "checkout", "master")
+    _git(repo, "merge", "--no-ff", "approval", "-m", "merge approval")
+    merge_source = _git(repo, "rev-parse", "HEAD")
+
+    with pytest.raises(ValueError, match="single-parent"):
+        mod.validate_committed_approval(
+            repo,
+            candidate_version="2.0.0",
+            release_source_sha=merge_source,
+        )

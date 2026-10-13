@@ -1759,3 +1759,40 @@ PMF_PROVEN = FALSE
 冻结文件包括 workspace orchestrator、label seed、self-report exporter、human eval、pilot manifest builder 与 stable-readiness evaluator。历史 v4 workspace 不做原地“升级”；需要按旧证据继续重放时必须使用对应历史 toolchain，或用当前源码创建一个新的 v5 workspace。
 
 该修复只关闭 evaluator implementation provenance，不修改 Policy v8 的 threshold / min_n / cohort / profile / label-source / complete-coverage 规则，也不抬高产品成熟度。公开 beta.8 仍保持 immutable；workspace v5 需要后续 prerelease 才能成为新的 packaged/operator baseline。
+
+
+---
+
+## beta.9 evaluator-toolchain provenance release candidate · 2026-10-13
+
+beta.8 已公开打包 Stable Policy v8，但其发布 SHA 不包含随后完成的 Pilot Workspace v5 evaluator-toolchain fingerprint。
+
+当前候选状态：
+
+```text
+CURRENT_PUBLIC_BETA = v2.0.0-beta.8
+CURRENT_PUBLIC_BETA_SOURCE_SHA = 9442e9891453aff3b1e482933056593b893f6288
+CURRENT_PUBLIC_PACKAGED_POLICY = v2.0-R1-stable-promotion-8
+
+NEXT_BETA_CANDIDATE = v2.0.0-beta.9
+CANDIDATE_STABLE_POLICY = v2.0-R1-stable-promotion-8
+CANDIDATE_PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
+CANDIDATE_TOOLCHAIN_FINGERPRINT_CONTRACT = v2.0-R1-pilot-toolchain-1
+
+TOOLCHAIN_FILES_FROZEN = 6
+FINALIZE_ON_TOOLCHAIN_DRIFT = FAIL_CLOSED
+EVALUATE_ON_TOOLCHAIN_DRIFT = FAIL_CLOSED
+HISTORICAL_WORKSPACE_IN_PLACE_UPGRADE = FORBIDDEN
+
+NUMERICAL_THRESHOLDS_CHANGED_FROM_BETA8 = FALSE
+MIN_N_CHANGED_FROM_BETA8 = FALSE
+PROFILE_FLOORS_CHANGED_FROM_BETA8 = FALSE
+STABLE_METRIC_COVERAGE_CHANGED_FROM_BETA8 = FALSE
+
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+beta.9 的存在理由是 **evaluator reproducibility / provenance**，不是功能扩张。只有 beta.9 exact green main SHA 完成 Windows build、clean-install、draft download-back、SHA256、downloaded-install replay、public tag/source invariant、prerelease channel 与 post-publish provenance gate 后，才允许把公开 Beta truth 从 beta.8 改写为 beta.9。

@@ -30,9 +30,52 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-4"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-5"
 MIN_PRODUCT_SCHEMA = 12
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
+
+TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-1"
+TOOLCHAIN_RELATIVE_PATHS = (
+    "scripts/v2_conversation_pilot_workspace.py",
+    "scripts/v2_conversation_label_seed.py",
+    "scripts/v2_conversation_feedback_export.py",
+    "scripts/v2_conversation_human_eval.py",
+    "scripts/v2_conversation_pilot_manifest.py",
+    "scripts/v2_conversation_stable_readiness.py",
+)
+
+
+def _toolchain_fingerprint() -> dict[str, Any]:
+    files = []
+    for relative in TOOLCHAIN_RELATIVE_PATHS:
+        path = ROOT / relative
+        if not path.is_file():
+            raise RuntimeError(f"pilot evaluator toolchain file missing: {relative}")
+        files.append({
+            "path": relative,
+            "sha256": _sha256(path),
+        })
+    return {
+        "contract_version": TOOLCHAIN_FINGERPRINT_CONTRACT,
+        "workspace_contract": WORKSPACE_CONTRACT,
+        "human_eval_report_contract": getattr(human_eval, "REPORT_CONTRACT_VERSION", ""),
+        "files": files,
+    }
+
+
+def _require_toolchain(metadata: dict[str, Any]) -> dict[str, Any]:
+    frozen = metadata.get("toolchain")
+    if not isinstance(frozen, dict):
+        raise ValueError(
+            "pilot workspace has no frozen evaluator toolchain; historical workspace remains historical evidence "
+            "and cannot be re-evaluated under workspace contract v5"
+        )
+    current = _toolchain_fingerprint()
+    if frozen != current:
+        raise ValueError(
+            "pilot evaluator toolchain drift detected; use the exact original checkout/toolchain or create a new workspace"
+        )
+    return current
 
 
 def _load_script(module_name: str, filename: str):
@@ -708,7 +751,7 @@ This directory is **local evidence workspace**, not a release artifact and not p
 
 ## Files
 
-- `workspace.json`: provenance for this workspace; contains hashes, counts and claim boundaries.
+- `workspace.json`: provenance for this workspace; contains hashes, counts, frozen evaluator-toolchain fingerprints and claim boundaries.
 - `selected-cohort.snapshot.json`: privacy-minimized logical snapshot of selected Session structure + Frozen Session Pack identity/digest.
 - `stable-promotion-policy.json`: the exact policy snapshot frozen when the workspace was initialized.
 - `pilot-manifest.draft.json`: DB-derived cohort structure. It is intentionally not Stable-eligible.
@@ -730,8 +773,9 @@ This directory is **local evidence workspace**, not a release artifact and not p
    favorable self-report or independent-review subsets, leaving required labels
    null, or using a disallowed source fails closed before Stable evaluation.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
-4. Finalize only after you can truthfully make every required operator attestation.
-5. Evaluate with the finalized manifest plus independent-review file(s).
+4. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v5 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
+5. Finalize only after you can truthfully make every required operator attestation.
+6. Evaluate with the finalized manifest plus independent-review file(s).
 
 The workspace tool never verifies human identity, real-world authorization, participant consent or PMF.
 A Stable Gate PASS only permits a separate stable-release review.
@@ -828,6 +872,7 @@ def init_workspace(
                 "pilot_manifest_contract_version": policy.get("pilot_manifest_contract_version"),
                 "cross_session_space_user_binding": policy.get("cross_session_space_user_binding"),
             },
+            "toolchain": _toolchain_fingerprint(),
             "cohort": cohort_summary,
             "selected_session_ids": sorted(selected_ids),
             "outputs": {
@@ -887,6 +932,7 @@ def finalize_workspace(
     metadata = _json_load(workspace / "workspace.json")
     if metadata.get("contract_version") != WORKSPACE_CONTRACT:
         raise ValueError("unsupported pilot workspace contract")
+    toolchain = _require_toolchain(metadata)
     policy_path = workspace / "stable-promotion-policy.json"
     policy = _json_load(policy_path)
     _require_hash(
@@ -963,6 +1009,7 @@ def finalize_workspace(
         "draft_manifest_sha256": _sha256(draft_path),
         "final_manifest_sha256": _sha256(final_path),
         "policy_sha256": _sha256(workspace / "stable-promotion-policy.json"),
+        "toolchain": toolchain,
         "cohort": cohort_summary,
         "attestations_are_operator_declarations": True,
         "real_user_identity_system_verified": False,
@@ -984,6 +1031,7 @@ def evaluate_workspace(
     metadata = _json_load(workspace / "workspace.json")
     if metadata.get("contract_version") != WORKSPACE_CONTRACT:
         raise ValueError("unsupported pilot workspace contract")
+    toolchain = _require_toolchain(metadata)
 
     final_manifest_path = workspace / "pilot-manifest.final.json"
     if not final_manifest_path.is_file():
@@ -1094,6 +1142,7 @@ def evaluate_workspace(
         evaluation_manifest = {
             "contract_version": WORKSPACE_CONTRACT,
             "evaluated_at": _utc_now(),
+            "toolchain": toolchain,
             "inputs": {
                 "selected_cohort_snapshot_sha256": _sha256(cohort_snapshot_path),
                 "selected_cohort_logical_sha256": _canonical_json_sha256(

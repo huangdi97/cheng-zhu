@@ -370,6 +370,35 @@ Otherwise Stable readiness is `NO_GO`.
 
 This closes denominator selection bias. It does **not** prove reviewer identity/independence, participant consent, real-world authorization, Stable release status or PMF.
 
+## 5.3 Evaluator implementation provenance
+
+Freezing Policy v8 is necessary but not sufficient for reproducible Stable evidence. A policy snapshot defines thresholds/populations; the executable tools still determine how rows are loaded, bound, aggregated and evaluated.
+
+Current post-beta.8 source therefore uses pilot workspace contract v5:
+
+```text
+workspace init
+→ freeze Policy bytes
+→ freeze selected cohort / seed / self-report
+→ freeze evaluator toolchain SHA256 set
+→ finalize requires same toolchain
+→ evaluate requires same toolchain
+→ evaluation-manifest records same toolchain
+```
+
+The frozen toolchain covers:
+
+- pilot workspace orchestrator;
+- label-seed exporter;
+- explicit self-report exporter;
+- human-eval aggregator;
+- pilot-manifest builder;
+- Stable-readiness evaluator.
+
+If any tool differs, finalize/evaluate fail closed. The operator must use the exact original checkout/toolchain or create a fresh workspace. Historical workspace contracts remain historical evidence; do not silently upgrade them in place.
+
+This hardening does **not** change Stable Policy v8 numerical thresholds, min_n, profile floors, label-source rules, cohort definition, or maturity claims. It is post-beta.8 source truth until a later prerelease explicitly packages it.
+
 ## 6. Tooling
 
 ### Recommended

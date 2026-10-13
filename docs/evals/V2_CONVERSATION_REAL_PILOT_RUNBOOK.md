@@ -1,8 +1,8 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: BETA.7 PUBLISHED · REAL-PILOT OPERATOR WORKFLOW · CURRENT SOURCE STABLE POLICY v8  
-**Public Beta**: v2.0.0-beta.7  
-**Published source/tag SHA**: `dc2188cd6b796b5dca9baf0eac2372da7be5bbf2`  
+**Status**: BETA.8 PUBLISHED · REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v8  
+**Public Beta**: v2.0.0-beta.8  
+**Published source/tag SHA**: `9442e9891453aff3b1e482933056593b893f6288`  
 **Stable v2**: NOT CLAIMED  
 **REAL_USER_VALIDATED**: FALSE  
 **PMF_PROVEN**: FALSE
@@ -13,9 +13,9 @@ It does not change any release or evidence claim by itself.
 
 ## 1. Preconditions
 
-Use the published `v2.0.0-beta.7` runtime/source with product schema >= v12.
+Use the published `v2.0.0-beta.8` runtime/source with product schema >= v12 for new Stable-readiness pilots.
 
-The currently published participant-facing/runtime product is `v2.0.0-beta.7`, which packages Stable Policy v7. **Post-publication audit found a material independent-review selection-bias gap in Policy v7. Therefore beta.7 remains valid for engineering/product dogfood, but it must not be the baseline for a new Stable-readiness evidence workspace.** Current source freezes Stable Policy v8, which requires complete frozen Stable metric population coverage across self-report, independent-review, and metrics that allow either source. Historical v7 workspaces remain historical evidence and must not be rewritten; create a fresh v8 workspace for Stable review. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The currently published participant-facing/runtime product is `v2.0.0-beta.8`, which packages Stable Policy v8. Policy v8 requires complete frozen Stable metric population coverage across self-report, independent-review, and metrics that allow either source, while retaining the v7 same-user longitudinal Space binding. beta.7 remains immutable historical prerelease evidence and must not be rewritten as containing Policy v8. Historical v6/v7 workspaces remain historical evidence; do not upgrade their frozen policy or evaluator semantics in place. Create a fresh Policy v8 workspace for new Stable review. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -173,6 +173,8 @@ Important properties:
 - `selected-cohort.snapshot.json` freezes selected Session structure + local pseudonymous `user_ref` + Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest）, without transcript / participant / Guidance / source text;
 - the SQLite main-file SHA256 is advisory only; Chengzhu uses WAL, so the main file alone is not the logical database-state anchor;
 - the exact Stable Promotion policy bytes are frozen;
+- workspace contract v5 freezes SHA256 fingerprints for the workspace orchestrator plus label-seed, self-report export, human-eval, pilot-manifest and stable-readiness tools;
+- finalize/evaluate fail closed if that evaluator toolchain differs from the one used at workspace initialization;
 - the draft manifest is deliberately not Stable-eligible;
 - self-report remains explicit local self-report only;
 - `REAL_USER_VALIDATED`, `V2_STABLE_RELEASE` and `PMF_PROVEN` remain false.
@@ -305,7 +307,9 @@ To rerun with changed labels/cohort/rules, preserve the old workspace and create
 
 Workspace provenance protects against accidental evidence drift.
 
-The workflow refuses to continue when any frozen input hash changes:
+For new workspace contract v5 workspaces, provenance freezes both evidence inputs **and the evaluator implementation**. The workflow refuses to continue when the evaluator toolchain SHA256 set differs from initialization; use the exact original checkout/toolchain or create a new workspace rather than silently recalculating old evidence under changed code.
+
+The workflow also refuses to continue when any frozen input hash changes:
 
 - `selected-cohort.snapshot.json`;
 - `stable-promotion-policy.json`;
@@ -372,18 +376,20 @@ A separate release review must still verify current main, current packaged artif
 
 ## 13. Current product truth
 
-After beta.7 publication:
+After beta.8 publication:
 
 ```text
-PUBLIC_BETA = v2.0.0-beta.7
-PUBLIC_BETA_SOURCE_SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
+PUBLIC_BETA = v2.0.0-beta.8
+PUBLIC_BETA_SOURCE_SHA = 9442e9891453aff3b1e482933056593b893f6288
 PILOT_RUNTIME_AVAILABLE = TRUE
 PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
-PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-7
+PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-8
 CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-8
+CURRENT_SOURCE_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
+EVALUATOR_TOOLCHAIN_FINGERPRINT = REQUIRED_FOR_NEW_V5_WORKSPACES
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -391,7 +397,9 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`.
+Publication provenance: `docs/releases/V2_0_0_BETA_8_PUBLICATION_PROVENANCE.md`.
+
+The v5 workspace-contract/toolchain-fingerprint hardening is **post-beta.8 source truth** until explicitly packaged in a later prerelease; beta.8 remains immutable and must not be rewritten as containing that post-publication change.
 
 
 ### Finalize 的双重 cohort revalidation

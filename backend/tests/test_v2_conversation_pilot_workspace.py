@@ -160,9 +160,55 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert frozen_policy["policy_version"] == "v2.0-R1-stable-promotion-8"
     assert frozen_policy["stable_metric_coverage_policy"] == "COMPLETE_FROZEN_ELIGIBLE_POPULATION"
     assert result["policy"]["cross_session_space_user_binding"] == "SINGLE_PSEUDONYMOUS_USER_REF"
+    assert result["toolchain"]["contract_version"] == mod.TOOLCHAIN_FINGERPRINT_CONTRACT
+    assert result["toolchain"]["workspace_contract"] == mod.WORKSPACE_CONTRACT
+    assert result["toolchain"]["human_eval_report_contract"] == mod.human_eval.REPORT_CONTRACT_VERSION
+    assert {row["path"] for row in result["toolchain"]["files"]} == set(mod.TOOLCHAIN_RELATIVE_PATHS)
+    assert all(len(row["sha256"]) == 64 for row in result["toolchain"]["files"])
 
     with pytest.raises(FileExistsError, match="workspace already exists"):
         mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
+
+
+def test_workspace_toolchain_fingerprint_fails_closed_on_drift(product_env, tmp_path):
+    mod = _load()
+    data = _workspace_fixture(product_env, tmp_path)
+    workspace = data["workspace"]
+    result = mod.init_workspace(Path(store.DB_PATH), data["assignments"], workspace)
+    frozen = result["toolchain"]
+    assert frozen == mod._toolchain_fingerprint()
+
+    workspace_path = workspace / "workspace.json"
+    metadata = json.loads(workspace_path.read_text(encoding="utf-8"))
+    original = json.loads(json.dumps(metadata))
+    metadata["toolchain"]["files"][0]["sha256"] = "0" * 64
+    workspace_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="toolchain drift"):
+        mod.finalize_workspace(
+            Path(store.DB_PATH),
+            workspace,
+            attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+            critical_incidents=0,
+        )
+    assert not (workspace / "pilot-manifest.final.json").exists()
+
+    workspace_path.write_text(json.dumps(original, ensure_ascii=False, indent=2), encoding="utf-8")
+    finalization = mod.finalize_workspace(
+        Path(store.DB_PATH),
+        workspace,
+        attestations=mod.pilot_manifest.REQUIRED_ATTESTATIONS,
+        critical_incidents=0,
+    )
+    assert finalization["toolchain"] == frozen
+
+    # Evaluation re-checks the same frozen toolchain instead of trusting only
+    # the finalization file.
+    metadata = json.loads(workspace_path.read_text(encoding="utf-8"))
+    metadata["toolchain"]["files"][-1]["sha256"] = "f" * 64
+    workspace_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    with pytest.raises(ValueError, match="toolchain drift"):
+        mod.evaluate_workspace(workspace, [])
 
 
 def test_workspace_rejects_policy_that_allows_annotation_count_inflation(product_env, tmp_path):
@@ -680,6 +726,7 @@ def test_evaluate_workspace_rejects_seed_and_preserves_no_go(product_env, tmp_pa
     manifest = json.loads((evaluation / "evaluation-manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "NO_GO"
     assert manifest["contract_version"] == mod.WORKSPACE_CONTRACT
+    assert manifest["toolchain"] == mod._toolchain_fingerprint()
     assert manifest["inputs"]["independent_review_seed_sha256"] == mod._sha256(seed)
     assert manifest["inputs"]["independent_review_seed_rows"] > 0
     assert manifest["inputs"]["verified_independent_review_rows"] == 1

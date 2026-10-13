@@ -198,12 +198,12 @@ def evaluate(
     )
 
     required_coverage_contract = str(
-        policy.get("independent_review_coverage_contract_version") or ""
+        policy.get("stable_metric_coverage_contract_version") or ""
     )
     required_coverage_policy = str(
-        policy.get("independent_review_coverage_policy") or ""
+        policy.get("stable_metric_coverage_policy") or ""
     )
-    coverage = human_report.get("independent_review_coverage")
+    coverage = human_report.get("stable_metric_coverage")
     if not isinstance(coverage, dict):
         coverage = {}
     required_pairs = coverage.get("required_event_metric_pairs")
@@ -211,31 +211,30 @@ def evaluate(
     missing_pairs = coverage.get("missing_event_metric_pairs")
     complete = coverage.get("complete")
     coverage_contract_ok = (
-        required_coverage_contract == "v2.0-R1-independent-review-coverage-1"
-        and required_coverage_policy == "COMPLETE_REQUIRED_OBJECTIVE_POPULATION"
+        required_coverage_contract == "v2.0-R1-stable-metric-coverage-1"
+        and required_coverage_policy == "COMPLETE_FROZEN_ELIGIBLE_POPULATION"
     )
     add(
-        "independent_review_coverage_policy_contract",
+        "stable_metric_coverage_policy_contract",
         coverage_contract_ok,
         actual={
             "contract_version": required_coverage_contract,
             "policy": required_coverage_policy,
         },
         required={
-            "contract_version": "v2.0-R1-independent-review-coverage-1",
-            "policy": "COMPLETE_REQUIRED_OBJECTIVE_POPULATION",
+            "contract_version": "v2.0-R1-stable-metric-coverage-1",
+            "policy": "COMPLETE_FROZEN_ELIGIBLE_POPULATION",
         },
         reason=(
-            "Objective Stable metrics whose only allowed label source is independent review "
-            "must cover the complete frozen seed event×metric population."
+            "Every Stable metric must cover the complete frozen eligible event population "
+            "with at least one label source already allowed for that metric."
         ),
     )
     add(
-        "human_report_independent_review_coverage",
+        "human_report_stable_metric_coverage",
         coverage_contract_ok
         and coverage.get("contract_version") == required_coverage_contract
         and coverage.get("policy") == required_coverage_policy
-        and coverage.get("label_source") == "INDEPENDENT_HUMAN_REVIEW"
         and type(required_pairs) is int
         and type(covered_pairs) is int
         and type(missing_pairs) is int
@@ -246,7 +245,6 @@ def evaluate(
         actual={
             "contract_version": coverage.get("contract_version"),
             "policy": coverage.get("policy"),
-            "label_source": coverage.get("label_source"),
             "required_event_metric_pairs": required_pairs,
             "covered_event_metric_pairs": covered_pairs,
             "missing_event_metric_pairs": missing_pairs,
@@ -255,12 +253,11 @@ def evaluate(
         required={
             "contract_version": required_coverage_contract,
             "policy": required_coverage_policy,
-            "label_source": "INDEPENDENT_HUMAN_REVIEW",
-            "coverage": "100% of required frozen objective event×metric pairs",
+            "coverage": "100% of frozen Stable-eligible event×metric pairs",
         },
         reason=(
-            "Missing or null objective independent-review labels create selection bias: "
-            "a favorable subset must never be enough to satisfy Stable min_n."
+            "Omitted or null labels create selection bias whether the metric uses self-report, "
+            "independent review, or either allowed source. A favorable subset must never be enough to pass."
         ),
     )
 

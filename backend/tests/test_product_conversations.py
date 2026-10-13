@@ -3084,6 +3084,12 @@ def test_topic_recall_and_live_mode_update(product_env):
     shown = conversations.evaluate_guidance(s2["id"], {"current_topic": "offline migration"})
     assert shown["guidance"]["kind"] == "RECALL"
     assert shown["guidance"]["reason"] == "TOPIC_RECALL"
+    recall_ref = shown["guidance"]["source_refs"][0]
+    assert recall_ref["kind"] == "CONVERSATION_ITEM"
+    assert recall_ref["id"] == item["id"]
+    assert recall_ref["space_id"] == space["id"]
+    assert recall_ref["session_id"] == s1["id"]
+    assert recall_ref["review_status"] == "USER_CONFIRMED"
 
     updated = conversations.update_session(s2["id"], {"assistance_mode": "QUIET"})
     assert updated["assistance_mode"] == "QUIET"
@@ -3642,6 +3648,11 @@ def test_transcript_topic_recall_is_sourced_deduped_and_quiet_respected(product_
     conversations.start_session(live["id"])
     first = conversations.guidance_from_transcript(live["id"], "我们回到 offline migration")
     assert first and first["kind"] == "RECALL" and first["reason"] == "TRANSCRIPT_TOPIC_RECALL"
+    recall_ref = first["source_refs"][0]
+    assert recall_ref["kind"] == "CONVERSATION_ITEM"
+    assert recall_ref["id"] == decision["id"]
+    assert recall_ref["space_id"] == space["id"]
+    assert recall_ref["session_id"] == old["id"]
     assert conversations.guidance_from_transcript(live["id"], "offline migration 再说一下") is None
 
     conversations.update_session(live["id"], {"assistance_mode": "QUIET"})

@@ -182,3 +182,12 @@ def test_release_publish_path_rechecks_v2_stable_approval() -> None:
     assert "$major -ge 2" in gate
     assert "github.event.inputs.publish == 'true'" in gate
     assert version_i < approval_i < build_i < publish_i
+
+
+def test_stable_approval_validator_has_candidate_parent_history_available() -> None:
+    publisher = PUBLISHER.read_text(encoding="utf-8")
+    release = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "fetch-depth: 2" in publisher
+    assert "fetch-depth: 2" in release
+    assert 'git", "-C", str(repo_root), "rev-parse"' not in publisher  # validator stays in Python

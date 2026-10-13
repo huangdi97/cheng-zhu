@@ -15,7 +15,7 @@ It does not change any release or evidence claim by itself.
 
 Use the published `v2.0.0-beta.7` runtime/source with product schema >= v12.
 
-The currently published participant-facing/runtime product is `v2.0.0-beta.7`, which packages Stable Policy v7. New Stable-readiness pilot workspaces should therefore freeze Policy v7 directly from beta.7/current source; historical workspaces initialized under older policies remain historical evidence and must not be rewritten. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The currently published participant-facing/runtime product is `v2.0.0-beta.7`, which packages Stable Policy v7. **Post-publication audit found a material independent-review selection-bias gap in Policy v7. Therefore beta.7 remains valid for engineering/product dogfood, but it must not be the baseline for a new Stable-readiness evidence workspace.** Current source freezes Stable Policy v8, which requires complete objective independent-review seed coverage. Historical v7 workspaces remain historical evidence and must not be rewritten; create a fresh v8 workspace for Stable review. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -151,7 +151,7 @@ python scripts/v2_conversation_pilot_workspace.py init \
 
 The command creates a new directory and refuses to overwrite an existing one.
 
-Policy is frozen into each workspace. A workspace initialized under policy v6 remains historical v6 evidence; do **not** edit its frozen policy to v7. For new pilots, create a fresh workspace using published beta.7/current source so `stable-promotion-policy.json` freezes packaged policy v7 and the same-user Space binding is auditable from initialization onward.
+Policy is frozen into each workspace. Historical v6/v7 workspaces remain historical evidence; do **not** edit their frozen policy in place. For a new Stable-readiness pilot, create a fresh workspace using current Policy v8 source (or a later prerelease that explicitly packages v8) so both same-user Space binding and complete objective independent-review coverage are frozen from initialization onward.
 
 Expected files:
 
@@ -204,9 +204,11 @@ The reviewer must **not** change or invent any frozen seed provenance. In partic
 
 At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.jsonl`, binds every independent-review row to the exact frozen `(session_id, kind, event_id)` seed row, and compares every non-human field. An invented event, altered prediction, altered runtime origin, unknown extra field, changed profile/Space, or edited source provenance fails closed before aggregation.
 
+Policy v8 additionally computes the complete required objective event×metric population from that frozen seed **before** inspecting labels. For metrics restricted to independent review, every eligible frozen event must have its required objective label fields completed. Do not stop reviewing when a favorable subset reaches `min_n`; omitted or null objective rows make Stable readiness `NO_GO`.
+
 The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
 
-Stable Policy v7 preserves the v6 sample-unit rule:
+Stable Policy v8 preserves the v7 cohort/sample-unit rules and adds complete objective independent-review coverage:
 
 ```text
 min_n = unique product event × metric observations
@@ -280,7 +282,7 @@ explicit local self-report
 +
 independent human review
 → human-label report
-→ frozen Stable policy v7
+→ frozen Stable policy v8
 → stable-readiness report
 ```
 
@@ -381,7 +383,7 @@ AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
 PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-7
-CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-7
+CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-8
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE

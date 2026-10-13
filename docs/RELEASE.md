@@ -65,8 +65,60 @@ Use the hold for a confirmed release-blocking issue discovered after a release c
 | `LICENSE.txt` | root MIT license |
 | `THIRD_PARTY_NOTICES.md` | third-party licensing |
 | `RELEASE_NOTES_vX.Y.Z.md` | version-specific release notes |
+| `RELEASE_AUTHORIZATION.json` | channel authorization audit: Beta = not required; Stable v2+ = verified human Stable-review GO |
 
 Target machines do not require Python, Node, npm or pip.
+
+## Stable v2+ publication authorization
+
+Stable major version 2 and later is **never** auto-published merely because a version bump reached green `main`.
+
+The enforced path is:
+
+```text
+authorized real pilot
+→ frozen Stable evaluator PASS
+→ stable-review-handoff
+→ explicit human review of every release check
+→ GO decision bound to exact candidate SHA + stable version
+→ privacy-minimized authorization token
+→ manual Release workflow
+→ authorization recheck
+→ build / clean-install / download-back / tag-source verification
+→ Stable publish
+```
+
+The generic publisher explicitly no-ops for unpublished Stable v2+ versions. Manual `release.yml` publication must provide `stable_review_authorization_b64`; the workflow validates it with `scripts/verify_stable_release_authorization.py` and writes `RELEASE_AUTHORIZATION.json` into the release evidence/assets. A tag-push path cannot bypass this requirement.
+
+Generate the decision only after a PASS handoff and on the exact clean candidate checkout:
+
+```bash
+python scripts/v2_stable_release_review_decision.py init \
+  --handoff-dir <stable-handoff> \
+  --candidate-source-sha <40-char-sha> \
+  --candidate-version 2.0.0 \
+  --out stable-release-review.draft.json
+
+# Human reviewer edits every check to PASS/FAIL and supplies non-sensitive evidence_ref.
+
+python scripts/v2_stable_release_review_decision.py finalize \
+  --handoff-dir <stable-handoff> \
+  --draft stable-release-review.draft.json \
+  --out-dir stable-release-review-decision
+```
+
+Only a fully reviewed GO emits `stable-release-authorization.b64`. A NO_GO decision never emits a usable release token.
+
+Important truth boundary:
+
+```text
+HUMAN_RELEASE_REVIEW_GO != V2_STABLE_RELEASE
+AUTHORIZATION_TOKEN != PUBLICATION
+STABLE_WORKFLOW_SUCCESS + PUBLIC TAG/ASSETS = RELEASE FACT
+PMF_PROVEN remains separate
+```
+
+The authorization mechanism prevents accidental/process bypass. It does not cryptographically prove reviewer identity, real-world authorization, participant consent, or reviewer independence; those remain explicit human evidence boundaries.
 
 ## Release pipeline
 

@@ -148,3 +148,37 @@ def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     hold_i = text.index('if [ -f ".github/RELEASE_HOLD" ]; then')
     dispatch_i = text.index("gh workflow run release.yml")
     assert stale_i < hold_i < dispatch_i
+
+
+def test_generic_publisher_requires_committed_approval_for_v2_stable() -> None:
+    text = PUBLISHER.read_text(encoding="utf-8")
+    stable_i = text.index('if [[ "$version" != *-* ]]; then')
+    approval_i = text.index('approval=".github/stable-release-approvals/v$version.json"')
+    validate_i = text.index("scripts/v2_stable_release_approval.py validate-committed")
+    tag_i = text.index('tag="v$version"')
+    dispatch_i = text.index("gh workflow run release.yml")
+
+    assert 'if [ "$major" -ge 2 ]; then' in text
+    assert "stable v2+ approval missing" in text
+    assert "--release-source-sha" in text
+    assert '"$SOURCE_SHA"' in text
+    assert stable_i < approval_i < validate_i < tag_i < dispatch_i
+
+
+def test_release_publish_path_rechecks_v2_stable_approval() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    version_i = text.index("- name: Release version consistency")
+    approval_i = text.index("- name: Stable v2 release approval gate")
+    build_i = text.index("- name: Build backend sidecar")
+    publish_i = text.index("- name: Publish verified GitHub Release")
+
+    gate = _section(
+        text,
+        "- name: Stable v2 release approval gate",
+        "- name: License gate",
+    )
+    assert "scripts/v2_stable_release_approval.py validate-committed" in gate
+    assert "$env:CHENGZHU_RELEASE_SOURCE_SHA" in gate
+    assert "$major -ge 2" in gate
+    assert "github.event.inputs.publish == 'true'" in gate
+    assert version_i < approval_i < build_i < publish_i

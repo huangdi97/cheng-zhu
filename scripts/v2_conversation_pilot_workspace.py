@@ -1055,7 +1055,6 @@ def evaluate_workspace(
     temp_dir.mkdir()
     try:
         rows: list[dict[str, Any]] = []
-        independent_review_rows: list[dict[str, Any]] = []
         seen: set[tuple[str, str, str, str]] = set()
         verified_review_rows = 0
         if self_report_path.is_file():
@@ -1067,7 +1066,6 @@ def evaluate_workspace(
                 seed_index,
                 source_name=path.name,
             )
-            independent_review_rows.extend(review_rows)
             rows.extend(review_rows)
 
         policy = _json_load(policy_path)

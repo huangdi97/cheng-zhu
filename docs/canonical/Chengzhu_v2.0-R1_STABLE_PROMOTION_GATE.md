@@ -317,40 +317,49 @@ Full operator procedure:
 
 `docs/evals/V2_CONVERSATION_REAL_PILOT_RUNBOOK.md`
 
-## 5.4 Independent-review completeness / anti-selection-bias gate
+## 5.4 Complete Stable metric coverage / anti-selection-bias gate
 
-Post-beta.7 audit found a material Stable-evidence correctness gap in Policy v7: reviewer rows were bound to the frozen seed, but the evaluator did not require reviewers to cover the **complete objective independent-review population**. A reviewer could therefore omit unfavorable seed events, submit only a favorable subset, and—once enough favorable events reached `min_n`—bias the metric upward.
+Post-beta.7 attack-style audit found a material Stable-evidence correctness gap in Policy v7: frozen seed provenance and submitted-row binding were strong, but the evaluator still allowed the **labeled subset** to define a metric denominator. That leaves selection bias across both independent review and in-product self-report:
 
-Policy v8 closes this without changing any numerical threshold, `min_n`, profile floor, label-source vocabulary, cross-session requirement or sample unit.
+- an independent reviewer could omit unfavorable objective events;
+- a user could leave high-regret Guidance unlabeled;
+- only favorable Session Outcome / Quick Debrief rows could be completed;
+- for metrics allowing either self-report or independent review, an operator could select whichever source produced the more favorable subset.
 
-For every Stable metric whose allowed label sources are **only** `INDEPENDENT_HUMAN_REVIEW`, Chengzhu now derives the required event×metric population from the frozen `independent-review.seed.jsonl` **before reviewer labels are examined**. The following must all hold:
+Policy v8 closes this without changing any numerical threshold, `min_n`, profile floor, label-source vocabulary, cross-session requirement or unique-event sample unit.
+
+For **every Stable metric**, Chengzhu derives the full eligible event×metric population from the frozen seed **before human labels are examined**. Each required pair must then be covered by at least one label source already allowed by that metric:
 
 ```text
-required frozen event×metric pair exists
-→ reviewer row is bound to that exact seed event
-→ label_source = INDEPENDENT_HUMAN_REVIEW
-→ metric-specific required label fields are non-null
-→ every required pair is covered exactly once at metric aggregation
+frozen eligible product event
+→ derive Stable metric membership from immutable prediction/runtime provenance
+→ look up that metric's allowed_label_sources
+→ require the metric-specific human label fields
+→ coverage only if one allowed source supplies a complete label
+→ all required event×metric pairs covered before threshold/min_n evaluation
 ```
 
 Examples:
 
-- auto-runtime Guidance → `source_correct` for Source Attribution Accuracy;
+- auto-runtime PROACTIVE Guidance → `useful` / `interruption_regret`;
+- auto-runtime Guidance → `source_correct`;
 - RECALL Guidance → `recall_correct`;
+- ARBITER SILENT decision → `silence_correct`;
 - Direct Question frozen prediction → `actual`;
 - predicted Decision / Commitment / Task → `actual_type + actual_state`;
-- Continue → `writeback_accurate`.
+- Continue → `writeback_accurate`;
+- Session Outcome → `cognitive_load_delta + would_reuse_space`.
 
-A missing row, null objective label, or alternate label source remains **missing coverage**; it cannot disappear from the denominator merely because the reviewer did not submit it.
+A missing row, null required label, disallowed label source, or unresolved duplicate allowed-source observation remains **missing/invalid coverage**; it cannot disappear from the denominator merely because the operator stopped labeling after a favorable subset reached `min_n`.
 
 The human report must carry:
 
 ```text
-independent_review_coverage.contract_version
-= v2.0-R1-independent-review-coverage-1
+stable_metric_coverage.contract_version
+= v2.0-R1-stable-metric-coverage-1
 
-independent_review_coverage.policy
-= COMPLETE_REQUIRED_OBJECTIVE_POPULATION
+stable_metric_coverage.policy
+= COMPLETE_FROZEN_ELIGIBLE_POPULATION
 
 covered_event_metric_pairs == required_event_metric_pairs
 missing_event_metric_pairs == 0
@@ -359,7 +368,7 @@ complete == true
 
 Otherwise Stable readiness is `NO_GO`.
 
-This is an evidence-integrity correction, not a new product metric and not proof of reviewer identity or independence.
+This closes denominator selection bias. It does **not** prove reviewer identity/independence, participant consent, real-world authorization, Stable release status or PMF.
 
 ## 6. Tooling
 

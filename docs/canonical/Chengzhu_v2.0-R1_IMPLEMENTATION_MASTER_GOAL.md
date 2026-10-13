@@ -897,7 +897,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 使用当前公开发布的 `v2.0.0-beta.7` 进行授权 local dogfood / real pilot，优先 Project Sync / Design Review，并以 packaged Stable Policy v7 作为新 pilot workspace 的冻结基线；
+1. 当前公开下载仍是 `v2.0.0-beta.7`，但 post-beta.7 审计已经冻结 Stable Policy v8 的 COMPLETE_FROZEN_ELIGIBLE_POPULATION 规则；**新的 Stable-readiness pilot workspace 不再以 Policy v7 作为 canonical 基线**。等待 `v2.0.0-beta.8` exact-SHA prerelease 完成后，优先使用 beta.8 进行授权 Project Sync / Design Review dogfood / real pilot；
 2. 进行真实 Project Sync / Design Review 小规模使用；
 3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；
@@ -947,4 +947,4 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`. Another prerelease is not the default next step; first run the authorized real Project Sync / Design Review pilot under packaged Policy v7.
+Publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`. Post-publication Policy v8 audit identified a material favorable-subset selection-bias defect in the Stable metric denominator, so the earlier “do not create beta.8” recommendation is superseded. `v2.0.0-beta.8` is now justified as an evidence-correctness prerelease candidate; it must complete a new exact-SHA release cycle before Policy v8 becomes packaged public truth.

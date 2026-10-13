@@ -131,5 +131,17 @@ jobs:
             echo "$tag exists only as a draft; release.yml will replace the draft after rebuilding from $SOURCE_SHA"
           fi
 
+          # Stable v2+ is intentionally never auto-published from a green main.
+          # It requires an explicit human Stable release-review GO artifact,
+          # converted to a privacy-minimized authorization token and supplied
+          # manually to release.yml. Prereleases remain fully automatic.
+          if [[ "$version" != *-* ]]; then
+            major="${version%%.*}"
+            if [ "$major" -ge 2 ]; then
+              echo "Stable v2+ $tag requires manual human release authorization; generic publisher will not dispatch"
+              exit 0
+            fi
+          fi
+
           gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"
           echo "Dispatched verified release workflow for $tag from CI-proven SHA $SOURCE_SHA"

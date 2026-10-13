@@ -1562,6 +1562,31 @@ def _confirmed_context_items(space_id: str) -> list[dict[str, Any]]:
     )
 
 
+def _conversation_item_provenance_ref(item: dict[str, Any]) -> dict[str, Any]:
+    """Stable provenance edge from a Guidance/Ask result to Conversation truth."""
+    return {
+        "kind": "CONVERSATION_ITEM",
+        "id": str(item.get("id") or ""),
+        "space_id": str(item.get("space_id") or ""),
+        "session_id": str(item.get("session_id") or ""),
+        "review_status": str(item.get("review_status") or ""),
+        "state": str(item.get("state") or ""),
+        "visibility": str(item.get("visibility") or "PRIVATE"),
+    }
+
+
+def _confirmed_item_source_refs(item: dict[str, Any]) -> list[dict[str, Any]]:
+    refs = [dict(ref) for ref in (item.get("source_refs") or [])]
+    item_id = str(item.get("id") or "")
+    if item_id and not any(
+        str(ref.get("kind") or "") == "CONVERSATION_ITEM"
+        and str(ref.get("id") or "") == item_id
+        for ref in refs
+    ):
+        refs.insert(0, _conversation_item_provenance_ref(item))
+    return refs
+
+
 def freeze_pack(
     session_id: str,
     *,
@@ -2013,7 +2038,7 @@ def ask(session_id: str, question: str) -> dict[str, Any]:
                 "item_type": item.get("type") or "",
                 "state": item.get("state") or "",
                 "review_status": item.get("review_status") or "",
-                "source_refs": list(item.get("source_refs") or []),
+                "source_refs": _confirmed_item_source_refs(item),
             }))
 
     # 2) Ready source versions frozen when the session started.
@@ -3091,7 +3116,7 @@ def evaluate_guidance(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     recall = _recall_for_topic(session["space_id"], state.get("current_topic") or "")
     budget_exhausted = _suggestion_budget_exhausted(session_id, mode)
     if mode != "QUIET" and not budget_exhausted and _guidance_kind_allowed(session, "RECALL") and recall:
-        refs = list(recall.get("source_refs") or [])
+        refs = _confirmed_item_source_refs(recall)
         if refs and _source_visibility_allows_guidance(refs):
             event = _persist_guidance(
                 session_id, kind="RECALL", action=ExpressionAction.RECALL.value,
@@ -3395,6 +3420,11 @@ def guidance_from_transcript(
         return None
 
     refs = list(useful.get("source_refs") or [])
+    if str(useful.get("authority") or "") == "CONFIRMED_TRUTH":
+        item_id = str(useful.get("id") or "")
+        item = store.get("conversation_item", item_id) if item_id else None
+        if item and str(item.get("space_id") or "") == str(session.get("space_id") or ""):
+            refs = _confirmed_item_source_refs(item)
     if not refs or not _source_visibility_allows_guidance(refs):
         _persist_transcript_silence(
             session_id,

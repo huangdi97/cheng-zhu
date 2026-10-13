@@ -161,6 +161,9 @@ def test_finalize_rejects_pending_or_missing_evidence(tmp_path, monkeypatch):
         candidate_source_sha=source_sha,
         candidate_version="2.0.0",
     )
+    pending = json.loads(draft.read_text(encoding="utf-8"))
+    pending["reviewer"]["reviewer_ref"] = "release-reviewer-01"
+    _write_json(draft, pending)
     with pytest.raises(ValueError, match="PASS or FAIL"):
         decision.finalize_review(handoff, draft, tmp_path / "decision-pending", ROOT)
 

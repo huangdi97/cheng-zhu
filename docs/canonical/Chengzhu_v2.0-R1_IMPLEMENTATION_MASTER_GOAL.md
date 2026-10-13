@@ -897,7 +897,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 使用当前公开发布的 `v2.0.0-beta.6` 进行授权 local dogfood / real pilot，优先 Project Sync / Design Review；
+1. 使用当前公开发布的 `v2.0.0-beta.7` 进行授权 local dogfood / real pilot，优先 Project Sync / Design Review，并以 packaged Stable Policy v7 作为新 pilot workspace 的冻结基线；
 2. 进行真实 Project Sync / Design Review 小规模使用；
 3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；

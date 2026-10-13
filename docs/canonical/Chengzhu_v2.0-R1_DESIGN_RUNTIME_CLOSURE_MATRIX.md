@@ -1841,3 +1841,34 @@ PMF_PROVEN = FALSE
 ```
 
 The canonical next action is **new authorized Project Sync / Design Review pilot evidence on beta.9**, not another feature-driven prerelease. Publication provenance: `docs/releases/V2_0_0_BETA_9_PUBLICATION_PROVENANCE.md`.
+
+
+---
+
+## Stable Release Review Handoff · source closure after beta.9
+
+beta.9 freezes the real-pilot evaluator toolchain, but a Policy v8 PASS still requires a separate human Stable release review. Source now adds a privacy-minimized handoff layer:
+
+```text
+frozen Pilot Workspace v5
+→ evaluate under Stable Policy v8
+→ PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW
+→ stable-review-handoff
+→ all release checks = PENDING_HUMAN_RELEASE_REVIEW
+→ separate human release decision
+```
+
+The handoff re-verifies frozen evaluation/workspace SHA256 provenance, refuses NO_GO or claim escalation, and copies no transcript / Guidance text / reviewer notes.
+
+Truth remains:
+
+```text
+PUBLIC_BETA = v2.0.0-beta.9
+STABLE_REVIEW_HANDOFF_SOURCE_READY = TRUE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE  # until real pilot PASS exists
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+This is operator/release-governance closure, not another product feature cycle and not evidence that a real pilot has happened.

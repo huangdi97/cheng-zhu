@@ -983,7 +983,7 @@ Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_s
 因此当前状态仍为：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.6
+V2_PUBLIC_BETA = v2.0.0-beta.7
 PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -1599,8 +1599,8 @@ MIN_N_CHANGED_FROM_V6 = FALSE
 PROFILE_USER_SESSION_SPACE_FLOORS_CHANGED_FROM_V6 = FALSE
 METRIC_SAMPLE_UNIT = UNIQUE_EVENT_PER_METRIC
 
-PUBLIC_BETA = v2.0.0-beta.6
-PUBLIC_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-6
+PUBLIC_BETA = v2.0.0-beta.7
+PUBLIC_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
@@ -1613,15 +1613,16 @@ Pilot Manifest builder 与 Stable evaluator 双层执行同一规则：builder �
 
 ---
 
-## Beta.7 release-candidate closure · 2026-10-13
+## Beta.7 publication closure · 2026-10-13
 
 Post-beta.6 audit identified one material Stable-readiness correctness gap: Policy v6 could qualify a repeated Space when its >=3 authorized Sessions were assigned to different pseudonymous users. Current main closes that gap with Policy v7 and has already passed exact-main CI; beta.7 exists solely to align the public prerelease with that corrected operator/evaluator truth before a real pilot is treated as Stable-review evidence.
 
 ```text
-PUBLISHED_BETA = v2.0.0-beta.6
-PUBLISHED_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-6
-NEXT_BETA_CANDIDATE = v2.0.0-beta.7
-CANDIDATE_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+PUBLISHED_BETA = v2.0.0-beta.7
+PUBLISHED_BETA_SOURCE_SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
+PUBLISHED_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+MAIN_CI_992 = SUCCESS
+RELEASE_324 = SUCCESS
 CROSS_SESSION_SPACE_USER_BINDING = SINGLE_PSEUDONYMOUS_USER_REF
 QUALITY_THRESHOLDS_CHANGED = FALSE
 MIN_N_CHANGED = FALSE
@@ -1634,4 +1635,4 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-This is a release-correctness freeze, not a new feature wave. Published beta.6 provenance remains immutable until beta.7 actually completes the full exact-SHA release pipeline.
+This was a release-correctness freeze, not a new feature wave. beta.7 has completed the full exact-SHA release pipeline and is now the public Conversation Beta. Published beta.6 remains immutable historical provenance. beta.7 publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`.

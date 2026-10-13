@@ -1,6 +1,6 @@
 {
-  "policy_version": "v2.0-R1-stable-promotion-7",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical quality thresholds, min_n values and profile floors remain unchanged from policy v6. Policy v7 closes a longitudinal-cohort ambiguity: one qualifying cross-session Conversation Space must bind to exactly one pseudonymous user_ref and contain at least the frozen minimum authorized Sessions for that same user; mixed-user Spaces fail closed and cannot manufacture continuity.",
+  "policy_version": "v2.0-R1-stable-promotion-8",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Policy v8 closes the remaining longitudinal-value ambiguity: repeated use and correct Recall are not sufficient by themselves; Stable review also requires enough capture-time-proven prior-session auto-RECALL events to be explicitly useful to the Chengzhu user. No pre-existing threshold, min_n, profile floor, cohort rule or label-source allowance is lowered. The new longitudinal utility gate reuses the already-frozen opportunity usefulness threshold (0.80) and Recall sample floor (20).",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -45,6 +45,14 @@
       "min_n": 20,
       "allowed_label_sources": [
         "INDEPENDENT_HUMAN_REVIEW"
+      ]
+    },
+    "longitudinal_recall_utility_rate": {
+      "direction": "gte",
+      "threshold": 0.8,
+      "min_n": 20,
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
       ]
     },
     "useful_silence_rate": {
@@ -120,7 +128,7 @@
       "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
     ]
   },
-  "change_control": "Numerical quality thresholds, every min_n number, required profile floors, the >=3 Sessions cross-session Space minimum, label-source rules and UNIQUE_EVENT_PER_METRIC sample unit are unchanged from policy v6. Policy v7 is a pre-pilot longitudinal-evidence correction: one Space must bind to one pseudonymous user_ref across selected Sessions. Do not lower thresholds/floors, broaden populations, mix users inside one continuity Space, duplicate one event across reviewers/sources, mix manual-lab events, count forced silence, or weaken a quality/cohort rule merely to make a failing pilot pass.",
+  "change_control": "Policy v8 does not lower or broaden any pre-existing Stable threshold, min_n, profile floor, cohort rule, label-source rule or UNIQUE_EVENT_PER_METRIC sample unit. It adds one longitudinal-value check before real pilot evidence is accepted: longitudinal_recall_utility_rate >= 0.80 with n >= 20, reusing the existing opportunity usefulness threshold and Recall sample floor. Its population is only capture-time-proven auto RECALL whose primary Conversation Item source comes from a different Session in the same Space, and its accepted source is explicit local user self-report. Do not reclassify pre-fix Recall, substitute repeated-use counts for usefulness, let an independent reviewer impersonate user-perceived value, lower the reused numbers, mix users inside one continuity Space, duplicate one event across reviewers/sources, or weaken a quality/cohort rule merely to make a failing pilot pass.",
   "label_source_policy": {
     "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT": "Explicit post-session labels entered in Chengzhu on the local device. Valid for user-perception/outcome measures only where a metric explicitly allows it; not verified identity proof.",
     "INDEPENDENT_HUMAN_REVIEW": "Explicit human review performed independently from the in-product self-report surface under the human-label protocol.",
@@ -132,7 +140,8 @@
         "opportunity_precision",
         "interruption_regret",
         "source_attribution_accuracy",
-        "recall_precision"
+        "recall_precision",
+        "longitudinal_recall_utility_rate"
       ],
       "required_origin_kind": "TRANSCRIPT_AUTO",
       "required_transcript_segment_id": true,
@@ -177,9 +186,21 @@
     "sample_unit": {
       "value": "UNIQUE_EVENT_PER_METRIC",
       "interpretation": "Each product event can contribute at most one resolved observation to a given Stable metric. Multiple reviewer/source annotations of the same event+metric must be resolved or selected outside the Stable aggregate; they cannot increase min_n."
+    },
+    "longitudinal_recall_utility_rate": {
+      "required_origin_kind": "TRANSCRIPT_AUTO",
+      "required_guidance_class": "RECALL",
+      "required_primary_source_ref_kind": "CONVERSATION_ITEM",
+      "required_source_relationship": "SAME_SPACE_DIFFERENT_SESSION",
+      "required_label": "useful",
+      "allowed_label_sources": [
+        "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT"
+      ],
+      "historical_reclassification": "FORBIDDEN",
+      "interpretation": "Measures whether an automatic Recall grounded in confirmed truth from a prior Session in the same Space was explicitly useful to the user. Repeated Sessions, reuse intent, Recall correctness, same-session Recall, or independent reviewer judgment cannot substitute for this user-value observation."
     }
   },
-  "human_report_contract_version": "v2.0-R1-human-eval-5",
+  "human_report_contract_version": "v2.0-R1-human-eval-6",
   "pilot_manifest_contract_version": "v2.0-R1-pilot-cohort-2",
   "metric_profiles": [
     "PROJECT_SYNC",
@@ -188,5 +209,6 @@
   "cross_session_space_min_sessions": 3,
   "metric_sample_unit": "UNIQUE_EVENT_PER_METRIC",
   "duplicate_event_metric_policy": "FAIL_CLOSED",
-  "cross_session_space_user_binding": "SINGLE_PSEUDONYMOUS_USER_REF"
+  "cross_session_space_user_binding": "SINGLE_PSEUDONYMOUS_USER_REF",
+  "longitudinal_recall_utility_contract": "AUTO_RECALL_PRIOR_SESSION_CONFIRMED_ITEM_PLUS_EXPLICIT_USER_USEFULNESS"
 }

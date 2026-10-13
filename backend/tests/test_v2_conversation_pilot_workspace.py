@@ -154,9 +154,11 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert snapshot_meta["sessions"] == 2
     assert snapshot_meta["sha256"]
     assert snapshot_meta["logical_sha256"]
-    assert json.loads((workspace / "stable-promotion-policy.json").read_text(encoding="utf-8"))[
-        "policy_version"
-    ] == "v2.0-R1-stable-promotion-7"
+    frozen_policy = json.loads(
+        (workspace / "stable-promotion-policy.json").read_text(encoding="utf-8")
+    )
+    assert frozen_policy["policy_version"] == "v2.0-R1-stable-promotion-8"
+    assert frozen_policy["independent_review_coverage_policy"] == "COMPLETE_REQUIRED_OBJECTIVE_POPULATION"
     assert result["policy"]["cross_session_space_user_binding"] == "SINGLE_PSEUDONYMOUS_USER_REF"
 
     with pytest.raises(FileExistsError, match="workspace already exists"):

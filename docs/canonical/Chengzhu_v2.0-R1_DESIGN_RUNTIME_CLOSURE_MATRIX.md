@@ -1971,7 +1971,8 @@ The committed approval validator independently requires:
 - Stable handoff v2 SHA256 anchors;
 - reviewer reference + timezone-aware review timestamp;
 - frozen attestations;
-- all 13 checks APPROVED with non-empty evidence references;
+- all 11 pre-publication checks APPROVED with non-empty evidence references;
+- both post/during-publication facts explicitly delegated to mandatory release.yml machine gates;
 - no rejected checks;
 - candidate did not already contain the approval file;
 - release source parent = candidate SHA;

@@ -939,7 +939,7 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
-公开 Beta 已推进到 `v2.0.0-beta.7` prerelease；beta.7 保留 beta.6 的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity、auto-runtime Guidance/SILENT evidence、dependency-security hardening、Quick Debrief 与 real-pilot operationalization/evidence-integrity contract，并进一步把 Stable Policy v7 的 single-user cross-session Space binding 固化进公开下载。下一阶段不再通过继续堆 Beta 功能冒充验证，而应执行 Project Sync / Design Review 授权真实 pilot 与独立 review，同时补仍缺的 Google / Microsoft real-account evidence。仍不声明 stable。
+公开 Beta 已推进到 `v2.0.0-beta.8` prerelease；beta.8 保留 beta.7 的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity、auto-runtime Guidance/SILENT evidence、dependency-security hardening、Quick Debrief、real-pilot operationalization/evidence-integrity contract 与 single-user cross-session Space binding，并进一步把 Stable Policy v8 的 **complete frozen eligible event×metric coverage** 固化进公开下载。下一阶段不再通过继续堆 Beta 功能冒充验证，而应以 beta.8 为 canonical baseline 执行 Project Sync / Design Review 授权真实 pilot 与独立 review，同时补仍缺的 Google / Microsoft real-account evidence。仍不声明 stable。
 
 ---
 
@@ -1720,9 +1720,9 @@ SINGLE_USER_SPACE_BINDING_CHANGED_FROM_V7 = FALSE
 UNIQUE_EVENT_SAMPLE_UNIT_CHANGED_FROM_V7 = FALSE
 
 CURRENT_PUBLIC_BETA = v2.0.0-beta.7
-CURRENT_PUBLIC_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
-NEXT_BETA_CANDIDATE = v2.0.0-beta.8
-CANDIDATE_PACKAGED_POLICY = v2.0-R1-stable-promotion-8
+CURRENT_PUBLIC_BETA = v2.0.0-beta.8
+CURRENT_PUBLIC_BETA_SOURCE_SHA = 9442e9891453aff3b1e482933056593b893f6288
+CURRENT_PUBLIC_PACKAGED_POLICY = v2.0-R1-stable-promotion-8
 
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -1732,4 +1732,4 @@ PMF_PROVEN = FALSE
 
 Policy v8 does not raise a maturity claim. It closes selection bias by requiring every eligible frozen event × metric pair in the Stable population to be completely labeled by at least one label source already allowed for that metric before thresholds and min_n are evaluated.
 
-Until beta.8 is actually published through the full exact-SHA Windows release path, public downloadable truth remains beta.7 / Policy v7. After beta.8 publication, **new** Stable-readiness workspaces should freeze Policy v8 (or later), not Policy v7.
+beta.8 has now been published through the full exact-SHA Windows release path from `9442e9891453aff3b1e482933056593b893f6288`; public downloadable truth is beta.8 / Policy v8. **New** Stable-readiness workspaces should freeze Policy v8 (or later), not Policy v7. Publication provenance is recorded in `docs/releases/V2_0_0_BETA_8_PUBLICATION_PROVENANCE.md`.

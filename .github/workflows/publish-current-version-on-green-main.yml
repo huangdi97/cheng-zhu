@@ -65,26 +65,6 @@ jobs:
 
           python3 scripts/check_release_version.py
 
-          # Conversation v2+ Stable releases are never auto-published merely
-          # because a version bump reached green main. The stable candidate
-          # must first pass the human Stable release-review handoff, then gain
-          # exactly one approval-only child commit containing the version-
-          # scoped approval artifact.
-          if [[ "$version" != *-* ]]; then
-            major="${version%%.*}"
-            if [ "$major" -ge 2 ]; then
-              approval=".github/stable-release-approvals/v$version.json"
-              if [ ! -f "$approval" ]; then
-                echo "stable v2+ approval missing for $version; nothing to publish"
-                exit 0
-              fi
-              python3 scripts/v2_stable_release_approval.py validate-committed \
-                --repo-root . \
-                --candidate-version "$version" \
-                --release-source-sha "$SOURCE_SHA"
-            fi
-          fi
-
           tag="v$version"
           if gh release view "$tag" >/dev/null 2>&1; then
             is_draft="$(gh release view "$tag" --json isDraft --jq '.isDraft')"
@@ -150,6 +130,25 @@ jobs:
               exit 0
             fi
             echo "$tag exists only as a draft; release.yml will replace the draft after rebuilding from $SOURCE_SHA"
+          fi
+
+          # Conversation v2+ Stable releases are never auto-published merely
+          # because a version bump reached green main. Run this only after the
+          # already-published-version path above has had a chance to exit:
+          # later main commits must not re-authorize an immutable old release.
+          if [[ "$version" != *-* ]]; then
+            major="${version%%.*}"
+            if [ "$major" -ge 2 ]; then
+              approval=".github/stable-release-approvals/v$version.json"
+              if [ ! -f "$approval" ]; then
+                echo "stable v2+ approval missing for $version; nothing to publish"
+                exit 0
+              fi
+              python3 scripts/v2_stable_release_approval.py validate-committed \
+                --repo-root . \
+                --candidate-version "$version" \
+                --release-source-sha "$SOURCE_SHA"
+            fi
           fi
 
           gh workflow run release.yml --ref main -f publish=true -f source_sha="$SOURCE_SHA"

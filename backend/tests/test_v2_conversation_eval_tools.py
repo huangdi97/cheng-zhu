@@ -851,3 +851,126 @@ def test_human_eval_marks_conflicting_session_profile_or_space_as_incomplete():
     report = human_eval.aggregate(rows)
     assert report["cohort"]["status"] == "INCOMPLETE"
     assert any("inconsistent profile/space" in value for value in report["cohort"]["errors"])
+
+
+def test_human_eval_longitudinal_recall_utility_requires_prior_session_same_space_provenance():
+    human_eval = _load("v2_human_eval_longitudinal_recall", "scripts/v2_conversation_human_eval.py")
+
+    def recall_row(event_id: str, source_session: str, source_space: str, *, with_item_ref: bool = True):
+        system = _auto_system(f"seg-{event_id}")
+        system["source_refs"] = (
+            [{
+                "kind": "CONVERSATION_ITEM",
+                "id": f"ci-{event_id}",
+                "space_id": source_space,
+                "session_id": source_session,
+                "review_status": "USER_CONFIRMED",
+                "state": "AGREED",
+                "visibility": "PRIVATE",
+            }]
+            if with_item_ref else
+            [{"kind": "TRANSCRIPT_SEGMENT", "id": f"legacy-{event_id}", "visibility": "PRIVATE"}]
+        )
+        return {
+            "kind": "guidance",
+            "session_id": "cv-current",
+            "space_id": "cs-current",
+            "profile": "PROJECT_SYNC",
+            "event_id": event_id,
+            "reviewer": "IN_PRODUCT_SELF_REPORT",
+            "label_source": "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT",
+            "guidance_class": "RECALL",
+            "useful": True,
+            "recall_correct": None,
+            "system": system,
+        }
+
+    report = human_eval.aggregate([
+        recall_row("g-long", "cv-prior", "cs-current"),
+        recall_row("g-same-session", "cv-current", "cs-current"),
+        recall_row("g-cross-space", "cv-prior-other", "cs-other"),
+        recall_row("g-legacy", "", "", with_item_ref=False),
+    ])
+
+    assert report["report_contract_version"] == "v2.0-R1-human-eval-6"
+    assert report["metrics"]["longitudinal_recall_utility_rate"] == {"value": 1.0, "n": 1}
+    population = report["metric_population"]
+    assert population["auto_recall_rows"] == 4
+    assert population["longitudinal_recall_rows"] == 1
+    assert population["excluded_recall_without_prior_session_item_provenance"] == 3
+    assert population["unique_metric_observations"]["longitudinal_recall_utility_rate"] == 1
+
+
+def test_feedback_export_preserves_prior_session_recall_provenance_for_longitudinal_value(product_env):
+    exporter = _load("v2_feedback_export_longitudinal", "scripts/v2_conversation_feedback_export.py")
+    human_eval = _load("v2_human_eval_longitudinal_export", "scripts/v2_conversation_human_eval.py")
+
+    space = conversations.create_space("Longitudinal Feedback", "PROJECT_SYNC")
+    prior = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(prior["id"])
+    decision = conversations.add_item(
+        prior["id"],
+        item_type="Decision",
+        title="offline migration 采用 v2",
+        source_refs=[{"kind": "USER_NOTE", "excerpt": "明确采用 v2", "visibility": "PRIVATE"}],
+        epistemic_status="OBSERVED",
+    )
+    conversations.review_item(decision["id"], "CONFIRM")
+    conversations.end_session(prior["id"])
+
+    current = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(current["id"])
+    segment_id = "cts-longitudinal-feedback"
+    store.insert("conversation_transcript_segment", {
+        "id": segment_id,
+        "space_id": space["id"],
+        "session_id": current["id"],
+        "channel": "PRIMARY_AUDIO",
+        "text": "我们回到 offline migration",
+        "provider": "whisper",
+        "source": "SYSTEM_LOOPBACK",
+        "is_final": True,
+        "analysis": {
+            "direct_question": {
+                "eligible": True,
+                "predicted": False,
+                "detector_version": "heuristic-v1",
+                "channel": "PRIMARY_AUDIO",
+                "ai_assistance": "AI_ALLOWED",
+            },
+        },
+        "created_at": store.now(),
+    })
+    recall = conversations.guidance_from_transcript(
+        current["id"],
+        "我们回到 offline migration",
+        channel="PRIMARY_AUDIO",
+        frozen_direct_question={
+            "eligible": True,
+            "predicted": False,
+            "detector_version": "heuristic-v1",
+            "channel": "PRIMARY_AUDIO",
+            "ai_assistance": "AI_ALLOWED",
+        },
+        transcript_segment_id=segment_id,
+    )
+    assert recall and recall["kind"] == "RECALL"
+    assert recall["source_refs"][0]["kind"] == "CONVERSATION_ITEM"
+    assert recall["source_refs"][0]["session_id"] == prior["id"]
+
+    conversation_feedback.upsert_feedback(
+        current["id"],
+        kind="GUIDANCE",
+        target_id=recall["id"],
+        labels={"useful": True},
+    )
+    conversations.end_session(current["id"])
+
+    rows = exporter.export_rows(Path(store.DB_PATH))
+    exported = next(row for row in rows if row.get("event_id") == recall["id"])
+    assert exported["system"]["source_refs"][0]["kind"] == "CONVERSATION_ITEM"
+    assert exported["system"]["source_refs"][0]["id"] == decision["id"]
+    assert exported["system"]["source_refs"][0]["session_id"] == prior["id"]
+
+    report = human_eval.aggregate([exported])
+    assert report["metrics"]["longitudinal_recall_utility_rate"] == {"value": 1.0, "n": 1}

@@ -1,6 +1,6 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: POST-BETA.6 REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
+**Status**: POST-BETA.6 REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v8  
 **Public Beta**: v2.0.0-beta.6  
 **Published source/tag SHA**: `38a70b719b2d5b0c9e8273e6a908fed9229ab706`  
 **Stable v2**: NOT CLAIMED  
@@ -15,7 +15,11 @@ It does not change any release or evidence claim by itself.
 
 Use the current beta.6-compatible source/runtime with product schema >= v12.
 
-The participant-facing/runtime product may use the published `v2.0.0-beta.6` Windows prerelease. beta.6 itself is immutable and packages Stable Policy v6. The **current operator source** applies post-beta.6 Stable Policy v7, which keeps all beta.6 quality thresholds/floors but requires each longitudinal Space to bind to exactly one pseudonymous user_ref. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The published `v2.0.0-beta.6` Windows prerelease remains immutable and packages Stable Policy v6. The **current operator source** applies post-beta.6 Stable Policy v8. v7 added single-user longitudinal Space binding; v8 additionally requires explicit user-perceived utility from capture-time-proven prior-session auto RECALL.
+
+Important compatibility boundary: beta.6 predates the new `CONVERSATION_ITEM / source_session_id` Recall provenance. beta.6 Sessions may still contribute to Stable metrics whose required evidence they actually captured, but their historical RECALL rows must not be retroactively upgraded into `longitudinal_recall_utility_rate` samples. To collect Policy-v8 longitudinal samples, use a source/runtime build that contains the v8 Recall provenance change or the next prerelease that packages it.
+
+This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -28,7 +32,9 @@ Stable policy currently requires each profile to satisfy:
 - >= 20 authorized real Sessions;
 - >= 3 cross-session Spaces;
 - each qualifying cross-session Space contains >= 3 authorized Sessions **for the same pseudonymous user_ref**;
-- one Space mapped to multiple pilot user_ref values is a cohort-integrity failure, not longitudinal evidence.
+- one Space mapped to multiple pilot user_ref values is a cohort-integrity failure, not longitudinal evidence;
+- across the target profiles, >= 20 unique capture-time-proven prior-session auto RECALL events must receive explicit local user usefulness labels, with longitudinal utility rate >= 0.80;
+- Recall correctness, reuse intent, repeated-session counts or independent reviewer opinion cannot substitute for this user-value gate.
 
 These are acceptance floors, not scientific sample-size claims.
 
@@ -151,7 +157,7 @@ python scripts/v2_conversation_pilot_workspace.py init \
 
 The command creates a new directory and refuses to overwrite an existing one.
 
-Policy is frozen into each workspace. A workspace initialized under policy v6 remains historical v6 evidence; do **not** edit its frozen policy to v7. After this post-beta.6 correction, create a fresh workspace under current source so `stable-promotion-policy.json` freezes policy v7 and the same-user Space binding is auditable from initialization onward.
+Policy is frozen into each workspace. A workspace initialized under policy v6 or v7 remains historical evidence; do **not** edit its frozen policy to v8. Create a fresh workspace under current source so `stable-promotion-policy.json` freezes policy v8, the same-user Space binding remains auditable, and human-report contract v6 can carry the longitudinal Recall utility population.
 
 Expected files:
 
@@ -206,7 +212,7 @@ At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.js
 
 The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
 
-Stable Policy v7 preserves the v6 sample-unit rule:
+Stable Policy v8 preserves the v6 sample-unit rule:
 
 ```text
 min_n = unique product event × metric observations
@@ -216,6 +222,8 @@ not reviewer annotation rows
 Different reviewers may annotate the same event for inter-rater analysis, but the same event cannot contribute the same Stable metric twice. Duplicate event/metric labels across reviewers or label sources fail closed and must be resolved/selected before Stable aggregation. Different metric dimensions on the same event may still be reviewed separately.
 
 Stable live-guidance metrics use only v12 TRANSCRIPT_AUTO provenance.
+
+Longitudinal Recall Utility additionally requires the RECALL event's **primary** source ref to be a `CONVERSATION_ITEM` from the same Space and a different Session. The user-facing `useful` label must come from `LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT`. Missing provenance remains missing; do not reconstruct it from old beta.6 rows.
 
 Direct Question metrics use only v11 capture-time frozen predictions.
 
@@ -280,7 +288,7 @@ explicit local self-report
 +
 independent human review
 → human-label report
-→ frozen Stable policy v7
+→ frozen Stable policy v8
 → stable-readiness report
 ```
 

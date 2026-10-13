@@ -62,12 +62,12 @@ Both launch-wedge profiles must independently satisfy:
 ### Project Sync
 - distinct users >= 5
 - real sessions >= 20
-- cross-session Spaces (>=3 sessions in same Space) >= 3
+- cross-session Spaces (same Space + same pseudonymous user_ref + >=3 authorized Sessions) >= 3
 
 ### Design Review
 - distinct users >= 5
 - real sessions >= 20
-- cross-session Spaces (>=3 sessions in same Space) >= 3
+- cross-session Spaces (same Space + same pseudonymous user_ref + >=3 authorized Sessions) >= 3
 
 These are **release acceptance floors**, not scientific population estimates.
 
@@ -99,7 +99,7 @@ Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current repository evaluator policy = `v2.0-R1-stable-promotion-6`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v5. v5 fixed the pre-pilot cross-session Space qualification bug; v6 closes a second pre-pilot evidence-semantics gap by freezing `metric_sample_unit = UNIQUE_EVENT_PER_METRIC` and `duplicate_event_metric_policy = FAIL_CLOSED`. One product event may contribute at most one resolved observation to a given Stable metric, regardless of how many reviewers or allowed label sources annotate it. Published beta.5 provenance remains correctly bound to the packaged policy-v4 evaluator; v5/v6 are post-beta.5 source truth and must not be back-attributed to beta.5 binaries. Thresholds/floors must not be lowered, and sample populations must not be broadened or duplicated, after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-7`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v6. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, and v7 closes the remaining longitudinal-cohort ambiguity: one qualifying Conversation Space must bind to exactly one pseudonymous `user_ref` and contain >=3 authorized Sessions for that same user. A mixed-user Space fails cohort integrity and cannot count as continuity. Published beta.6 remains immutable and correctly contains policy v6; policy v7 is post-beta.6 source truth until a later release is explicitly justified. Thresholds/floors must not be lowered, and sample/cohort populations must not be broadened after seeing a failing pilot merely to create a PASS.
 
 ---
 
@@ -266,7 +266,41 @@ policy value < 3 = fail closed
 
 No quality threshold, user floor, total Session floor or required cross-session-Space count is lowered. This is a denominator/cohort-definition correction, not a post-hoc attempt to create a PASS.
 
-## 5.6 Recommended operator workflow
+## 5.6 Cross-session user continuity integrity
+
+Policy v7 tightens the meaning of longitudinal Conversation continuity without changing any numerical threshold:
+
+```text
+qualifying cross-session Space
+=
+same space_id
++ exactly one pseudonymous user_ref
++ >= 3 authorized Sessions for that user
+```
+
+The old policy-v6 failure mode was structurally possible:
+
+```text
+Space A
+├─ Session 1 → pilot-user-01
+├─ Session 2 → pilot-user-02
+└─ Session 3 → pilot-user-03
+
+old count: cross_session_spaces += 1
+v7: cohort integrity failure
+```
+
+This matters because Chengzhu's continuity claim is personal/longitudinal. Three different people each using a shared Space once do not prove that any one user received cross-session value.
+
+Hard rules:
+
+- the Pilot Manifest builder rejects one `space_id` mapped to multiple `user_ref` values;
+- Stable readiness independently rechecks the same invariant;
+- mixed-user Spaces are not merely excluded from the count—they make cohort integrity fail closed;
+- `user_ref` remains a local pseudonym, not verified identity;
+- this correction changes evidence qualification only; it does not change beta.6 binaries, quality thresholds, `min_n`, profile floors, Stable status or PMF claims.
+
+## 5.7 Recommended operator workflow
 
 The low-level scripts remain canonical building blocks, but the recommended real-pilot path is now the fail-closed Pilot Workspace orchestrator:
 

@@ -1,6 +1,6 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: BETA.6 REAL-PILOT OPERATOR WORKFLOW  
+**Status**: POST-BETA.6 REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
 **Public Beta**: v2.0.0-beta.6  
 **Published source/tag SHA**: `38a70b719b2d5b0c9e8273e6a908fed9229ab706`  
 **Stable v2**: NOT CLAIMED  
@@ -15,7 +15,7 @@ It does not change any release or evidence claim by itself.
 
 Use the current beta.6-compatible source/runtime with product schema >= v12.
 
-The participant-facing/runtime product may use the published `v2.0.0-beta.6` Windows prerelease. The exact beta.6 source/tag SHA includes the current real-pilot operationalization/evidence-integrity chain described here. This runbook still represents an **operator workflow**, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The participant-facing/runtime product may use the published `v2.0.0-beta.6` Windows prerelease. beta.6 itself is immutable and packages Stable Policy v6. The **current operator source** applies post-beta.6 Stable Policy v7, which keeps all beta.6 quality thresholds/floors but requires each longitudinal Space to bind to exactly one pseudonymous user_ref. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -27,7 +27,8 @@ Stable policy currently requires each profile to satisfy:
 - >= 5 distinct pseudonymous users;
 - >= 20 authorized real Sessions;
 - >= 3 cross-session Spaces;
-- each qualifying cross-session Space contains >= 3 authorized Sessions.
+- each qualifying cross-session Space contains >= 3 authorized Sessions **for the same pseudonymous user_ref**;
+- one Space mapped to multiple pilot user_ref values is a cohort-integrity failure, not longitudinal evidence.
 
 These are acceptance floors, not scientific sample-size claims.
 
@@ -120,6 +121,14 @@ pilot-user-03
 
 Do not use names, email addresses or other direct identifiers as `user_ref`.
 
+For longitudinal evidence, keep the mapping stable at the Space level:
+
+```text
+one space_id → exactly one pseudonymous user_ref
+```
+
+If different pilot participants used the same local Space, do not combine those Sessions as one continuity Space. Create/separate participant-specific Spaces or exclude the mixed Space from that cohort; the current builder/evaluator fail closed on mixed-user assignment.
+
 A Session may be selected only when the local database confirms:
 
 - Session status = ENDED;
@@ -141,6 +150,8 @@ python scripts/v2_conversation_pilot_workspace.py init \
 ```
 
 The command creates a new directory and refuses to overwrite an existing one.
+
+Policy is frozen into each workspace. A workspace initialized under policy v6 remains historical v6 evidence; do **not** edit its frozen policy to v7. After this post-beta.6 correction, create a fresh workspace under current source so `stable-promotion-policy.json` freezes policy v7 and the same-user Space binding is auditable from initialization onward.
 
 Expected files:
 
@@ -195,7 +206,7 @@ At `evaluate`, Chengzhu re-verifies the byte hash of `independent-review.seed.js
 
 The seed is not evidence until reviewed, and a reviewer file is not accepted merely because its Session belongs to the authorized cohort.
 
-Stable Policy v6 also freezes the sample unit:
+Stable Policy v7 preserves the v6 sample-unit rule:
 
 ```text
 min_n = unique product event × metric observations
@@ -269,7 +280,7 @@ explicit local self-report
 +
 independent human review
 → human-label report
-→ frozen Stable policy v6
+→ frozen Stable policy v7
 → stable-readiness report
 ```
 
@@ -369,7 +380,8 @@ PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
-STABLE_POLICY = v2.0-R1-stable-promotion-6
+PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-6
+CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-7
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE

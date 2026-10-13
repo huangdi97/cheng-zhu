@@ -506,6 +506,8 @@ def _policy_contract_check(policy: dict[str, Any]) -> None:
         raise ValueError("Stable policy duplicate event/metric handling must be FAIL_CLOSED")
     if int(policy.get("cross_session_space_min_sessions") or 0) != pilot_manifest.CROSS_SESSION_SPACE_MIN_SESSIONS:
         raise ValueError("cross-session Space minimum does not match the frozen workspace policy")
+    if str(policy.get("cross_session_space_user_binding") or "") != pilot_manifest.CROSS_SESSION_SPACE_USER_BINDING:
+        raise ValueError("cross-session Space user binding does not match the frozen workspace policy")
     required = tuple(str(value) for value in (policy.get("required_attestations") or []))
     if set(required) != set(pilot_manifest.REQUIRED_ATTESTATIONS):
         raise ValueError("pilot attestation vocabulary does not match the frozen workspace policy")
@@ -529,7 +531,7 @@ This directory is **local evidence workspace**, not a release artifact and not p
 
 ## Required flow
 
-1. Review `pilot-manifest.draft.json` and the selected Session/user pseudonym mapping.
+1. Review `pilot-manifest.draft.json` and the selected Session/user pseudonym mapping. Every selected Session in the same Space must use the same pseudonymous user_ref.
 2. Have independent reviewers fill a copy of `independent-review.seed.jsonl`.
    Use `label_source=INDEPENDENT_HUMAN_REVIEW` where required by policy.
    Reviewers may edit only reviewer / label_source / notes and the kind-specific
@@ -632,6 +634,7 @@ def init_workspace(
                 "policy_version": policy.get("policy_version"),
                 "sha256": _sha256(policy_out),
                 "pilot_manifest_contract_version": policy.get("pilot_manifest_contract_version"),
+                "cross_session_space_user_binding": policy.get("cross_session_space_user_binding"),
             },
             "cohort": cohort_summary,
             "selected_session_ids": sorted(selected_ids),

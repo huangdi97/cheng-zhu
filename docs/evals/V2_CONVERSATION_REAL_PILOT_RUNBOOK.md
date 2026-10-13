@@ -1,6 +1,6 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: POST-BETA.6 REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
+**Status**: BETA.7 RELEASE CANDIDATE · REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
 **Public Beta**: v2.0.0-beta.6  
 **Published source/tag SHA**: `38a70b719b2d5b0c9e8273e6a908fed9229ab706`  
 **Stable v2**: NOT CLAIMED  
@@ -15,7 +15,7 @@ It does not change any release or evidence claim by itself.
 
 Use the current beta.6-compatible source/runtime with product schema >= v12.
 
-The participant-facing/runtime product may use the published `v2.0.0-beta.6` Windows prerelease. beta.6 itself is immutable and packages Stable Policy v6. The **current operator source** applies post-beta.6 Stable Policy v7, which keeps all beta.6 quality thresholds/floors but requires each longitudinal Space to bind to exactly one pseudonymous user_ref. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The currently published participant-facing/runtime product remains `v2.0.0-beta.6`, which is immutable and packages Stable Policy v6. The repository is now freezing `v2.0.0-beta.7` so the downloadable prerelease and operator source both use Stable Policy v7 before new Stable-readiness evidence is accepted. Until beta.7 actually publishes, operators must use current source for Policy v7 evaluation rather than treating packaged beta.6 Policy v6 as authoritative. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -381,6 +381,8 @@ AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
 PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-6
+NEXT_BETA_CANDIDATE = v2.0.0-beta.7
+CANDIDATE_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-7
 CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-7
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE

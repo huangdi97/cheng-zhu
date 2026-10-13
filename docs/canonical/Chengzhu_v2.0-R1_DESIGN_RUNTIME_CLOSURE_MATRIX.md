@@ -1931,3 +1931,64 @@ PMF_PROVEN = FALSE
 ```
 
 This is source-side release-governance hardening after beta.9. It does not justify a feature-driven beta.10 and does not claim that a real pilot has occurred.
+
+
+---
+
+## Stable release approval gate · source after beta.9
+
+Stable handoff v2 closes the evidence-to-review provenance chain, but a separate audit found a publication-control gap: the generic current-version publisher would still dispatch any green non-prerelease version, including a future `2.0.0`, without machine-enforcing the human Stable release decision.
+
+Current source closes that gap:
+
+```text
+STABLE_RELEASE_APPROVAL_CONTRACT = v2.0-R1-stable-release-approval-1
+
+C0 = exact Stable candidate
+     version = v2+
+     no approval artifact
+
+HUMAN_STABLE_RELEASE_REVIEW
+     consumes handoff v2
+     reviews all 13 release checks
+
+C1 = exactly one child of C0
+     diff = only .github/stable-release-approvals/v<version>.json
+
+GENERIC_PUBLISHER
+     prerelease → existing automatic path
+     already-published version → existing provenance verification / no-op
+     new v2+ Stable → approval required
+
+RELEASE_WORKFLOW
+     tag/manual publish → same committed approval validator required
+```
+
+The committed approval validator independently requires:
+
+- exact Stable SemVer v2+;
+- candidate SHA/version match;
+- Stable handoff v2 SHA256 anchors;
+- reviewer reference + timezone-aware review timestamp;
+- frozen attestations;
+- all 13 checks APPROVED with non-empty evidence references;
+- no rejected checks;
+- candidate did not already contain the approval file;
+- release source parent = candidate SHA;
+- candidate→release-source diff contains only the version-scoped approval JSON.
+
+This resolves the SHA self-reference problem while ensuring any product/dependency/workflow/release-note change after human review invalidates the approval.
+
+Truth boundary remains:
+
+```text
+PUBLIC_BETA = v2.0.0-beta.9
+STABLE_RELEASE_APPROVAL_GATE_SOURCE_READY = TRUE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+STABLE_RELEASE_PUBLICATION_AUTHORIZED = FALSE  # no real PASS + human decision yet
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+This is release-governance hardening. It does not create real pilot evidence and does not justify beta.10 by itself.

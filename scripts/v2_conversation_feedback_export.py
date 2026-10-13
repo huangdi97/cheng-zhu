@@ -113,6 +113,7 @@ def export_rows(db: Path, *, space_id: str = "") -> list[dict[str, Any]]:
                             "expression_action": event.get("expression_action"),
                             "reason": event.get("reason"),
                             "status": event.get("status"),
+                            "source_refs": _json(event.get("source_refs_json"), []),
                             "origin": origin,
                         },
                     }

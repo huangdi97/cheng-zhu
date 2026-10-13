@@ -320,20 +320,18 @@ jobs:
           $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
           if (-not $sourceSha) { throw "CHENGZHU_RELEASE_SOURCE_SHA is empty" }
           $isPrerelease = $version.Contains('-')
-          $assets = @(
-            "dist/release/Chengzhu-Setup-x64.exe",
-            "dist/release/Chengzhu-Portable-x64.zip",
-            "dist/release/SHA256SUMS.txt",
-            "dist/release/LICENSE.txt",
-            "dist/release/THIRD_PARTY_NOTICES.md",
-            "dist/release/RELEASE_NOTES_v$version.md",
-            "dist/release/RELEASE_AUTHORIZATION.json"
-          )
-          foreach ($asset in $assets) {
-            if (-not (Test-Path $asset)) { throw "missing release asset: $asset" }
+          if (-not (Test-Path "dist/release/RELEASE_AUTHORIZATION.json")) {
+            throw "missing release authorization audit asset"
           }
           if ($isPrerelease) {
-            gh release create $tag @assets `
+            gh release create $tag `
+              dist/release/Chengzhu-Setup-x64.exe `
+              dist/release/Chengzhu-Portable-x64.zip `
+              dist/release/SHA256SUMS.txt `
+              dist/release/LICENSE.txt `
+              dist/release/THIRD_PARTY_NOTICES.md `
+              "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
               --prerelease `
@@ -341,7 +339,14 @@ jobs:
               --title "成竹 Chengzhu $tag" `
               --notes-file "dist/release/RELEASE_NOTES_v$version.md"
           } else {
-            gh release create $tag @assets `
+            gh release create $tag `
+              dist/release/Chengzhu-Setup-x64.exe `
+              dist/release/Chengzhu-Portable-x64.zip `
+              dist/release/SHA256SUMS.txt `
+              dist/release/LICENSE.txt `
+              dist/release/THIRD_PARTY_NOTICES.md `
+              "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
               --title "成竹 Chengzhu $tag" `

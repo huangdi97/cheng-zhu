@@ -78,23 +78,24 @@ Required path:
 2. Python / Node setup;
 3. backend tests + strict eval;
 4. version consistency;
-5. license gate;
-6. frontend typecheck/unit/build;
-7. desktop unit tests;
-8. build backend sidecar in clean venv;
-9. packaged sidecar smoke;
-10. build installer + portable;
-11. capture packaged runtime UI evidence;
-12. clean installer replay on a fresh Windows runner;
-13. installed-layout smoke;
-14. collect assets + SHA256;
-15. create draft GitHub Release with the tag explicitly targeted at the same source SHA used for the binaries;
-16. verify public tag SHA = binary source SHA, then download assets back from GitHub;
-17. verify SHA256 on downloaded assets;
-18. reinstall the downloaded installer;
-19. rerun packaged smoke from downloaded/installed files;
-20. re-check tag SHA = binary source SHA and publish the verified Release;
-21. enrich and upload the post-publish verification JSON without changing the release itself.
+5. **when actually publishing a v2+ Stable version, validate the exact-candidate Stable approval artifact**;
+6. license gate;
+7. frontend typecheck/unit/build;
+8. desktop unit tests;
+9. build backend sidecar in clean venv;
+10. packaged sidecar smoke;
+11. build installer + portable;
+12. capture packaged runtime UI evidence;
+13. clean installer replay on a fresh Windows runner;
+14. installed-layout smoke;
+15. collect assets + SHA256;
+16. create draft GitHub Release with the tag explicitly targeted at the same source SHA used for the binaries;
+17. verify public tag SHA = binary source SHA, then download assets back from GitHub;
+18. verify SHA256 on downloaded assets;
+19. reinstall the downloaded installer;
+20. rerun packaged smoke from downloaded/installed files;
+21. re-check tag SHA = binary source SHA and publish the verified Release;
+22. enrich and upload the post-publish verification JSON without changing the release itself.
 
 A failing clean-install, download-back or source/tag provenance gate is a release failure. A failure **after** publication must be classified by step: do not automatically treat an already-published artifact as corrupt when the failed step only writes evidence metadata. The public tag, release channel, target SHA and downloadable assets must be independently re-verified before deciding whether to withdraw or republish.
 
@@ -180,6 +181,8 @@ Required:
 - GitHub Release exists;
 - expected assets exist;
 - release download-back verification succeeds.
+
+For Chengzhu v2+ Stable, green CI alone is intentionally insufficient. The Stable candidate commit must first receive a human release decision derived from a valid Stable handoff. The next release-source commit must be exactly one child whose only diff is `.github/stable-release-approvals/v<version>.json`. Both the generic publisher and `release.yml` validate this invariant. A stable candidate without approval is expected to remain unpublished.
 
 Only after this may a **stable-channel** version become Current Stable. A prerelease that passes the same gate becomes a verified public Beta, remains `prerelease=true`, and must not become GitHub Latest.
 

@@ -382,7 +382,12 @@ def create_connection(base: str, spec: ProviderSpec, token_env: str) -> dict[str
     )
 
 
-def create_space_and_session(base: str, label: str) -> tuple[str, str]:
+def create_space_and_session(
+    base: str,
+    label: str,
+    *,
+    connector_permissions: tuple[str, ...] = (),
+) -> tuple[str, str]:
     space = http(base, "POST", f"{API}/spaces", {
         "title": f"External provider replay · {label}",
         "profile": "PROJECT_SYNC",
@@ -397,6 +402,7 @@ def create_space_and_session(base: str, label: str) -> tuple[str, str]:
             "external_writeback": "REVIEW_REQUIRED",
             "participant_consent_status": "NOT_APPLICABLE",
             "participant_transparency_plan": "NOT_APPLICABLE",
+            "connector_permissions": list(connector_permissions),
         },
     })
     return space_id, str(session.get("id") or "")
@@ -415,7 +421,11 @@ def run_read_replay(
     connection: dict[str, Any],
     query_value: str,
 ) -> dict[str, Any]:
-    space_id, session_id = create_space_and_session(base, spec.cli_name)
+    space_id, session_id = create_space_and_session(
+        base,
+        spec.cli_name,
+        connector_permissions=spec.capabilities,
+    )
     sync = http(
         base,
         "POST",
@@ -436,15 +446,6 @@ def run_read_replay(
         })
 
     preflight = http(base, "GET", f"{API}/sessions/{session_id}/preflight")
-    # Read permissions are explicitly frozen into the Session Pack.
-    # Recreate the session with requested permissions if the default session
-    # did not ask for them.
-    if spec.capabilities:
-        session = http(base, "GET", f"{API}/sessions/{session_id}")
-        policy = dict(session.get("policy") or {})
-        policy["connector_permissions"] = list(spec.capabilities)
-        http(base, "PATCH", f"{API}/sessions/{session_id}", {"policy": policy})
-        preflight = http(base, "GET", f"{API}/sessions/{session_id}/preflight")
 
     started = http(base, "POST", f"{API}/sessions/{session_id}/start")
     context = http(base, "GET", f"{API}/sessions/{session_id}/context")

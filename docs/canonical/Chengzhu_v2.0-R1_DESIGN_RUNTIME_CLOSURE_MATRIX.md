@@ -1796,3 +1796,48 @@ PMF_PROVEN = FALSE
 ```
 
 beta.9 的存在理由是 **evaluator reproducibility / provenance**，不是功能扩张。只有 beta.9 exact green main SHA 完成 Windows build、clean-install、draft download-back、SHA256、downloaded-install replay、public tag/source invariant、prerelease channel 与 post-publish provenance gate 后，才允许把公开 Beta truth 从 beta.8 改写为 beta.9。
+
+
+---
+
+## Beta.9 evaluator-provenance publication closure · 2026-10-13
+
+After beta.8 packaged Stable Policy v8, a post-publication audit found a separate reproducibility gap: frozen cohort/policy/seed evidence could still be re-evaluated by a later-changed evaluator implementation without proving toolchain drift.
+
+That source-side gap is now packaged and published:
+
+```text
+PUBLIC_BETA_TAG = v2.0.0-beta.9
+PUBLIC_BETA_SOURCE_SHA = 146db913a4467e179d547b37fc006753f64655bb
+PUBLIC_BETA_PRERELEASE = TRUE
+PUBLIC_BETA_DRAFT = FALSE
+STABLE_LATEST = v1.4.2
+
+MAIN_CI_1021 = SUCCESS
+RELEASE_RUN_328 = SUCCESS
+TAG_SOURCE_INVARIANT = PASS
+PACKAGED_UI_EVIDENCE = PASS
+CLEAN_INSTALL_REPLAY = PASS
+DOWNLOAD_BACK_SHA256 = PASS
+POST_PUBLISH_VERIFICATION = PASS
+
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-8
+PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
+PILOT_TOOLCHAIN_FINGERPRINT_CONTRACT = v2.0-R1-pilot-toolchain-1
+EVALUATOR_TOOLCHAIN_SHA256_FREEZE = TRUE
+TOOLCHAIN_DRIFT = FAIL_CLOSED
+```
+
+beta.9 makes evaluator implementation provenance part of the frozen pilot workspace. It does **not** prove reviewer identity/independence, participant consent, real-user value, Stable readiness or PMF.
+
+Current maturity boundary:
+
+```text
+PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+The canonical next action is **new authorized Project Sync / Design Review pilot evidence on beta.9**, not another feature-driven prerelease. Publication provenance: `docs/releases/V2_0_0_BETA_9_PUBLICATION_PROVENANCE.md`.

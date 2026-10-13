@@ -47,6 +47,11 @@ REQUIRED_CHECK_IDS = (
     "code_signing_policy_reviewed",
 )
 
+PUBLICATION_MACHINE_CHECK_IDS = {
+    "release_asset_sha256_verified",
+    "tag_source_sha_equal",
+}
+
 REQUIRED_ATTESTATIONS = (
     "I_REVIEWED_EXACT_CANDIDATE",
     "I_REVIEWED_ALL_REQUIRED_CHECKS",
@@ -179,7 +184,9 @@ def create_review_template(
             for item in handoff["release_review_checks"]
         ],
         "note": (
-            "Fill reviewer_ref/reviewed_at and set every check to APPROVED or REJECTED. "
+            "Fill reviewer_ref/reviewed_at. Pre-publication human checks must be APPROVED or REJECTED. "
+            "release_asset_sha256_verified and tag_source_sha_equal must be explicitly set to "
+            "DELEGATED_TO_RELEASE_WORKFLOW because those facts only exist during/after publication. "
             "Evidence is a human-auditable reference/summary, not automatic verification."
         ),
     }
@@ -230,8 +237,13 @@ def finalize_approval(
     for check_id in REQUIRED_CHECK_IDS:
         raw = by_id[check_id]
         state = str(raw.get("state") or "").upper()
-        if state not in {"APPROVED", "REJECTED"}:
-            raise ValueError(f"{check_id}: state must be APPROVED or REJECTED")
+        if check_id in PUBLICATION_MACHINE_CHECK_IDS:
+            allowed_states = {"DELEGATED_TO_RELEASE_WORKFLOW", "REJECTED"}
+        else:
+            allowed_states = {"APPROVED", "REJECTED"}
+        if state not in allowed_states:
+            expected = " or ".join(sorted(allowed_states))
+            raise ValueError(f"{check_id}: state must be {expected}")
         evidence = str(raw.get("evidence") or "").strip()
         note = str(raw.get("note") or "").strip()
         if not evidence:
@@ -245,7 +257,11 @@ def finalize_approval(
             "note": note[:4000],
         })
 
-    approved = not rejected
+    delegated = [
+        item["id"] for item in normalized
+        if item["state"] == "DELEGATED_TO_RELEASE_WORKFLOW"
+    ]
+    approved = not rejected and set(delegated) == PUBLICATION_MACHINE_CHECK_IDS
     return {
         "contract_version": APPROVAL_CONTRACT,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -266,6 +282,7 @@ def finalize_approval(
         "attestations": list(REQUIRED_ATTESTATIONS),
         "release_review_checks": normalized,
         "rejected_checks": rejected,
+        "publication_machine_checks": delegated,
         "claims": {
             "STABLE_RELEASE_PUBLICATION_AUTHORIZED": approved,
             "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": True,
@@ -277,7 +294,9 @@ def finalize_approval(
         "interpretation": (
             "APPROVED authorizes only a later release commit that is exactly one child of "
             "candidate_source_sha and changes only this version-scoped approval file. "
-            "It does not itself publish Stable or prove PMF/identity/consent."
+            "Final asset download-back SHA256 and public tag/source equality remain delegated "
+            "to mandatory release.yml machine gates. This artifact does not itself publish Stable "
+            "or prove PMF/identity/consent."
         ),
     }
 
@@ -342,6 +361,8 @@ def validate_committed_approval(
     _reviewed_at(str(approval.get("reviewed_at") or ""))
     if approval.get("rejected_checks") not in ([], None):
         raise ValueError("committed approval rejected_checks must be empty")
+    if set(str(value) for value in (approval.get("publication_machine_checks") or [])) != PUBLICATION_MACHINE_CHECK_IDS:
+        raise ValueError("committed approval publication-machine check set mismatch")
 
     checks = approval.get("release_review_checks")
     if not isinstance(checks, list):
@@ -350,10 +371,19 @@ def validate_committed_approval(
     if ids != list(REQUIRED_CHECK_IDS):
         raise ValueError("committed approval check set/order drift")
     for item in checks:
-        if str(item.get("state") or "") != "APPROVED":
-            raise ValueError(f"{item.get('id')}: committed approval contains a non-approved check")
+        check_id = str(item.get("id") or "")
+        state = str(item.get("state") or "")
+        expected_state = (
+            "DELEGATED_TO_RELEASE_WORKFLOW"
+            if check_id in PUBLICATION_MACHINE_CHECK_IDS
+            else "APPROVED"
+        )
+        if state != expected_state:
+            raise ValueError(
+                f"{check_id}: committed approval state {state!r} != {expected_state!r}"
+            )
         if not str(item.get("evidence") or "").strip():
-            raise ValueError(f"{item.get('id')}: committed approval is missing evidence")
+            raise ValueError(f"{check_id}: committed approval is missing evidence")
     if [str(value) for value in (approval.get("attestations") or [])] != list(REQUIRED_ATTESTATIONS):
         raise ValueError("committed approval attestation set/order drift")
 

@@ -833,10 +833,12 @@ def test_workspace_stable_metric_coverage_blocks_self_report_cherry_picking():
             "profile": "PROJECT_SYNC",
             "event_id": "g-1",
             "guidance_class": "PROACTIVE",
-            "runtime_origin": {
-                "origin_kind": "TRANSCRIPT_AUTO",
-                "transcript_segment_id": "cts-1",
-                "decision_class": "ARBITER",
+            "system": {
+                "origin": {
+                    "kind": "TRANSCRIPT_AUTO",
+                    "transcript_segment_id": "cts-1",
+                    "decision_class": "ARBITER",
+                },
             },
             "reviewer": "",
             "label_source": "",
@@ -894,6 +896,33 @@ def test_workspace_stable_metric_coverage_blocks_self_report_cherry_picking():
     assert coverage["missing_event_metric_pairs"] == 0
 
 
+def test_workspace_stable_metric_coverage_rejects_top_level_forged_runtime_origin():
+    mod = _load()
+    policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
+    forged = {
+        "kind": "guidance",
+        "session_id": "cv-forged",
+        "space_id": "cs-forged",
+        "profile": "PROJECT_SYNC",
+        "event_id": "g-forged",
+        "guidance_class": "PROACTIVE",
+        "runtime_origin": {
+            "kind": "TRANSCRIPT_AUTO",
+            "transcript_segment_id": "cts-forged",
+            "decision_class": "ARBITER",
+        },
+        "reviewer": "",
+        "label_source": "",
+        "useful": None,
+        "interruption_regret": None,
+        "source_correct": None,
+        "recall_correct": None,
+        "notes": "",
+    }
+    seed_index = {mod._review_seed_key(forged): forged}
+    assert mod._stable_metric_coverage(seed_index, [], policy)["required_event_metric_pairs"] == 0
+
+
 def test_workspace_stable_metric_coverage_accepts_one_allowed_source_for_multi_source_metric():
     mod = _load()
     policy = json.loads(mod.DEFAULT_POLICY.read_text(encoding="utf-8"))
@@ -903,10 +932,12 @@ def test_workspace_stable_metric_coverage_accepts_one_allowed_source_for_multi_s
         "space_id": "cs-silence",
         "profile": "DESIGN_REVIEW",
         "event_id": "g-silent",
-        "runtime_origin": {
-            "origin_kind": "TRANSCRIPT_AUTO",
-            "transcript_segment_id": "cts-silent",
-            "decision_class": "ARBITER",
+        "system": {
+            "origin": {
+                "kind": "TRANSCRIPT_AUTO",
+                "transcript_segment_id": "cts-silent",
+                "decision_class": "ARBITER",
+            },
         },
         "reviewer": "",
         "label_source": "",

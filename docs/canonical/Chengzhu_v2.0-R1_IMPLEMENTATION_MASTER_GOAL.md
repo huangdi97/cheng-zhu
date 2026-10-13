@@ -919,9 +919,9 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 ---
 
-## Beta.7 release-candidate freeze · 2026-10-13
+## Beta.7 publication freeze · 2026-10-13
 
-Current published Conversation Beta remains `v2.0.0-beta.6 @ 38a70b719b2d5b0c9e8273e6a908fed9229ab706`. The next candidate is `v2.0.0-beta.7`, created to package the post-beta.6 Stable Policy v7 single-user cross-session binding correction before real-pilot Stable-readiness evidence is accepted.
+Published Conversation Beta is now `v2.0.0-beta.7 @ dc2188cd6b796b5dca9baf0eac2372da7be5bbf2`. It packages the post-beta.6 Stable Policy v7 single-user cross-session binding correction before real-pilot Stable-readiness evidence is accepted.
 
 Policy v7 changes no numerical quality threshold, no `min_n`, no launch-profile floor and no unique-event sample-unit rule. It only makes longitudinal continuity faithful to the product definition:
 
@@ -935,13 +935,16 @@ mixed user_ref values inside one Space
 = FAIL_CLOSED
 ```
 
-beta.7 also carries the current published-Release-page authoritative-status hardening. Publication is not complete until exact-main CI, Windows package build, clean-install, GitHub draft download-back, downloaded SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel preservation and public tag/source equality all pass.
+beta.7 also carries the published-Release-page authoritative-status hardening. Exact-main CI #992 and Release #324 completed successfully, including Windows package build, clean-install, installed-layout smoke, GitHub draft download-back, SHA256 verification, packaged smoke, prerelease-channel preservation, public tag/source equality and post-publish metadata verification.
 
 ```text
-PUBLISHED_BETA = v2.0.0-beta.6
-NEXT_BETA_CANDIDATE = v2.0.0-beta.7
-CANDIDATE_STABLE_POLICY = v2.0-R1-stable-promotion-7
+PUBLISHED_BETA = v2.0.0-beta.7
+PUBLISHED_BETA_SOURCE_SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
+PUBLISHED_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+Publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`. Another prerelease is not the default next step; first run the authorized real Project Sync / Design Review pilot under packaged Policy v7.

@@ -92,6 +92,37 @@ jobs:
       - name: Release version consistency
         run: python scripts/check_release_version.py
 
+      - name: Stable green-main source wrapper regression
+        env:
+          GH_TOKEN: regression-token
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixtureSha = 'a' * 40
+          function global:gh {
+            $joined = $args -join ' '
+            if ($joined -match 'git/ref/heads/main') {
+              return $fixtureSha
+            }
+            if ($joined -match 'actions/workflows/ci.yml/runs') {
+              return (@{
+                workflow_runs = @(@{
+                  head_sha = $fixtureSha
+                  head_branch = 'main'
+                  event = 'push'
+                  conclusion = 'success'
+                })
+              } | ConvertTo-Json -Depth 4)
+            }
+            throw "unexpected gh regression invocation: $joined"
+          }
+          try {
+            & scripts/verify_stable_release_source.ps1 `
+              -Version '2.0.0' `
+              -SourceSha $fixtureSha
+          } finally {
+            Remove-Item function:global:gh -ErrorAction SilentlyContinue
+          }
       - name: Stable v2+ human release authorization gate
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:

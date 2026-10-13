@@ -87,7 +87,11 @@ def _approved_review(mod, template: dict) -> dict:
     review["reviewed_at"] = "2026-10-14T00:00:00+00:00"
     review["attestations"] = list(mod.REQUIRED_ATTESTATIONS)
     for item in review["release_review_checks"]:
-        item["state"] = "APPROVED"
+        item["state"] = (
+            "DELEGATED_TO_RELEASE_WORKFLOW"
+            if item["id"] in mod.PUBLICATION_MACHINE_CHECK_IDS
+            else "APPROVED"
+        )
         item["evidence"] = f"evidence:{item['id']}"
     return review
 
@@ -117,6 +121,7 @@ def test_finalize_requires_complete_evidence_and_no_go_is_not_approval(tmp_path)
     approved = mod.finalize_approval(handoff, review_path, "b" * 40, "2.0.0")
     assert approved["status"] == mod.APPROVED_STATUS
     assert approved["claims"]["STABLE_RELEASE_PUBLICATION_AUTHORIZED"] is True
+    assert set(approved["publication_machine_checks"]) == mod.PUBLICATION_MACHINE_CHECK_IDS
     assert approved["claims"]["V2_STABLE_RELEASE"] is False
     assert approved["claims"]["PMF_PROVEN"] is False
     assert approved["approval_path"] == ".github/stable-release-approvals/v2.0.0.json"
@@ -134,6 +139,19 @@ def test_finalize_requires_complete_evidence_and_no_go_is_not_approval(tmp_path)
     _write_json(tmp_path / "missing-evidence.json", review)
     with pytest.raises(ValueError, match="evidence"):
         mod.finalize_approval(handoff, tmp_path / "missing-evidence.json", "b" * 40, "2.0.0")
+
+
+def test_publication_time_checks_cannot_be_preclaimed_as_human_approved(tmp_path):
+    mod, handoff = _handoff(tmp_path)
+    template = mod.create_review_template(handoff, "e" * 40, "2.0.0")
+    review = _approved_review(mod, template)
+    machine_id = next(iter(mod.PUBLICATION_MACHINE_CHECK_IDS))
+    for item in review["release_review_checks"]:
+        if item["id"] == machine_id:
+            item["state"] = "APPROVED"
+    _write_json(tmp_path / "preclaim.json", review)
+    with pytest.raises(ValueError, match="DELEGATED_TO_RELEASE_WORKFLOW"):
+        mod.finalize_approval(handoff, tmp_path / "preclaim.json", "e" * 40, "2.0.0")
 
 
 def test_finalize_requires_timezone_aware_review_timestamp(tmp_path):

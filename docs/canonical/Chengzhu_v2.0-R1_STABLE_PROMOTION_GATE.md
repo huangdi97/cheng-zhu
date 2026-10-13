@@ -99,7 +99,7 @@ Thresholds and metric populations are frozen in:
 
 `docs/evals/V2_CONVERSATION_STABLE_PROMOTION_POLICY.json`
 
-Current repository evaluator policy = `v2.0-R1-stable-promotion-7`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v6. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, and v7 closes the remaining longitudinal-cohort ambiguity: one qualifying Conversation Space must bind to exactly one pseudonymous `user_ref` and contain >=3 authorized Sessions for that same user. A mixed-user Space fails cohort integrity and cannot count as continuity. Published beta.6 remains immutable and correctly contains policy v6; policy v7 is post-beta.6 source truth until a later release is explicitly justified. Thresholds/floors must not be lowered, and sample/cohort populations must not be broadened after seeing a failing pilot merely to create a PASS.
+Current repository evaluator policy = `v2.0-R1-stable-promotion-8`. Numerical quality thresholds, every `min_n` number, and the profile floors (5 users / 20 Sessions / 3 cross-session Spaces per launch profile) are unchanged from policy v6. v5 fixed the >=3-Session cross-session floor, v6 froze `UNIQUE_EVENT_PER_METRIC`, and v7 closes the remaining longitudinal-cohort ambiguity: one qualifying Conversation Space must bind to exactly one pseudonymous `user_ref` and contain >=3 authorized Sessions for that same user. A mixed-user Space fails cohort integrity and cannot count as continuity. Published beta.6 remains immutable and correctly contains policy v6; policy v7 is post-beta.6 source truth until a later release is explicitly justified. Thresholds/floors must not be lowered, and sample/cohort populations must not be broadened after seeing a failing pilot merely to create a PASS.
 
 ---
 
@@ -316,6 +316,50 @@ It freezes the exact policy snapshot, limits exports to explicitly selected Sess
 Full operator procedure:
 
 `docs/evals/V2_CONVERSATION_REAL_PILOT_RUNBOOK.md`
+
+## 5.4 Independent-review completeness / anti-selection-bias gate
+
+Post-beta.7 audit found a material Stable-evidence correctness gap in Policy v7: reviewer rows were bound to the frozen seed, but the evaluator did not require reviewers to cover the **complete objective independent-review population**. A reviewer could therefore omit unfavorable seed events, submit only a favorable subset, and—once enough favorable events reached `min_n`—bias the metric upward.
+
+Policy v8 closes this without changing any numerical threshold, `min_n`, profile floor, label-source vocabulary, cross-session requirement or sample unit.
+
+For every Stable metric whose allowed label sources are **only** `INDEPENDENT_HUMAN_REVIEW`, Chengzhu now derives the required event×metric population from the frozen `independent-review.seed.jsonl` **before reviewer labels are examined**. The following must all hold:
+
+```text
+required frozen event×metric pair exists
+→ reviewer row is bound to that exact seed event
+→ label_source = INDEPENDENT_HUMAN_REVIEW
+→ metric-specific required label fields are non-null
+→ every required pair is covered exactly once at metric aggregation
+```
+
+Examples:
+
+- auto-runtime Guidance → `source_correct` for Source Attribution Accuracy;
+- RECALL Guidance → `recall_correct`;
+- Direct Question frozen prediction → `actual`;
+- predicted Decision / Commitment / Task → `actual_type + actual_state`;
+- Continue → `writeback_accurate`.
+
+A missing row, null objective label, or alternate label source remains **missing coverage**; it cannot disappear from the denominator merely because the reviewer did not submit it.
+
+The human report must carry:
+
+```text
+independent_review_coverage.contract_version
+= v2.0-R1-independent-review-coverage-1
+
+independent_review_coverage.policy
+= COMPLETE_REQUIRED_OBJECTIVE_POPULATION
+
+covered_event_metric_pairs == required_event_metric_pairs
+missing_event_metric_pairs == 0
+complete == true
+```
+
+Otherwise Stable readiness is `NO_GO`.
+
+This is an evidence-integrity correction, not a new product metric and not proof of reviewer identity or independence.
 
 ## 6. Tooling
 

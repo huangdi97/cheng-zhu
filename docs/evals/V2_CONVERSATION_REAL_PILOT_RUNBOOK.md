@@ -394,10 +394,19 @@ The tool fails closed when:
 
 - the Stable gate is `NO_GO`;
 - any frozen workspace/evaluation input no longer matches its SHA256 provenance;
+- workspace / finalization / evaluation contract or evaluator-toolchain metadata disagree;
+- selected-cohort physical or canonical-logical hashes disagree across workspace / finalization / evaluation;
+- Stable policy version/hash disagree across workspace / finalization / evaluation / stable-readiness;
+- evaluation claims disagree with `stable-readiness.json`;
+- evaluation Stable metric coverage disagrees with the coverage frozen into `human-report.json`;
 - the Stable evaluator tries to claim `V2_STABLE_RELEASE=true` or `PMF_PROVEN=true`;
 - the output directory already exists.
 
 The handoff contains only hashes, cohort/evaluation summaries, checkout context and pending release-review obligations. It does **not** copy transcript text, Guidance text, reviewer notes or direct identifiers.
+
+Current source handoff contract v2 additionally treats `evaluation-manifest.json` as a summary that must agree with independently frozen workspace/finalization/human/stable artifacts; it is not allowed to self-assert a different toolchain, claims set or Stable-coverage summary. Reviewer input JSONL files themselves remain evaluation-time local inputs: if they are no longer present, the handoff does not pretend to re-open or re-authenticate them. Their hashes remain evaluation-manifest provenance only.
+
+This is still local tamper-evident provenance, **not** a cryptographic signature/WORM archive. A coordinated rewrite of every local evidence file is outside the system-verification boundary; operators who need stronger custody should preserve the finalized workspace in an independently controlled read-only/archive layer.
 
 Expected output:
 

@@ -1636,3 +1636,38 @@ PMF_PROVEN = FALSE
 ```
 
 This was a release-correctness freeze, not a new feature wave. beta.7 has completed the full exact-SHA release pipeline and is now the public Conversation Beta. Published beta.6 remains immutable historical provenance. beta.7 publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`.
+
+
+---
+
+## Stable Policy v8 independent-review completeness closure · 2026-10-13
+
+beta.7 发布后继续对 real-pilot evidence path 做攻击式审计，发现一个 material evidence-correctness gap：
+
+```text
+frozen independent-review seed = full review queue
+reviewer submission            = arbitrary subset of that seed
+old evaluator                  = only verifies submitted rows belong to seed
+```
+
+因此在 Policy v7 下，理论上可以省略不利 objective events，只提交有利样本；当有利子集达到 `min_n` 时，指标可能被 selection bias 人为抬高。
+
+当前源码修复为 Stable Policy v8：
+
+```text
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-8
+INDEPENDENT_REVIEW_COVERAGE_POLICY = COMPLETE_REQUIRED_OBJECTIVE_POPULATION
+INDEPENDENT_REVIEW_COVERAGE_CONTRACT = v2.0-R1-independent-review-coverage-1
+OBJECTIVE_REQUIRED_POPULATION_DERIVED_FROM_FROZEN_SEED = TRUE
+OMITTED_REQUIRED_EVENT_METRIC = NO_GO
+NULL_REQUIRED_OBJECTIVE_LABEL = NO_GO
+ALTERNATE_LABEL_SOURCE_FOR_INDEPENDENT_ONLY_METRIC = NO_GO
+NUMERICAL_THRESHOLDS_CHANGED = FALSE
+MIN_N_CHANGED = FALSE
+PROFILE_FLOORS_CHANGED = FALSE
+CROSS_SESSION_USER_BINDING_CHANGED = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Public beta.7 remains immutable and still packages Policy v7. It is valid as an engineering/product Beta, but after this audit it is **not the canonical baseline for a new Stable-readiness evidence workspace**. New Stable evidence must use current Policy v8 source or a later prerelease explicitly packaging v8. This material evidence-correctness fix justifies the next prerelease cycle; it does not retroactively modify beta.7 assets or provenance.

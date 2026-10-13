@@ -1,6 +1,6 @@
 {
   "policy_version": "v2.0-R1-stable-promotion-8",
-  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical quality thresholds, min_n values, profile floors, >=3 Sessions cross-session Space minimum, single-user Space binding and unique-event sample units remain unchanged from policy v7. Policy v8 closes independent-review selection bias: every frozen seed event×metric pair for an objective Stable metric whose allowed source is exclusively INDEPENDENT_HUMAN_REVIEW must be completely reviewed from the frozen seed population; omitted rows, null required labels or alternate label sources fail closed.",
+  "purpose": "Product-evidence graduation gate for Chengzhu Conversation v2. Numerical quality thresholds, min_n values, profile floors, >=3 Sessions cross-session Space minimum, single-user Space binding and unique-event sample units remain unchanged from policy v7. Policy v8 closes Stable-metric selection bias: every frozen seed event×metric pair in the Stable population must be completely labeled by at least one source explicitly allowed for that metric before quality/min_n are evaluated; omitted events, null required labels or disallowed label sources fail closed.",
   "profiles_required": {
     "PROJECT_SYNC": {
       "distinct_users": 5,
@@ -120,7 +120,7 @@
       "REAL_USER_VALUE_UNIVERSALLY_PROVEN"
     ]
   },
-  "change_control": "Numerical quality thresholds, every min_n number, required profile floors, the >=3 Sessions cross-session Space minimum, single-user longitudinal binding, label-source rules and UNIQUE_EVENT_PER_METRIC sample unit are unchanged from policy v7. Policy v8 is a pre-pilot evidence-integrity correction: objective Stable metrics that can be satisfied only by INDEPENDENT_HUMAN_REVIEW must cover the complete frozen seed event×metric population. Do not lower thresholds/floors, broaden populations, omit unfavorable seed events, leave required objective labels null, relabel objective rows as self-report, mix users inside one continuity Space, duplicate one event across reviewers/sources, mix manual-lab events, count forced silence, or weaken a quality/cohort/coverage rule merely to make a failing pilot pass.",
+  "change_control": "Numerical quality thresholds, every min_n number, required profile floors, the >=3 Sessions cross-session Space minimum, single-user longitudinal binding, label-source rules and UNIQUE_EVENT_PER_METRIC sample unit are unchanged from policy v7. Policy v8 is a pre-pilot evidence-integrity correction: every eligible frozen Stable event×metric pair must be labeled by at least one label source already allowed for that metric. Do not lower thresholds/floors, broaden populations, omit unfavorable seed events, leave required Stable labels null, use a disallowed source, mix users inside one continuity Space, duplicate one event across reviewers/sources, mix manual-lab events, count forced silence, or weaken a quality/cohort/coverage rule merely to make a failing pilot pass.",
   "label_source_policy": {
     "LOCAL_IN_PRODUCT_EXPLICIT_SELF_REPORT": "Explicit post-session labels entered in Chengzhu on the local device. Valid for user-perception/outcome measures only where a metric explicitly allows it; not verified identity proof.",
     "INDEPENDENT_HUMAN_REVIEW": "Explicit human review performed independently from the in-product self-report surface under the human-label protocol.",
@@ -189,6 +189,6 @@
   "metric_sample_unit": "UNIQUE_EVENT_PER_METRIC",
   "duplicate_event_metric_policy": "FAIL_CLOSED",
   "cross_session_space_user_binding": "SINGLE_PSEUDONYMOUS_USER_REF",
-  "independent_review_coverage_policy": "COMPLETE_REQUIRED_OBJECTIVE_POPULATION",
-  "independent_review_coverage_contract_version": "v2.0-R1-independent-review-coverage-1"
+  "stable_metric_coverage_policy": "COMPLETE_FROZEN_ELIGIBLE_POPULATION",
+  "stable_metric_coverage_contract_version": "v2.0-R1-stable-metric-coverage-1"
 }

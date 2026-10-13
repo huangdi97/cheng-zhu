@@ -134,6 +134,16 @@ def test_finalize_requires_complete_evidence_and_no_go_is_not_approval(tmp_path)
         mod.finalize_approval(handoff, tmp_path / "missing-evidence.json", "b" * 40, "2.0.0")
 
 
+def test_finalize_requires_timezone_aware_review_timestamp(tmp_path):
+    mod, handoff = _handoff(tmp_path)
+    template = mod.create_review_template(handoff, "d" * 40, "2.0.0")
+    review = _approved_review(mod, template)
+    review["reviewed_at"] = "2026-10-14T00:00:00"
+    _write_json(tmp_path / "naive-time.json", review)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        mod.finalize_approval(handoff, tmp_path / "naive-time.json", "d" * 40, "2.0.0")
+
+
 def test_handoff_drift_or_missing_required_check_fails_closed(tmp_path):
     mod, handoff = _handoff(tmp_path)
     handoff_json = handoff / "stable-review-handoff.json"

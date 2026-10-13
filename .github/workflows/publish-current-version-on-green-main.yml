@@ -148,6 +148,14 @@ jobs:
                 --repo-root . \
                 --candidate-version "$version" \
                 --release-source-sha "$SOURCE_SHA"
+
+              candidate_sha="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["candidate_source_sha"])' "$approval")"
+              candidate_ci_count="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$candidate_sha&event=push&per_page=100" --jq '[.workflow_runs[] | select(.name == "CI" and .head_branch == "main" and .conclusion == "success")] | length')"
+              if [ "$candidate_ci_count" -lt 1 ]; then
+                echo "Stable candidate $candidate_sha has no successful main CI push run" >&2
+                exit 1
+              fi
+              echo "Stable candidate main-CI invariant: $candidate_sha -> success"
             fi
           fi
 

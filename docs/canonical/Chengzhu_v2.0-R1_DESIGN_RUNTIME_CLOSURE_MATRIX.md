@@ -1686,3 +1686,50 @@ Coverage applies to every Stable metric according to its frozen `allowed_label_s
 
 Public beta.7 remains immutable and still packages Policy v7. It remains a valid engineering/product Beta, but after this audit it is **not the canonical baseline for a new Stable-readiness evidence workspace**. New Stable evidence must use current Policy v8 source or a later prerelease explicitly packaging v8. This material evidence-correctness fix justifies the next prerelease cycle; it does not retroactively modify beta.7 assets or provenance.
 
+
+
+---
+
+## Stable Policy v8 complete-population coverage closure · 2026-10-13
+
+Post-beta.7 attack-style audit found a remaining Stable-evidence denominator defect:
+
+```text
+frozen eligible population exists
+→ only favorable rows are labeled
+→ labeled subset alone reaches min_n
+→ metric could pass
+```
+
+Current source closes this with:
+
+```text
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-8
+STABLE_METRIC_COVERAGE_POLICY = COMPLETE_FROZEN_ELIGIBLE_POPULATION
+FROZEN_POPULATION_DERIVED_BEFORE_LABEL_VALUES = TRUE
+MISSING_REQUIRED_EVENT_METRIC_LABEL = FAIL_CLOSED
+NULL_REQUIRED_LABEL = FAIL_CLOSED
+DISALLOWED_ONLY_SOURCE = FAIL_CLOSED
+UNRESOLVED_DUPLICATE_SOURCE = FAIL_CLOSED
+
+NUMERICAL_THRESHOLDS_CHANGED_FROM_V7 = FALSE
+MIN_N_CHANGED_FROM_V7 = FALSE
+PROFILE_FLOORS_CHANGED_FROM_V7 = FALSE
+CROSS_SESSION_MIN_CHANGED_FROM_V7 = FALSE
+SINGLE_USER_SPACE_BINDING_CHANGED_FROM_V7 = FALSE
+UNIQUE_EVENT_SAMPLE_UNIT_CHANGED_FROM_V7 = FALSE
+
+CURRENT_PUBLIC_BETA = v2.0.0-beta.7
+CURRENT_PUBLIC_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+NEXT_BETA_CANDIDATE = v2.0.0-beta.8
+CANDIDATE_PACKAGED_POLICY = v2.0-R1-stable-promotion-8
+
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Policy v8 does not raise a maturity claim. It closes selection bias by requiring every eligible frozen event × metric pair in the Stable population to be completely labeled by at least one label source already allowed for that metric before thresholds and min_n are evaluated.
+
+Until beta.8 is actually published through the full exact-SHA Windows release path, public downloadable truth remains beta.7 / Policy v7. After beta.8 publication, **new** Stable-readiness workspaces should freeze Policy v8 (or later), not Policy v7.

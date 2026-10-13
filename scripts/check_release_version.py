@@ -87,7 +87,7 @@ def main() -> int:
         "CHENGZHU_PUBLISHED_STATUS_BEGIN",
         "Stable v2 release approval gate",
         "scripts/v2_stable_release_approval.py validate-committed",
-        "Stable candidate main-CI invariant",
+        "Stable main-CI invariant",
     ):
         if token not in release_workflow:
             errors.append(f"release workflow missing provenance invariant: {token}")

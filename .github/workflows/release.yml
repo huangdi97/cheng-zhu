@@ -17,6 +17,9 @@ on:
       - "scripts/build_sidecar.py"
       - "scripts/packaged_smoke.py"
       - "scripts/render_published_release_body.py"
+      - "scripts/v2_conversation_stable_review_handoff.py"
+      - "scripts/v2_stable_release_review_decision.py"
+      - "scripts/verify_stable_release_authorization.py"
       - "frontend/scripts/capture-v13-packaged-window-evidence.mjs"
       - "frontend/scripts/capture-v13-packaged-web-evidence.mjs"
       - "frontend/scripts/capture-v20-conversation-packaged-evidence.mjs"
@@ -29,6 +32,10 @@ on:
         default: "false"
       source_sha:
         description: "Exact CI-proven commit SHA to build and tag. Empty = workflow event SHA."
+        required: false
+        default: ""
+      stable_review_authorization_b64:
+        description: "Stable v2+ only: base64 authorization emitted by v2_stable_release_review_decision.py. Never required for prereleases."
         required: false
         default: ""
 
@@ -81,6 +88,28 @@ jobs:
 
       - name: Release version consistency
         run: python scripts/check_release_version.py
+
+      - name: Stable v2+ human release authorization gate
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force dist/release | Out-Null
+          python scripts/verify_stable_release_authorization.py `
+            --version $version `
+            --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
+            --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
+            --out dist/release/RELEASE_AUTHORIZATION.json
+          if ($LASTEXITCODE -ne 0) { throw "Stable release authorization gate failed" }
+          $authorization = Get-Content dist/release/RELEASE_AUTHORIZATION.json -Raw | ConvertFrom-Json
+          if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
+            if ($authorization.status -ne 'VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO') {
+              throw "Stable v2+ requires VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
+            }
+          }
 
       - name: License gate
         run: python scripts/generate_third_party_notices.py --check
@@ -251,7 +280,11 @@ jobs:
           Copy-Item THIRD_PARTY_NOTICES.md dist/release/
           $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           Copy-Item "docs/RELEASE_NOTES_v$version.md" dist/release/
-          $lines = foreach ($f in @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip')) {
+          $hashFiles = @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip')
+          if (Test-Path "dist/release/RELEASE_AUTHORIZATION.json") {
+            $hashFiles += 'RELEASE_AUTHORIZATION.json'
+          }
+          $lines = foreach ($f in $hashFiles) {
             $h = (Get-FileHash "dist/release/$f" -Algorithm SHA256).Hash.ToLower()
             "$h  $f"
           }
@@ -287,6 +320,9 @@ jobs:
           $sourceSha = $env:CHENGZHU_RELEASE_SOURCE_SHA
           if (-not $sourceSha) { throw "CHENGZHU_RELEASE_SOURCE_SHA is empty" }
           $isPrerelease = $version.Contains('-')
+          if (-not (Test-Path "dist/release/RELEASE_AUTHORIZATION.json")) {
+            throw "missing release authorization audit asset"
+          }
           if ($isPrerelease) {
             gh release create $tag `
               dist/release/Chengzhu-Setup-x64.exe `
@@ -295,6 +331,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
               --prerelease `
@@ -309,6 +346,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
               --title "成竹 Chengzhu $tag" `
@@ -354,7 +392,7 @@ jobs:
           $downloaded = $false
           for ($i = 1; $i -le 5; $i++) {
             try {
-              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt"
+              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt" --pattern "RELEASE_AUTHORIZATION.json"
               $downloaded = $true
               break
             } catch {
@@ -422,12 +460,26 @@ jobs:
             throw "refusing to publish: draft $tag targets $draftTarget but binaries were built from $sourceSha"
           }
 
+          $isPrerelease = $version.Contains('-')
+          if (-not $isPrerelease -and [int]($version.Split('.')[0]) -ge 2) {
+            $authorizationPath = "dist/release/RELEASE_AUTHORIZATION.json"
+            if (-not (Test-Path $authorizationPath)) {
+              throw "Stable v2+ publish refused: RELEASE_AUTHORIZATION.json is missing"
+            }
+            $authorization = Get-Content $authorizationPath -Raw | ConvertFrom-Json
+            if ($authorization.status -ne "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO") {
+              throw "Stable v2+ publish refused: human Stable release review is not GO"
+            }
+            if ($authorization.version -ne $version -or $authorization.source_sha -ne $sourceSha) {
+              throw "Stable v2+ publish refused: authorization candidate drift"
+            }
+          }
+
           # Render authoritative publication metadata before the draft becomes
           # public. The uploaded RELEASE_NOTES asset stays byte-for-byte
           # unchanged; only the GitHub Release display body gets a generated
           # status block. Doing this pre-publication also works with repositories
           # that enable immutable Releases after publish.
-          $isPrerelease = $version.Contains('-')
           $releaseChannel = $(if ($isPrerelease) { "PRERELEASE" } else { "STABLE" })
           $publishedBody = "dist/release/published-release-body.md"
           $renderArgs = @(

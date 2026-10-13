@@ -475,3 +475,41 @@ revalidate selected cohort against frozen snapshot
 ```
 
 因此，如果选中 Session / Frozen Session Pack 在 final manifest 的独立 DB 读取窗口内发生漂移，finalize 必须失败，而且不能留下半成品 final evidence。与 cohort 无关的其他 Session/WAL 增长仍允许。
+
+
+---
+
+## Stable release review → publication authorization
+
+当 Stable evaluator 返回 `PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW` 后，仍不能直接把版本改成 Stable 并依赖 generic publisher。当前 release governance 强制把最后的人类决策与发布动作拆开：
+
+```text
+PASS workspace
+→ v2_conversation_stable_review_handoff.py
+→ v2_stable_release_review_decision.py init
+→ human reviews every required check
+→ finalize
+→ GO / NO_GO
+```
+
+GO 必须绑定：
+
+- exact candidate source SHA；
+- stable SemVer（无 prerelease suffix）；
+- handoff JSON/Markdown/checksum provenance；
+- 完整 release-review check set；
+- 每项 PASS 的非敏感 evidence_ref；
+- clean candidate checkout + version match。
+
+GO 只会生成本地 privacy-minimized `stable-release-authorization.b64`。它不包含 transcript、Guidance text 或 reviewer notes，也不自动发布。
+
+Stable v2+ 的 generic publisher 被硬编码为 no-op。真正发布必须由人工手动触发 `Release` workflow，并将该 authorization token 作为 `stable_review_authorization_b64` 输入；workflow 在构建前与最终 publish 前都会 fail-closed 复核 source SHA / version / GO 状态，并把 `RELEASE_AUTHORIZATION.json` 纳入 SHA256 + download-back audit。
+
+因此：
+
+```text
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = prerequisite
+HUMAN_STABLE_RELEASE_REVIEW_GO = publication authorization
+V2_STABLE_RELEASE = only after verified public Stable Release
+PMF_PROVEN = still FALSE unless separately established
+```

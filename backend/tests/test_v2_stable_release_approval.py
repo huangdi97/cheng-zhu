@@ -244,7 +244,6 @@ def test_committed_approval_refuses_non_approval_delta(tmp_path):
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "candidate")
     candidate = _git(repo, "rev-parse", "HEAD")
-    base_branch = _git(repo, "branch", "--show-current")
 
     template = mod.create_review_template(handoff, candidate, "2.0.0")
     review = _approved_review(mod, template)

@@ -378,6 +378,10 @@ Use `scripts/v2_conversation_pilot_workspace.py` and the Real Pilot Runbook for 
 
 ### Low-level / audit path
 
+The low-level scripts remain useful for inspection/debugging, but under Policy v8 they are **not sufficient by themselves for a Stable PASS** because `stable_metric_coverage` must be derived from the frozen workspace seed + frozen policy before aggregation. The canonical Stable-review path is the workspace orchestrator above.
+
+For audit/debug only:
+
 1. Export local label seed.
 2. Human reviewers label real sessions.
 3. Aggregate:

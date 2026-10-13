@@ -93,6 +93,19 @@ def _approval_path(version: str) -> Path:
     return Path(".github") / "stable-release-approvals" / f"v{version}.json"
 
 
+def _reviewed_at(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("reviewed_at is required")
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("reviewed_at must be timezone-aware ISO-8601") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("reviewed_at must be timezone-aware ISO-8601")
+    return raw
+
+
 def _verify_handoff(handoff_dir: Path) -> dict[str, Any]:
     handoff_dir = handoff_dir.resolve()
     handoff_path = handoff_dir / "stable-review-handoff.json"
@@ -189,9 +202,7 @@ def finalize_approval(
     reviewer_ref = str(review.get("reviewer_ref") or "").strip()
     if not reviewer_ref:
         raise ValueError("reviewer_ref is required")
-    reviewed_at = str(review.get("reviewed_at") or "").strip()
-    if not reviewed_at:
-        raise ValueError("reviewed_at is required")
+    reviewed_at = _reviewed_at(str(review.get("reviewed_at") or ""))
 
     attestations = [str(value) for value in (review.get("attestations") or [])]
     if set(attestations) != set(REQUIRED_ATTESTATIONS):
@@ -305,6 +316,13 @@ def validate_committed_approval(
         raise ValueError("committed approval path contract mismatch")
 
     claims = dict(approval.get("claims") or {})
+    handoff = dict(approval.get("handoff") or {})
+    if not re.fullmatch(r"[0-9a-f]{64}", str(handoff.get("manifest_sha256") or "")):
+        raise ValueError("committed approval handoff manifest SHA256 missing/invalid")
+    if str(handoff.get("contract_version") or "") != HANDOFF_CONTRACT:
+        raise ValueError("committed approval handoff contract mismatch")
+    if str(handoff.get("evidence_status") or "") != EVIDENCE_READY:
+        raise ValueError("committed approval handoff evidence status mismatch")
     if claims.get("STABLE_RELEASE_PUBLICATION_AUTHORIZED") is not True:
         raise ValueError("committed approval does not authorize Stable publication")
     if claims.get("V2_STABLE_RELEASE") is not False or claims.get("PMF_PROVEN") is not False:

@@ -1609,3 +1609,29 @@ PMF_PROVEN = FALSE
 Pilot Manifest builder 与 Stable evaluator 双层执行同一规则：builder 在 DRAFT 阶段即拒绝一个 Space 对应多个 `user_ref`；evaluator 独立复核，不能靠手工构造 manifest 绕过。
 
 `user_ref` 仍只是本地匿名代号，不是系统验证身份。该修复关闭的是 **longitudinal cohort qualification** 漏洞，不构成真实用户价值证据，也不倒写已经公开的 beta.6 二进制/provenance。只有未来需要把 policy v7 operator tooling 固化到新的可下载 release，或真实 pilot 暴露 runtime defect 时，才进入新的 prerelease cycle。
+
+
+---
+
+## Beta.7 release-candidate closure · 2026-10-13
+
+Post-beta.6 audit identified one material Stable-readiness correctness gap: Policy v6 could qualify a repeated Space when its >=3 authorized Sessions were assigned to different pseudonymous users. Current main closes that gap with Policy v7 and has already passed exact-main CI; beta.7 exists solely to align the public prerelease with that corrected operator/evaluator truth before a real pilot is treated as Stable-review evidence.
+
+```text
+PUBLISHED_BETA = v2.0.0-beta.6
+PUBLISHED_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-6
+NEXT_BETA_CANDIDATE = v2.0.0-beta.7
+CANDIDATE_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+CROSS_SESSION_SPACE_USER_BINDING = SINGLE_PSEUDONYMOUS_USER_REF
+QUALITY_THRESHOLDS_CHANGED = FALSE
+MIN_N_CHANGED = FALSE
+PROFILE_FLOORS_CHANGED = FALSE
+METRIC_SAMPLE_UNIT_CHANGED = FALSE
+PRODUCT_FEATURE_SCOPE_CHANGE = NONE
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+This is a release-correctness freeze, not a new feature wave. Published beta.6 provenance remains immutable until beta.7 actually completes the full exact-SHA release pipeline.

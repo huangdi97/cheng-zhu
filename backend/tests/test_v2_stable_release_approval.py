@@ -244,6 +244,7 @@ def test_committed_approval_refuses_non_approval_delta(tmp_path):
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "candidate")
     candidate = _git(repo, "rev-parse", "HEAD")
+    base_branch = _git(repo, "branch", "--show-current")
 
     template = mod.create_review_template(handoff, candidate, "2.0.0")
     review = _approved_review(mod, template)
@@ -289,7 +290,7 @@ def test_committed_approval_refuses_multi_parent_merge_even_with_same_tree_delta
     _git(repo, "add", ".github/stable-release-approvals/v2.0.0.json")
     _git(repo, "commit", "-m", "approval side commit")
 
-    _git(repo, "checkout", "master")
+    _git(repo, "checkout", base_branch)
     _git(repo, "merge", "--no-ff", "approval", "-m", "merge approval")
     merge_source = _git(repo, "rev-parse", "HEAD")
 

@@ -157,15 +157,17 @@ def test_generic_publisher_requires_committed_approval_for_unpublished_v2_stable
     stable_i = text.index('if [[ "$version" != *-* ]]; then')
     approval_i = text.index('approval=".github/stable-release-approvals/v$version.json"')
     validate_i = text.index("scripts/v2_stable_release_approval.py validate-committed")
+    candidate_ci_i = text.index("Stable candidate main-CI invariant")
     dispatch_i = text.index("gh workflow run release.yml")
 
     assert 'if [ "$major" -ge 2 ]; then' in text
     assert "stable v2+ approval missing" in text
     assert "--release-source-sha" in text
     assert '"$SOURCE_SHA"' in text
+    assert 'actions/runs?head_sha=$candidate_sha&event=push' in text
     # Already-published immutable versions exit before approval validation;
     # only a new/draft Stable publication needs the exact-candidate approval.
-    assert tag_i < published_i < stable_i < approval_i < validate_i < dispatch_i
+    assert tag_i < published_i < stable_i < approval_i < validate_i < candidate_ci_i < dispatch_i
 
 
 def test_release_publish_path_rechecks_v2_stable_approval() -> None:
@@ -184,6 +186,9 @@ def test_release_publish_path_rechecks_v2_stable_approval() -> None:
     assert "$env:CHENGZHU_RELEASE_SOURCE_SHA" in gate
     assert "$major -ge 2" in gate
     assert "github.event.inputs.publish == 'true'" in gate
+    assert "GH_TOKEN:" in gate
+    assert "actions/runs?head_sha=$candidateSha&event=push" in gate
+    assert "Stable candidate main-CI invariant" in gate
     assert version_i < approval_i < build_i < publish_i
 
 

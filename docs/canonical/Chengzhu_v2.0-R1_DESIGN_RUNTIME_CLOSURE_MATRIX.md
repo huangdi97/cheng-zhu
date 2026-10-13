@@ -1556,3 +1556,56 @@ PMF_PROVEN = FALSE
 发布 provenance：`docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`。
 
 从这里开始，默认下一步不再是 beta.7 功能扩张，而是使用 beta.6 执行授权真实 Project Sync / Design Review pilot、完成 Quick Debrief + independent review、用 frozen Policy v6 跑 Stable readiness；只有真实 pilot 暴露 runtime defect、需要打包修复，或出现新的 provider/runtime evidence 才进入新的 prerelease cycle。
+
+
+---
+
+## Post-beta.6 cross-session user-binding correction · 2026-10-13
+
+在 beta.6 发布后继续审计 Stable Policy v6 的 longitudinal cohort 语义时发现：evaluator 虽要求一个 `space_id` 至少包含 3 个授权 Session，却没有要求这些 Session 属于同一个 pseudonymous `user_ref`。
+
+因此旧语义允许：
+
+```text
+Space A
+├─ Session 1 → pilot-user-01
+├─ Session 2 → pilot-user-02
+└─ Session 3 → pilot-user-03
+
+policy v6:
+  len(Session ids) = 3
+  → cross_session_spaces += 1
+```
+
+这不能证明任何一个 Chengzhu 用户获得了跨场连续价值，与 Personal Conversation Intelligence 的 longitudinal continuity 北极星不一致。
+
+当前源码冻结为：
+
+```text
+STABLE_PROMOTION_POLICY = v2.0-R1-stable-promotion-7
+CROSS_SESSION_SPACE_MIN_SESSIONS = 3
+CROSS_SESSION_SPACE_USER_BINDING = SINGLE_PSEUDONYMOUS_USER_REF
+
+QUALIFYING_CROSS_SESSION_SPACE =
+  same space_id
+  + same pseudonymous user_ref
+  + >= 3 authorized Sessions
+
+MIXED_USER_SPACE = FAIL_CLOSED
+MIXED_USER_SPACE_COUNTS_AS_CONTINUITY = FALSE
+
+NUMERICAL_QUALITY_THRESHOLDS_CHANGED_FROM_V6 = FALSE
+MIN_N_CHANGED_FROM_V6 = FALSE
+PROFILE_USER_SESSION_SPACE_FLOORS_CHANGED_FROM_V6 = FALSE
+METRIC_SAMPLE_UNIT = UNIQUE_EVENT_PER_METRIC
+
+PUBLIC_BETA = v2.0.0-beta.6
+PUBLIC_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-6
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+Pilot Manifest builder 与 Stable evaluator 双层执行同一规则：builder 在 DRAFT 阶段即拒绝一个 Space 对应多个 `user_ref`；evaluator 独立复核，不能靠手工构造 manifest 绕过。
+
+`user_ref` 仍只是本地匿名代号，不是系统验证身份。该修复关闭的是 **longitudinal cohort qualification** 漏洞，不构成真实用户价值证据，也不倒写已经公开的 beta.6 二进制/provenance。只有未来需要把 policy v7 operator tooling 固化到新的可下载 release，或真实 pilot 暴露 runtime defect 时，才进入新的 prerelease cycle。

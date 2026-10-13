@@ -1,8 +1,8 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: BETA.7 RELEASE CANDIDATE · REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
-**Public Beta**: v2.0.0-beta.6  
-**Published source/tag SHA**: `38a70b719b2d5b0c9e8273e6a908fed9229ab706`  
+**Status**: BETA.7 PUBLISHED · REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v7  
+**Public Beta**: v2.0.0-beta.7  
+**Published source/tag SHA**: `dc2188cd6b796b5dca9baf0eac2372da7be5bbf2`  
 **Stable v2**: NOT CLAIMED  
 **REAL_USER_VALIDATED**: FALSE  
 **PMF_PROVEN**: FALSE
@@ -13,9 +13,9 @@ It does not change any release or evidence claim by itself.
 
 ## 1. Preconditions
 
-Use the current beta.6-compatible source/runtime with product schema >= v12.
+Use the published `v2.0.0-beta.7` runtime/source with product schema >= v12.
 
-The currently published participant-facing/runtime product remains `v2.0.0-beta.6`, which is immutable and packages Stable Policy v6. The repository is now freezing `v2.0.0-beta.7` so the downloadable prerelease and operator source both use Stable Policy v7 before new Stable-readiness evidence is accepted. Until beta.7 actually publishes, operators must use current source for Policy v7 evaluation rather than treating packaged beta.6 Policy v6 as authoritative. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+The currently published participant-facing/runtime product is `v2.0.0-beta.7`, which packages Stable Policy v7. New Stable-readiness pilot workspaces should therefore freeze Policy v7 directly from beta.7/current source; historical workspaces initialized under older policies remain historical evidence and must not be rewritten. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -370,19 +370,17 @@ A separate release review must still verify current main, current packaged artif
 
 ## 13. Current product truth
 
-After beta.6 publication:
+After beta.7 publication:
 
 ```text
-PUBLIC_BETA = v2.0.0-beta.6
-PUBLIC_BETA_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
+PUBLIC_BETA = v2.0.0-beta.7
+PUBLIC_BETA_SOURCE_SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
 PILOT_RUNTIME_AVAILABLE = TRUE
 PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
-PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-6
-NEXT_BETA_CANDIDATE = v2.0.0-beta.7
-CANDIDATE_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-7
+PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-7
 CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-7
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
@@ -391,7 +389,7 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Publication provenance: `docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`.
+Publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`.
 
 
 ### Finalize 的双重 cohort revalidation

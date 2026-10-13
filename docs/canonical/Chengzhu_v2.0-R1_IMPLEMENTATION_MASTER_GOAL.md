@@ -915,3 +915,33 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 已经进入 beta.2 的 Human Coach、Share Privacy、Manual/AUTO Screen Context 不再列为“待实现”；它们下一步需要的是 dogfood / real-session evidence 与成熟度验证，而不是重复补一套 runtime。
 
 以上剩余项不是“再补几个字段就能合法完成”的纯仓库 gap：要么依赖真实用户证据，要么依赖外部系统权限/执行结果，要么属于 stable release / platform governance。
+
+
+---
+
+## Beta.7 release-candidate freeze · 2026-10-13
+
+Current published Conversation Beta remains `v2.0.0-beta.6 @ 38a70b719b2d5b0c9e8273e6a908fed9229ab706`. The next candidate is `v2.0.0-beta.7`, created to package the post-beta.6 Stable Policy v7 single-user cross-session binding correction before real-pilot Stable-readiness evidence is accepted.
+
+Policy v7 changes no numerical quality threshold, no `min_n`, no launch-profile floor and no unique-event sample-unit rule. It only makes longitudinal continuity faithful to the product definition:
+
+```text
+same Space
++ same pseudonymous user_ref
++ >= 3 authorized Sessions
+= qualifying cross-session continuity
+
+mixed user_ref values inside one Space
+= FAIL_CLOSED
+```
+
+beta.7 also carries the current published-Release-page authoritative-status hardening. Publication is not complete until exact-main CI, Windows package build, clean-install, GitHub draft download-back, downloaded SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel preservation and public tag/source equality all pass.
+
+```text
+PUBLISHED_BETA = v2.0.0-beta.6
+NEXT_BETA_CANDIDATE = v2.0.0-beta.7
+CANDIDATE_STABLE_POLICY = v2.0-R1-stable-promotion-7
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

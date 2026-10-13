@@ -12,6 +12,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/release.yml"
+      - ".github/stable-release-approvals/**"
       - "desktop/**"
       - "packaging/**"
       - "scripts/build_sidecar.py"

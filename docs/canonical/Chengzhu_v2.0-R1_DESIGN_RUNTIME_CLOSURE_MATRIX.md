@@ -930,7 +930,7 @@ V2_PACKAGED_WINDOWS     = TRUE   (installer + portable 重新构建 + SHA256SUMS
                                   clean-install replay，PATH 中无 Python/Node)
 V2_CONNECTOR_RUNTIME    = PARTIAL (GitHub 真实账号 replay PASS；Google Calendar / Drive /
                                   Gmail / Microsoft To Do = BLOCKED_ACCOUNT，本机无凭据)
-V2_PUBLIC_BETA           = v2.0.0-beta.6 @ 38a70b719b2d5b0c9e8273e6a908fed9229ab706
+V2_PUBLIC_BETA           = v2.0.0-beta.7 @ dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
 V2_PRODUCTIZED_RELEASE  = FALSE  (只有 prerelease；stable promotion 需要真实用户证据)
 REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 ```
@@ -939,7 +939,7 @@ REAL_USER_VALIDATED     = FALSE  (BLOCKED_HUMAN_EVIDENCE · PMF_PROVEN = FALSE)
 而完全无法启动（已修复 + packaging 回归测试）；grounded retrieval 把 `3 days` 错误命中到
 `30 days`（已修复 + 4 组判别 token 回归测试）；一个负载相关的单元测试假红（按真实契约修正同步条件）。
 
-公开 Beta 已推进到 `v2.0.0-beta.6` prerelease；beta.6 继承 beta.5 已发布的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity、auto-runtime Guidance/SILENT evidence、dependency-security hardening，并进一步把 Quick Debrief 与当前 real-pilot operationalization/evidence-integrity contract 纳入公开 prerelease，包括 Stable Policy v6、authorized pilot workspace、privacy-minimized Session inventory、WAL/TOCTOU selected-cohort provenance、frozen independent-review seed binding 与 unique-event-per-metric sample enforcement。下一阶段不再通过继续堆 Beta 功能冒充验证，而应执行 Project Sync / Design Review 授权真实 pilot 与独立 review，同时补 Google / Microsoft real-account evidence。仍不声明 stable。
+公开 Beta 已推进到 `v2.0.0-beta.7` prerelease；beta.7 保留 beta.6 的 schema v10–v12 Pilot Evidence Bridge、Direct Question provenance、feedback retention integrity、auto-runtime Guidance/SILENT evidence、dependency-security hardening、Quick Debrief 与 real-pilot operationalization/evidence-integrity contract，并进一步把 Stable Policy v7 的 single-user cross-session Space binding 固化进公开下载。下一阶段不再通过继续堆 Beta 功能冒充验证，而应执行 Project Sync / Design Review 授权真实 pilot 与独立 review，同时补仍缺的 Google / Microsoft real-account evidence。仍不声明 stable。
 
 ---
 
@@ -983,7 +983,7 @@ Stable Promotion Policy v3 对每个指标同时冻结可接受 `allowed_label_s
 因此当前状态仍为：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.6
+V2_PUBLIC_BETA = v2.0.0-beta.7
 PILOT_EVIDENCE_CAPTURE_RUNTIME = PACKAGED_BETA_AVAILABLE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -1407,8 +1407,8 @@ This is post-beta.5 source-side operator tooling. It does not change the already
 That source-side operator state has now been packaged into the later beta.6 release cycle. Current truth is:
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.6
-V2_PUBLIC_BETA_SOURCE_SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
+V2_PUBLIC_BETA = v2.0.0-beta.7
+V2_PUBLIC_BETA_SOURCE_SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
@@ -1542,10 +1542,10 @@ RELEASE_HOLD = OFF_AFTER_EXACT_MAIN_PROOF
 - real-user value；
 - PMF。
 
-因此 beta.6 发布后的成熟度仍是：
+因此该 beta.6 阶段的成熟度边界是（后续公开 Beta 已推进到 beta.7，但结论未被放宽）：
 
 ```text
-V2_PUBLIC_BETA = v2.0.0-beta.6
+V2_PUBLIC_BETA_AT_THIS_CHECKPOINT = v2.0.0-beta.6
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -1555,7 +1555,7 @@ PMF_PROVEN = FALSE
 
 发布 provenance：`docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`。
 
-从这里开始，默认下一步不再是 beta.7 功能扩张，而是使用 beta.6 执行授权真实 Project Sync / Design Review pilot、完成 Quick Debrief + independent review、用 frozen Policy v6 跑 Stable readiness；只有真实 pilot 暴露 runtime defect、需要打包修复，或出现新的 provider/runtime evidence 才进入新的 prerelease cycle。
+这一阶段已经继续演进为公开 beta.7 / packaged Policy v7。当前默认下一步不是 beta.8 功能扩张，而是使用 beta.7 执行授权真实 Project Sync / Design Review pilot、完成 Quick Debrief + independent review、用 frozen Policy v7 跑 Stable readiness；只有真实 pilot 暴露 runtime defect、material evidence-correctness issue，或出现新的 distributable provider/runtime evidence 才进入新的 prerelease cycle。
 
 
 ---
@@ -1599,8 +1599,8 @@ MIN_N_CHANGED_FROM_V6 = FALSE
 PROFILE_USER_SESSION_SPACE_FLOORS_CHANGED_FROM_V6 = FALSE
 METRIC_SAMPLE_UNIT = UNIQUE_EVENT_PER_METRIC
 
-PUBLIC_BETA = v2.0.0-beta.6
-PUBLIC_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-6
+PUBLIC_BETA = v2.0.0-beta.7
+PUBLIC_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
 V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
@@ -1608,20 +1608,21 @@ PMF_PROVEN = FALSE
 
 Pilot Manifest builder 与 Stable evaluator 双层执行同一规则：builder 在 DRAFT 阶段即拒绝一个 Space 对应多个 `user_ref`；evaluator 独立复核，不能靠手工构造 manifest 绕过。
 
-`user_ref` 仍只是本地匿名代号，不是系统验证身份。该修复关闭的是 **longitudinal cohort qualification** 漏洞，不构成真实用户价值证据，也不倒写已经公开的 beta.6 二进制/provenance。只有未来需要把 policy v7 operator tooling 固化到新的可下载 release，或真实 pilot 暴露 runtime defect 时，才进入新的 prerelease cycle。
+`user_ref` 仍只是本地匿名代号，不是系统验证身份。该修复关闭的是 **longitudinal cohort qualification** 漏洞，不构成真实用户价值证据，也不倒写已经公开的 beta.6 二进制/provenance。该 correction 现已随 beta.7 固化到可下载 prerelease；后续只有真实 pilot 暴露 runtime defect、material evidence-correctness issue 或 distributable provider/runtime 变化时，才进入新的 prerelease cycle。
 
 
 ---
 
-## Beta.7 release-candidate closure · 2026-10-13
+## Beta.7 publication closure · 2026-10-13
 
 Post-beta.6 audit identified one material Stable-readiness correctness gap: Policy v6 could qualify a repeated Space when its >=3 authorized Sessions were assigned to different pseudonymous users. Current main closes that gap with Policy v7 and has already passed exact-main CI; beta.7 exists solely to align the public prerelease with that corrected operator/evaluator truth before a real pilot is treated as Stable-review evidence.
 
 ```text
-PUBLISHED_BETA = v2.0.0-beta.6
-PUBLISHED_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-6
-NEXT_BETA_CANDIDATE = v2.0.0-beta.7
-CANDIDATE_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+PUBLISHED_BETA = v2.0.0-beta.7
+PUBLISHED_BETA_SOURCE_SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
+PUBLISHED_BETA_PACKAGED_POLICY = v2.0-R1-stable-promotion-7
+MAIN_CI_992 = SUCCESS
+RELEASE_324 = SUCCESS
 CROSS_SESSION_SPACE_USER_BINDING = SINGLE_PSEUDONYMOUS_USER_REF
 QUALITY_THRESHOLDS_CHANGED = FALSE
 MIN_N_CHANGED = FALSE
@@ -1634,4 +1635,4 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-This is a release-correctness freeze, not a new feature wave. Published beta.6 provenance remains immutable until beta.7 actually completes the full exact-SHA release pipeline.
+This was a release-correctness freeze, not a new feature wave. beta.7 has completed the full exact-SHA release pipeline and is now the public Conversation Beta. Published beta.6 remains immutable historical provenance. beta.7 publication provenance: `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`.

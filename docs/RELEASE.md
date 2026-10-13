@@ -27,18 +27,16 @@ Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Published = v2.0.0-beta.6
-Published Beta tag/source SHA = 38a70b719b2d5b0c9e8273e6a908fed9229ab706
-Next Conversation Beta Candidate = v2.0.0-beta.7
+Conversation Beta Published = v2.0.0-beta.7
+Published Beta tag/source SHA = dc2188cd6b796b5dca9baf0eac2372da7be5bbf2
+Published Beta packaged Stable Policy = v2.0-R1-stable-promotion-7
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.6 provenance is recorded in `docs/releases/V2_0_0_BETA_6_PUBLICATION_PROVENANCE.md`. beta.6 is the **real-pilot operationalization** prerelease. It was published from exact green main/tag SHA `38a70b719b2d5b0c9e8273e6a908fed9229ab706` through main CI #980 and Release run #318 after Backend/Frontend/Desktop gates, dependency-security/release consistency, Windows build, packaged UI evidence, clean-install replay, draft download-back, downloaded-asset SHA256 verification, downloaded-installer replay, packaged smoke, prerelease-channel verification, Stable-Latest preservation, public tag/source equality and post-publish verification-artifact upload all completed successfully. The release includes the immediate post-Session Quick Debrief and the current fail-closed real-pilot/evidence-integrity source truth present at that exact SHA, including Stable Policy v6, authorized pilot workspace, privacy-minimized Session inventory, WAL/TOCTOU selected-cohort provenance, frozen independent-review seed binding and unique-event-per-metric sample enforcement. These are validation/productization mechanisms, not real-user or PMF evidence. beta.5 / beta.4 / beta.3 remain immutable historical releases and must not be rewritten as containing beta.6 changes. The original beta.6 release-notes asset contains candidate/future-tense wording because it was authored pre-publication; keep that artifact immutable and use the beta.6 publication provenance/current channel truth for post-publication status.
-
-Post-beta.6 source hardening now uses **Stable Policy v7** for operator-side evidence review. v7 does not change any quality threshold, min_n value or profile floor; it requires a qualifying longitudinal Space to contain >=3 authorized Sessions all bound to the **same pseudonymous user_ref**. Mixed-user Spaces fail cohort integrity. The already-published beta.6 tag/assets remain immutable Policy v6. Because beta.6 is explicitly the real-pilot operationalization release, running a new pilot against a known weaker longitudinal denominator would be inconsistent with current source truth; therefore `v2.0.0-beta.7` is now the prerelease candidate that packages Policy v7 plus the latest release-page truth hardening. Until that candidate is actually published, Published Beta remains beta.6.
+Published beta.7 provenance is recorded in `docs/releases/V2_0_0_BETA_7_PUBLICATION_PROVENANCE.md`. beta.7 is the **Stable-evidence correctness** prerelease. It was published from exact green main/tag SHA `dc2188cd6b796b5dca9baf0eac2372da7be5bbf2` through main CI #992 and Release run #324 after dependency-security, Backend/Frontend/Desktop gates, Windows build, packaged UI evidence, clean-install replay, installed-layout smoke, draft download-back, SHA256 verification, final publish, Release-page truth regression, Stable-Latest preservation, public tag/source equality and post-publish verification-artifact upload all completed successfully. It retains beta.6's real-pilot operationalization stack and packages **Stable Policy v7**: a qualifying longitudinal Space must contain >=3 authorized Sessions all bound to the same pseudonymous `user_ref`; mixed-user Spaces fail closed. Numerical quality thresholds, min_n values, profile floors, label-source rules and the unique-event-per-metric sample unit remain unchanged. beta.6 / beta.5 / beta.4 / beta.3 remain immutable historical releases and must not be rewritten as containing beta.7 changes. The original beta.7 release-notes asset was authored pre-publication and remains immutable; the generated published-status block plus beta.7 publication provenance are authoritative for current publication state.
 
 The generic publisher is `.github/workflows/publish-current-version-on-green-main.yml`. It reads the version from the exact green main SHA and dispatches `release.yml` against that immutable SHA. Historical version-specific publishers may remain for release provenance; they must no-op when the current version does not match their pinned version.
 

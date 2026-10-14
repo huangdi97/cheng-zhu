@@ -248,7 +248,7 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         distribution_map: dict[str, str] = {}
         for raw_distribution in distributions:
             match = re.fullmatch(
-                r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\\s;]+)",
+                r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;]+)",
                 str(raw_distribution or "").strip(),
             )
             if not match:

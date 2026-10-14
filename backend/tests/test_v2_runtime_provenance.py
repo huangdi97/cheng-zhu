@@ -1,6 +1,7 @@
 """Product runtime provenance must bind pilot evidence to the shipped runtime."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -66,7 +67,29 @@ def _fixture_repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _packaged(version: str = "2.0.0-beta.10", *, runtime_sha: str = "b" * 64) -> dict:
+def _python_env(*, version: str = "3.11.14", distributions: list[str] | None = None) -> dict:
+    values = list(distributions or ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"])
+    material = {
+        "python_version": version,
+        "implementation": "CPython",
+        "architecture": "AMD64",
+        "distributions": values,
+    }
+    raw = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {
+        "contract_version": "v2.0-R1-python-build-environment-1",
+        **material,
+        "distributions_count": len(values),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def _packaged(
+    version: str = "2.0.0-beta.10",
+    *,
+    runtime_sha: str = "b" * 64,
+    python_env: dict | None = None,
+) -> dict:
     return {
         "contract_version": "v2.0-R1-build-provenance-1",
         "app_version": version,
@@ -77,6 +100,7 @@ def _packaged(version: str = "2.0.0-beta.10", *, runtime_sha: str = "b" * 64) ->
             "sha256": runtime_sha,
             "files": 42,
         },
+        "python_environment": python_env or _python_env(),
         "runtime_origin": "PACKAGED_EMBEDDED",
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
     }
@@ -148,6 +172,7 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     assert loaded["runtime_origin"] == "PACKAGED_EMBEDDED"
     assert loaded["source_sha"] == "a" * 40
     assert loaded["runtime_fingerprint"]["sha256"] == "b" * 64
+    assert loaded["python_environment"]["sha256"] == _python_env()["sha256"]
     assert build_provenance.packaged_build_provenance() == loaded
 
     broken = json.loads(path.read_text(encoding="utf-8"))
@@ -155,6 +180,14 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     path.write_text(json.dumps(broken), encoding="utf-8")
     build_provenance.current_build_provenance.cache_clear()
     with pytest.raises(ValueError, match="fingerprint sha256"):
+        build_provenance.current_build_provenance()
+    build_provenance.current_build_provenance.cache_clear()
+
+    value = _packaged()
+    value.pop("runtime_origin", None)
+    value["python_environment"]["distributions"].append("unexpected==9")
+    path.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(ValueError, match="environment SHA256"):
         build_provenance.current_build_provenance()
     build_provenance.current_build_provenance.cache_clear()
 

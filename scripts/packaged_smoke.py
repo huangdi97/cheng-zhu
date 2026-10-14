@@ -306,16 +306,21 @@ def main() -> int:
         conv_session_runtime = (conv_started.get("session") or {}).get("runtime_provenance") or {}
         conv_pack_runtime = (conv_pack.get("payload") or {}).get("runtime_provenance") or {}
         runtime_fp = conv_session_runtime.get("runtime_fingerprint") or {}
+        python_env = conv_session_runtime.get("python_environment") or {}
         checks["conversation_packaged_runtime_provenance"] = (
             conv_session_runtime == conv_pack_runtime
             and conv_session_runtime.get("runtime_origin") == "PACKAGED_EMBEDDED"
             and conv_session_runtime.get("contract_version") == "v2.0-R1-build-provenance-1"
             and runtime_fp.get("contract_version") == "v2.0-R1-runtime-fingerprint-1"
+            and python_env.get("contract_version") == "v2.0-R1-python-build-environment-1"
             and len(str(conv_session_runtime.get("source_sha") or "")) == 40
             and len(str(runtime_fp.get("sha256") or "")) == 64
+            and len(str(python_env.get("sha256") or "")) == 64
+            and int(python_env.get("distributions_count") or 0) > 0
         )
         checks["conversation_runtime_source_sha"] = conv_session_runtime.get("source_sha")
         checks["conversation_runtime_fingerprint_sha256"] = runtime_fp.get("sha256")
+        checks["conversation_python_environment_sha256"] = python_env.get("sha256")
         ok &= bool(checks["conversation_packaged_runtime_provenance"])
 
         conv_decision = http_json(

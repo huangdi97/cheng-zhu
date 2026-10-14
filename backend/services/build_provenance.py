@@ -18,6 +18,7 @@ from typing import Any
 
 BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
+PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
 
 
 def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
@@ -40,6 +41,36 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
     files = runtime.get("files")
     if isinstance(files, bool) or not isinstance(files, int) or files <= 0:
         raise ValueError("runtime fingerprint files invalid")
+    python_env = value.get("python_environment")
+    if not isinstance(python_env, dict):
+        raise ValueError("build provenance python_environment missing")
+    if str(python_env.get("contract_version") or "") != PYTHON_ENVIRONMENT_CONTRACT:
+        raise ValueError("Python build environment contract mismatch")
+    distributions = python_env.get("distributions")
+    if not isinstance(distributions, list) or any(not isinstance(item, str) for item in distributions):
+        raise ValueError("Python build environment distributions invalid")
+    if int(python_env.get("distributions_count") or -1) != len(distributions):
+        raise ValueError("Python build environment distribution count mismatch")
+    material = {
+        "python_version": str(python_env.get("python_version") or ""),
+        "implementation": str(python_env.get("implementation") or ""),
+        "architecture": str(python_env.get("architecture") or ""),
+        "distributions": list(distributions),
+    }
+    env_sha = str(python_env.get("sha256") or "").strip().lower()
+    expected_env_sha = hashlib.sha256(
+        json.dumps(
+            material,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if not material["python_version"] or not material["implementation"]:
+        raise ValueError("Python build environment metadata missing")
+    if env_sha != expected_env_sha:
+        raise ValueError("Python build environment SHA256 mismatch")
+
     channel = str(value.get("release_channel") or "").upper()
     expected_channel = "PRERELEASE" if "-" in version else "STABLE"
     if channel != expected_channel:
@@ -53,6 +84,12 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
             "contract_version": RUNTIME_FINGERPRINT_CONTRACT,
             "sha256": runtime_sha,
             "files": files,
+        },
+        "python_environment": {
+            "contract_version": PYTHON_ENVIRONMENT_CONTRACT,
+            **material,
+            "distributions_count": len(distributions),
+            "sha256": env_sha,
         },
         "runtime_origin": origin,
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
@@ -101,7 +138,10 @@ def _source_checkout_provenance() -> dict[str, Any]:
         raise RuntimeError("cannot load runtime fingerprint tool")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.build_provenance(repo)
+    return module.build_provenance(
+        repo,
+        python_environment_value=module.python_environment(Path(sys.executable)),
+    )
 
 
 @lru_cache(maxsize=1)

@@ -4,13 +4,15 @@ A clean venv containing only backend/requirements.txt + PyInstaller keeps the
 bundle reproducible and small (a developer interpreter may carry torch /
 tensorflow that optional imports would drag in).
 
-Usage:  python scripts/build_sidecar.py [--python PATH]
+Usage:  python scripts/build_sidecar.py [--python PATH] [--clean]
 Output: build/sidecar/chengzhu-backend/chengzhu-backend.exe
 """
 from __future__ import annotations
 
 import argparse
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +21,28 @@ import runtime_fingerprint
 
 ROOT = Path(__file__).resolve().parents[1]
 VENV = ROOT / "build" / "sidecar-venv"
+PYTHON_VERSION_FILE = ROOT / "packaging" / "sidecar-python-version.txt"
+
+
+def required_python_version() -> str:
+    if not PYTHON_VERSION_FILE.is_file():
+        raise RuntimeError(f"sidecar Python version file missing: {PYTHON_VERSION_FILE}")
+    value = PYTHON_VERSION_FILE.read_text(encoding="utf-8").strip()
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value):
+        raise RuntimeError("sidecar Python version must be exact major.minor.patch")
+    return value
+
+
+def interpreter_version(executable: str | Path) -> str:
+    return subprocess.check_output(
+        [
+            str(executable),
+            "-c",
+            "import platform; print(platform.python_version())",
+        ],
+        text=True,
+        cwd=ROOT,
+    ).strip()
 
 
 def run(cmd: list[str]) -> None:
@@ -28,11 +52,33 @@ def run(cmd: list[str]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--python", default=sys.executable, help="interpreter used to create the venv (3.11 recommended)")
+    parser.add_argument("--python", default=sys.executable, help="interpreter used to create the venv")
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="remove any existing sidecar venv before building (required by CI/release)",
+    )
     args = parser.parse_args()
+
+    required = required_python_version()
+    actual = interpreter_version(args.python)
+    if actual != required:
+        raise RuntimeError(
+            f"sidecar build requires Python {required}, got {actual}; "
+            f"use --python with the pinned interpreter from {PYTHON_VERSION_FILE}"
+        )
+
+    if args.clean and VENV.exists():
+        shutil.rmtree(VENV)
     if not VENV.exists():
         run([args.python, "-m", "venv", str(VENV)])
     py = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    venv_version = interpreter_version(py)
+    if venv_version != required:
+        raise RuntimeError(
+            f"existing sidecar venv uses Python {venv_version}, expected {required}; "
+            "re-run with --clean"
+        )
     run([str(py), "-m", "pip", "install", "--upgrade", "pip", "--quiet"])
     run([str(py), "-m", "pip", "install", "-r", "backend/requirements.txt", "pyinstaller>=6.10,<7", "--quiet"])
 

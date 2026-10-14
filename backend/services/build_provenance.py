@@ -119,6 +119,24 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
         artifact_sha = str(artifact.get("sha256") or "").strip().lower()
         if artifact_sha != expected_artifact_sha:
             raise ValueError("Python artifact provenance SHA256 mismatch")
+        distribution_map: dict[str, str] = {}
+        for raw_distribution in distributions:
+            match = re.fullmatch(
+                r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;]+)",
+                str(raw_distribution or "").strip(),
+            )
+            if not match:
+                raise ValueError("Python build environment distribution is not exact name==version")
+            name = re.sub(r"[-_.]+", "-", match.group("name")).lower()
+            version_value = match.group("version")
+            if name in distribution_map and distribution_map[name] != version_value:
+                raise ValueError("Python build environment duplicate distribution version conflict")
+            distribution_map[name] = version_value
+        artifact_map = {row["name"]: row["version"] for row in normalized}
+        if artifact_map != distribution_map:
+            raise ValueError(
+                "Python artifact provenance set/version does not match resolved distributions"
+            )
         validated_artifact = {
             "contract_version": PYTHON_ARTIFACT_PROVENANCE_CONTRACT,
             "artifacts": normalized,

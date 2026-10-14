@@ -41,6 +41,22 @@ def _canonical_sha(value: object) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _python_env() -> dict:
+    distributions = ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"]
+    material = {
+        "python_version": "3.11.14",
+        "implementation": "CPython",
+        "architecture": "AMD64",
+        "distributions": distributions,
+    }
+    return {
+        "contract_version": "v2.0-R1-python-build-environment-1",
+        **material,
+        "distributions_count": len(distributions),
+        "sha256": _canonical_sha(material),
+    }
+
+
 def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     ws = tmp_path / "pilot"
     ev = ws / "evaluation"
@@ -59,6 +75,7 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
             "sha256": "b" * 64,
             "files": 42,
         },
+        "python_environment": _python_env(),
         "source_builds": [
             {"app_version": "2.0.0-beta.10", "source_sha": "a" * 40},
         ],
@@ -194,6 +211,7 @@ def test_handoff_requires_pass_and_keeps_release_decision_pending(tmp_path):
     assert result["claims"]["V2_STABLE_RELEASE"] is False
     assert result["claims"]["PMF_PROVEN"] is False
     assert result["pilot_runtime_baseline"]["runtime_fingerprint"]["sha256"] == "b" * 64
+    assert result["pilot_runtime_baseline"]["python_environment"]["sha256"] == _python_env()["sha256"]
     assert result["claims"]["REAL_USER_IDENTITY_SYSTEM_VERIFIED"] is False
     assert all(
         row["state"] == "PENDING_HUMAN_RELEASE_REVIEW"

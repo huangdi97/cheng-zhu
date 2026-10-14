@@ -176,6 +176,24 @@ def _require_runtime_baseline(value: Any, label: str) -> dict[str, Any]:
     ).hexdigest()
     if str(artifact.get("sha256") or "").strip().lower() != expected_artifact_sha:
         raise ValueError(f"{label}: Python artifact provenance SHA256 mismatch")
+    if str(artifact.get("install_mode") or "") != "WHEEL_SHA256_PINNED":
+        raise ValueError(f"{label}: Python artifact provenance install mode mismatch")
+    distribution_map: dict[str, str] = {}
+    for raw_distribution in distributions:
+        match = re.fullmatch(
+            r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;]+)",
+            str(raw_distribution or "").strip(),
+        )
+        if not match:
+            raise ValueError(f"{label}: Python distribution is not exact name==version")
+        name = re.sub(r"[-_.]+", "-", match.group("name")).lower()
+        version_value = match.group("version")
+        if name in distribution_map and distribution_map[name] != version_value:
+            raise ValueError(f"{label}: conflicting Python distribution version")
+        distribution_map[name] = version_value
+    artifact_map = {row["name"]: row["version"] for row in normalized}
+    if artifact_map != distribution_map:
+        raise ValueError(f"{label}: Python artifact set/version differs from distributions")
     return value
 
 

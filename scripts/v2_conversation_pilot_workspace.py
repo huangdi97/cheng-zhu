@@ -30,11 +30,11 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-7"
 MIN_PRODUCT_SCHEMA = 13
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
-TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-2"
+TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-3"
 TOOLCHAIN_RELATIVE_PATHS = (
     "scripts/runtime_fingerprint.py",
     "scripts/v2_conversation_pilot_workspace.py",
@@ -69,7 +69,7 @@ def _require_toolchain(metadata: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(frozen, dict):
         raise ValueError(
             "pilot workspace has no frozen evaluator toolchain; historical workspace remains historical evidence "
-            "and cannot be re-evaluated under workspace contract v6"
+            "and cannot be re-evaluated under workspace contract v7"
         )
     current = _toolchain_fingerprint()
     if frozen != current:
@@ -108,8 +108,8 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-1"
-BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
+RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-2"
+BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-2"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
 NODE_ENVIRONMENT_CONTRACT = "v2.0-R1-node-build-environment-1"
@@ -279,7 +279,7 @@ def _require_runtime_baseline(metadata: dict[str, Any], snapshot: dict[str, Any]
     if not isinstance(frozen, dict):
         raise ValueError(
             "pilot workspace has no frozen packaged runtime baseline; "
-            "historical workspace remains historical evidence and cannot be upgraded to workspace contract v6"
+            "historical workspace remains historical evidence and cannot be upgraded to workspace contract v7"
         )
     current = _runtime_baseline_from_snapshot(snapshot)
     if frozen != current:

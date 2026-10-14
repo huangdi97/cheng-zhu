@@ -1030,3 +1030,37 @@ def test_workspace_stable_metric_coverage_accepts_one_allowed_source_for_multi_s
     assert coverage["complete"] is True
     assert coverage["required_by_metric"] == {"useful_silence_rate": 1}
     assert coverage["covered_by_metric"] == {"useful_silence_rate": 1}
+
+
+def test_workspace_rejects_pre_v13_or_source_checkout_session_provenance(product_env, tmp_path):
+    mod = _load()
+    space = conversations.create_space("Historical", "PROJECT_SYNC")
+    # This uses the test/source checkout runtime rather than packaged provenance.
+    session = conversations.create_session(space["id"], consent_ack=True)
+    conversations.start_session(session["id"])
+    conversations.end_session(session["id"])
+
+    with pytest.raises(ValueError, match="PACKAGED_EMBEDDED|packaged runtime provenance"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            [(session["id"], "pilot-user-historical")],
+            tmp_path / "historical-workspace",
+        )
+
+
+def test_workspace_rejects_mixed_packaged_runtime_fingerprints(product_env, tmp_path):
+    mod = _load()
+    project = conversations.create_space("Runtime A", "PROJECT_SYNC")
+    design = conversations.create_space("Runtime B", "DESIGN_REVIEW")
+    first = _ended_session(project["id"], title="A", runtime_sha="b" * 64)
+    second = _ended_session(design["id"], title="B", runtime_sha="c" * 64)
+
+    with pytest.raises(ValueError, match="different product runtime fingerprints"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            [
+                (first["id"], "pilot-user-a"),
+                (second["id"], "pilot-user-b"),
+            ],
+            tmp_path / "mixed-runtime-workspace",
+        )

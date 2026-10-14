@@ -40,6 +40,10 @@ def _write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _runtime_sha() -> str:
+    return str(decision.runtime_fingerprint.fingerprint(ROOT)["sha256"])
+
+
 def _handoff(tmp_path: Path) -> Path:
     out = tmp_path / "handoff"
     out.mkdir()
@@ -57,6 +61,20 @@ def _handoff(tmp_path: Path) -> Path:
         "status": "READY_FOR_HUMAN_STABLE_RELEASE_REVIEW",
         "evidence_status": "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW",
         "stable_policy_version": "v2.0-R1-stable-promotion-8",
+        "pilot_runtime_baseline": {
+            "contract_version": "v2.0-R1-pilot-runtime-baseline-1",
+            "runtime_origin": "PACKAGED_EMBEDDED",
+            "release_channel": "PRERELEASE",
+            "runtime_fingerprint": {
+                "contract_version": decision.runtime_fingerprint.CONTRACT_VERSION,
+                "sha256": _runtime_sha(),
+                "files": int(decision.runtime_fingerprint.fingerprint(ROOT)["files"]),
+            },
+            "source_builds": [
+                {"app_version": "2.0.0-beta.10", "source_sha": "f" * 40},
+            ],
+            "sessions": 40,
+        },
         "release_review_checks": checks,
         "claims": {
             "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": True,
@@ -121,9 +139,11 @@ def test_go_decision_produces_exact_sha_bound_authorization_accepted_by_release_
     assert result["claims"]["V2_STABLE_RELEASE"] is False
     assert result["claims"]["PMF_PROVEN"] is False
     token = (out / "stable-release-authorization.b64").read_text(encoding="ascii").strip()
-    verified = verify.verify_authorization(token, source_sha=source_sha, version="2.0.0")
+    verified = verify.verify_authorization(token, source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
     assert verified["required"] is True
     assert verified["status"] == "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
+    assert verified["runtime_fingerprint_sha256"] == _runtime_sha()
+    assert verified["pilot_runtime_fingerprint_sha256"] == _runtime_sha()
     assert verified["claims"]["V2_STABLE_RELEASE"] is False
 
 
@@ -224,7 +244,7 @@ def test_release_verifier_requires_token_only_for_stable_v2_plus():
     assert legacy["status"] == "NOT_REQUIRED_LEGACY_STABLE"
 
     with pytest.raises(ValueError, match="requires stable_review_authorization_b64"):
-        verify.verify_authorization("", source_sha=source_sha, version="2.0.0")
+        verify.verify_authorization("", source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
 
 
 def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monkeypatch):
@@ -245,9 +265,9 @@ def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monke
     token = (out / "stable-release-authorization.b64").read_text(encoding="ascii").strip()
 
     with pytest.raises(ValueError, match="source SHA"):
-        verify.verify_authorization(token, source_sha="3" * 40, version="2.0.0")
+        verify.verify_authorization(token, source_sha="3" * 40, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
     with pytest.raises(ValueError, match="version"):
-        verify.verify_authorization(token, source_sha=source_sha, version="2.1.0")
+        verify.verify_authorization(token, source_sha=source_sha, version="2.1.0", runtime_fingerprint_sha256=_runtime_sha())
 
     raw = json.loads(base64.b64decode(token).decode("utf-8"))
     raw["checks"][0]["state"] = "FAIL"
@@ -255,7 +275,63 @@ def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monke
         json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).decode("ascii")
     with pytest.raises(ValueError, match="non-PASS"):
-        verify.verify_authorization(tampered, source_sha=source_sha, version="2.0.0")
+        verify.verify_authorization(tampered, source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
+
+
+def test_human_go_cannot_be_reused_after_candidate_runtime_drift(tmp_path, monkeypatch):
+    handoff = _handoff(tmp_path)
+    source_sha = "e" * 40
+    _candidate(monkeypatch, source_sha, "2.0.0")
+    draft = tmp_path / "review.draft.json"
+    decision.init_review(
+        handoff,
+        draft,
+        ROOT,
+        candidate_source_sha=source_sha,
+        candidate_version="2.0.0",
+    )
+    _review_all(draft)
+
+    original_fingerprint = decision.runtime_fingerprint.fingerprint
+    monkeypatch.setattr(
+        decision.runtime_fingerprint,
+        "fingerprint",
+        lambda _root: {
+            "contract_version": decision.runtime_fingerprint.CONTRACT_VERSION,
+            "sha256": "9" * 64,
+            "files": 42,
+            "inputs": [],
+        },
+    )
+    with pytest.raises(ValueError, match="runtime differs|runtime fingerprint drift"):
+        decision.finalize_review(handoff, draft, tmp_path / "decision-runtime-drift", ROOT)
+    monkeypatch.setattr(decision.runtime_fingerprint, "fingerprint", original_fingerprint)
+
+
+def test_release_gate_rejects_go_token_for_different_runtime_fingerprint(tmp_path, monkeypatch):
+    handoff = _handoff(tmp_path)
+    source_sha = "6" * 40
+    _candidate(monkeypatch, source_sha, "2.0.0")
+    draft = tmp_path / "review.draft.json"
+    decision.init_review(
+        handoff,
+        draft,
+        ROOT,
+        candidate_source_sha=source_sha,
+        candidate_version="2.0.0",
+    )
+    _review_all(draft)
+    out = tmp_path / "decision"
+    decision.finalize_review(handoff, draft, out, ROOT)
+    token = (out / "stable-release-authorization.b64").read_text(encoding="ascii").strip()
+
+    with pytest.raises(ValueError, match="runtime fingerprint"):
+        verify.verify_authorization(
+            token,
+            source_sha=source_sha,
+            version="2.0.0",
+            runtime_fingerprint_sha256="7" * 64,
+        )
 
 
 def test_release_workflows_enforce_stable_v2_human_authorization_contract():

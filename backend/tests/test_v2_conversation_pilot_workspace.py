@@ -1127,6 +1127,36 @@ def test_workspace_rejects_mixed_resolved_python_environments(product_env, tmp_p
         )
 
 
+def test_workspace_rejects_same_versions_with_different_wheel_artifacts(product_env, tmp_path):
+    mod = _load()
+    project = conversations.create_space("Artifact A", "PROJECT_SYNC")
+    design = conversations.create_space("Artifact B", "DESIGN_REVIEW")
+    first_env = _python_env()
+    second_env = json.loads(json.dumps(first_env))
+    second_env["artifact_provenance"]["artifacts"][0]["sha256"] = "9" * 64
+    second_env["artifact_provenance"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            {"artifacts": second_env["artifact_provenance"]["artifacts"]},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+    first = _ended_session(project["id"], title="A", python_env=first_env)
+    second = _ended_session(design["id"], title="B", python_env=second_env)
+
+    with pytest.raises(ValueError, match="different resolved Python build environments/artifacts"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            [
+                (first["id"], "pilot-user-a"),
+                (second["id"], "pilot-user-b"),
+            ],
+            tmp_path / "mixed-python-artifact-workspace",
+        )
+
+
 def test_workspace_rejects_mixed_packaged_runtime_fingerprints(product_env, tmp_path):
     mod = _load()
     project = conversations.create_space("Runtime A", "PROJECT_SYNC")

@@ -67,6 +67,32 @@ def _fixture_repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _artifact_provenance(distributions: list[str]) -> dict:
+    import re
+
+    artifacts = []
+    for raw in distributions:
+        name, version = raw.split("==", 1)
+        normalized = re.sub(r"[-_.]+", "-", name).lower()
+        artifacts.append({
+            "name": normalized,
+            "version": version,
+            "filename": f"{normalized}-{version}-py3-none-any.whl",
+            "sha256": hashlib.sha256(f"{normalized}-{version}-wheel".encode("utf-8")).hexdigest(),
+        })
+    artifacts.sort(key=lambda row: row["name"])
+    material = {"artifacts": artifacts}
+    return {
+        "contract_version": "v2.0-R1-python-artifact-provenance-1",
+        "artifacts": artifacts,
+        "artifacts_count": len(artifacts),
+        "sha256": hashlib.sha256(
+            json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+        "install_mode": "WHEEL_SHA256_PINNED",
+    }
+
+
 def _python_env(*, version: str = "3.11.14", distributions: list[str] | None = None) -> dict:
     values = list(distributions or ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"])
     material = {
@@ -81,6 +107,7 @@ def _python_env(*, version: str = "3.11.14", distributions: list[str] | None = N
         **material,
         "distributions_count": len(values),
         "sha256": hashlib.sha256(raw).hexdigest(),
+        "artifact_provenance": _artifact_provenance(values),
     }
 
 
@@ -173,6 +200,7 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     assert loaded["source_sha"] == "a" * 40
     assert loaded["runtime_fingerprint"]["sha256"] == "b" * 64
     assert loaded["python_environment"]["sha256"] == _python_env()["sha256"]
+    assert loaded["python_environment"]["artifact_provenance"]["sha256"] == _python_env()["artifact_provenance"]["sha256"]
     assert build_provenance.packaged_build_provenance() == loaded
 
     broken = json.loads(path.read_text(encoding="utf-8"))

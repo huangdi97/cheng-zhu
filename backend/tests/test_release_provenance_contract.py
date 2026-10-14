@@ -168,3 +168,36 @@ def test_release_embedded_provenance_gate_validates_runtime_and_python_environme
     # Regression for Release #380: a missing quote/end-anchor in this regex
     # caused a PowerShell ParserError after sidecar build despite green CI.
     assert "$pythonEnvSha -notmatch '^[0-9a-f]{64})" not in verify
+
+
+def test_release_replays_pilot_python_environment_before_stable_sidecar_build() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    replay = _section(
+        text,
+        "- name: Stable v2+ replay pilot Python environment constraints",
+        "- name: Build backend sidecar",
+    )
+
+    assert 'python-version-file: "packaging/sidecar-python-version.txt"' in text
+    assert 'python-version-file: "packaging/sidecar-python-version.txt"' in ci
+    assert 'python-version: "3.11"' not in text
+    assert 'python-version: "3.11"' not in ci
+
+    assert "scripts/stable_python_environment_replay.py" in replay
+    assert "--authorization-b64" in replay
+    assert "--source-sha" in replay
+    assert "--version" in replay
+    assert "--runtime-fingerprint-sha256" in replay
+    assert "--python-version-file packaging/sidecar-python-version.txt" in replay
+    assert "PIP_CONSTRAINT=$constraints" in replay
+    assert "STABLE_PYTHON_ENVIRONMENT_REPLAY.json" in replay
+
+    replay_i = text.index("- name: Stable v2+ replay pilot Python environment constraints")
+    build_i = text.index("- name: Build backend sidecar")
+    verify_i = text.index("- name: Verify embedded build provenance matches candidate")
+    auth_i = text.index("- name: Stable v2+ human release authorization gate")
+    assert replay_i < build_i < verify_i < auth_i
+
+    assert "python scripts/build_sidecar.py --clean" in text
+    assert "python scripts/build_sidecar.py --clean" in ci

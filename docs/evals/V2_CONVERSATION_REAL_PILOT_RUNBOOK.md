@@ -490,9 +490,14 @@ AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
 PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-8
+PUBLIC_BETA_PACKAGED_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
 CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-8
-CURRENT_SOURCE_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
-EVALUATOR_TOOLCHAIN_FINGERPRINT = REQUIRED_FOR_NEW_V5_WORKSPACES
+CURRENT_SOURCE_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-7
+CURRENT_SOURCE_TOOLCHAIN_CONTRACT = v2.0-R1-pilot-toolchain-3
+CURRENT_SOURCE_RUNTIME_BASELINE = v2.0-R1-pilot-runtime-baseline-2
+CURRENT_SOURCE_PYTHON_ARTIFACT_PROVENANCE = v2.0-R1-python-artifact-provenance-1
+TARGET_NEXT_STABLE_PILOT_PRERELEASE = v2.0.0-beta.10
+EVALUATOR_TOOLCHAIN_AND_RUNTIME_FINGERPRINT = REQUIRED_FOR_NEW_V7_WORKSPACES
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 V2_STABLE_RELEASE = FALSE
@@ -502,7 +507,7 @@ PMF_PROVEN = FALSE
 
 Publication provenance: `docs/releases/V2_0_0_BETA_9_PUBLICATION_PROVENANCE.md`.
 
-Workspace contract v5 and evaluator-toolchain SHA256 provenance are now **published beta.9 truth**. beta.8 remains immutable historical evidence and must not be rewritten as containing that later change.
+Workspace contract v5 and evaluator-toolchain SHA256 provenance are **published beta.9 truth**. Current source has advanced to workspace v7 with packaged runtime/Python wheel-artifact provenance; that source truth becomes a participant-facing canonical Stable-pilot baseline only after beta.10 completes the full prerelease publication gate. beta.9/beta.8 remain immutable historical evidence and must not be rewritten as containing those later capture-time provenance fields.
 
 
 ### Finalize 的双重 cohort revalidation

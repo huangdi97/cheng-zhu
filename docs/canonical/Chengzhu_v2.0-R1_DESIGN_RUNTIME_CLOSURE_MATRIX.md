@@ -2008,3 +2008,47 @@ PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+---
+
+## Stable packaged Python environment replay hardening · source candidate after beta.9
+
+Packaged runtime provenance v13 closes the “pilot on runtime A / Stable on runtime B” gap, including the exact resolved Python distribution SHA. A further release-operability audit found a narrower problem: the previous Stable pipeline could **detect** Python environment drift after rebuilding, but could not actively reproduce the pilot environment. Because `backend/requirements.txt` intentionally uses compatible ranges and the clean sidecar builder resolves PyPI dependencies at build time, a later Stable build could fail closed on dependency drift even when normalized product source/runtime had not changed.
+
+Current source candidate adds a reproducible build boundary:
+
+```text
+SIDECAR_PYTHON_VERSION = 3.13.16
+PYTHON_VERSION_PIN_IS_RUNTIME_FINGERPRINT_INPUT = TRUE
+CI_RELEASE_SIDECAR_VENV = CLEAN
+STABLE_PILOT_PYTHON_DISTRIBUTIONS = FROZEN_IN_GO_TOKEN
+
+Stable v2+ build:
+  exact human GO token
+  → exact source/version/runtime re-check
+  → validate pilot Python environment SHA
+  → accept only safe exact name==version pins
+  → reject URL / VCS / editable / marker / range specs
+  → PIP_CONSTRAINT
+  → clean sidecar venv
+  → resolved environment pre-check against pilot SHA
+  → PyInstaller
+  → existing embedded provenance check
+  → existing Stable authorization environment re-check
+```
+
+Python 3.13.16 is a deliberate **new prerelease baseline**, not a rewrite of beta.9. beta.9 remains immutable and continues to represent its original packaged Python/runtime environment. A new Stable-readiness pilot must use a later prerelease that actually packages the v13 runtime baseline and this pinned/replayable build environment.
+
+The constraint replay is not an additional package source: it cannot install URL/VCS/editable specifications and it does not make the human authorization token a cryptographic signature. It only constrains the clean build to package versions already frozen by the packaged pilot environment. The independently computed post-build Python-environment SHA remains the final machine gate.
+
+Maturity remains unchanged:
+
+```text
+PUBLIC_BETA = v2.0.0-beta.9
+NEXT_RUNTIME_BASELINE_PRERELEASE = PENDING
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```

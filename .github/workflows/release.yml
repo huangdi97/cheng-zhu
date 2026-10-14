@@ -77,7 +77,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version-file: "packaging/sidecar-python-version.txt"
 
       - uses: actions/setup-node@v4
         with:
@@ -170,8 +170,40 @@ jobs:
           npm ci
           node --test *.test.js
 
+      - name: Stable v2+ replay pilot Python environment constraints
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
+            New-Item -ItemType Directory -Force dist/release | Out-Null
+            $constraints = Join-Path $PWD "dist/release/STABLE_PYTHON_CONSTRAINTS.txt"
+            python scripts/stable_python_environment_replay.py `
+              --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
+              --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
+              --version $version `
+              --runtime-fingerprint-sha256 $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256 `
+              --python-version-file packaging/sidecar-python-version.txt `
+              --constraints-out $constraints `
+              --out dist/release/STABLE_PYTHON_ENVIRONMENT_REPLAY.json
+            if ($LASTEXITCODE -ne 0) { throw "Stable Python environment replay preparation failed" }
+            $replay = Get-Content dist/release/STABLE_PYTHON_ENVIRONMENT_REPLAY.json -Raw | ConvertFrom-Json
+            $expectedEnvSha = [string]$replay.pilot_python_environment_sha256
+            if ($expectedEnvSha -notmatch '^[0-9a-f]{64}$') {
+              throw "Stable Python replay metadata contains invalid environment SHA256"
+            }
+            "PIP_CONSTRAINT=$constraints" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "CHENGZHU_EXPECTED_PYTHON_ENVIRONMENT_SHA256=$expectedEnvSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "Stable sidecar build will replay and pre-verify the pilot Python environment."
+          } else {
+            Write-Host "Python environment replay is not required for prerelease / legacy Stable channels."
+          }
+
       - name: Build backend sidecar (clean venv, PyInstaller)
-        run: python scripts/build_sidecar.py
+        run: python scripts/build_sidecar.py --clean
 
       - name: Verify embedded build provenance matches candidate
         shell: pwsh

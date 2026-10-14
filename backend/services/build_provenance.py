@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 
-BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
+BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-2"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
 NODE_ENVIRONMENT_CONTRACT = "v2.0-R1-node-build-environment-1"

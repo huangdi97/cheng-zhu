@@ -44,6 +44,8 @@ def verify_authorization(
     *,
     source_sha: str,
     version: str,
+    runtime_fingerprint_sha256: str = "",
+    python_environment_sha256: str = "",
 ) -> dict[str, Any]:
     is_prerelease, major = _version_kind(version)
     source_sha = str(source_sha or "").strip().lower()
@@ -65,6 +67,14 @@ def verify_authorization(
             "version": version,
             "source_sha": source_sha,
         }
+
+    runtime_fingerprint_sha256 = str(runtime_fingerprint_sha256 or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", runtime_fingerprint_sha256):
+        raise ValueError("Stable v2+ publication requires a valid candidate runtime fingerprint SHA256")
+
+    python_environment_sha256 = str(python_environment_sha256 or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", python_environment_sha256):
+        raise ValueError("Stable v2+ publication requires a valid packaged Python environment SHA256")
 
     token = str(authorization_b64 or "").strip()
     if not token:
@@ -91,6 +101,59 @@ def verify_authorization(
         raise ValueError("Stable release authorization handoff contract mismatch")
     if not re.fullmatch(r"[0-9a-f]{64}", str(value.get("handoff_json_sha256") or "")):
         raise ValueError("Stable release authorization is missing a valid handoff SHA256")
+
+    pilot_runtime = value.get("pilot_runtime_fingerprint")
+    candidate_runtime = value.get("candidate_runtime_fingerprint")
+    if not isinstance(pilot_runtime, dict) or not isinstance(candidate_runtime, dict):
+        raise ValueError("Stable release authorization is missing runtime baseline provenance")
+    for label, runtime in (
+        ("pilot", pilot_runtime),
+        ("candidate", candidate_runtime),
+    ):
+        if str(runtime.get("contract_version") or "") != "v2.0-R1-runtime-fingerprint-1":
+            raise ValueError(f"Stable release authorization {label} runtime contract mismatch")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(runtime.get("sha256") or "")):
+            raise ValueError(f"Stable release authorization {label} runtime SHA256 invalid")
+    if value.get("runtime_baseline_match") is not True:
+        raise ValueError("Stable release authorization does not prove runtime-baseline match")
+    pilot_runtime_sha = str(pilot_runtime.get("sha256") or "").lower()
+    candidate_runtime_sha = str(candidate_runtime.get("sha256") or "").lower()
+    if pilot_runtime_sha != candidate_runtime_sha:
+        raise ValueError("Stable release authorization pilot/candidate runtime fingerprints differ")
+    if candidate_runtime_sha != runtime_fingerprint_sha256:
+        raise ValueError("Stable release authorization runtime fingerprint does not match release candidate")
+
+    pilot_python_env = value.get("pilot_python_environment")
+    if not isinstance(pilot_python_env, dict):
+        raise ValueError("Stable release authorization is missing pilot Python environment provenance")
+    if str(pilot_python_env.get("contract_version") or "") != "v2.0-R1-python-build-environment-1":
+        raise ValueError("Stable release authorization Python environment contract mismatch")
+    distributions = pilot_python_env.get("distributions")
+    if not isinstance(distributions, list) or any(not isinstance(item, str) for item in distributions):
+        raise ValueError("Stable release authorization Python environment distributions invalid")
+    if int(pilot_python_env.get("distributions_count") or -1) != len(distributions):
+        raise ValueError("Stable release authorization Python environment distribution count mismatch")
+    env_material = {
+        "python_version": str(pilot_python_env.get("python_version") or ""),
+        "implementation": str(pilot_python_env.get("implementation") or ""),
+        "architecture": str(pilot_python_env.get("architecture") or ""),
+        "distributions": list(distributions),
+    }
+    pilot_python_env_sha = str(pilot_python_env.get("sha256") or "").strip().lower()
+    expected_python_env_sha = hashlib.sha256(
+        json.dumps(
+            env_material,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if pilot_python_env_sha != expected_python_env_sha:
+        raise ValueError("Stable release authorization pilot Python environment SHA256 mismatch")
+    if pilot_python_env_sha != python_environment_sha256:
+        raise ValueError(
+            "Stable release packaged Python environment differs from the pilot baseline"
+        )
 
     expected_ids = [check_id for check_id, _reason in handoff_tool.REQUIRED_RELEASE_REVIEW_CHECKS]
     checks = list(value.get("checks") or [])
@@ -123,6 +186,10 @@ def verify_authorization(
         "status": "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO",
         "version": version,
         "source_sha": source_sha,
+        "runtime_fingerprint_sha256": runtime_fingerprint_sha256,
+        "pilot_runtime_fingerprint_sha256": pilot_runtime_sha,
+        "python_environment_sha256": python_environment_sha256,
+        "pilot_python_environment_sha256": pilot_python_env_sha,
         "authorization": value,
         "authorization_token_sha256": hashlib.sha256(token.encode("ascii")).hexdigest(),
         "claims": required_claims,
@@ -134,6 +201,8 @@ def main() -> int:
     parser.add_argument("--authorization-b64", default="")
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--runtime-fingerprint-sha256", default="")
+    parser.add_argument("--python-environment-sha256", default="")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     try:
@@ -141,6 +210,8 @@ def main() -> int:
             args.authorization_b64,
             source_sha=args.source_sha,
             version=args.version,
+            runtime_fingerprint_sha256=args.runtime_fingerprint_sha256,
+            python_environment_sha256=args.python_environment_sha256,
         )
         _write_json(Path(args.out), result)
         print(json.dumps({
@@ -148,6 +219,8 @@ def main() -> int:
             "status": result["status"],
             "version": result["version"],
             "source_sha": result["source_sha"],
+            "runtime_fingerprint_sha256": result.get("runtime_fingerprint_sha256"),
+            "python_environment_sha256": result.get("python_environment_sha256"),
         }, ensure_ascii=False))
         return 0
     except (ValueError, UnicodeError, json.JSONDecodeError) as exc:

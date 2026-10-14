@@ -21,7 +21,10 @@ from pathlib import Path
 from typing import Any
 
 
-CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-2"
+CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-3"
+REQUIRED_WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
+REQUIRED_TOOLCHAIN_CONTRACT = "v2.0-R1-pilot-toolchain-2"
+REQUIRED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-2"
 READY_STATUS = "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
 
 REQUIRED_RELEASE_REVIEW_CHECKS: tuple[tuple[str, str], ...] = (
@@ -80,6 +83,52 @@ def _canonical_json_sha256(value: Any) -> str:
 def _require_equal(actual: Any, expected: Any, label: str) -> None:
     if actual != expected:
         raise ValueError(f"{label}: provenance mismatch")
+
+
+def _require_runtime_baseline(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label}: missing packaged runtime baseline")
+    if str(value.get("contract_version") or "") != "v2.0-R1-pilot-runtime-baseline-1":
+        raise ValueError(f"{label}: runtime baseline contract mismatch")
+    runtime = value.get("runtime_fingerprint")
+    if not isinstance(runtime, dict):
+        raise ValueError(f"{label}: runtime fingerprint missing")
+    if str(runtime.get("contract_version") or "") != "v2.0-R1-runtime-fingerprint-1":
+        raise ValueError(f"{label}: runtime fingerprint contract mismatch")
+    runtime_sha = str(runtime.get("sha256") or "").strip().lower()
+    if len(runtime_sha) != 64 or any(ch not in "0123456789abcdef" for ch in runtime_sha):
+        raise ValueError(f"{label}: runtime fingerprint SHA256 invalid")
+    if str(value.get("runtime_origin") or "") != "PACKAGED_EMBEDDED":
+        raise ValueError(f"{label}: runtime baseline is not packaged")
+    if str(value.get("release_channel") or "") != "PRERELEASE":
+        raise ValueError(f"{label}: runtime baseline is not prerelease")
+    python_env = value.get("python_environment")
+    if not isinstance(python_env, dict):
+        raise ValueError(f"{label}: packaged Python environment baseline missing")
+    if str(python_env.get("contract_version") or "") != "v2.0-R1-python-build-environment-1":
+        raise ValueError(f"{label}: Python environment contract mismatch")
+    distributions = python_env.get("distributions")
+    if not isinstance(distributions, list) or any(not isinstance(item, str) for item in distributions):
+        raise ValueError(f"{label}: Python environment distributions invalid")
+    if int(python_env.get("distributions_count") or -1) != len(distributions):
+        raise ValueError(f"{label}: Python environment distribution count mismatch")
+    env_material = {
+        "python_version": str(python_env.get("python_version") or ""),
+        "implementation": str(python_env.get("implementation") or ""),
+        "architecture": str(python_env.get("architecture") or ""),
+        "distributions": list(distributions),
+    }
+    expected_env_sha = hashlib.sha256(
+        json.dumps(
+            env_material,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(python_env.get("sha256") or "").strip().lower() != expected_env_sha:
+        raise ValueError(f"{label}: Python environment SHA256 mismatch")
+    return value
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -151,6 +200,10 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     workspace_contract = str(workspace_meta.get("contract_version") or "")
     if not workspace_contract:
         raise ValueError("workspace.json: missing contract_version")
+    if workspace_contract != REQUIRED_WORKSPACE_CONTRACT:
+        raise ValueError(
+            "Stable handoff requires Pilot Workspace v6 with packaged runtime baseline provenance"
+        )
     _require_equal(
         str(finalization.get("contract_version") or ""),
         workspace_contract,
@@ -165,6 +218,12 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     workspace_toolchain = workspace_meta.get("toolchain")
     if not isinstance(workspace_toolchain, dict):
         raise ValueError("workspace.json: missing frozen evaluator toolchain")
+    if str(workspace_toolchain.get("contract_version") or "") != REQUIRED_TOOLCHAIN_CONTRACT:
+        raise ValueError("Stable handoff requires Pilot Toolchain v2")
+    workspace_runtime_baseline = _require_runtime_baseline(
+        workspace_meta.get("runtime_baseline"),
+        "workspace.json",
+    )
     _require_equal(
         finalization.get("toolchain"),
         workspace_toolchain,
@@ -175,10 +234,22 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         workspace_toolchain,
         "evaluation/workspace toolchain",
     )
+    _require_equal(
+        _require_runtime_baseline(finalization.get("runtime_baseline"), "finalization.json"),
+        workspace_runtime_baseline,
+        "finalization/workspace runtime baseline",
+    )
+    _require_equal(
+        _require_runtime_baseline(evaluation_manifest.get("runtime_baseline"), "evaluation-manifest.json"),
+        workspace_runtime_baseline,
+        "evaluation/workspace runtime baseline",
+    )
 
     _require_hash(stable_path, str(outputs.get("stable_readiness_sha256") or ""), "stable-readiness.json")
     _require_hash(human_path, str(outputs.get("human_report_sha256") or ""), "human-report.json")
 
+    if str(cohort_snapshot.get("contract_version") or "") != REQUIRED_COHORT_SNAPSHOT_CONTRACT:
+        raise ValueError("Stable handoff requires selected cohort snapshot v2")
     workspace_cohort_meta = workspace_outputs.get("selected_cohort_snapshot") or {}
     _require_hash(
         cohort_path,
@@ -351,6 +422,7 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         "stable_policy_version": stable.get("policy_version"),
         "pilot_manifest_contract_version": final_manifest.get("contract_version"),
         "evaluator_toolchain": workspace_toolchain,
+        "pilot_runtime_baseline": workspace_runtime_baseline,
         "pilot_cohort": stable.get("pilot_cohort"),
         "stable_gate": {
             "checks_total": stable.get("checks_total"),
@@ -361,6 +433,7 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         "provenance_consistency": {
             "workspace_contract": "VERIFIED",
             "toolchain": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+            "runtime_baseline": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
             "selected_cohort": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
             "policy": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
             "draft_and_final_manifest": "VERIFIED",
@@ -386,7 +459,8 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         },
         "interpretation": (
             "This artifact proves only that the frozen pilot evaluation passed the evidence gate and "
-            "that its frozen workspace/finalization/evaluation facts cross-match and its handoff inputs still "
+            "that its packaged pilot runtime baseline plus frozen workspace/finalization/evaluation facts cross-match "
+            "and its handoff inputs still "
             "match their SHA256 provenance. Every release-review check remains "
             "PENDING_HUMAN_RELEASE_REVIEW. Creating this artifact does not publish Stable, verify identities/"
             "consent/reviewer independence, or prove PMF."

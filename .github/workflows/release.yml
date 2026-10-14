@@ -15,6 +15,8 @@ on:
       - "desktop/**"
       - "packaging/**"
       - "scripts/build_sidecar.py"
+      - "scripts/runtime_fingerprint.py"
+      - "backend/services/build_provenance.py"
       - "scripts/packaged_smoke.py"
       - "scripts/render_published_release_body.py"
       - "scripts/v2_conversation_stable_review_handoff.py"
@@ -92,6 +94,22 @@ jobs:
       - name: Release version consistency
         run: python scripts/check_release_version.py
 
+      - name: Candidate runtime build provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force dist/release | Out-Null
+          python scripts/runtime_fingerprint.py `
+            --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
+            --version $version `
+            --out dist/release/CANDIDATE_BUILD_PROVENANCE.json
+          if ($LASTEXITCODE -ne 0) { throw "candidate runtime fingerprint failed" }
+          $candidate = Get-Content dist/release/CANDIDATE_BUILD_PROVENANCE.json -Raw | ConvertFrom-Json
+          $runtimeSha = [string]$candidate.runtime_fingerprint.sha256
+          if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "candidate runtime fingerprint SHA256 invalid" }
+          "CHENGZHU_RUNTIME_FINGERPRINT_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "candidate runtime fingerprint: $runtimeSha"
       - name: Stable green-main source wrapper regression
         env:
           GH_TOKEN: regression-token
@@ -123,28 +141,6 @@ jobs:
           } finally {
             Remove-Item function:global:gh -ErrorAction SilentlyContinue
           }
-      - name: Stable v2+ human release authorization gate
-        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
-        env:
-          STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
-          New-Item -ItemType Directory -Force dist/release | Out-Null
-          python scripts/verify_stable_release_authorization.py `
-            --version $version `
-            --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
-            --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
-            --out dist/release/RELEASE_AUTHORIZATION.json
-          if ($LASTEXITCODE -ne 0) { throw "Stable release authorization gate failed" }
-          $authorization = Get-Content dist/release/RELEASE_AUTHORIZATION.json -Raw | ConvertFrom-Json
-          if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
-            if ($authorization.status -ne 'VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO') {
-              throw "Stable v2+ requires VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
-            }
-          }
-
       - name: Stable v2+ exact green-main source gate
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
@@ -176,6 +172,46 @@ jobs:
 
       - name: Build backend sidecar (clean venv, PyInstaller)
         run: python scripts/build_sidecar.py
+
+      - name: Verify embedded build provenance matches candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidate = Get-Content dist/release/CANDIDATE_BUILD_PROVENANCE.json -Raw | ConvertFrom-Json
+          $built = Get-Content build/provenance/build-provenance.json -Raw | ConvertFrom-Json
+          foreach ($field in @('contract_version','app_version','source_sha','release_channel')) {
+            if ([string]$candidate.$field -ne [string]$built.$field) { throw "embedded build provenance drift: $field" }
+          }
+          if ([string]$candidate.runtime_fingerprint.contract_version -ne [string]$built.runtime_fingerprint.contract_version) { throw "embedded runtime fingerprint contract drift" }
+          if ([string]$candidate.runtime_fingerprint.sha256 -ne [string]$built.runtime_fingerprint.sha256) { throw "embedded runtime fingerprint SHA drift" }
+          if ([string]$built.runtime_fingerprint.sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) { throw "embedded runtime fingerprint differs from release gate runtime SHA" }
+          $pythonEnvSha = [string]$built.python_environment.sha256
+          if ($pythonEnvSha -notmatch '^[0-9a-f]{64}$') { throw "embedded Python environment SHA256 invalid" }
+          "CHENGZHU_PYTHON_ENVIRONMENT_SHA256=$pythonEnvSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Copy-Item build/provenance/build-provenance.json dist/release/BUILD_PROVENANCE.json -Force
+      - name: Stable v2+ human release authorization gate
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force dist/release | Out-Null
+          python scripts/verify_stable_release_authorization.py `
+            --version $version `
+            --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
+            --runtime-fingerprint-sha256 $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256 `
+            --python-environment-sha256 $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256 `
+            --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
+            --out dist/release/RELEASE_AUTHORIZATION.json
+          if ($LASTEXITCODE -ne 0) { throw "Stable release authorization gate failed" }
+          $authorization = Get-Content dist/release/RELEASE_AUTHORIZATION.json -Raw | ConvertFrom-Json
+          if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
+            if ($authorization.status -ne 'VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO') {
+              throw "Stable v2+ requires VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
+            }
+          }
 
       - name: Packaged smoke (sidecar, fake provider, restart, persistence)
         run: |
@@ -326,7 +362,7 @@ jobs:
           Copy-Item THIRD_PARTY_NOTICES.md dist/release/
           $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           Copy-Item "docs/RELEASE_NOTES_v$version.md" dist/release/
-          $hashFiles = @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip')
+          $hashFiles = @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip','BUILD_PROVENANCE.json')
           if (Test-Path "dist/release/RELEASE_AUTHORIZATION.json") {
             $hashFiles += 'RELEASE_AUTHORIZATION.json'
           }
@@ -377,6 +413,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/BUILD_PROVENANCE.json `
               dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
@@ -392,6 +429,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/BUILD_PROVENANCE.json `
               dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
@@ -438,7 +476,7 @@ jobs:
           $downloaded = $false
           for ($i = 1; $i -le 5; $i++) {
             try {
-              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt" --pattern "RELEASE_AUTHORIZATION.json"
+              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt" --pattern "BUILD_PROVENANCE.json" --pattern "RELEASE_AUTHORIZATION.json"
               $downloaded = $true
               break
             } catch {
@@ -525,6 +563,19 @@ jobs:
             }
             if ($authorization.version -ne $version -or $authorization.source_sha -ne $sourceSha) {
               throw "Stable v2+ publish refused: authorization candidate drift"
+            }
+            if ([string]$authorization.runtime_fingerprint_sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) {
+              throw "Stable v2+ publish refused: authorization runtime fingerprint drift"
+            }
+            $publicBuild = Get-Content dist/release/BUILD_PROVENANCE.json -Raw | ConvertFrom-Json
+            if ([string]$publicBuild.runtime_fingerprint.sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) {
+              throw "Stable v2+ publish refused: public build provenance runtime fingerprint drift"
+            }
+            if ([string]$authorization.python_environment_sha256 -ne $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256) {
+              throw "Stable v2+ publish refused: authorization Python environment drift"
+            }
+            if ([string]$publicBuild.python_environment.sha256 -ne $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256) {
+              throw "Stable v2+ publish refused: public build Python environment drift"
             }
           }
 

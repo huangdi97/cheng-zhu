@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from services.storage.product_migrations import LATEST_SCHEMA_VERSION, _MIGRATIONS, ensure_schema  # noqa: E402
 
-CASES = ("fresh", "v1", "v2", "v4", "v7", "v8", "v9", "v10", "v11", "v12")
+CASES = ("fresh", "v1", "v2", "v4", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
 
 
 def _build_at(conn: sqlite3.Connection, upto: int) -> None:

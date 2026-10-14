@@ -41,14 +41,46 @@ def _canonical_sha(value: object) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _python_env() -> dict:
+    distributions = ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"]
+    material = {
+        "python_version": "3.11.14",
+        "implementation": "CPython",
+        "architecture": "AMD64",
+        "distributions": distributions,
+    }
+    return {
+        "contract_version": "v2.0-R1-python-build-environment-1",
+        **material,
+        "distributions_count": len(distributions),
+        "sha256": _canonical_sha(material),
+    }
+
+
 def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     ws = tmp_path / "pilot"
     ev = ws / "evaluation"
     ev.mkdir(parents=True)
 
     toolchain = {
-        "contract_version": "v2.0-R1-pilot-toolchain-1",
+        "contract_version": "v2.0-R1-pilot-toolchain-2",
         "files": [{"path": "scripts/v2_conversation_stable_readiness.py", "sha256": "a" * 64}],
+    }
+    runtime_baseline = {
+        "contract_version": "v2.0-R1-pilot-runtime-baseline-1",
+        "runtime_origin": "PACKAGED_EMBEDDED",
+        "release_channel": "PRERELEASE",
+        "runtime_fingerprint": {
+            "contract_version": "v2.0-R1-runtime-fingerprint-1",
+            "sha256": "b" * 64,
+            "files": 42,
+        },
+        "python_environment": _python_env(),
+        "source_builds": [
+            {"app_version": "2.0.0-beta.10", "source_sha": "a" * 40},
+        ],
+        "sessions": 1,
+        "claim_boundary": "SAME_NORMALIZED_RUNTIME_SOURCE_FINGERPRINT_NOT_BEHAVIORAL_EQUIVALENCE_OR_REAL_USER_IDENTITY_PROOF",
     }
     cohort = {
         "contract_version": "v2.0-R1-selected-cohort-snapshot-2",
@@ -89,12 +121,13 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     )
 
     _write_json(ws / "workspace.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-5",
+        "contract_version": "v2.0-R1-pilot-workspace-6",
         "policy": {
             "policy_version": policy["policy_version"],
             "sha256": _sha(ws / "stable-promotion-policy.json"),
         },
         "toolchain": toolchain,
+        "runtime_baseline": runtime_baseline,
         "outputs": {
             "selected_cohort_snapshot": {
                 "sha256": _sha(ws / "selected-cohort.snapshot.json"),
@@ -134,18 +167,20 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     })
 
     _write_json(ws / "finalization.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-5",
+        "contract_version": "v2.0-R1-pilot-workspace-6",
         "selected_cohort_snapshot_sha256": _sha(ws / "selected-cohort.snapshot.json"),
         "selected_cohort_logical_sha256": _canonical_sha(cohort),
         "draft_manifest_sha256": _sha(ws / "pilot-manifest.draft.json"),
         "final_manifest_sha256": _sha(ws / "pilot-manifest.final.json"),
         "policy_sha256": _sha(ws / "stable-promotion-policy.json"),
         "toolchain": toolchain,
+        "runtime_baseline": runtime_baseline,
     })
     _write_json(ev / "evaluation-manifest.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-5",
+        "contract_version": "v2.0-R1-pilot-workspace-6",
         "status": status,
         "toolchain": toolchain,
+        "runtime_baseline": runtime_baseline,
         "inputs": {
             "selected_cohort_snapshot_sha256": _sha(ws / "selected-cohort.snapshot.json"),
             "selected_cohort_logical_sha256": _canonical_sha(cohort),
@@ -175,6 +210,8 @@ def test_handoff_requires_pass_and_keeps_release_decision_pending(tmp_path):
     assert result["claims"]["PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"] is True
     assert result["claims"]["V2_STABLE_RELEASE"] is False
     assert result["claims"]["PMF_PROVEN"] is False
+    assert result["pilot_runtime_baseline"]["runtime_fingerprint"]["sha256"] == "b" * 64
+    assert result["pilot_runtime_baseline"]["python_environment"]["sha256"] == _python_env()["sha256"]
     assert result["claims"]["REAL_USER_IDENTITY_SYSTEM_VERIFIED"] is False
     assert all(
         row["state"] == "PENDING_HUMAN_RELEASE_REVIEW"
@@ -190,6 +227,7 @@ def test_handoff_requires_pass_and_keeps_release_decision_pending(tmp_path):
     assert result["provenance_consistency"] == {
         "workspace_contract": "VERIFIED",
         "toolchain": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
+        "runtime_baseline": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
         "selected_cohort": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
         "policy": "VERIFIED_ACROSS_WORKSPACE_FINALIZATION_EVALUATION",
         "draft_and_final_manifest": "VERIFIED",

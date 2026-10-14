@@ -160,6 +160,29 @@ export interface ConversationParticipant {
   counterparty_state: CounterpartyState
 }
 
+export interface ConversationBuildProvenance {
+  contract_version: 'v2.0-R1-build-provenance-1' | string
+  app_version: string
+  source_sha: string
+  release_channel: 'PRERELEASE' | 'STABLE' | string
+  runtime_fingerprint: {
+    contract_version: 'v2.0-R1-runtime-fingerprint-1' | string
+    sha256: string
+    files: number
+  }
+  python_environment: {
+    contract_version: 'v2.0-R1-python-build-environment-1' | string
+    python_version: string
+    implementation: string
+    architecture: string
+    distributions: string[]
+    distributions_count: number
+    sha256: string
+  }
+  runtime_origin: 'PACKAGED_EMBEDDED' | 'SOURCE_CHECKOUT' | string
+  claim_boundary: string
+}
+
 export interface ConversationSession {
   id: string
   space_id: string
@@ -175,6 +198,7 @@ export interface ConversationSession {
   consent_ack: boolean
   policy: ConversationSessionPolicy
   pack_id: string
+  runtime_provenance: ConversationBuildProvenance | Record<string, never>
   status: 'UPCOMING' | 'ACTIVE' | 'ENDED'
   state: { current_topic?: string; open_threads?: string[]; last_guidance_id?: string; calendar_imported?: boolean }
   source_calendar_event: {
@@ -723,6 +747,7 @@ export interface ConversationSessionContext {
   screen_runtime: Partial<ConversationScreenRuntime>
   connector_runtime: Partial<ConversationConnectorRuntime>
   share_privacy_runtime: Partial<ConversationSharePrivacyRuntime>
+  runtime_provenance: ConversationBuildProvenance | Record<string, never>
   policy: ConversationSessionPolicy
   pack_digest: string
 }

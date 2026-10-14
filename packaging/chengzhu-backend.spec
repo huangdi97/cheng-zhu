@@ -16,6 +16,12 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 REPO = os.path.abspath(os.path.join(SPECPATH, ".."))
 BACKEND = os.path.join(REPO, "backend")
+BUILD_PROVENANCE = os.path.join(REPO, "build", "provenance", "build-provenance.json")
+if not os.path.isfile(BUILD_PROVENANCE):
+    raise FileNotFoundError(
+        "missing build/provenance/build-provenance.json; build via scripts/build_sidecar.py "
+        "so exact source/runtime provenance is generated before PyInstaller"
+    )
 
 hiddenimports = []
 for pkg in ("api", "services", "core", "evals"):
@@ -40,6 +46,7 @@ hiddenimports += [
 ]
 
 datas = [
+    (BUILD_PROVENANCE, "."),
     (os.path.join(BACKEND, "config.example.json"), "."),
     (os.path.join(BACKEND, "assets"), "assets"),
     (os.path.join(BACKEND, "services", "capture", "_screen_capture_worker.py"), os.path.join("services", "capture")),

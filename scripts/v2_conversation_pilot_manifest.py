@@ -96,6 +96,19 @@ def validated_session_fact(row: dict[str, Any], session_id: str) -> dict[str, An
 
     frozen_space = payload.get("space") if isinstance(payload.get("space"), dict) else {}
     frozen_policy = payload.get("policy") if isinstance(payload.get("policy"), dict) else {}
+    frozen_runtime_provenance = (
+        payload.get("runtime_provenance")
+        if isinstance(payload.get("runtime_provenance"), dict)
+        else {}
+    )
+    try:
+        row_runtime_provenance = json.loads(
+            str(row.get("runtime_provenance_json") or "{}")
+        )
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{session_id}: Session runtime provenance 不是有效 JSON") from exc
+    if not isinstance(row_runtime_provenance, dict):
+        raise ValueError(f"{session_id}: Session runtime provenance 结构无效")
 
     row_space_id = str(row.get("space_id") or "")
     row_profile = str(row.get("template") or "").upper()
@@ -124,6 +137,8 @@ def validated_session_fact(row: dict[str, Any], session_id: str) -> dict[str, An
         mismatches.append("assistance_mode")
     if frozen_consent != row_consent:
         mismatches.append("consent_ack")
+    if frozen_runtime_provenance != row_runtime_provenance:
+        mismatches.append("runtime_provenance")
     if mismatches:
         raise ValueError(
             f"{session_id}: Session row 与 Frozen Session Pack 不一致: "
@@ -145,6 +160,7 @@ def validated_session_fact(row: dict[str, Any], session_id: str) -> dict[str, An
         "frozen_pack_id": frozen_pack_id,
         "frozen_pack_digest": stored_digest,
         "frozen_pack_payload_digest_verified": True,
+        "runtime_provenance": row_runtime_provenance,
     }
 
 
@@ -190,7 +206,7 @@ def _session_rows(db: Path, session_ids: Iterable[str]) -> dict[str, dict[str, A
         rows = conn.execute(
             "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
             "s.capture_mode, s.processing_mode, s.assistance_mode, "
-            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id, "
+            "s.consent_ack, s.pack_id, s.runtime_provenance_json, p.id AS frozen_pack_id, "
             "p.digest AS frozen_pack_digest, p.payload_json AS frozen_pack_payload_json "
             "FROM conversation_session s "
             "LEFT JOIN conversation_session_pack p "

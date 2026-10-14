@@ -30,12 +30,13 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-5"
-MIN_PRODUCT_SCHEMA = 12
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
+MIN_PRODUCT_SCHEMA = 13
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
-TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-1"
+TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-2"
 TOOLCHAIN_RELATIVE_PATHS = (
+    "scripts/runtime_fingerprint.py",
     "scripts/v2_conversation_pilot_workspace.py",
     "scripts/v2_conversation_label_seed.py",
     "scripts/v2_conversation_feedback_export.py",
@@ -68,7 +69,7 @@ def _require_toolchain(metadata: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(frozen, dict):
         raise ValueError(
             "pilot workspace has no frozen evaluator toolchain; historical workspace remains historical evidence "
-            "and cannot be re-evaluated under workspace contract v5"
+            "and cannot be re-evaluated under workspace contract v6"
         )
     current = _toolchain_fingerprint()
     if frozen != current:
@@ -107,6 +108,145 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-1"
+BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
+RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
+PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+
+
+def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    sessions = list(snapshot.get("sessions") or [])
+    if not sessions:
+        raise ValueError("selected cohort has no Sessions for runtime baseline")
+
+    fingerprints: set[str] = set()
+    builds: set[tuple[str, str]] = set()
+    file_counts: set[int] = set()
+    python_environments: dict[str, dict[str, Any]] = {}
+    for row in sessions:
+        session_id = str(row.get("session_id") or "<unknown>")
+        provenance = row.get("runtime_provenance")
+        if not isinstance(provenance, dict) or not provenance:
+            raise ValueError(
+                f"{session_id}: Stable pilot requires packaged runtime provenance; "
+                "historical pre-v13 Session cannot be upgraded after the fact"
+            )
+        if str(provenance.get("contract_version") or "") != BUILD_PROVENANCE_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported packaged build provenance contract")
+        if str(provenance.get("runtime_origin") or "") != "PACKAGED_EMBEDDED":
+            raise ValueError(
+                f"{session_id}: Stable pilot requires PACKAGED_EMBEDDED runtime provenance"
+            )
+        if str(provenance.get("release_channel") or "") != "PRERELEASE":
+            raise ValueError(
+                f"{session_id}: initial v2 Stable pilot baseline must come from a published prerelease runtime"
+            )
+        source_sha = str(provenance.get("source_sha") or "").strip().lower()
+        version = str(provenance.get("app_version") or "").strip()
+        if len(source_sha) != 40 or any(ch not in "0123456789abcdef" for ch in source_sha):
+            raise ValueError(f"{session_id}: packaged runtime source SHA is invalid")
+        if not version:
+            raise ValueError(f"{session_id}: packaged runtime app version is missing")
+        runtime = provenance.get("runtime_fingerprint")
+        if not isinstance(runtime, dict):
+            raise ValueError(f"{session_id}: packaged runtime fingerprint is missing")
+        if str(runtime.get("contract_version") or "") != RUNTIME_FINGERPRINT_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported runtime fingerprint contract")
+        runtime_sha = str(runtime.get("sha256") or "").strip().lower()
+        if len(runtime_sha) != 64 or any(ch not in "0123456789abcdef" for ch in runtime_sha):
+            raise ValueError(f"{session_id}: runtime fingerprint SHA256 is invalid")
+        files = runtime.get("files")
+        if isinstance(files, bool) or not isinstance(files, int) or files <= 0:
+            raise ValueError(f"{session_id}: runtime fingerprint file count is invalid")
+        python_env = provenance.get("python_environment")
+        if not isinstance(python_env, dict):
+            raise ValueError(f"{session_id}: packaged Python environment provenance is missing")
+        if str(python_env.get("contract_version") or "") != PYTHON_ENVIRONMENT_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported Python environment contract")
+        distributions = python_env.get("distributions")
+        if not isinstance(distributions, list) or any(not isinstance(item, str) for item in distributions):
+            raise ValueError(f"{session_id}: Python environment distributions are invalid")
+        if int(python_env.get("distributions_count") or -1) != len(distributions):
+            raise ValueError(f"{session_id}: Python environment distribution count mismatch")
+        env_material = {
+            "python_version": str(python_env.get("python_version") or ""),
+            "implementation": str(python_env.get("implementation") or ""),
+            "architecture": str(python_env.get("architecture") or ""),
+            "distributions": list(distributions),
+        }
+        env_sha = str(python_env.get("sha256") or "").strip().lower()
+        expected_env_sha = hashlib.sha256(
+            json.dumps(
+                env_material,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        if env_sha != expected_env_sha:
+            raise ValueError(f"{session_id}: Python environment SHA256 mismatch")
+        if not env_material["python_version"] or not env_material["implementation"]:
+            raise ValueError(f"{session_id}: Python environment metadata missing")
+
+        fingerprints.add(runtime_sha)
+        file_counts.add(files)
+        builds.add((version, source_sha))
+        python_environments[env_sha] = {
+            "contract_version": PYTHON_ENVIRONMENT_CONTRACT,
+            **env_material,
+            "distributions_count": len(distributions),
+            "sha256": env_sha,
+        }
+
+    if len(fingerprints) != 1 or len(file_counts) != 1:
+        raise ValueError(
+            "selected pilot Sessions span different product runtime fingerprints; "
+            "do not use old pilot evidence for changed runtime behavior"
+        )
+
+    if len(python_environments) != 1:
+        raise ValueError(
+            "selected pilot Sessions span different resolved Python build environments; "
+            "do not mix evidence from dependency-drifted packaged runtimes"
+        )
+
+    runtime_sha = next(iter(fingerprints))
+    python_environment = next(iter(python_environments.values()))
+    return {
+        "contract_version": RUNTIME_BASELINE_CONTRACT,
+        "runtime_origin": "PACKAGED_EMBEDDED",
+        "release_channel": "PRERELEASE",
+        "runtime_fingerprint": {
+            "contract_version": RUNTIME_FINGERPRINT_CONTRACT,
+            "sha256": runtime_sha,
+            "files": next(iter(file_counts)),
+        },
+        "python_environment": python_environment,
+        "source_builds": [
+            {"app_version": version, "source_sha": source_sha}
+            for version, source_sha in sorted(builds)
+        ],
+        "sessions": len(sessions),
+        "claim_boundary": (
+            "SAME_NORMALIZED_RUNTIME_SOURCE_AND_RESOLVED_PYTHON_ENVIRONMENT_"
+            "NOT_BEHAVIORAL_EQUIVALENCE_OR_REAL_USER_IDENTITY_PROOF"
+        ),
+    }
+
+
+def _require_runtime_baseline(metadata: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    frozen = metadata.get("runtime_baseline")
+    if not isinstance(frozen, dict):
+        raise ValueError(
+            "pilot workspace has no frozen packaged runtime baseline; "
+            "historical workspace remains historical evidence and cannot be upgraded to workspace contract v6"
+        )
+    current = _runtime_baseline_from_snapshot(snapshot)
+    if frozen != current:
+        raise ValueError("pilot packaged runtime baseline drift detected")
+    return current
+
+
 def _schema_version(db: Path) -> int:
     if not db.is_file():
         raise FileNotFoundError(db)
@@ -130,7 +270,7 @@ def _iso_optional(value: float | None) -> str | None:
     return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-SELECTED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-1"
+SELECTED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-2"
 
 
 def _canonical_json_sha256(value: Any) -> str:
@@ -211,7 +351,7 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
         session_rows = conn.execute(
             "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
             "s.capture_mode, s.processing_mode, s.assistance_mode, "
-            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id, "
+            "s.consent_ack, s.pack_id, s.runtime_provenance_json, p.id AS frozen_pack_id, "
             "p.digest AS frozen_pack_digest, p.payload_json AS frozen_pack_payload_json "
             "FROM conversation_session s "
             "LEFT JOIN conversation_session_pack p "
@@ -278,6 +418,24 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
             profile = str(frozen_fact.get("profile") or profile).upper()
         except ValueError:
             frozen_fact = {}
+        runtime_baseline_ready = False
+        runtime_build: dict[str, Any] = {}
+        if frozen_fact:
+            try:
+                one = _runtime_baseline_from_snapshot({
+                    "sessions": [frozen_fact],
+                })
+                runtime_baseline_ready = True
+                source_build = (one.get("source_builds") or [{}])[0]
+                runtime_build = {
+                    "app_version": source_build.get("app_version") or "",
+                    "source_sha": source_build.get("source_sha") or "",
+                    "runtime_fingerprint_sha256": (
+                        (one.get("runtime_fingerprint") or {}).get("sha256") or ""
+                    ),
+                }
+            except ValueError:
+                pass
         blockers: list[str] = []
         if profile not in pilot_manifest.REQUIRED_PROFILES:
             blockers.append("PROFILE_NOT_LAUNCH_COHORT")
@@ -287,6 +445,8 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
             blockers.append("CONSENT_ACK_NOT_RECORDED")
         if not frozen_pack_verified:
             blockers.append("FROZEN_SESSION_PACK_INTEGRITY_FAILED")
+        if not runtime_baseline_ready:
+            blockers.append("PACKAGED_RUNTIME_BASELINE_REQUIRED")
         if started_at is None:
             blockers.append("STARTED_AT_INVALID")
         if ended_at is None:
@@ -323,6 +483,8 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
             "ended_at": _iso_optional(ended_at),
             "consent_ack_recorded": consent_ack_recorded,
             "frozen_pack_verified": frozen_pack_verified,
+            "runtime_baseline_ready": runtime_baseline_ready,
+            "runtime_build": runtime_build,
             "structurally_selectable": not blockers,
             "structural_blockers": blockers,
             "local_self_report": {
@@ -773,9 +935,10 @@ This directory is **local evidence workspace**, not a release artifact and not p
    favorable self-report or independent-review subsets, leaving required labels
    null, or using a disallowed source fails closed before Stable evaluation.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
-4. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v5 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
-5. Finalize only after you can truthfully make every required operator attestation.
-6. Evaluate with the finalized manifest plus independent-review file(s).
+4. Use only Sessions created by a packaged prerelease that embeds build provenance. All selected Sessions must share one normalized product-runtime fingerprint. Source-checkout Sessions, pre-v13 historical Sessions, or mixed runtime fingerprints are not Stable-pilot eligible.
+5. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v6 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
+6. Finalize only after you can truthfully make every required operator attestation.
+7. Evaluate with the finalized manifest plus independent-review file(s).
 
 The workspace tool never verifies human identity, real-world authorization, participant consent or PMF.
 A Stable Gate PASS only permits a separate stable-release review.
@@ -810,6 +973,7 @@ def init_workspace(
         finalize=False,
     )
     selected_snapshot = _selected_cohort_snapshot(db, pairs)
+    runtime_baseline = _runtime_baseline_from_snapshot(selected_snapshot)
     selected_ids = {session_id for session_id, _ in pairs}
 
     seed_rows = [
@@ -873,6 +1037,7 @@ def init_workspace(
                 "cross_session_space_user_binding": policy.get("cross_session_space_user_binding"),
             },
             "toolchain": _toolchain_fingerprint(),
+            "runtime_baseline": runtime_baseline,
             "cohort": cohort_summary,
             "selected_session_ids": sorted(selected_ids),
             "outputs": {
@@ -966,6 +1131,7 @@ def finalize_workspace(
         != SELECTED_COHORT_SNAPSHOT_CONTRACT
     ):
         raise ValueError("unsupported selected cohort snapshot contract")
+    runtime_baseline = _require_runtime_baseline(metadata, frozen_cohort_snapshot)
     live_cohort_snapshot = _selected_cohort_snapshot(db, assignments)
     if live_cohort_snapshot != frozen_cohort_snapshot:
         raise ValueError(
@@ -1010,6 +1176,7 @@ def finalize_workspace(
         "final_manifest_sha256": _sha256(final_path),
         "policy_sha256": _sha256(workspace / "stable-promotion-policy.json"),
         "toolchain": toolchain,
+        "runtime_baseline": runtime_baseline,
         "cohort": cohort_summary,
         "attestations_are_operator_declarations": True,
         "real_user_identity_system_verified": False,
@@ -1056,6 +1223,10 @@ def evaluate_workspace(
         str(finalization.get("selected_cohort_snapshot_sha256") or ""),
         "selected-cohort.snapshot.json finalization provenance",
     )
+    frozen_cohort_snapshot = _json_load(cohort_snapshot_path)
+    runtime_baseline = _require_runtime_baseline(metadata, frozen_cohort_snapshot)
+    if finalization.get("runtime_baseline") != runtime_baseline:
+        raise ValueError("finalization/workspace packaged runtime baseline provenance mismatch")
     _require_hash(
         policy_path,
         str((metadata.get("policy") or {}).get("sha256") or ""),
@@ -1143,6 +1314,7 @@ def evaluate_workspace(
             "contract_version": WORKSPACE_CONTRACT,
             "evaluated_at": _utc_now(),
             "toolchain": toolchain,
+            "runtime_baseline": runtime_baseline,
             "inputs": {
                 "selected_cohort_snapshot_sha256": _sha256(cohort_snapshot_path),
                 "selected_cohort_logical_sha256": _canonical_json_sha256(

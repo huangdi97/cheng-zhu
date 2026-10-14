@@ -148,3 +148,23 @@ def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     hold_i = text.index('if [ -f ".github/RELEASE_HOLD" ]; then')
     dispatch_i = text.index("gh workflow run release.yml")
     assert stale_i < hold_i < dispatch_i
+
+
+def test_release_embedded_provenance_gate_validates_runtime_and_python_environment_sha() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    verify = _section(
+        text,
+        "- name: Verify embedded build provenance matches candidate",
+        "- name: Stable v2+ human release authorization gate",
+    )
+
+    assert "CANDIDATE_BUILD_PROVENANCE.json" in verify
+    assert "build/provenance/build-provenance.json" in verify
+    assert "CHENGZHU_RUNTIME_FINGERPRINT_SHA256" in verify
+    assert "CHENGZHU_PYTHON_ENVIRONMENT_SHA256" in verify
+    assert "$pythonEnvSha -notmatch '^[0-9a-f]{64}$'" in verify
+    assert "embedded Python environment SHA256 invalid" in verify
+
+    # Regression for Release #380: a missing quote/end-anchor in this regex
+    # caused a PowerShell ParserError after sidecar build despite green CI.
+    assert "$pythonEnvSha -notmatch '^[0-9a-f]{64})" not in verify

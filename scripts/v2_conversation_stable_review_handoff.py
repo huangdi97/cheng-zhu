@@ -128,6 +128,30 @@ def _require_runtime_baseline(value: Any, label: str) -> dict[str, Any]:
     ).hexdigest()
     if str(python_env.get("sha256") or "").strip().lower() != expected_env_sha:
         raise ValueError(f"{label}: Python environment SHA256 mismatch")
+
+    node_env = value.get("node_environment")
+    if not isinstance(node_env, dict):
+        raise ValueError(f"{label}: packaged Node environment baseline missing")
+    if str(node_env.get("contract_version") or "") != "v2.0-R1-node-build-environment-1":
+        raise ValueError(f"{label}: Node environment contract mismatch")
+    node_material = {
+        "node_version": str(node_env.get("node_version") or ""),
+        "npm_version": str(node_env.get("npm_version") or ""),
+        "platform": str(node_env.get("platform") or ""),
+        "architecture": str(node_env.get("architecture") or ""),
+    }
+    if not all(node_material.values()):
+        raise ValueError(f"{label}: Node environment metadata missing")
+    expected_node_sha = hashlib.sha256(
+        json.dumps(
+            node_material,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(node_env.get("sha256") or "").strip().lower() != expected_node_sha:
+        raise ValueError(f"{label}: Node environment SHA256 mismatch")
     return value
 
 

@@ -34,7 +34,7 @@ def _python_env(distributions: list[str] | None = None) -> dict:
         "setuptools==65.5.0",
     ])
     material = {
-        "python_version": "3.11.9",
+        "python_version": "3.13.16",
         "implementation": "CPython",
         "architecture": "AMD64",
         "distributions": values,
@@ -78,7 +78,7 @@ def _token(*, env: dict | None = None, source: str = "a" * 40, runtime: str = "b
 
 def _current() -> dict[str, str]:
     return {
-        "python_version": "3.11.9",
+        "python_version": "3.13.16",
         "implementation": "CPython",
         "architecture": "AMD64",
     }
@@ -91,11 +91,11 @@ def test_prepare_replay_generates_only_exact_normalized_constraints():
         source_sha="a" * 40,
         version="2.0.0",
         runtime_fingerprint_sha256="b" * 64,
-        required_python_version="3.11.9",
+        required_python_version="3.13.16",
         current_python=_current(),
     )
     assert result["contract_version"] == "v2.0-R1-stable-python-environment-replay-1"
-    assert result["python_version"] == "3.11.9"
+    assert result["python_version"] == "3.13.16"
     assert result["constraints"] == [
         "fastapi==0.999.0",
         "pip==25.2",
@@ -121,7 +121,7 @@ def test_prepare_replay_rejects_non_exact_or_remote_distribution_specs(unsafe):
             source_sha="a" * 40,
             version="2.0.0",
             runtime_fingerprint_sha256="b" * 64,
-            required_python_version="3.11.9",
+            required_python_version="3.13.16",
             current_python=_current(),
         )
 
@@ -134,7 +134,7 @@ def test_prepare_replay_rejects_conflicting_normalized_distribution_names():
             source_sha="a" * 40,
             version="2.0.0",
             runtime_fingerprint_sha256="b" * 64,
-            required_python_version="3.11.9",
+            required_python_version="3.13.16",
             current_python=_current(),
         )
 
@@ -144,7 +144,7 @@ def test_prepare_replay_rejects_conflicting_normalized_distribution_names():
     [
         ("source", "c" * 40, "source SHA"),
         ("runtime", "d" * 64, "runtime"),
-        ("required_python_version", "3.11.8", "repository-pinned"),
+        ("required_python_version", "3.13.15", "repository-pinned"),
     ],
 )
 def test_prepare_replay_is_bound_to_candidate_and_pinned_python(field, value, message):
@@ -154,7 +154,7 @@ def test_prepare_replay_is_bound_to_candidate_and_pinned_python(field, value, me
         "source_sha": "a" * 40,
         "version": "2.0.0",
         "runtime_fingerprint_sha256": "b" * 64,
-        "required_python_version": "3.11.9",
+        "required_python_version": "3.13.16",
         "current_python": _current(),
     }
     if field == "source":
@@ -175,8 +175,8 @@ def test_prepare_replay_rejects_current_interpreter_drift():
             source_sha="a" * 40,
             version="2.0.0",
             runtime_fingerprint_sha256="b" * 64,
-            required_python_version="3.11.9",
-            current_python={**_current(), "python_version": "3.11.10"},
+            required_python_version="3.13.16",
+            current_python={**_current(), "python_version": "3.13.17"},
         )
 
 
@@ -185,7 +185,7 @@ def test_sidecar_python_patch_pin_is_a_runtime_fingerprint_input(tmp_path):
     repo = _minimal_runtime_repo(tmp_path)
     first = runtime.fingerprint(repo)
     version_file = repo / "packaging" / "sidecar-python-version.txt"
-    version_file.write_text("3.11.10\n", encoding="utf-8")
+    version_file.write_text("3.13.17\n", encoding="utf-8")
     second = runtime.fingerprint(repo)
     assert second["sha256"] != first["sha256"]
 
@@ -217,7 +217,7 @@ def _minimal_runtime_repo(root: Path) -> Path:
         "desktop/package.json": '{"name":"d","version":"2.0.0-beta.10"}\n',
         "desktop/package-lock.json": '{"name":"d","version":"2.0.0-beta.10","lockfileVersion":3,"packages":{"":{"version":"2.0.0-beta.10"}}}\n',
         "packaging/chengzhu-backend.spec": "SPEC=1\n",
-        "packaging/sidecar-python-version.txt": "3.11.9\n",
+        "packaging/sidecar-python-version.txt": "3.13.16\n",
         "scripts/build_sidecar.py": "print('build')\n",
         "scripts/runtime_fingerprint.py": "# fingerprint\n",
     }

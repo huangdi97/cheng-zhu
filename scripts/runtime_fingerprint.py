@@ -26,6 +26,7 @@ from pathlib import Path
 
 CONTRACT_VERSION = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+NODE_ENVIRONMENT_CONTRACT = "v2.0-R1-node-build-environment-1"
 
 # Runtime-bearing tracked paths. Keep evaluator/release/tests/docs out; include
 # packaging/build inputs that can change the shipped product.
@@ -247,12 +248,68 @@ def python_environment(python_executable: Path | str) -> dict[str, object]:
     }
 
 
+def node_environment(
+    node_executable: Path | str = "node",
+    npm_executable: Path | str = "npm",
+) -> dict[str, object]:
+    """Freeze the Node/npm builder used for frontend/Electron packaging.
+
+    package-lock files freeze dependency resolution, but a floating setup-node
+    major can still change the Node/npm toolchain between the pilot prerelease
+    and a later Stable candidate. Stable promotion therefore binds the exact
+    builder tuple as independent provenance.
+    """
+    node_executable = str(node_executable)
+    npm_executable = str(npm_executable)
+    meta_raw = subprocess.check_output(
+        [
+            node_executable,
+            "-p",
+            (
+                "JSON.stringify({"
+                "node_version:process.versions.node,"
+                "platform:process.platform,"
+                "architecture:process.arch"
+                "})"
+            ),
+        ],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    meta = json.loads(meta_raw)
+    npm_version = subprocess.check_output(
+        [npm_executable, "--version"],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    material = {
+        "node_version": str(meta.get("node_version") or ""),
+        "npm_version": str(npm_version or ""),
+        "platform": str(meta.get("platform") or ""),
+        "architecture": str(meta.get("architecture") or ""),
+    }
+    if not all(material.values()):
+        raise ValueError("could not determine Node/npm build environment")
+    raw = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "contract_version": NODE_ENVIRONMENT_CONTRACT,
+        **material,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
 def build_provenance(
     repo: Path,
     *,
     exact_source_sha: str | None = None,
     exact_version: str | None = None,
     python_environment_value: dict[str, object] | None = None,
+    node_environment_value: dict[str, object] | None = None,
 ) -> dict[str, object]:
     repo = repo.resolve()
     sha = str(exact_source_sha or source_sha(repo)).strip().lower()
@@ -273,7 +330,12 @@ def build_provenance(
             "files": runtime["files"],
         },
         "python_environment": python_environment_value,
-        "provenance_level": "PACKAGED_BUILD" if python_environment_value else "SOURCE_CANDIDATE",
+        "node_environment": node_environment_value,
+        "provenance_level": (
+            "PACKAGED_BUILD"
+            if python_environment_value and node_environment_value
+            else "SOURCE_CANDIDATE"
+        ),
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
     }
 

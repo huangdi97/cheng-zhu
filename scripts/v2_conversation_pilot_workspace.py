@@ -112,6 +112,7 @@ RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-1"
 BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+NODE_ENVIRONMENT_CONTRACT = "v2.0-R1-node-build-environment-1"
 
 
 def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -123,6 +124,7 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     builds: set[tuple[str, str]] = set()
     file_counts: set[int] = set()
     python_environments: dict[str, dict[str, Any]] = {}
+    node_environments: dict[str, dict[str, Any]] = {}
     for row in sessions:
         session_id = str(row.get("session_id") or "<unknown>")
         provenance = row.get("runtime_provenance")
@@ -188,6 +190,31 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         if not env_material["python_version"] or not env_material["implementation"]:
             raise ValueError(f"{session_id}: Python environment metadata missing")
 
+        node_env = provenance.get("node_environment")
+        if not isinstance(node_env, dict):
+            raise ValueError(f"{session_id}: packaged Node environment provenance is missing")
+        if str(node_env.get("contract_version") or "") != NODE_ENVIRONMENT_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported Node environment contract")
+        node_material = {
+            "node_version": str(node_env.get("node_version") or ""),
+            "npm_version": str(node_env.get("npm_version") or ""),
+            "platform": str(node_env.get("platform") or ""),
+            "architecture": str(node_env.get("architecture") or ""),
+        }
+        if not all(node_material.values()):
+            raise ValueError(f"{session_id}: Node environment metadata missing")
+        node_env_sha = str(node_env.get("sha256") or "").strip().lower()
+        expected_node_env_sha = hashlib.sha256(
+            json.dumps(
+                node_material,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        if node_env_sha != expected_node_env_sha:
+            raise ValueError(f"{session_id}: Node environment SHA256 mismatch")
+
         fingerprints.add(runtime_sha)
         file_counts.add(files)
         builds.add((version, source_sha))
@@ -196,6 +223,11 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             **env_material,
             "distributions_count": len(distributions),
             "sha256": env_sha,
+        }
+        node_environments[node_env_sha] = {
+            "contract_version": NODE_ENVIRONMENT_CONTRACT,
+            **node_material,
+            "sha256": node_env_sha,
         }
 
     if len(fingerprints) != 1 or len(file_counts) != 1:
@@ -210,8 +242,15 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             "do not mix evidence from dependency-drifted packaged runtimes"
         )
 
+    if len(node_environments) != 1:
+        raise ValueError(
+            "selected pilot Sessions span different Node/npm build environments; "
+            "do not mix evidence from differently built frontend/Electron runtimes"
+        )
+
     runtime_sha = next(iter(fingerprints))
     python_environment = next(iter(python_environments.values()))
+    node_environment = next(iter(node_environments.values()))
     return {
         "contract_version": RUNTIME_BASELINE_CONTRACT,
         "runtime_origin": "PACKAGED_EMBEDDED",
@@ -222,13 +261,14 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             "files": next(iter(file_counts)),
         },
         "python_environment": python_environment,
+        "node_environment": node_environment,
         "source_builds": [
             {"app_version": version, "source_sha": source_sha}
             for version, source_sha in sorted(builds)
         ],
         "sessions": len(sessions),
         "claim_boundary": (
-            "SAME_NORMALIZED_RUNTIME_SOURCE_AND_RESOLVED_PYTHON_ENVIRONMENT_"
+            "SAME_NORMALIZED_RUNTIME_SOURCE_AND_RESOLVED_PYTHON_AND_NODE_ENVIRONMENTS_"
             "NOT_BEHAVIORAL_EQUIVALENCE_OR_REAL_USER_IDENTITY_PROOF"
         ),
     }

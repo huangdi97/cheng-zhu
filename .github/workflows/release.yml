@@ -190,8 +190,14 @@ jobs:
               --constraints-out $constraints `
               --out dist/release/STABLE_PYTHON_ENVIRONMENT_REPLAY.json
             if ($LASTEXITCODE -ne 0) { throw "Stable Python environment replay preparation failed" }
+            $replay = Get-Content dist/release/STABLE_PYTHON_ENVIRONMENT_REPLAY.json -Raw | ConvertFrom-Json
+            $expectedEnvSha = [string]$replay.pilot_python_environment_sha256
+            if ($expectedEnvSha -notmatch '^[0-9a-f]{64}$') {
+              throw "Stable Python replay metadata contains invalid environment SHA256"
+            }
             "PIP_CONSTRAINT=$constraints" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host "Stable sidecar build will replay the pilot Python environment through exact safe constraints."
+            "CHENGZHU_EXPECTED_PYTHON_ENVIRONMENT_SHA256=$expectedEnvSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "Stable sidecar build will replay and pre-verify the pilot Python environment."
           } else {
             Write-Host "Python environment replay is not required for prerelease / legacy Stable channels."
           }

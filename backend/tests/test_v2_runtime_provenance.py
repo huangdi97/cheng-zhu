@@ -9,7 +9,6 @@ import pytest
 
 from services import build_provenance
 from services.product import conversations
-from services.storage import product as store
 
 
 ROOT = Path(__file__).resolve().parents[2]

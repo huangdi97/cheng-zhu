@@ -141,29 +141,6 @@ jobs:
           } finally {
             Remove-Item function:global:gh -ErrorAction SilentlyContinue
           }
-      - name: Stable v2+ human release authorization gate
-        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
-        env:
-          STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
-          New-Item -ItemType Directory -Force dist/release | Out-Null
-          python scripts/verify_stable_release_authorization.py `
-            --version $version `
-            --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
-            --runtime-fingerprint-sha256 $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256 `
-            --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
-            --out dist/release/RELEASE_AUTHORIZATION.json
-          if ($LASTEXITCODE -ne 0) { throw "Stable release authorization gate failed" }
-          $authorization = Get-Content dist/release/RELEASE_AUTHORIZATION.json -Raw | ConvertFrom-Json
-          if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
-            if ($authorization.status -ne 'VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO') {
-              throw "Stable v2+ requires VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
-            }
-          }
-
       - name: Stable v2+ exact green-main source gate
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
@@ -208,7 +185,34 @@ jobs:
           if ([string]$candidate.runtime_fingerprint.contract_version -ne [string]$built.runtime_fingerprint.contract_version) { throw "embedded runtime fingerprint contract drift" }
           if ([string]$candidate.runtime_fingerprint.sha256 -ne [string]$built.runtime_fingerprint.sha256) { throw "embedded runtime fingerprint SHA drift" }
           if ([string]$built.runtime_fingerprint.sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) { throw "embedded runtime fingerprint differs from release gate runtime SHA" }
+          $pythonEnvSha = [string]$built.python_environment.sha256
+          if ($pythonEnvSha -notmatch '^[0-9a-f]{64}) { throw "embedded Python environment SHA256 invalid" }
+          "CHENGZHU_PYTHON_ENVIRONMENT_SHA256=$pythonEnvSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Copy-Item build/provenance/build-provenance.json dist/release/BUILD_PROVENANCE.json -Force
+      - name: Stable v2+ human release authorization gate
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
+        env:
+          STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force dist/release | Out-Null
+          python scripts/verify_stable_release_authorization.py `
+            --version $version `
+            --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
+            --runtime-fingerprint-sha256 $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256 `
+            --python-environment-sha256 $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256 `
+            --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
+            --out dist/release/RELEASE_AUTHORIZATION.json
+          if ($LASTEXITCODE -ne 0) { throw "Stable release authorization gate failed" }
+          $authorization = Get-Content dist/release/RELEASE_AUTHORIZATION.json -Raw | ConvertFrom-Json
+          if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
+            if ($authorization.status -ne 'VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO') {
+              throw "Stable v2+ requires VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
+            }
+          }
+
       - name: Packaged smoke (sidecar, fake provider, restart, persistence)
         run: |
           pip install websocket-client
@@ -566,6 +570,12 @@ jobs:
             $publicBuild = Get-Content dist/release/BUILD_PROVENANCE.json -Raw | ConvertFrom-Json
             if ([string]$publicBuild.runtime_fingerprint.sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) {
               throw "Stable v2+ publish refused: public build provenance runtime fingerprint drift"
+            }
+            if ([string]$authorization.python_environment_sha256 -ne $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256) {
+              throw "Stable v2+ publish refused: authorization Python environment drift"
+            }
+            if ([string]$publicBuild.python_environment.sha256 -ne $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256) {
+              throw "Stable v2+ publish refused: public build Python environment drift"
             }
           }
 

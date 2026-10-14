@@ -203,6 +203,26 @@ def verify_authorization(
     pilot_artifact_sha = str(artifact.get("sha256") or "").strip().lower()
     if pilot_artifact_sha != expected_artifact_sha:
         raise ValueError("Stable release authorization Python artifact provenance SHA256 mismatch")
+    if str(artifact.get("install_mode") or "") != "WHEEL_SHA256_PINNED":
+        raise ValueError("Stable release authorization Python artifact install mode mismatch")
+    distribution_map: dict[str, str] = {}
+    for raw_distribution in distributions:
+        match = re.fullmatch(
+            r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;]+)",
+            str(raw_distribution or "").strip(),
+        )
+        if not match:
+            raise ValueError("Stable release authorization distribution is not exact name==version")
+        name = re.sub(r"[-_.]+", "-", match.group("name")).lower()
+        version_value = match.group("version")
+        if name in distribution_map and distribution_map[name] != version_value:
+            raise ValueError("Stable release authorization duplicate distribution conflict")
+        distribution_map[name] = version_value
+    artifact_map = {row["name"]: row["version"] for row in normalized_artifacts}
+    if artifact_map != distribution_map:
+        raise ValueError(
+            "Stable release authorization artifact set/version differs from distribution set"
+        )
     token_artifact_sha = str(
         value.get("pilot_python_artifact_provenance_sha256") or ""
     ).strip().lower()

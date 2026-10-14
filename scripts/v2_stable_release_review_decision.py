@@ -152,7 +152,7 @@ def _runtime_equivalence(repo_root: Path, handoff: dict[str, Any]) -> dict[str, 
         raise ValueError("handoff pilot Python artifact provenance SHA256 invalid")
 
     return {
-        "contract_version": "v2.0-R1-stable-runtime-equivalence-2",
+        "contract_version": "v2.0-R1-stable-runtime-equivalence-3",
         "pilot_runtime_fingerprint": {
             "contract_version": runtime_fingerprint.CONTRACT_VERSION,
             "sha256": pilot_sha,

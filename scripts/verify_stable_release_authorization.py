@@ -46,6 +46,7 @@ def verify_authorization(
     version: str,
     runtime_fingerprint_sha256: str = "",
     python_environment_sha256: str = "",
+    python_artifact_provenance_sha256: str = "",
 ) -> dict[str, Any]:
     is_prerelease, major = _version_kind(version)
     source_sha = str(source_sha or "").strip().lower()
@@ -75,6 +76,13 @@ def verify_authorization(
     python_environment_sha256 = str(python_environment_sha256 or "").strip().lower()
     if not re.fullmatch(r"[0-9a-f]{64}", python_environment_sha256):
         raise ValueError("Stable v2+ publication requires a valid packaged Python environment SHA256")
+    python_artifact_provenance_sha256 = str(
+        python_artifact_provenance_sha256 or ""
+    ).strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", python_artifact_provenance_sha256):
+        raise ValueError(
+            "Stable v2+ publication requires a valid packaged Python artifact provenance SHA256"
+        )
 
     token = str(authorization_b64 or "").strip()
     if not token:
@@ -155,6 +163,76 @@ def verify_authorization(
             "Stable release packaged Python environment differs from the pilot baseline"
         )
 
+    artifact = pilot_python_env.get("artifact_provenance")
+    if not isinstance(artifact, dict):
+        raise ValueError("Stable release authorization is missing pilot Python artifact provenance")
+    if str(artifact.get("contract_version") or "") != "v2.0-R1-python-artifact-provenance-1":
+        raise ValueError("Stable release authorization Python artifact contract mismatch")
+    artifacts = artifact.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ValueError("Stable release authorization Python artifact set missing")
+    if int(artifact.get("artifacts_count") or -1) != len(artifacts):
+        raise ValueError("Stable release authorization Python artifact count mismatch")
+    normalized_artifacts: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+    for raw_artifact in artifacts:
+        if not isinstance(raw_artifact, dict):
+            raise ValueError("Stable release authorization Python artifact row invalid")
+        name = re.sub(r"[-_.]+", "-", str(raw_artifact.get("name") or "").strip()).lower()
+        artifact_version = str(raw_artifact.get("version") or "").strip()
+        filename = str(raw_artifact.get("filename") or "").strip()
+        artifact_sha256 = str(raw_artifact.get("sha256") or "").strip().lower()
+        if (
+            not name
+            or not artifact_version
+            or not filename.lower().endswith(".whl")
+            or not re.fullmatch(r"[0-9a-f]{64}", artifact_sha256)
+        ):
+            raise ValueError("Stable release authorization Python artifact row metadata invalid")
+        if name in seen_names:
+            raise ValueError("Stable release authorization Python artifact duplicate distribution")
+        seen_names.add(name)
+        normalized_artifacts.append({
+            "name": name,
+            "version": artifact_version,
+            "filename": filename,
+            "sha256": artifact_sha256,
+        })
+    normalized_artifacts.sort(key=lambda row: row["name"])
+    expected_artifact_sha = _canonical_sha256({"artifacts": normalized_artifacts})
+    pilot_artifact_sha = str(artifact.get("sha256") or "").strip().lower()
+    if pilot_artifact_sha != expected_artifact_sha:
+        raise ValueError("Stable release authorization Python artifact provenance SHA256 mismatch")
+    if str(artifact.get("install_mode") or "") != "WHEEL_SHA256_PINNED":
+        raise ValueError("Stable release authorization Python artifact install mode mismatch")
+    distribution_map: dict[str, str] = {}
+    for raw_distribution in distributions:
+        match = re.fullmatch(
+            r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;]+)",
+            str(raw_distribution or "").strip(),
+        )
+        if not match:
+            raise ValueError("Stable release authorization distribution is not exact name==version")
+        name = re.sub(r"[-_.]+", "-", match.group("name")).lower()
+        version_value = match.group("version")
+        if name in distribution_map and distribution_map[name] != version_value:
+            raise ValueError("Stable release authorization duplicate distribution conflict")
+        distribution_map[name] = version_value
+    artifact_map = {row["name"]: row["version"] for row in normalized_artifacts}
+    if artifact_map != distribution_map:
+        raise ValueError(
+            "Stable release authorization artifact set/version differs from distribution set"
+        )
+    token_artifact_sha = str(
+        value.get("pilot_python_artifact_provenance_sha256") or ""
+    ).strip().lower()
+    if token_artifact_sha != pilot_artifact_sha:
+        raise ValueError("Stable release authorization Python artifact summary drift")
+    if pilot_artifact_sha != python_artifact_provenance_sha256:
+        raise ValueError(
+            "Stable release packaged Python artifacts differ from the pilot baseline"
+        )
+
     expected_ids = [check_id for check_id, _reason in handoff_tool.REQUIRED_RELEASE_REVIEW_CHECKS]
     checks = list(value.get("checks") or [])
     if [str(row.get("id") or "") for row in checks] != expected_ids:
@@ -190,6 +268,8 @@ def verify_authorization(
         "pilot_runtime_fingerprint_sha256": pilot_runtime_sha,
         "python_environment_sha256": python_environment_sha256,
         "pilot_python_environment_sha256": pilot_python_env_sha,
+        "python_artifact_provenance_sha256": python_artifact_provenance_sha256,
+        "pilot_python_artifact_provenance_sha256": pilot_artifact_sha,
         "authorization": value,
         "authorization_token_sha256": hashlib.sha256(token.encode("ascii")).hexdigest(),
         "claims": required_claims,
@@ -203,6 +283,7 @@ def main() -> int:
     parser.add_argument("--version", required=True)
     parser.add_argument("--runtime-fingerprint-sha256", default="")
     parser.add_argument("--python-environment-sha256", default="")
+    parser.add_argument("--python-artifact-provenance-sha256", default="")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     try:
@@ -212,6 +293,7 @@ def main() -> int:
             version=args.version,
             runtime_fingerprint_sha256=args.runtime_fingerprint_sha256,
             python_environment_sha256=args.python_environment_sha256,
+            python_artifact_provenance_sha256=args.python_artifact_provenance_sha256,
         )
         _write_json(Path(args.out), result)
         print(json.dumps({
@@ -221,6 +303,7 @@ def main() -> int:
             "source_sha": result["source_sha"],
             "runtime_fingerprint_sha256": result.get("runtime_fingerprint_sha256"),
             "python_environment_sha256": result.get("python_environment_sha256"),
+            "python_artifact_provenance_sha256": result.get("python_artifact_provenance_sha256"),
         }, ensure_ascii=False))
         return 0
     except (ValueError, UnicodeError, json.JSONDecodeError) as exc:

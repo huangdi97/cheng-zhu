@@ -150,7 +150,7 @@ def test_generic_publisher_refuses_a_stale_green_main_sha() -> None:
     assert stale_i < hold_i < dispatch_i
 
 
-def test_release_embedded_provenance_gate_validates_runtime_and_python_environment_sha() -> None:
+def test_release_embedded_provenance_gate_validates_runtime_python_environment_and_artifact_sha() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     verify = _section(
         text,
@@ -162,20 +162,25 @@ def test_release_embedded_provenance_gate_validates_runtime_and_python_environme
     assert "build/provenance/build-provenance.json" in verify
     assert "CHENGZHU_RUNTIME_FINGERPRINT_SHA256" in verify
     assert "CHENGZHU_PYTHON_ENVIRONMENT_SHA256" in verify
+    assert "CHENGZHU_PYTHON_ARTIFACT_PROVENANCE_SHA256" in verify
     assert "$pythonEnvSha -notmatch '^[0-9a-f]{64}$'" in verify
+    assert "$pythonArtifactSha -notmatch '^[0-9a-f]{64}$'" in verify
     assert "embedded Python environment SHA256 invalid" in verify
+    assert "embedded Python artifact provenance SHA256 invalid" in verify
+    assert "WHEEL_SHA256_PINNED" in verify
 
     # Regression for Release #380: a missing quote/end-anchor in this regex
     # caused a PowerShell ParserError after sidecar build despite green CI.
     assert "$pythonEnvSha -notmatch '^[0-9a-f]{64})" not in verify
+    assert "$pythonArtifactSha -notmatch '^[0-9a-f]{64})" not in verify
 
 
-def test_release_replays_pilot_python_environment_before_stable_sidecar_build() -> None:
+def test_release_replays_pilot_python_wheel_hashes_before_stable_sidecar_build() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     replay = _section(
         text,
-        "- name: Stable v2+ replay pilot Python environment constraints",
+        "- name: Stable v2+ replay pilot Python wheel artifacts",
         "- name: Build backend sidecar",
     )
 
@@ -190,10 +195,17 @@ def test_release_replays_pilot_python_environment_before_stable_sidecar_build() 
     assert "--version" in replay
     assert "--runtime-fingerprint-sha256" in replay
     assert "--python-version-file packaging/sidecar-python-version.txt" in replay
-    assert "PIP_CONSTRAINT=$constraints" in replay
+    assert "--bootstrap-requirements-out" in replay
+    assert "--runtime-requirements-out" in replay
+    assert "STABLE_PYTHON_BOOTSTRAP_REQUIREMENTS.txt" in replay
+    assert "STABLE_PYTHON_RUNTIME_REQUIREMENTS.txt" in replay
+    assert "CHENGZHU_STABLE_PYTHON_BOOTSTRAP_REQUIREMENTS" in replay
+    assert "CHENGZHU_STABLE_PYTHON_RUNTIME_REQUIREMENTS" in replay
+    assert "CHENGZHU_EXPECTED_PYTHON_ARTIFACT_PROVENANCE_SHA256" in replay
+    assert "PIP_CONSTRAINT=" not in replay
     assert "STABLE_PYTHON_ENVIRONMENT_REPLAY.json" in replay
 
-    replay_i = text.index("- name: Stable v2+ replay pilot Python environment constraints")
+    replay_i = text.index("- name: Stable v2+ replay pilot Python wheel artifacts")
     build_i = text.index("- name: Build backend sidecar")
     verify_i = text.index("- name: Verify embedded build provenance matches candidate")
     auth_i = text.index("- name: Stable v2+ human release authorization gate")

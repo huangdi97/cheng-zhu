@@ -41,6 +41,32 @@ def _canonical_sha(value: object) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _artifact_provenance(distributions: list[str]) -> dict:
+    import re
+
+    artifacts = []
+    for raw in distributions:
+        name, version = raw.split("==", 1)
+        normalized = re.sub(r"[-_.]+", "-", name).lower()
+        artifacts.append({
+            "name": normalized,
+            "version": version,
+            "filename": f"{normalized}-{version}-py3-none-any.whl",
+            "sha256": hashlib.sha256(f"{normalized}-{version}-wheel".encode("utf-8")).hexdigest(),
+        })
+    artifacts.sort(key=lambda row: row["name"])
+    material = {"artifacts": artifacts}
+    return {
+        "contract_version": "v2.0-R1-python-artifact-provenance-1",
+        "artifacts": artifacts,
+        "artifacts_count": len(artifacts),
+        "sha256": hashlib.sha256(
+            json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+        "install_mode": "WHEEL_SHA256_PINNED",
+    }
+
+
 def _python_env() -> dict:
     distributions = ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"]
     material = {
@@ -54,6 +80,7 @@ def _python_env() -> dict:
         **material,
         "distributions_count": len(distributions),
         "sha256": _canonical_sha(material),
+        "artifact_provenance": _artifact_provenance(distributions),
     }
 
 
@@ -63,11 +90,11 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     ev.mkdir(parents=True)
 
     toolchain = {
-        "contract_version": "v2.0-R1-pilot-toolchain-2",
+        "contract_version": "v2.0-R1-pilot-toolchain-3",
         "files": [{"path": "scripts/v2_conversation_stable_readiness.py", "sha256": "a" * 64}],
     }
     runtime_baseline = {
-        "contract_version": "v2.0-R1-pilot-runtime-baseline-1",
+        "contract_version": "v2.0-R1-pilot-runtime-baseline-2",
         "runtime_origin": "PACKAGED_EMBEDDED",
         "release_channel": "PRERELEASE",
         "runtime_fingerprint": {
@@ -121,7 +148,7 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     )
 
     _write_json(ws / "workspace.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-6",
+        "contract_version": "v2.0-R1-pilot-workspace-7",
         "policy": {
             "policy_version": policy["policy_version"],
             "sha256": _sha(ws / "stable-promotion-policy.json"),
@@ -167,7 +194,7 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
     })
 
     _write_json(ws / "finalization.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-6",
+        "contract_version": "v2.0-R1-pilot-workspace-7",
         "selected_cohort_snapshot_sha256": _sha(ws / "selected-cohort.snapshot.json"),
         "selected_cohort_logical_sha256": _canonical_sha(cohort),
         "draft_manifest_sha256": _sha(ws / "pilot-manifest.draft.json"),
@@ -177,7 +204,7 @@ def _workspace(tmp_path: Path, *, status: str = READY) -> Path:
         "runtime_baseline": runtime_baseline,
     })
     _write_json(ev / "evaluation-manifest.json", {
-        "contract_version": "v2.0-R1-pilot-workspace-6",
+        "contract_version": "v2.0-R1-pilot-workspace-7",
         "status": status,
         "toolchain": toolchain,
         "runtime_baseline": runtime_baseline,
@@ -212,6 +239,7 @@ def test_handoff_requires_pass_and_keeps_release_decision_pending(tmp_path):
     assert result["claims"]["PMF_PROVEN"] is False
     assert result["pilot_runtime_baseline"]["runtime_fingerprint"]["sha256"] == "b" * 64
     assert result["pilot_runtime_baseline"]["python_environment"]["sha256"] == _python_env()["sha256"]
+    assert result["pilot_runtime_baseline"]["python_environment"]["artifact_provenance"]["sha256"] == _python_env()["artifact_provenance"]["sha256"]
     assert result["claims"]["REAL_USER_IDENTITY_SYSTEM_VERIFIED"] is False
     assert all(
         row["state"] == "PENDING_HUMAN_RELEASE_REVIEW"

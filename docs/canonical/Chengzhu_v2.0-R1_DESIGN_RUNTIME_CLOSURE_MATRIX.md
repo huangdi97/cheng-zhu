@@ -2052,3 +2052,138 @@ V2_STABLE_RELEASE = FALSE
 REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
+
+
+---
+
+## Stable Python wheel-artifact provenance closure · source candidate after beta.9
+
+继续攻击式审计上一节的“Python environment replay”后发现：仅冻结
+
+```text
+Python patch version
++ pip freeze name==version
+```
+
+仍不足以证明构建输入字节可重放。理论上同一个 `name==version` 可以对应不同 wheel / mirror artifact；旧 environment SHA 只哈希包名与版本，因此无法区分这种 drift。
+
+当前源码把发布 provenance 再收紧一层：
+
+```text
+PYTHON_ARTIFACT_PROVENANCE_CONTRACT =
+  v2.0-R1-python-artifact-provenance-1
+
+PILOT_WORKSPACE_CONTRACT =
+  v2.0-R1-pilot-workspace-7
+
+PILOT_TOOLCHAIN_CONTRACT =
+  v2.0-R1-pilot-toolchain-3
+
+PILOT_RUNTIME_BASELINE_CONTRACT =
+  v2.0-R1-pilot-runtime-baseline-2
+
+STABLE_REVIEW_HANDOFF_CONTRACT =
+  v2.0-R1-stable-review-handoff-4
+
+STABLE_RELEASE_REVIEW_DRAFT / DECISION / AUTHORIZATION =
+  v3
+
+STABLE_PYTHON_REPLAY_CONTRACT =
+  v2.0-R1-stable-python-environment-replay-2
+
+STABLE_RUNTIME_EQUIVALENCE_CONTRACT =
+  v2.0-R1-stable-runtime-equivalence-3
+```
+
+### Packaged prerelease build
+
+每次 clean sidecar build 都必须通过 pip installation report 冻结实际安装构件：
+
+```text
+distribution name
+version
+wheel filename
+wheel sha256
+```
+
+并满足：
+
+```text
+ONLY_WHEEL_ARTIFACTS = TRUE
+DIRECT_URL_VCS_LOCAL_INSTALL = FORBIDDEN
+YANKED_ARTIFACT = FORBIDDEN
+ARTIFACT_SET == FINAL_PIP_FREEZE_SET
+ARTIFACT_VERSION == FINAL_PIP_FREEZE_VERSION
+ARTIFACT_PROVENANCE_SHA256 = CANONICAL
+```
+
+### Pilot baseline
+
+Workspace v7 只允许同一 baseline 中所有 selected Sessions 同时满足：
+
+```text
+same normalized runtime fingerprint
+same source build
+same Python interpreter / architecture
+same resolved name==version environment SHA
+same wheel artifact-set SHA
+```
+
+因此：
+
+```text
+same versions + different wheel bytes
+!= same Stable-pilot runtime baseline
+```
+
+pre-beta.10 / pre-artifact packaged runtime 没有 capture-time artifact provenance，不能事后用当前 PyPI 重新解析再“升级”为 Workspace v7。
+
+### Stable build replay
+
+Stable v2+ 发布不再使用普通 `PIP_CONSTRAINT` 作为最终可重放边界，而是从 human GO authorization 生成完整 hash-checking requirements：
+
+```text
+pip bootstrap:
+  name==version --hash=sha256:<pilot-wheel-hash>
+
+runtime/build distributions:
+  name==version --hash=sha256:<pilot-wheel-hash>
+```
+
+安装必须：
+
+```text
+--require-hashes
+--only-binary :all:
+--no-cache-dir
+clean venv
+```
+
+构建后独立重算：
+
+```text
+candidate runtime fingerprint SHA
+candidate Python environment SHA
+candidate Python artifact provenance SHA
+```
+
+三者都必须与 authorization / pilot baseline 一致，才允许继续 Stable publication。
+
+### Truth boundary
+
+该修复关闭的是 **build input artifact reproducibility / provenance**，不是 supply-chain signature verification，也不是 reviewer identity、participant consent、真实用户价值或 PMF 证明。
+
+当前发布真相不变：
+
+```text
+PUBLIC_BETA = v2.0.0-beta.9
+PUBLIC_BETA_SOURCE_SHA = 146db913a4467e179d547b37fc006753f64655bb
+NEXT_CANONICAL_STABLE_PILOT_PRERELEASE = PENDING
+TARGET_NEXT_PRERELEASE = v2.0.0-beta.10
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+只有后续 prerelease 真正通过 exact-SHA Windows build、packaged smoke、clean-install、download-back、tag/source 和 publication provenance，并把该 artifact provenance contract 打进下载包，才允许它成为新的 Stable-readiness pilot baseline。

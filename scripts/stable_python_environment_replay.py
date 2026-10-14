@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Prepare a replay-safe Python package constraint set for Chengzhu Stable v2+.
+"""Prepare hash-checked Python replay inputs for Chengzhu Stable v2+.
 
-A Stable authorization already carries the exact resolved Python environment
-from the packaged prerelease that produced the real-pilot evidence. This tool
-turns that frozen baseline into a *constraints* file for the later Stable build
-without allowing arbitrary pip URLs, VCS references, editable installs or
-environment markers.
+A Stable authorization carries the exact resolved Python environment and the
+wheel SHA256 set from the packaged prerelease that produced real-pilot
+evidence. This tool turns that frozen baseline into complete hash-checking
+requirements for the later Stable build without allowing arbitrary URLs, VCS,
+editable installs, environment markers or source distributions.
 
 This is a build reproducibility control, not a signature or human-identity
 system. The authoritative post-build gate remains
@@ -27,7 +27,7 @@ import runtime_fingerprint
 import v2_stable_release_review_decision as decision_tool
 
 
-CONTRACT_VERSION = "v2.0-R1-stable-python-environment-replay-1"
+CONTRACT_VERSION = "v2.0-R1-stable-python-environment-replay-2"
 _PIN_RE = re.compile(
     r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)=="
     r"(?P<version>[A-Za-z0-9][A-Za-z0-9.!+_-]*)$"
@@ -63,7 +63,7 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def _safe_constraints(distributions: Any) -> list[str]:
+def _safe_distributions(distributions: Any) -> dict[str, str]:
     if not isinstance(distributions, list) or not distributions:
         raise ValueError("pilot Python environment distributions are missing")
     by_name: dict[str, str] = {}
@@ -78,11 +78,88 @@ def _safe_constraints(distributions: Any) -> list[str]:
                 f"unsafe or non-exact entry: {value!r}"
             )
         normalized = _normalize_name(match.group("name"))
-        pin = f"{normalized}=={match.group('version')}"
-        if normalized in by_name and by_name[normalized] != pin:
+        version = match.group("version")
+        if normalized in by_name and by_name[normalized] != version:
             raise ValueError(f"conflicting duplicate distribution: {normalized}")
-        by_name[normalized] = pin
-    return [by_name[name] for name in sorted(by_name)]
+        by_name[normalized] = version
+    return by_name
+
+
+def _hashed_requirements(
+    env: dict[str, Any],
+    distributions: dict[str, str],
+) -> tuple[list[str], list[str], str]:
+    provenance = env.get("artifact_provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("pilot Python environment is missing artifact provenance")
+    if (
+        str(provenance.get("contract_version") or "")
+        != runtime_fingerprint.PYTHON_ARTIFACT_PROVENANCE_CONTRACT
+    ):
+        raise ValueError("pilot Python artifact provenance contract mismatch")
+    artifacts = provenance.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ValueError("pilot Python artifact provenance is empty")
+    if int(provenance.get("artifacts_count") or -1) != len(artifacts):
+        raise ValueError("pilot Python artifact count mismatch")
+    if str(provenance.get("install_mode") or "") != "WHEEL_SHA256_PINNED":
+        raise ValueError("pilot Python artifact install mode mismatch")
+
+    by_name: dict[str, dict[str, str]] = {}
+    for raw in artifacts:
+        if not isinstance(raw, dict):
+            raise ValueError("pilot Python artifact row is invalid")
+        name = _normalize_name(str(raw.get("name") or ""))
+        version = str(raw.get("version") or "").strip()
+        filename = str(raw.get("filename") or "").strip()
+        sha256 = str(raw.get("sha256") or "").strip().lower()
+        if not name or not version:
+            raise ValueError("pilot Python artifact name/version missing")
+        if not filename.lower().endswith(".whl"):
+            raise ValueError(f"{name}=={version}: Stable replay requires wheel artifact")
+        if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+            raise ValueError(f"{name}=={version}: Stable replay artifact sha256 invalid")
+        row = {
+            "name": name,
+            "version": version,
+            "filename": filename,
+            "sha256": sha256,
+        }
+        previous = by_name.get(name)
+        if previous is not None and previous != row:
+            raise ValueError(f"conflicting pilot Python artifact: {name}")
+        by_name[name] = row
+
+    material = {"artifacts": [by_name[name] for name in sorted(by_name)]}
+    expected_artifact_sha = _canonical_sha256(material)
+    artifact_sha = str(provenance.get("sha256") or "").strip().lower()
+    if artifact_sha != expected_artifact_sha:
+        raise ValueError("pilot Python artifact provenance SHA256 mismatch")
+
+    if set(by_name) != set(distributions):
+        missing = sorted(set(distributions) - set(by_name))
+        unexpected = sorted(set(by_name) - set(distributions))
+        raise ValueError(
+            "pilot Python artifact set differs from resolved distribution set; "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    for name, version in distributions.items():
+        if by_name[name]["version"] != version:
+            raise ValueError(
+                f"pilot artifact version differs from resolved distribution: {name}"
+            )
+
+    lines = {
+        name: f"{name}=={row['version']} --hash=sha256:{row['sha256']}"
+        for name, row in by_name.items()
+    }
+    if "pip" not in lines:
+        raise ValueError("pilot artifact provenance must include pip bootstrap wheel")
+    bootstrap = [lines["pip"]]
+    runtime = [lines[name] for name in sorted(lines) if name != "pip"]
+    if not runtime:
+        raise ValueError("pilot artifact provenance has no runtime distributions")
+    return bootstrap, runtime, artifact_sha
 
 
 def prepare_replay(
@@ -139,7 +216,7 @@ def prepare_replay(
     if str(env.get("contract_version") or "") != runtime_fingerprint.PYTHON_ENVIRONMENT_CONTRACT:
         raise ValueError("pilot Python environment contract mismatch")
     distributions = env.get("distributions")
-    constraints = _safe_constraints(distributions)
+    distribution_map = _safe_distributions(distributions)
     if int(env.get("distributions_count") or -1) != len(distributions):
         raise ValueError("pilot Python environment distribution count mismatch")
 
@@ -176,22 +253,41 @@ def prepare_replay(
                 f"{current.get(field) or 'UNKNOWN'} != {material[field]}"
             )
 
+    bootstrap_requirements, runtime_requirements, artifact_sha = _hashed_requirements(
+        env,
+        distribution_map,
+    )
+    authorization_artifact_sha = str(
+        value.get("pilot_python_artifact_provenance_sha256") or ""
+    ).strip().lower()
+    if authorization_artifact_sha != artifact_sha:
+        raise ValueError(
+            "Stable release authorization Python artifact provenance summary drift"
+        )
+
     return {
         "contract_version": CONTRACT_VERSION,
         "candidate_source_sha": source_sha,
         "candidate_version": version,
         "runtime_fingerprint_sha256": runtime_sha,
         "pilot_python_environment_sha256": env_sha,
+        "pilot_python_artifact_provenance_sha256": artifact_sha,
         "python_version": material["python_version"],
         "implementation": material["implementation"],
         "architecture": material["architecture"],
-        "constraints": constraints,
-        "constraints_count": len(constraints),
-        "constraints_sha256": hashlib.sha256(
-            ("\n".join(constraints) + "\n").encode("utf-8")
+        "bootstrap_requirements": bootstrap_requirements,
+        "runtime_requirements": runtime_requirements,
+        "requirements_count": len(bootstrap_requirements) + len(runtime_requirements),
+        "hashed_requirements_sha256": hashlib.sha256(
+            (
+                "\n".join(bootstrap_requirements)
+                + "\n--RUNTIME--\n"
+                + "\n".join(runtime_requirements)
+                + "\n"
+            ).encode("utf-8")
         ).hexdigest(),
         "claim_boundary": (
-            "SAFE_EXACT_PACKAGE_REPLAY_INPUT_NOT_RELEASE_AUTHORIZATION_"
+            "WHEEL_SHA256_HASH_CHECKING_REPLAY_INPUT_NOT_RELEASE_AUTHORIZATION_"
             "OR_POST_BUILD_ENVIRONMENT_PROOF"
         ),
     }
@@ -214,7 +310,8 @@ def main() -> int:
         "--python-version-file",
         default=str(Path(__file__).resolve().parents[1] / "packaging" / "sidecar-python-version.txt"),
     )
-    parser.add_argument("--constraints-out", required=True)
+    parser.add_argument("--bootstrap-requirements-out", required=True)
+    parser.add_argument("--runtime-requirements-out", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -230,12 +327,29 @@ def main() -> int:
             runtime_fingerprint_sha256=args.runtime_fingerprint_sha256,
             required_python_version=required,
         )
-        constraints_path = Path(args.constraints_out)
+        bootstrap_path = Path(args.bootstrap_requirements_out)
+        runtime_path = Path(args.runtime_requirements_out)
         out_path = Path(args.out)
-        if constraints_path.resolve() == out_path.resolve():
-            raise ValueError("constraints and replay metadata outputs must differ")
-        _write_new(constraints_path, "\n".join(replay["constraints"]) + "\n")
-        public = {key: value for key, value in replay.items() if key != "constraints"}
+        resolved = {
+            bootstrap_path.resolve(),
+            runtime_path.resolve(),
+            out_path.resolve(),
+        }
+        if len(resolved) != 3:
+            raise ValueError("Stable replay outputs must use distinct paths")
+        _write_new(
+            bootstrap_path,
+            "\n".join(replay["bootstrap_requirements"]) + "\n",
+        )
+        _write_new(
+            runtime_path,
+            "\n".join(replay["runtime_requirements"]) + "\n",
+        )
+        public = {
+            key: value
+            for key, value in replay.items()
+            if key not in {"bootstrap_requirements", "runtime_requirements"}
+        }
         _write_new(
             out_path,
             json.dumps(public, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -246,8 +360,9 @@ def main() -> int:
     print(json.dumps({
         "status": "STABLE_PYTHON_ENVIRONMENT_REPLAY_READY",
         "python_version": replay["python_version"],
-        "constraints_count": replay["constraints_count"],
+        "requirements_count": replay["requirements_count"],
         "pilot_python_environment_sha256": replay["pilot_python_environment_sha256"],
+        "pilot_python_artifact_provenance_sha256": replay["pilot_python_artifact_provenance_sha256"],
         "out": args.out,
     }, ensure_ascii=False))
     return 0

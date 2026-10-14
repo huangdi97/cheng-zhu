@@ -26,9 +26,9 @@ import runtime_fingerprint
 import v2_conversation_stable_review_handoff as handoff_tool
 
 
-DRAFT_CONTRACT = "v2.0-R1-stable-release-review-draft-2"
-DECISION_CONTRACT = "v2.0-R1-stable-release-review-decision-2"
-AUTHORIZATION_CONTRACT = "v2.0-R1-stable-release-authorization-2"
+DRAFT_CONTRACT = "v2.0-R1-stable-release-review-draft-3"
+DECISION_CONTRACT = "v2.0-R1-stable-release-review-decision-3"
+AUTHORIZATION_CONTRACT = "v2.0-R1-stable-release-authorization-3"
 READY_STATUS = "READY_FOR_HUMAN_STABLE_RELEASE_REVIEW"
 EVIDENCE_READY = "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
 
@@ -111,6 +111,10 @@ def _runtime_equivalence(repo_root: Path, handoff: dict[str, Any]) -> dict[str, 
     pilot = handoff.get("pilot_runtime_baseline")
     if not isinstance(pilot, dict):
         raise ValueError("handoff is missing packaged pilot runtime baseline")
+    pilot = handoff_tool._require_runtime_baseline(
+        pilot,
+        "handoff pilot_runtime_baseline",
+    )
     pilot_runtime = pilot.get("runtime_fingerprint")
     if not isinstance(pilot_runtime, dict):
         raise ValueError("handoff pilot runtime fingerprint missing")
@@ -139,15 +143,27 @@ def _runtime_equivalence(repo_root: Path, handoff: dict[str, Any]) -> dict[str, 
     pilot_env_sha = str(pilot_python_environment.get("sha256") or "").strip().lower()
     if not re.fullmatch(r"[0-9a-f]{64}", pilot_env_sha):
         raise ValueError("handoff pilot Python environment SHA256 invalid")
+    artifact = pilot_python_environment.get("artifact_provenance")
+    if not isinstance(artifact, dict):
+        raise ValueError("handoff pilot Python artifact provenance missing")
+    if (
+        str(artifact.get("contract_version") or "")
+        != runtime_fingerprint.PYTHON_ARTIFACT_PROVENANCE_CONTRACT
+    ):
+        raise ValueError("handoff pilot Python artifact provenance contract mismatch")
+    pilot_artifact_sha = str(artifact.get("sha256") or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", pilot_artifact_sha):
+        raise ValueError("handoff pilot Python artifact provenance SHA256 invalid")
 
     return {
-        "contract_version": "v2.0-R1-stable-runtime-equivalence-2",
+        "contract_version": "v2.0-R1-stable-runtime-equivalence-3",
         "pilot_runtime_fingerprint": {
             "contract_version": runtime_fingerprint.CONTRACT_VERSION,
             "sha256": pilot_sha,
             "files": int(pilot_runtime.get("files") or 0),
         },
         "pilot_python_environment": pilot_python_environment,
+        "pilot_python_artifact_provenance_sha256": pilot_artifact_sha,
         "candidate_runtime_fingerprint": candidate,
         "runtime_baseline_match": True,
         "interpretation": (
@@ -378,6 +394,7 @@ def finalize_review(
         "handoff_json_sha256": hashes["handoff_json_sha256"],
         "pilot_runtime_fingerprint": runtime_equivalence["pilot_runtime_fingerprint"],
         "pilot_python_environment": runtime_equivalence["pilot_python_environment"],
+        "pilot_python_artifact_provenance_sha256": runtime_equivalence["pilot_python_artifact_provenance_sha256"],
         "candidate_runtime_fingerprint": runtime_equivalence["candidate_runtime_fingerprint"],
         "runtime_baseline_match": True,
         "review_check_digest": authorization_check_digest,

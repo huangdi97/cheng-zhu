@@ -25,6 +25,32 @@ def _load():
     return mod
 
 
+def _artifact_provenance(distributions: list[str]) -> dict:
+    import re
+
+    artifacts = []
+    for raw in distributions:
+        name, version = raw.split("==", 1)
+        normalized = re.sub(r"[-_.]+", "-", name).lower()
+        artifacts.append({
+            "name": normalized,
+            "version": version,
+            "filename": f"{normalized}-{version}-py3-none-any.whl",
+            "sha256": hashlib.sha256(f"{normalized}-{version}-wheel".encode("utf-8")).hexdigest(),
+        })
+    artifacts.sort(key=lambda row: row["name"])
+    material = {"artifacts": artifacts}
+    return {
+        "contract_version": "v2.0-R1-python-artifact-provenance-1",
+        "artifacts": artifacts,
+        "artifacts_count": len(artifacts),
+        "sha256": hashlib.sha256(
+            json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+        "install_mode": "WHEEL_SHA256_PINNED",
+    }
+
+
 def _python_env(*, marker: str = "baseline") -> dict:
     distributions = [f"fastapi==0.999.0+{marker}", "pydantic==2.12.5", "pyinstaller==6.16.0"]
     material = {
@@ -39,6 +65,7 @@ def _python_env(*, marker: str = "baseline") -> dict:
         **material,
         "distributions_count": len(distributions),
         "sha256": hashlib.sha256(raw).hexdigest(),
+        "artifact_provenance": _artifact_provenance(distributions),
     }
 
 
@@ -218,6 +245,7 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert result["runtime_baseline"]["runtime_origin"] == "PACKAGED_EMBEDDED"
     assert result["runtime_baseline"]["runtime_fingerprint"]["sha256"] == "b" * 64
     assert result["runtime_baseline"]["python_environment"]["sha256"] == _python_env()["sha256"]
+    assert result["runtime_baseline"]["python_environment"]["artifact_provenance"]["sha256"] == _python_env()["artifact_provenance"]["sha256"]
     assert result["runtime_baseline"]["sessions"] == 2
     assert result["toolchain"]["contract_version"] == mod.TOOLCHAIN_FINGERPRINT_CONTRACT
     assert result["toolchain"]["workspace_contract"] == mod.WORKSPACE_CONTRACT
@@ -1096,6 +1124,36 @@ def test_workspace_rejects_mixed_resolved_python_environments(product_env, tmp_p
                 (second["id"], "pilot-user-b"),
             ],
             tmp_path / "mixed-python-env-workspace",
+        )
+
+
+def test_workspace_rejects_same_versions_with_different_wheel_artifacts(product_env, tmp_path):
+    mod = _load()
+    project = conversations.create_space("Artifact A", "PROJECT_SYNC")
+    design = conversations.create_space("Artifact B", "DESIGN_REVIEW")
+    first_env = _python_env()
+    second_env = json.loads(json.dumps(first_env))
+    second_env["artifact_provenance"]["artifacts"][0]["sha256"] = "9" * 64
+    second_env["artifact_provenance"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            {"artifacts": second_env["artifact_provenance"]["artifacts"]},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+    first = _ended_session(project["id"], title="A", python_env=first_env)
+    second = _ended_session(design["id"], title="B", python_env=second_env)
+
+    with pytest.raises(ValueError, match="different resolved Python build environments/artifacts"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            [
+                (first["id"], "pilot-user-a"),
+                (second["id"], "pilot-user-b"),
+            ],
+            tmp_path / "mixed-python-artifact-workspace",
         )
 
 

@@ -170,7 +170,7 @@ jobs:
           npm ci
           node --test *.test.js
 
-      - name: Stable v2+ replay pilot Python environment constraints
+      - name: Stable v2+ replay pilot Python wheel artifacts
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
         env:
           STABLE_REVIEW_AUTHORIZATION_B64: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stable_review_authorization_b64 || '' }}
@@ -180,26 +180,34 @@ jobs:
           $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           if (-not $version.Contains('-') -and [int]($version.Split('.')[0]) -ge 2) {
             New-Item -ItemType Directory -Force dist/release | Out-Null
-            $constraints = Join-Path $PWD "dist/release/STABLE_PYTHON_CONSTRAINTS.txt"
+            $bootstrap = Join-Path $PWD "dist/release/STABLE_PYTHON_BOOTSTRAP_REQUIREMENTS.txt"
+            $runtime = Join-Path $PWD "dist/release/STABLE_PYTHON_RUNTIME_REQUIREMENTS.txt"
             python scripts/stable_python_environment_replay.py `
               --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
               --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
               --version $version `
               --runtime-fingerprint-sha256 $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256 `
               --python-version-file packaging/sidecar-python-version.txt `
-              --constraints-out $constraints `
+              --bootstrap-requirements-out $bootstrap `
+              --runtime-requirements-out $runtime `
               --out dist/release/STABLE_PYTHON_ENVIRONMENT_REPLAY.json
-            if ($LASTEXITCODE -ne 0) { throw "Stable Python environment replay preparation failed" }
+            if ($LASTEXITCODE -ne 0) { throw "Stable Python artifact replay preparation failed" }
             $replay = Get-Content dist/release/STABLE_PYTHON_ENVIRONMENT_REPLAY.json -Raw | ConvertFrom-Json
             $expectedEnvSha = [string]$replay.pilot_python_environment_sha256
+            $expectedArtifactSha = [string]$replay.pilot_python_artifact_provenance_sha256
             if ($expectedEnvSha -notmatch '^[0-9a-f]{64}$') {
               throw "Stable Python replay metadata contains invalid environment SHA256"
             }
-            "PIP_CONSTRAINT=$constraints" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            if ($expectedArtifactSha -notmatch '^[0-9a-f]{64}$') {
+              throw "Stable Python replay metadata contains invalid artifact provenance SHA256"
+            }
+            "CHENGZHU_STABLE_PYTHON_BOOTSTRAP_REQUIREMENTS=$bootstrap" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "CHENGZHU_STABLE_PYTHON_RUNTIME_REQUIREMENTS=$runtime" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             "CHENGZHU_EXPECTED_PYTHON_ENVIRONMENT_SHA256=$expectedEnvSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host "Stable sidecar build will replay and pre-verify the pilot Python environment."
+            "CHENGZHU_EXPECTED_PYTHON_ARTIFACT_PROVENANCE_SHA256=$expectedArtifactSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "Stable sidecar build will replay exact wheel SHA256 artifacts and pre-verify the pilot Python environment."
           } else {
-            Write-Host "Python environment replay is not required for prerelease / legacy Stable channels."
+            Write-Host "Python artifact replay is not required for prerelease / legacy Stable channels."
           }
 
       - name: Build backend sidecar (clean venv, PyInstaller)
@@ -219,7 +227,13 @@ jobs:
           if ([string]$built.runtime_fingerprint.sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) { throw "embedded runtime fingerprint differs from release gate runtime SHA" }
           $pythonEnvSha = [string]$built.python_environment.sha256
           if ($pythonEnvSha -notmatch '^[0-9a-f]{64}$') { throw "embedded Python environment SHA256 invalid" }
+          $pythonArtifactSha = [string]$built.python_environment.artifact_provenance.sha256
+          if ($pythonArtifactSha -notmatch '^[0-9a-f]{64}$') { throw "embedded Python artifact provenance SHA256 invalid" }
+          if ([string]$built.python_environment.artifact_provenance.install_mode -ne 'WHEEL_SHA256_PINNED') {
+            throw "embedded Python artifact provenance install mode drift"
+          }
           "CHENGZHU_PYTHON_ENVIRONMENT_SHA256=$pythonEnvSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CHENGZHU_PYTHON_ARTIFACT_PROVENANCE_SHA256=$pythonArtifactSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Copy-Item build/provenance/build-provenance.json dist/release/BUILD_PROVENANCE.json -Force
       - name: Stable v2+ human release authorization gate
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish == 'true'
@@ -235,6 +249,7 @@ jobs:
             --source-sha $env:CHENGZHU_RELEASE_SOURCE_SHA `
             --runtime-fingerprint-sha256 $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256 `
             --python-environment-sha256 $env:CHENGZHU_PYTHON_ENVIRONMENT_SHA256 `
+            --python-artifact-provenance-sha256 $env:CHENGZHU_PYTHON_ARTIFACT_PROVENANCE_SHA256 `
             --authorization-b64 "$env:STABLE_REVIEW_AUTHORIZATION_B64" `
             --out dist/release/RELEASE_AUTHORIZATION.json
           if ($LASTEXITCODE -ne 0) { throw "Stable release authorization gate failed" }

@@ -1,6 +1,6 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: BETA.9 PUBLISHED · REAL-PILOT OPERATOR WORKFLOW · STABLE POLICY v8 · WORKSPACE v5  
+**Status**: BETA.9 PUBLISHED · NEXT STABLE-PILOT BASELINE PENDING · STABLE POLICY v8 · SOURCE WORKSPACE v7  
 **Public Beta**: v2.0.0-beta.9  
 **Published source/tag SHA**: `146db913a4467e179d547b37fc006753f64655bb`  
 **Stable v2**: NOT CLAIMED  
@@ -13,9 +13,24 @@ It does not change any release or evidence claim by itself.
 
 ## 1. Preconditions
 
-Use the published `v2.0.0-beta.9` runtime/source with product schema >= v12 for new Stable-readiness pilots.
+The currently published participant-facing/runtime product remains `v2.0.0-beta.9`. **Do not start a new Stable-readiness pilot on beta.9 if you expect that evidence to enter the current source Stable handoff.** beta.9 predates packaged runtime provenance v13 and the wheel-artifact SHA256 baseline required by current source.
 
-The currently published participant-facing/runtime product is `v2.0.0-beta.9`. It packages Stable Policy v8 **and** Pilot Workspace contract v5 / evaluator-toolchain fingerprint contract v1. Policy v8 requires complete frozen Stable metric population coverage across self-report, independent-review, and metrics that allow either source, while retaining the v7 same-user longitudinal Space binding. Workspace v5 additionally freezes the SHA256 of the evaluator implementation used at initialization and fails closed on later toolchain drift. beta.8 remains immutable historical prerelease evidence and must not be rewritten as containing workspace-v5 toolchain provenance. Historical workspaces remain historical evidence; do not upgrade their frozen policy/evaluator semantics in place. Create a fresh beta.9 workspace for new Stable review. This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
+Current source requires the next canonical Stable-pilot prerelease to package all of the following together:
+
+```text
+Stable Policy = v2.0-R1-stable-promotion-8
+Product schema >= v13
+Pilot Workspace = v2.0-R1-pilot-workspace-7
+Pilot Toolchain = v2.0-R1-pilot-toolchain-3
+Pilot Runtime Baseline = v2.0-R1-pilot-runtime-baseline-2
+Python Artifact Provenance = v2.0-R1-python-artifact-provenance-1
+Stable Handoff = v2.0-R1-stable-review-handoff-4
+Stable Authorization = v2.0-R1-stable-release-authorization-3
+```
+
+Workspace v7 freezes evaluator implementation, exact packaged runtime/source provenance, resolved Python package versions **and the SHA256 of every installed wheel artifact**. A pre-v7 workspace or pre-artifact packaged Session remains valid historical evidence but cannot be upgraded after the fact into this baseline. The next prerelease that actually packages these contracts (target: beta.10; publication not yet claimed here) should be used to create fresh Stable-readiness evidence.
+
+This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 
 Required launch profiles:
 
@@ -151,7 +166,7 @@ python scripts/v2_conversation_pilot_workspace.py init \
 
 The command creates a new directory and refuses to overwrite an existing one.
 
-Policy is frozen into each workspace. Historical v6/v7 workspaces remain historical evidence; do **not** edit their frozen policy in place. For a new Stable-readiness pilot, create a fresh workspace using current Policy v8 source (or a later prerelease that explicitly packages v8) so both same-user Space binding and complete Stable metric population coverage are frozen from initialization onward.
+Policy and runtime provenance are frozen into each workspace. Historical workspace contracts v1-v6 remain historical evidence; do **not** edit or “upgrade” their frozen policy/runtime/toolchain in place. For a new Stable-readiness pilot under current source, create a fresh Workspace v7 only from Sessions produced by a prerelease that actually embeds runtime-baseline v2 and wheel-artifact provenance.
 
 Expected files:
 
@@ -173,8 +188,9 @@ Important properties:
 - `selected-cohort.snapshot.json` freezes selected Session structure + local pseudonymous `user_ref` + Frozen Session Pack identity/digest（并重新计算 payload canonical digest 校验 stored digest）, without transcript / participant / Guidance / source text;
 - the SQLite main-file SHA256 is advisory only; Chengzhu uses WAL, so the main file alone is not the logical database-state anchor;
 - the exact Stable Promotion policy bytes are frozen;
-- workspace contract v5 freezes SHA256 fingerprints for the workspace orchestrator plus label-seed, self-report export, human-eval, pilot-manifest and stable-readiness tools;
-- finalize/evaluate fail closed if that evaluator toolchain differs from the one used at workspace initialization;
+- Workspace v7 freezes Pilot Toolchain v3 SHA256 fingerprints, including the runtime-fingerprint implementation plus workspace orchestrator, label-seed, self-report export, human-eval, pilot-manifest and stable-readiness tools;
+- Workspace v7 also freezes Runtime Baseline v2: normalized product runtime, exact Python environment and exact wheel artifact SHA256 set;
+- finalize/evaluate fail closed if evaluator toolchain, selected runtime, resolved package versions or wheel artifact set differs from initialization;
 - the draft manifest is deliberately not Stable-eligible;
 - self-report remains explicit local self-report only;
 - `REAL_USER_VALIDATED`, `V2_STABLE_RELEASE` and `PMF_PROVEN` remain false.
@@ -307,7 +323,7 @@ To rerun with changed labels/cohort/rules, preserve the old workspace and create
 
 Workspace provenance protects against accidental evidence drift.
 
-For new workspace contract v5 workspaces, provenance freezes both evidence inputs **and the evaluator implementation**. The workflow refuses to continue when the evaluator toolchain SHA256 set differs from initialization; use the exact original checkout/toolchain or create a new workspace rather than silently recalculating old evidence under changed code.
+For new Workspace v7 workspaces, provenance freezes evidence inputs, evaluator implementation, packaged runtime/source identity, resolved Python package versions **and wheel artifact SHA256 provenance**. The workflow refuses to continue when the evaluator toolchain SHA256 set differs from initialization; use the exact original checkout/toolchain or create a new workspace rather than silently recalculating old evidence under changed code.
 
 The workflow also refuses to continue when any frozen input hash changes:
 
@@ -325,6 +341,32 @@ Independent reviewer files are external inputs and their SHA256 values are recor
 The reviewer binding proves only that the human label is attached to a real frozen local review event/prediction. It does **not** prove the reviewer's identity, independence, competence, authorization, or honesty.
 
 This is tamper-evident local provenance, not a cryptographic identity/authorization system.
+
+## 9.1 Packaged Python artifact provenance
+
+For current-source Stable-readiness evidence, package versions alone are insufficient.
+
+The prerelease packaged build must freeze:
+
+```text
+Python exact patch version
++ normalized pip freeze name==version set
++ one wheel filename + SHA256 per installed distribution
+```
+
+Pilot Workspace v7 requires all selected Sessions to share the same environment SHA **and** the same artifact-set SHA. Same package versions with different wheel bytes are treated as different runtime baselines.
+
+Stable build replay uses hash-checking requirements:
+
+```text
+--require-hashes
+--only-binary :all:
+--no-cache-dir
+```
+
+The Stable release authorization is bound to the pilot artifact-set SHA and the release workflow independently recomputes the built artifact-set SHA before publication.
+
+This is build reproducibility provenance, not package-signature verification, reviewer identity verification, real-user evidence or PMF.
 
 ## 10. Retention interaction
 
@@ -404,7 +446,7 @@ The tool fails closed when:
 
 The handoff contains only hashes, cohort/evaluation summaries, checkout context and pending release-review obligations. It does **not** copy transcript text, Guidance text, reviewer notes or direct identifiers.
 
-Current source handoff contract v2 additionally treats `evaluation-manifest.json` as a summary that must agree with independently frozen workspace/finalization/human/stable artifacts; it is not allowed to self-assert a different toolchain, claims set or Stable-coverage summary. Reviewer input JSONL files themselves remain evaluation-time local inputs: if they are no longer present, the handoff does not pretend to re-open or re-authenticate them. Their hashes remain evaluation-manifest provenance only.
+Current source Handoff v4 additionally requires Workspace v7 / Toolchain v3 / Runtime Baseline v2 and treats `evaluation-manifest.json` as a summary that must agree with independently frozen workspace/finalization/human/stable artifacts; it is not allowed to self-assert a different toolchain, claims set or Stable-coverage summary. Reviewer input JSONL files themselves remain evaluation-time local inputs: if they are no longer present, the handoff does not pretend to re-open or re-authenticate them. Their hashes remain evaluation-manifest provenance only.
 
 This is still local tamper-evident provenance, **not** a cryptographic signature/WORM archive. A coordinated rewrite of every local evidence file is outside the system-verification boundary; operators who need stronger custody should preserve the finalized workspace in an independently controlled read-only/archive layer.
 

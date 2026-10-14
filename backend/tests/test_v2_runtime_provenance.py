@@ -67,6 +67,32 @@ def _fixture_repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _artifact_provenance(distributions: list[str]) -> dict:
+    import re
+
+    artifacts = []
+    for raw in distributions:
+        name, version = raw.split("==", 1)
+        normalized = re.sub(r"[-_.]+", "-", name).lower()
+        artifacts.append({
+            "name": normalized,
+            "version": version,
+            "filename": f"{normalized}-{version}-py3-none-any.whl",
+            "sha256": hashlib.sha256(f"{normalized}-{version}-wheel".encode("utf-8")).hexdigest(),
+        })
+    artifacts.sort(key=lambda row: row["name"])
+    material = {"artifacts": artifacts}
+    return {
+        "contract_version": "v2.0-R1-python-artifact-provenance-1",
+        "artifacts": artifacts,
+        "artifacts_count": len(artifacts),
+        "sha256": hashlib.sha256(
+            json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+        "install_mode": "WHEEL_SHA256_PINNED",
+    }
+
+
 def _python_env(*, version: str = "3.11.14", distributions: list[str] | None = None) -> dict:
     values = list(distributions or ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"])
     material = {
@@ -81,6 +107,7 @@ def _python_env(*, version: str = "3.11.14", distributions: list[str] | None = N
         **material,
         "distributions_count": len(values),
         "sha256": hashlib.sha256(raw).hexdigest(),
+        "artifact_provenance": _artifact_provenance(values),
     }
 
 
@@ -159,6 +186,52 @@ def test_runtime_fingerprint_changes_when_algorithm_or_dependency_changes(tmp_pa
     assert mod.fingerprint(repo)["sha256"] != baseline["sha256"]
 
 
+def test_python_artifact_provenance_reads_pip_reports_and_requires_complete_freeze_coverage(tmp_path):
+    mod = _load_runtime_fingerprint()
+    pip_report = tmp_path / "pip-report.json"
+    runtime_report = tmp_path / "runtime-report.json"
+    pip_report.write_text(json.dumps({
+        "version": "1",
+        "install": [{
+            "download_info": {
+                "url": "https://files.pythonhosted.org/pip-25.2-py3-none-any.whl",
+                "archive_info": {"hashes": {"sha256": "a" * 64}},
+            },
+            "is_direct": False,
+            "is_yanked": False,
+            "metadata": {"name": "pip", "version": "25.2"},
+        }],
+    }), encoding="utf-8")
+    runtime_report.write_text(json.dumps({
+        "version": "1",
+        "install": [{
+            "download_info": {
+                "url": "https://files.pythonhosted.org/FastAPI-0.999.0-py3-none-any.whl",
+                "archive_info": {"hashes": {"sha256": "b" * 64}},
+            },
+            "is_direct": False,
+            "is_yanked": False,
+            "metadata": {"name": "FastAPI", "version": "0.999.0"},
+        }],
+    }), encoding="utf-8")
+
+    result = mod.python_artifact_provenance(
+        [pip_report, runtime_report],
+        distributions=["fastapi==0.999.0", "pip==25.2"],
+    )
+    assert result["contract_version"] == "v2.0-R1-python-artifact-provenance-1"
+    assert result["install_mode"] == "WHEEL_SHA256_PINNED"
+    assert [row["name"] for row in result["artifacts"]] == ["fastapi", "pip"]
+    assert result["artifacts"][0]["sha256"] == "b" * 64
+    assert result["artifacts"][1]["sha256"] == "a" * 64
+
+    with pytest.raises(ValueError, match="does not cover final environment"):
+        mod.python_artifact_provenance(
+            [pip_report],
+            distributions=["fastapi==0.999.0", "pip==25.2"],
+        )
+
+
 def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     path = tmp_path / "build-provenance.json"
     value = _packaged()
@@ -173,6 +246,7 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     assert loaded["source_sha"] == "a" * 40
     assert loaded["runtime_fingerprint"]["sha256"] == "b" * 64
     assert loaded["python_environment"]["sha256"] == _python_env()["sha256"]
+    assert loaded["python_environment"]["artifact_provenance"]["sha256"] == _python_env()["artifact_provenance"]["sha256"]
     assert build_provenance.packaged_build_provenance() == loaded
 
     broken = json.loads(path.read_text(encoding="utf-8"))
@@ -200,6 +274,29 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     path.write_text(json.dumps(value), encoding="utf-8")
     build_provenance.current_build_provenance.cache_clear()
     with pytest.raises(ValueError, match="environment SHA256"):
+        build_provenance.current_build_provenance()
+    build_provenance.current_build_provenance.cache_clear()
+
+
+def test_packaged_build_provenance_rejects_artifact_set_drift(tmp_path, monkeypatch):
+    path = tmp_path / "build-provenance.json"
+    value = _packaged()
+    value.pop("runtime_origin", None)
+    artifact = value["python_environment"]["artifact_provenance"]
+    artifact["artifacts"] = artifact["artifacts"][:-1]
+    artifact["artifacts_count"] = len(artifact["artifacts"])
+    artifact["sha256"] = hashlib.sha256(
+        json.dumps(
+            {"artifacts": artifact["artifacts"]},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    path.write_text(json.dumps(value), encoding="utf-8")
+    monkeypatch.setenv("CHENGZHU_BUILD_PROVENANCE_FILE", str(path))
+    build_provenance.current_build_provenance.cache_clear()
+    with pytest.raises(ValueError, match="set/version does not match"):
         build_provenance.current_build_provenance()
     build_provenance.current_build_provenance.cache_clear()
 

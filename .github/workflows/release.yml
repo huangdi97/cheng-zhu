@@ -107,7 +107,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "candidate runtime fingerprint failed" }
           $candidate = Get-Content dist/release/CANDIDATE_BUILD_PROVENANCE.json -Raw | ConvertFrom-Json
           $runtimeSha = [string]$candidate.runtime_fingerprint.sha256
-          if ($runtimeSha -notmatch '^[0-9a-f]{64}      - name: Stable green-main source wrapper regression
+          if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "candidate runtime fingerprint SHA256 invalid" }
+          "CHENGZHU_RUNTIME_FINGERPRINT_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "candidate runtime fingerprint: $runtimeSha"
+      - name: Stable green-main source wrapper regression
         env:
           GH_TOKEN: regression-token
         shell: pwsh

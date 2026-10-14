@@ -22,6 +22,9 @@ from typing import Any
 
 
 CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-3"
+REQUIRED_WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
+REQUIRED_TOOLCHAIN_CONTRACT = "v2.0-R1-pilot-toolchain-2"
+REQUIRED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-2"
 READY_STATUS = "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
 
 REQUIRED_RELEASE_REVIEW_CHECKS: tuple[tuple[str, str], ...] = (
@@ -171,6 +174,10 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     workspace_contract = str(workspace_meta.get("contract_version") or "")
     if not workspace_contract:
         raise ValueError("workspace.json: missing contract_version")
+    if workspace_contract != REQUIRED_WORKSPACE_CONTRACT:
+        raise ValueError(
+            "Stable handoff requires Pilot Workspace v6 with packaged runtime baseline provenance"
+        )
     _require_equal(
         str(finalization.get("contract_version") or ""),
         workspace_contract,
@@ -185,6 +192,8 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     workspace_toolchain = workspace_meta.get("toolchain")
     if not isinstance(workspace_toolchain, dict):
         raise ValueError("workspace.json: missing frozen evaluator toolchain")
+    if str(workspace_toolchain.get("contract_version") or "") != REQUIRED_TOOLCHAIN_CONTRACT:
+        raise ValueError("Stable handoff requires Pilot Toolchain v2")
     workspace_runtime_baseline = _require_runtime_baseline(
         workspace_meta.get("runtime_baseline"),
         "workspace.json",
@@ -213,6 +222,8 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     _require_hash(stable_path, str(outputs.get("stable_readiness_sha256") or ""), "stable-readiness.json")
     _require_hash(human_path, str(outputs.get("human_report_sha256") or ""), "human-report.json")
 
+    if str(cohort_snapshot.get("contract_version") or "") != REQUIRED_COHORT_SNAPSHOT_CONTRACT:
+        raise ValueError("Stable handoff requires selected cohort snapshot v2")
     workspace_cohort_meta = workspace_outputs.get("selected_cohort_snapshot") or {}
     _require_hash(
         cohort_path,

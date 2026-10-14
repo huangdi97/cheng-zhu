@@ -15,15 +15,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
-CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-3"
-REQUIRED_WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
-REQUIRED_TOOLCHAIN_CONTRACT = "v2.0-R1-pilot-toolchain-2"
+CONTRACT_VERSION = "v2.0-R1-stable-review-handoff-4"
+REQUIRED_WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-7"
+REQUIRED_TOOLCHAIN_CONTRACT = "v2.0-R1-pilot-toolchain-3"
 REQUIRED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-2"
 READY_STATUS = "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
 
@@ -88,7 +89,7 @@ def _require_equal(actual: Any, expected: Any, label: str) -> None:
 def _require_runtime_baseline(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label}: missing packaged runtime baseline")
-    if str(value.get("contract_version") or "") != "v2.0-R1-pilot-runtime-baseline-1":
+    if str(value.get("contract_version") or "") != "v2.0-R1-pilot-runtime-baseline-2":
         raise ValueError(f"{label}: runtime baseline contract mismatch")
     runtime = value.get("runtime_fingerprint")
     if not isinstance(runtime, dict):
@@ -128,6 +129,53 @@ def _require_runtime_baseline(value: Any, label: str) -> dict[str, Any]:
     ).hexdigest()
     if str(python_env.get("sha256") or "").strip().lower() != expected_env_sha:
         raise ValueError(f"{label}: Python environment SHA256 mismatch")
+
+    artifact = python_env.get("artifact_provenance")
+    if not isinstance(artifact, dict):
+        raise ValueError(f"{label}: Python artifact provenance missing")
+    if str(artifact.get("contract_version") or "") != "v2.0-R1-python-artifact-provenance-1":
+        raise ValueError(f"{label}: Python artifact provenance contract mismatch")
+    artifacts = artifact.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ValueError(f"{label}: Python artifact provenance artifacts missing")
+    if int(artifact.get("artifacts_count") or -1) != len(artifacts):
+        raise ValueError(f"{label}: Python artifact provenance count mismatch")
+    normalized: list[dict[str, str]] = []
+    names: set[str] = set()
+    for row in artifacts:
+        if not isinstance(row, dict):
+            raise ValueError(f"{label}: Python artifact provenance row invalid")
+        name = re.sub(r"[-_.]+", "-", str(row.get("name") or "").strip()).lower()
+        version = str(row.get("version") or "").strip()
+        filename = str(row.get("filename") or "").strip()
+        sha256 = str(row.get("sha256") or "").strip().lower()
+        if (
+            not name
+            or not version
+            or not filename.lower().endswith(".whl")
+            or not re.fullmatch(r"[0-9a-f]{64}", sha256)
+        ):
+            raise ValueError(f"{label}: Python artifact provenance row metadata invalid")
+        if name in names:
+            raise ValueError(f"{label}: duplicate Python artifact distribution")
+        names.add(name)
+        normalized.append({
+            "name": name,
+            "version": version,
+            "filename": filename,
+            "sha256": sha256,
+        })
+    normalized.sort(key=lambda row: row["name"])
+    expected_artifact_sha = hashlib.sha256(
+        json.dumps(
+            {"artifacts": normalized},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(artifact.get("sha256") or "").strip().lower() != expected_artifact_sha:
+        raise ValueError(f"{label}: Python artifact provenance SHA256 mismatch")
     return value
 
 
@@ -202,7 +250,7 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
         raise ValueError("workspace.json: missing contract_version")
     if workspace_contract != REQUIRED_WORKSPACE_CONTRACT:
         raise ValueError(
-            "Stable handoff requires Pilot Workspace v6 with packaged runtime baseline provenance"
+            "Stable handoff requires Pilot Workspace v7 with wheel-hash packaged runtime provenance"
         )
     _require_equal(
         str(finalization.get("contract_version") or ""),
@@ -219,7 +267,7 @@ def create_handoff(workspace: Path, out_dir: Path, repo_root: Path) -> dict[str,
     if not isinstance(workspace_toolchain, dict):
         raise ValueError("workspace.json: missing frozen evaluator toolchain")
     if str(workspace_toolchain.get("contract_version") or "") != REQUIRED_TOOLCHAIN_CONTRACT:
-        raise ValueError("Stable handoff requires Pilot Toolchain v2")
+        raise ValueError("Stable handoff requires Pilot Toolchain v3")
     workspace_runtime_baseline = _require_runtime_baseline(
         workspace_meta.get("runtime_baseline"),
         "workspace.json",

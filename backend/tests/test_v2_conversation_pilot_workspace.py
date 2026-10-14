@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from services import build_provenance
 from services.product import conversation_feedback, conversations
 from services.storage import product as store
 
@@ -23,9 +24,30 @@ def _load():
     return mod
 
 
-def _ended_session(space_id: str, *, title: str) -> dict:
+def _packaged_runtime(runtime_sha: str = "b" * 64) -> dict:
+    return {
+        "contract_version": "v2.0-R1-build-provenance-1",
+        "app_version": "2.0.0-beta.10",
+        "source_sha": "a" * 40,
+        "release_channel": "PRERELEASE",
+        "runtime_fingerprint": {
+            "contract_version": "v2.0-R1-runtime-fingerprint-1",
+            "sha256": runtime_sha,
+            "files": 42,
+        },
+        "runtime_origin": "PACKAGED_EMBEDDED",
+        "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
+    }
+
+
+def _ended_session(space_id: str, *, title: str, runtime_sha: str = "b" * 64) -> dict:
     session = conversations.create_session(space_id, title=title, consent_ack=True)
-    conversations.start_session(session["id"])
+    original = build_provenance.current_build_provenance
+    build_provenance.current_build_provenance = lambda: _packaged_runtime(runtime_sha)
+    try:
+        conversations.start_session(session["id"])
+    finally:
+        build_provenance.current_build_provenance = original
     conversations.add_item(
         session["id"],
         item_type="OpenQuestion",
@@ -107,7 +129,7 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     workspace = data["workspace"]
     assert result["contract_version"] == mod.WORKSPACE_CONTRACT
     assert result["evidence_type"] == "LOCAL_OPERATOR_WORKSPACE_NOT_EVIDENCE"
-    assert result["source"]["product_schema_version"] >= 12
+    assert result["source"]["product_schema_version"] >= 13
     assert result["privacy"]["remote_upload"] is False
     assert result["claims"]["REAL_USER_VALIDATED"] is False
     assert result["claims"]["PMF_PROVEN"] is False
@@ -160,6 +182,10 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert frozen_policy["policy_version"] == "v2.0-R1-stable-promotion-8"
     assert frozen_policy["stable_metric_coverage_policy"] == "COMPLETE_FROZEN_ELIGIBLE_POPULATION"
     assert result["policy"]["cross_session_space_user_binding"] == "SINGLE_PSEUDONYMOUS_USER_REF"
+    assert result["runtime_baseline"]["contract_version"] == mod.RUNTIME_BASELINE_CONTRACT
+    assert result["runtime_baseline"]["runtime_origin"] == "PACKAGED_EMBEDDED"
+    assert result["runtime_baseline"]["runtime_fingerprint"]["sha256"] == "b" * 64
+    assert result["runtime_baseline"]["sessions"] == 2
     assert result["toolchain"]["contract_version"] == mod.TOOLCHAIN_FINGERPRINT_CONTRACT
     assert result["toolchain"]["workspace_contract"] == mod.WORKSPACE_CONTRACT
     assert result["toolchain"]["human_eval_report_contract"] == mod.human_eval.REPORT_CONTRACT_VERSION
@@ -273,6 +299,8 @@ def test_inspect_pilot_sessions_is_privacy_minimized_and_reports_quick_debrief(p
     assert project["structural_blockers"] == []
     assert project["consent_ack_recorded"] is True
     assert project["frozen_pack_verified"] is True
+    assert project["runtime_baseline_ready"] is True
+    assert project["runtime_build"]["runtime_fingerprint_sha256"] == "b" * 64
     assert project["local_self_report"]["quick_debrief"] == {
         "continue_accuracy": True,
         "space_reuse_intent": True,

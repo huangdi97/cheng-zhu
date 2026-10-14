@@ -44,6 +44,23 @@ def _runtime_sha() -> str:
     return str(decision.runtime_fingerprint.fingerprint(ROOT)["sha256"])
 
 
+def _python_env() -> dict:
+    distributions = ["fastapi==0.999.0", "pydantic==2.12.5", "pyinstaller==6.16.0"]
+    material = {
+        "python_version": "3.11.14",
+        "implementation": "CPython",
+        "architecture": "AMD64",
+        "distributions": distributions,
+    }
+    raw = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {
+        "contract_version": "v2.0-R1-python-build-environment-1",
+        **material,
+        "distributions_count": len(distributions),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
 def _handoff(tmp_path: Path) -> Path:
     out = tmp_path / "handoff"
     out.mkdir()
@@ -70,6 +87,7 @@ def _handoff(tmp_path: Path) -> Path:
                 "sha256": _runtime_sha(),
                 "files": int(decision.runtime_fingerprint.fingerprint(ROOT)["files"]),
             },
+            "python_environment": _python_env(),
             "source_builds": [
                 {"app_version": "2.0.0-beta.10", "source_sha": "f" * 40},
             ],
@@ -139,11 +157,13 @@ def test_go_decision_produces_exact_sha_bound_authorization_accepted_by_release_
     assert result["claims"]["V2_STABLE_RELEASE"] is False
     assert result["claims"]["PMF_PROVEN"] is False
     token = (out / "stable-release-authorization.b64").read_text(encoding="ascii").strip()
-    verified = verify.verify_authorization(token, source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
+    verified = verify.verify_authorization(token, source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha(), python_environment_sha256=_python_env()["sha256"])
     assert verified["required"] is True
     assert verified["status"] == "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO"
     assert verified["runtime_fingerprint_sha256"] == _runtime_sha()
     assert verified["pilot_runtime_fingerprint_sha256"] == _runtime_sha()
+    assert verified["python_environment_sha256"] == _python_env()["sha256"]
+    assert verified["pilot_python_environment_sha256"] == _python_env()["sha256"]
     assert verified["claims"]["V2_STABLE_RELEASE"] is False
 
 
@@ -244,7 +264,7 @@ def test_release_verifier_requires_token_only_for_stable_v2_plus():
     assert legacy["status"] == "NOT_REQUIRED_LEGACY_STABLE"
 
     with pytest.raises(ValueError, match="requires stable_review_authorization_b64"):
-        verify.verify_authorization("", source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
+        verify.verify_authorization("", source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha(), python_environment_sha256=_python_env()["sha256"])
 
 
 def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monkeypatch):
@@ -265,9 +285,9 @@ def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monke
     token = (out / "stable-release-authorization.b64").read_text(encoding="ascii").strip()
 
     with pytest.raises(ValueError, match="source SHA"):
-        verify.verify_authorization(token, source_sha="3" * 40, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
+        verify.verify_authorization(token, source_sha="3" * 40, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha(), python_environment_sha256=_python_env()["sha256"])
     with pytest.raises(ValueError, match="version"):
-        verify.verify_authorization(token, source_sha=source_sha, version="2.1.0", runtime_fingerprint_sha256=_runtime_sha())
+        verify.verify_authorization(token, source_sha=source_sha, version="2.1.0", runtime_fingerprint_sha256=_runtime_sha(), python_environment_sha256=_python_env()["sha256"])
 
     raw = json.loads(base64.b64decode(token).decode("utf-8"))
     raw["checks"][0]["state"] = "FAIL"
@@ -275,7 +295,7 @@ def test_release_verifier_rejects_source_version_and_check_drift(tmp_path, monke
         json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).decode("ascii")
     with pytest.raises(ValueError, match="non-PASS"):
-        verify.verify_authorization(tampered, source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha())
+        verify.verify_authorization(tampered, source_sha=source_sha, version="2.0.0", runtime_fingerprint_sha256=_runtime_sha(), python_environment_sha256=_python_env()["sha256"])
 
 
 def test_human_go_cannot_be_reused_after_candidate_runtime_drift(tmp_path, monkeypatch):
@@ -331,6 +351,34 @@ def test_release_gate_rejects_go_token_for_different_runtime_fingerprint(tmp_pat
             source_sha=source_sha,
             version="2.0.0",
             runtime_fingerprint_sha256="7" * 64,
+            python_environment_sha256=_python_env()["sha256"],
+        )
+
+
+def test_release_gate_rejects_go_token_for_different_python_environment(tmp_path, monkeypatch):
+    handoff = _handoff(tmp_path)
+    source_sha = "8" * 40
+    _candidate(monkeypatch, source_sha, "2.0.0")
+    draft = tmp_path / "review-python-env.draft.json"
+    decision.init_review(
+        handoff,
+        draft,
+        ROOT,
+        candidate_source_sha=source_sha,
+        candidate_version="2.0.0",
+    )
+    _review_all(draft)
+    out = tmp_path / "decision-python-env"
+    decision.finalize_review(handoff, draft, out, ROOT)
+    token = (out / "stable-release-authorization.b64").read_text(encoding="ascii").strip()
+
+    with pytest.raises(ValueError, match="Python environment"):
+        verify.verify_authorization(
+            token,
+            source_sha=source_sha,
+            version="2.0.0",
+            runtime_fingerprint_sha256=_runtime_sha(),
+            python_environment_sha256="9" * 64,
         )
 
 
@@ -344,7 +392,9 @@ def test_release_workflows_enforce_stable_v2_human_authorization_contract():
         "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO",
         "RELEASE_AUTHORIZATION.json",
         "--runtime-fingerprint-sha256",
+        "--python-environment-sha256",
         "CHENGZHU_RUNTIME_FINGERPRINT_SHA256",
+        "CHENGZHU_PYTHON_ENVIRONMENT_SHA256",
         "BUILD_PROVENANCE.json",
         "--pattern \"BUILD_PROVENANCE.json\"",
         "--pattern \"RELEASE_AUTHORIZATION.json\"",

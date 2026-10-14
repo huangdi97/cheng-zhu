@@ -224,7 +224,7 @@ def _iso_optional(value: float | None) -> str | None:
     return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-SELECTED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-1"
+SELECTED_COHORT_SNAPSHOT_CONTRACT = "v2.0-R1-selected-cohort-snapshot-2"
 
 
 def _canonical_json_sha256(value: Any) -> str:
@@ -305,7 +305,7 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
         session_rows = conn.execute(
             "SELECT s.id, s.space_id, s.template, s.status, s.started_at, s.ended_at, "
             "s.capture_mode, s.processing_mode, s.assistance_mode, "
-            "s.consent_ack, s.pack_id, p.id AS frozen_pack_id, "
+            "s.consent_ack, s.pack_id, s.runtime_provenance_json, p.id AS frozen_pack_id, "
             "p.digest AS frozen_pack_digest, p.payload_json AS frozen_pack_payload_json "
             "FROM conversation_session s "
             "LEFT JOIN conversation_session_pack p "
@@ -372,6 +372,24 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
             profile = str(frozen_fact.get("profile") or profile).upper()
         except ValueError:
             frozen_fact = {}
+        runtime_baseline_ready = False
+        runtime_build: dict[str, Any] = {}
+        if frozen_fact:
+            try:
+                one = _runtime_baseline_from_snapshot({
+                    "sessions": [frozen_fact],
+                })
+                runtime_baseline_ready = True
+                source_build = (one.get("source_builds") or [{}])[0]
+                runtime_build = {
+                    "app_version": source_build.get("app_version") or "",
+                    "source_sha": source_build.get("source_sha") or "",
+                    "runtime_fingerprint_sha256": (
+                        (one.get("runtime_fingerprint") or {}).get("sha256") or ""
+                    ),
+                }
+            except ValueError:
+                pass
         blockers: list[str] = []
         if profile not in pilot_manifest.REQUIRED_PROFILES:
             blockers.append("PROFILE_NOT_LAUNCH_COHORT")
@@ -381,6 +399,8 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
             blockers.append("CONSENT_ACK_NOT_RECORDED")
         if not frozen_pack_verified:
             blockers.append("FROZEN_SESSION_PACK_INTEGRITY_FAILED")
+        if not runtime_baseline_ready:
+            blockers.append("PACKAGED_RUNTIME_BASELINE_REQUIRED")
         if started_at is None:
             blockers.append("STARTED_AT_INVALID")
         if ended_at is None:
@@ -417,6 +437,8 @@ def inspect_pilot_sessions(db: Path) -> dict[str, Any]:
             "ended_at": _iso_optional(ended_at),
             "consent_ack_recorded": consent_ack_recorded,
             "frozen_pack_verified": frozen_pack_verified,
+            "runtime_baseline_ready": runtime_baseline_ready,
+            "runtime_build": runtime_build,
             "structurally_selectable": not blockers,
             "structural_blockers": blockers,
             "local_self_report": {
@@ -867,9 +889,10 @@ This directory is **local evidence workspace**, not a release artifact and not p
    favorable self-report or independent-review subsets, leaving required labels
    null, or using a disallowed source fails closed before Stable evaluation.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
-4. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v6 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
-5. Finalize only after you can truthfully make every required operator attestation.
-6. Evaluate with the finalized manifest plus independent-review file(s).
+4. Use only Sessions created by a packaged prerelease that embeds build provenance. All selected Sessions must share one normalized product-runtime fingerprint. Source-checkout Sessions, pre-v13 historical Sessions, or mixed runtime fingerprints are not Stable-pilot eligible.
+5. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v6 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
+6. Finalize only after you can truthfully make every required operator attestation.
+7. Evaluate with the finalized manifest plus independent-review file(s).
 
 The workspace tool never verifies human identity, real-world authorization, participant consent or PMF.
 A Stable Gate PASS only permits a separate stable-release review.
@@ -904,6 +927,7 @@ def init_workspace(
         finalize=False,
     )
     selected_snapshot = _selected_cohort_snapshot(db, pairs)
+    runtime_baseline = _runtime_baseline_from_snapshot(selected_snapshot)
     selected_ids = {session_id for session_id, _ in pairs}
 
     seed_rows = [
@@ -967,6 +991,7 @@ def init_workspace(
                 "cross_session_space_user_binding": policy.get("cross_session_space_user_binding"),
             },
             "toolchain": _toolchain_fingerprint(),
+            "runtime_baseline": runtime_baseline,
             "cohort": cohort_summary,
             "selected_session_ids": sorted(selected_ids),
             "outputs": {
@@ -1060,6 +1085,7 @@ def finalize_workspace(
         != SELECTED_COHORT_SNAPSHOT_CONTRACT
     ):
         raise ValueError("unsupported selected cohort snapshot contract")
+    runtime_baseline = _require_runtime_baseline(metadata, frozen_cohort_snapshot)
     live_cohort_snapshot = _selected_cohort_snapshot(db, assignments)
     if live_cohort_snapshot != frozen_cohort_snapshot:
         raise ValueError(
@@ -1104,6 +1130,7 @@ def finalize_workspace(
         "final_manifest_sha256": _sha256(final_path),
         "policy_sha256": _sha256(workspace / "stable-promotion-policy.json"),
         "toolchain": toolchain,
+        "runtime_baseline": runtime_baseline,
         "cohort": cohort_summary,
         "attestations_are_operator_declarations": True,
         "real_user_identity_system_verified": False,
@@ -1150,6 +1177,10 @@ def evaluate_workspace(
         str(finalization.get("selected_cohort_snapshot_sha256") or ""),
         "selected-cohort.snapshot.json finalization provenance",
     )
+    frozen_cohort_snapshot = _json_load(cohort_snapshot_path)
+    runtime_baseline = _require_runtime_baseline(metadata, frozen_cohort_snapshot)
+    if finalization.get("runtime_baseline") != runtime_baseline:
+        raise ValueError("finalization/workspace packaged runtime baseline provenance mismatch")
     _require_hash(
         policy_path,
         str((metadata.get("policy") or {}).get("sha256") or ""),
@@ -1237,6 +1268,7 @@ def evaluate_workspace(
             "contract_version": WORKSPACE_CONTRACT,
             "evaluated_at": _utc_now(),
             "toolchain": toolchain,
+            "runtime_baseline": runtime_baseline,
             "inputs": {
                 "selected_cohort_snapshot_sha256": _sha256(cohort_snapshot_path),
                 "selected_cohort_logical_sha256": _canonical_json_sha256(

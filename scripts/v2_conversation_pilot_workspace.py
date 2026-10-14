@@ -111,6 +111,7 @@ def _sha256(path: Path) -> str:
 RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-1"
 BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
+PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
 
 
 def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -121,6 +122,7 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     fingerprints: set[str] = set()
     builds: set[tuple[str, str]] = set()
     file_counts: set[int] = set()
+    python_environments: dict[str, dict[str, Any]] = {}
     for row in sessions:
         session_id = str(row.get("session_id") or "<unknown>")
         provenance = row.get("runtime_provenance")
@@ -156,9 +158,45 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         files = runtime.get("files")
         if isinstance(files, bool) or not isinstance(files, int) or files <= 0:
             raise ValueError(f"{session_id}: runtime fingerprint file count is invalid")
+        python_env = provenance.get("python_environment")
+        if not isinstance(python_env, dict):
+            raise ValueError(f"{session_id}: packaged Python environment provenance is missing")
+        if str(python_env.get("contract_version") or "") != PYTHON_ENVIRONMENT_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported Python environment contract")
+        distributions = python_env.get("distributions")
+        if not isinstance(distributions, list) or any(not isinstance(item, str) for item in distributions):
+            raise ValueError(f"{session_id}: Python environment distributions are invalid")
+        if int(python_env.get("distributions_count") or -1) != len(distributions):
+            raise ValueError(f"{session_id}: Python environment distribution count mismatch")
+        env_material = {
+            "python_version": str(python_env.get("python_version") or ""),
+            "implementation": str(python_env.get("implementation") or ""),
+            "architecture": str(python_env.get("architecture") or ""),
+            "distributions": list(distributions),
+        }
+        env_sha = str(python_env.get("sha256") or "").strip().lower()
+        expected_env_sha = hashlib.sha256(
+            json.dumps(
+                env_material,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        if env_sha != expected_env_sha:
+            raise ValueError(f"{session_id}: Python environment SHA256 mismatch")
+        if not env_material["python_version"] or not env_material["implementation"]:
+            raise ValueError(f"{session_id}: Python environment metadata missing")
+
         fingerprints.add(runtime_sha)
         file_counts.add(files)
         builds.add((version, source_sha))
+        python_environments[env_sha] = {
+            "contract_version": PYTHON_ENVIRONMENT_CONTRACT,
+            **env_material,
+            "distributions_count": len(distributions),
+            "sha256": env_sha,
+        }
 
     if len(fingerprints) != 1 or len(file_counts) != 1:
         raise ValueError(
@@ -166,7 +204,14 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             "do not use old pilot evidence for changed runtime behavior"
         )
 
+    if len(python_environments) != 1:
+        raise ValueError(
+            "selected pilot Sessions span different resolved Python build environments; "
+            "do not mix evidence from dependency-drifted packaged runtimes"
+        )
+
     runtime_sha = next(iter(fingerprints))
+    python_environment = next(iter(python_environments.values()))
     return {
         "contract_version": RUNTIME_BASELINE_CONTRACT,
         "runtime_origin": "PACKAGED_EMBEDDED",
@@ -176,14 +221,15 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             "sha256": runtime_sha,
             "files": next(iter(file_counts)),
         },
+        "python_environment": python_environment,
         "source_builds": [
             {"app_version": version, "source_sha": source_sha}
             for version, source_sha in sorted(builds)
         ],
         "sessions": len(sessions),
         "claim_boundary": (
-            "SAME_NORMALIZED_RUNTIME_SOURCE_FINGERPRINT_NOT_BEHAVIORAL_EQUIVALENCE_"
-            "OR_REAL_USER_IDENTITY_PROOF"
+            "SAME_NORMALIZED_RUNTIME_SOURCE_AND_RESOLVED_PYTHON_ENVIRONMENT_"
+            "NOT_BEHAVIORAL_EQUIVALENCE_OR_REAL_USER_IDENTITY_PROOF"
         ),
     }
 

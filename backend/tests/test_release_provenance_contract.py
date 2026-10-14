@@ -163,13 +163,7 @@ def test_release_embedded_provenance_gate_validates_runtime_python_environment_a
     assert "CHENGZHU_RUNTIME_FINGERPRINT_SHA256" in verify
     assert "CHENGZHU_PYTHON_ENVIRONMENT_SHA256" in verify
     assert "CHENGZHU_PYTHON_ARTIFACT_PROVENANCE_SHA256" in verify
-    assert "$pythonEnvSha -notmatch '^[0-9a-f]{64}
-    # Regression for Release #380: a missing quote/end-anchor in this regex
-    # caused a PowerShell ParserError after sidecar build despite green CI.
-    assert "$pythonEnvSha -notmatch '^[0-9a-f]{64})" not in verify
-
-
-def test_release_replays_pilot_python_wheel_hashes_before_stable_sidecar_build() -> None:
+    assert "$pythonEnvSha -notmatch '^[0-9a-f]{64}def test_release_replays_pilot_python_wheel_hashes_before_stable_sidecar_build() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     replay = _section(
@@ -208,13 +202,7 @@ def test_release_replays_pilot_python_wheel_hashes_before_stable_sidecar_build()
     assert "python scripts/build_sidecar.py --clean" in text
     assert "python scripts/build_sidecar.py --clean" in ci
 " in verify
-    assert "$pythonArtifactSha -notmatch '^[0-9a-f]{64}
-    # Regression for Release #380: a missing quote/end-anchor in this regex
-    # caused a PowerShell ParserError after sidecar build despite green CI.
-    assert "$pythonEnvSha -notmatch '^[0-9a-f]{64})" not in verify
-
-
-def test_release_replays_pilot_python_environment_before_stable_sidecar_build() -> None:
+    assert "$pythonArtifactSha -notmatch '^[0-9a-f]{64}def test_release_replays_pilot_python_environment_before_stable_sidecar_build() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     replay = _section(
@@ -253,6 +241,7 @@ def test_release_replays_pilot_python_environment_before_stable_sidecar_build() 
     # Regression for Release #380: a missing quote/end-anchor in this regex
     # caused a PowerShell ParserError after sidecar build despite green CI.
     assert "$pythonEnvSha -notmatch '^[0-9a-f]{64})" not in verify
+    assert "$pythonArtifactSha -notmatch '^[0-9a-f]{64})" not in verify
 
 
 def test_release_replays_pilot_python_environment_before_stable_sidecar_build() -> None:

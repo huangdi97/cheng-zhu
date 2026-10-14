@@ -170,6 +170,15 @@ export interface ConversationBuildProvenance {
     sha256: string
     files: number
   }
+  python_environment: {
+    contract_version: 'v2.0-R1-python-build-environment-1' | string
+    python_version: string
+    implementation: string
+    architecture: string
+    distributions: string[]
+    distributions_count: number
+    sha256: string
+  }
   runtime_origin: 'PACKAGED_EMBEDDED' | 'SOURCE_CHECKOUT' | string
   claim_boundary: string
 }

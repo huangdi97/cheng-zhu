@@ -22,12 +22,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import runtime_fingerprint
 import v2_conversation_stable_review_handoff as handoff_tool
 
 
-DRAFT_CONTRACT = "v2.0-R1-stable-release-review-draft-1"
-DECISION_CONTRACT = "v2.0-R1-stable-release-review-decision-1"
-AUTHORIZATION_CONTRACT = "v2.0-R1-stable-release-authorization-1"
+DRAFT_CONTRACT = "v2.0-R1-stable-release-review-draft-2"
+DECISION_CONTRACT = "v2.0-R1-stable-release-review-decision-2"
+AUTHORIZATION_CONTRACT = "v2.0-R1-stable-release-authorization-2"
 READY_STATUS = "READY_FOR_HUMAN_STABLE_RELEASE_REVIEW"
 EVIDENCE_READY = "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW"
 
@@ -106,6 +107,48 @@ def _require_repo_candidate(repo_root: Path, source_sha: str, version: str) -> d
     return state
 
 
+def _runtime_equivalence(repo_root: Path, handoff: dict[str, Any]) -> dict[str, Any]:
+    pilot = handoff.get("pilot_runtime_baseline")
+    if not isinstance(pilot, dict):
+        raise ValueError("handoff is missing packaged pilot runtime baseline")
+    pilot_runtime = pilot.get("runtime_fingerprint")
+    if not isinstance(pilot_runtime, dict):
+        raise ValueError("handoff pilot runtime fingerprint missing")
+    if str(pilot_runtime.get("contract_version") or "") != runtime_fingerprint.CONTRACT_VERSION:
+        raise ValueError("handoff pilot runtime fingerprint contract mismatch")
+    pilot_sha = str(pilot_runtime.get("sha256") or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", pilot_sha):
+        raise ValueError("handoff pilot runtime fingerprint SHA256 invalid")
+
+    current = runtime_fingerprint.fingerprint(repo_root.resolve())
+    candidate = {
+        "contract_version": str(current.get("contract_version") or ""),
+        "sha256": str(current.get("sha256") or "").strip().lower(),
+        "files": int(current.get("files") or 0),
+    }
+    if candidate["contract_version"] != runtime_fingerprint.CONTRACT_VERSION:
+        raise ValueError("candidate runtime fingerprint contract mismatch")
+    if candidate["sha256"] != pilot_sha:
+        raise ValueError(
+            "Stable candidate runtime differs from the packaged runtime that produced the pilot evidence; "
+            "run a new prerelease pilot before Stable promotion"
+        )
+    return {
+        "contract_version": "v2.0-R1-stable-runtime-equivalence-1",
+        "pilot_runtime_fingerprint": {
+            "contract_version": runtime_fingerprint.CONTRACT_VERSION,
+            "sha256": pilot_sha,
+            "files": int(pilot_runtime.get("files") or 0),
+        },
+        "candidate_runtime_fingerprint": candidate,
+        "runtime_baseline_match": True,
+        "interpretation": (
+            "Normalized source/runtime fingerprint equality is a release-provenance gate, "
+            "not a proof of behavioral equivalence, real-user identity, or PMF."
+        ),
+    }
+
+
 def _verify_handoff(handoff_dir: Path) -> tuple[dict[str, Any], dict[str, str]]:
     handoff_dir = handoff_dir.resolve()
     handoff_path = handoff_dir / "stable-review-handoff.json"
@@ -170,6 +213,7 @@ def init_review(
     source_sha, version = _validate_candidate(candidate_source_sha, candidate_version)
     handoff, hashes = _verify_handoff(handoff_dir)
     source = _require_repo_candidate(repo_root.resolve(), source_sha, version)
+    runtime_equivalence = _runtime_equivalence(repo_root.resolve(), handoff)
 
     draft = {
         "contract_version": DRAFT_CONTRACT,
@@ -199,6 +243,7 @@ def init_review(
             for check_id, reason in handoff_tool.REQUIRED_RELEASE_REVIEW_CHECKS
         ],
         "source_checkout": source,
+        "runtime_equivalence": runtime_equivalence,
         "claims": {
             "PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW": True,
             "V2_STABLE_RELEASE": False,
@@ -233,6 +278,11 @@ def finalize_review(
     candidate = dict(draft.get("candidate") or {})
     source_sha, version = _validate_candidate(candidate.get("source_sha"), candidate.get("version"))
     source = _require_repo_candidate(repo_root.resolve(), source_sha, version)
+    runtime_equivalence = _runtime_equivalence(repo_root.resolve(), handoff)
+    if draft.get("runtime_equivalence") != runtime_equivalence:
+        raise ValueError(
+            "Stable review draft runtime fingerprint drift; candidate or pilot baseline changed after review init"
+        )
 
     draft_handoff = dict(draft.get("handoff") or {})
     expected_handoff = {
@@ -300,10 +350,13 @@ def finalize_review(
         "checks": normalized_checks,
         "review_check_digest": decision_check_digest,
         "source_checkout": source,
+        "runtime_equivalence": runtime_equivalence,
         "claims": claims,
         "interpretation": (
-            "GO authorizes only the separate exact-SHA Stable release workflow. It is not publication itself. "
-            "NO_GO blocks publication. Neither result verifies identity/consent/reviewer independence or proves PMF."
+            "GO authorizes only the separate exact-SHA Stable release workflow after machine-verifying "
+            "that the candidate normalized runtime fingerprint matches the packaged pilot baseline. It is not "
+            "publication itself. NO_GO blocks publication. Neither result verifies identity/consent/reviewer "
+            "independence, proves behavioral equivalence, or proves PMF."
         ),
     }
 
@@ -315,6 +368,9 @@ def finalize_review(
         "candidate_version": version,
         "handoff_contract_version": handoff["contract_version"],
         "handoff_json_sha256": hashes["handoff_json_sha256"],
+        "pilot_runtime_fingerprint": runtime_equivalence["pilot_runtime_fingerprint"],
+        "candidate_runtime_fingerprint": runtime_equivalence["candidate_runtime_fingerprint"],
+        "runtime_baseline_match": True,
         "review_check_digest": authorization_check_digest,
         "checks": authorization_checks,
         "claims": claims,

@@ -537,6 +537,56 @@ def test_v12_guidance_origin_migration_is_additive_over_v11():
         conn.close()
 
 
+def test_v13_runtime_provenance_migration_is_additive_over_v12_session_rows():
+    from services.storage import product_migrations
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        for version in range(1, 13):
+            apply_step, _name = product_migrations._MIGRATIONS[version]
+            apply_step(conn)
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+
+        conn.execute(
+            "INSERT INTO conversation_space "
+            "(id, title, profile, description, default_goal, default_mode, relationship_key, status, "
+            "selected_source_ids_json, selected_quick_note_ids_json, selected_connector_snapshot_ids_json, "
+            "retention_policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("space-v13", "Runtime", "PROJECT_SYNC", "", "", "BALANCED", "", "ACTIVE",
+             "[]", "[]", "[]", "{}", 1.0, 1.0),
+        )
+        conn.execute(
+            "INSERT INTO conversation_session "
+            "(id, space_id, goal_ids_json, template, title, capture_mode, processing_mode, assistance_mode, "
+            "consent_ack, pack_id, status, state_json, source_calendar_event_json, policy_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("session-v12", "space-v13", "[]", "PROJECT_SYNC", "Runtime", "NOTES_ONLY", "LOCAL",
+             "BALANCED", 1, "", "ENDED", "{}", "{}", "{}", 1.0, 1.0),
+        )
+        conn.commit()
+        before = conn.execute(
+            "SELECT id, title, status FROM conversation_session WHERE id = 'session-v12'"
+        ).fetchone()
+
+        apply_v13, _name = product_migrations._MIGRATIONS[13]
+        apply_v13(conn)
+        conn.execute("PRAGMA user_version = 13")
+        conn.commit()
+
+        assert conn.execute(
+            "SELECT id, title, status FROM conversation_session WHERE id = 'session-v12'"
+        ).fetchone() == before
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(conversation_session)")}
+        assert "runtime_provenance_json" in cols
+        assert conn.execute(
+            "SELECT runtime_provenance_json FROM conversation_session WHERE id = 'session-v12'"
+        ).fetchone()[0] == "{}"
+    finally:
+        conn.close()
+
+
 def test_deleting_product_db_is_a_complete_rollback(v122_env):
     from services.product import goals
     from services.storage import product as product_store

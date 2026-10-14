@@ -16,6 +16,7 @@ import json
 import re
 from typing import Any, Optional
 
+from services import build_provenance as runtime_build_provenance
 from services.product import conversation_connectors, conversation_integrations, conversation_screen, materials
 from services.product.future_profile import (
     AssistanceMode,
@@ -1638,6 +1639,7 @@ def freeze_pack(
             if isinstance(share_privacy_runtime, dict)
             else share_privacy_runtime_status(session)
         ),
+        "runtime_provenance": dict(session.get("runtime_provenance") or {}),
         "policy": {
             **_normalize_session_policy(session.get("policy")),
             "capture_mode": session["capture_mode"],
@@ -1676,6 +1678,16 @@ def start_session(
     session = check["session"]
     if session["status"] == "ENDED":
         raise ValueError("已结束的会话不能重新开始")
+    if session["status"] == "UPCOMING":
+        # Freeze the actual runtime/build identity at Session Start. Do not
+        # backfill provenance onto already-running historical Sessions after an
+        # application update.
+        runtime_provenance = runtime_build_provenance.current_build_provenance()
+        store.update("conversation_session", session_id, {
+            "runtime_provenance": runtime_provenance,
+            "updated_at": store.now(),
+        })
+        session = require_session(session_id)
     share_runtime = share_privacy_runtime_status(session, share_privacy_runtime_proof)
     if share_runtime["requested"] == "PRIVATE_OVERLAY" and not share_runtime["verified"]:
         raise ValueError(
@@ -1856,6 +1868,7 @@ def session_context(session_id: str) -> dict[str, Any]:
             list(_normalize_session_policy(session.get("policy")).get("connector_permissions") or [])
         ),
         "share_privacy_runtime": payload.get("share_privacy_runtime") or share_privacy_runtime_status(session),
+        "runtime_provenance": payload.get("runtime_provenance") or session.get("runtime_provenance") or {},
         "policy": payload.get("policy") or _normalize_session_policy(session.get("policy")),
         "pack_digest": str((pack_row or {}).get("digest") or ""),
     }

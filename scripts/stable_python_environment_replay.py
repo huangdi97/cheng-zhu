@@ -257,6 +257,13 @@ def prepare_replay(
         env,
         distribution_map,
     )
+    authorization_artifact_sha = str(
+        value.get("pilot_python_artifact_provenance_sha256") or ""
+    ).strip().lower()
+    if authorization_artifact_sha != artifact_sha:
+        raise ValueError(
+            "Stable release authorization Python artifact provenance summary drift"
+        )
 
     return {
         "contract_version": CONTRACT_VERSION,

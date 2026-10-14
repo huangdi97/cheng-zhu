@@ -187,6 +187,18 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     value.pop("runtime_origin", None)
     value["python_environment"]["distributions"].append("unexpected==9")
     path.write_text(json.dumps(value), encoding="utf-8")
+    build_provenance.current_build_provenance.cache_clear()
+    with pytest.raises(ValueError, match="distribution count mismatch"):
+        build_provenance.current_build_provenance()
+
+    # Make the structural count self-consistent while deliberately leaving the
+    # environment digest stale. This proves the deeper SHA gate independently
+    # instead of expecting validation to skip the earlier shape invariant.
+    value["python_environment"]["distributions_count"] = len(
+        value["python_environment"]["distributions"]
+    )
+    path.write_text(json.dumps(value), encoding="utf-8")
+    build_provenance.current_build_provenance.cache_clear()
     with pytest.raises(ValueError, match="environment SHA256"):
         build_provenance.current_build_provenance()
     build_provenance.current_build_provenance.cache_clear()

@@ -30,11 +30,11 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-7"
 MIN_PRODUCT_SCHEMA = 13
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
-TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-2"
+TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-3"
 TOOLCHAIN_RELATIVE_PATHS = (
     "scripts/runtime_fingerprint.py",
     "scripts/v2_conversation_pilot_workspace.py",
@@ -69,7 +69,7 @@ def _require_toolchain(metadata: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(frozen, dict):
         raise ValueError(
             "pilot workspace has no frozen evaluator toolchain; historical workspace remains historical evidence "
-            "and cannot be re-evaluated under workspace contract v6"
+            "and cannot be re-evaluated under workspace contract v7"
         )
     current = _toolchain_fingerprint()
     if frozen != current:
@@ -108,10 +108,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-1"
+RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-2"
 BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+PYTHON_ARTIFACT_PROVENANCE_CONTRACT = "v2.0-R1-python-artifact-provenance-1"
 
 
 def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -122,7 +123,7 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     fingerprints: set[str] = set()
     builds: set[tuple[str, str]] = set()
     file_counts: set[int] = set()
-    python_environments: dict[str, dict[str, Any]] = {}
+    python_environments: dict[tuple[str, str], dict[str, Any]] = {}
     for row in sessions:
         session_id = str(row.get("session_id") or "<unknown>")
         provenance = row.get("runtime_provenance")
@@ -188,14 +189,98 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         if not env_material["python_version"] or not env_material["implementation"]:
             raise ValueError(f"{session_id}: Python environment metadata missing")
 
+        artifact = python_env.get("artifact_provenance")
+        if not isinstance(artifact, dict):
+            raise ValueError(
+                f"{session_id}: packaged Python artifact provenance is missing; "
+                "pre-beta.10 runtime cannot become a workspace-v7 Stable baseline"
+            )
+        if str(artifact.get("contract_version") or "") != PYTHON_ARTIFACT_PROVENANCE_CONTRACT:
+            raise ValueError(f"{session_id}: Python artifact provenance contract mismatch")
+        artifacts = artifact.get("artifacts")
+        if not isinstance(artifacts, list) or not artifacts:
+            raise ValueError(f"{session_id}: Python artifact provenance is empty")
+        if int(artifact.get("artifacts_count") or -1) != len(artifacts):
+            raise ValueError(f"{session_id}: Python artifact provenance count mismatch")
+        normalized_artifacts: list[dict[str, str]] = []
+        artifact_names: set[str] = set()
+        for raw_artifact in artifacts:
+            if not isinstance(raw_artifact, dict):
+                raise ValueError(f"{session_id}: Python artifact row invalid")
+            name = re.sub(
+                r"[-_.]+",
+                "-",
+                str(raw_artifact.get("name") or "").strip(),
+            ).lower()
+            artifact_version = str(raw_artifact.get("version") or "").strip()
+            filename = str(raw_artifact.get("filename") or "").strip()
+            artifact_sha256 = str(raw_artifact.get("sha256") or "").strip().lower()
+            if (
+                not name
+                or not artifact_version
+                or not filename.lower().endswith(".whl")
+                or len(artifact_sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in artifact_sha256)
+            ):
+                raise ValueError(f"{session_id}: Python artifact row metadata invalid")
+            if name in artifact_names:
+                raise ValueError(f"{session_id}: duplicate Python artifact distribution")
+            artifact_names.add(name)
+            normalized_artifacts.append({
+                "name": name,
+                "version": artifact_version,
+                "filename": filename,
+                "sha256": artifact_sha256,
+            })
+        normalized_artifacts.sort(key=lambda row: row["name"])
+        artifact_sha = str(artifact.get("sha256") or "").strip().lower()
+        expected_artifact_sha = hashlib.sha256(
+            json.dumps(
+                {"artifacts": normalized_artifacts},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        if artifact_sha != expected_artifact_sha:
+            raise ValueError(f"{session_id}: Python artifact provenance SHA256 mismatch")
+
+        distribution_map: dict[str, str] = {}
+        for raw_distribution in distributions:
+            match = re.fullmatch(
+                r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\\s;]+)",
+                str(raw_distribution or "").strip(),
+            )
+            if not match:
+                raise ValueError(f"{session_id}: Python distribution is not exact name==version")
+            distribution_map[
+                re.sub(r"[-_.]+", "-", match.group("name")).lower()
+            ] = match.group("version")
+        if artifact_names != set(distribution_map):
+            raise ValueError(
+                f"{session_id}: Python artifact set does not cover resolved distributions"
+            )
+        for artifact_row in normalized_artifacts:
+            if distribution_map[artifact_row["name"]] != artifact_row["version"]:
+                raise ValueError(
+                    f"{session_id}: Python artifact version differs from resolved distribution"
+                )
+
         fingerprints.add(runtime_sha)
         file_counts.add(files)
         builds.add((version, source_sha))
-        python_environments[env_sha] = {
+        python_environments[(env_sha, artifact_sha)] = {
             "contract_version": PYTHON_ENVIRONMENT_CONTRACT,
             **env_material,
             "distributions_count": len(distributions),
             "sha256": env_sha,
+            "artifact_provenance": {
+                "contract_version": PYTHON_ARTIFACT_PROVENANCE_CONTRACT,
+                "artifacts": normalized_artifacts,
+                "artifacts_count": len(normalized_artifacts),
+                "sha256": artifact_sha,
+                "install_mode": "WHEEL_SHA256_PINNED",
+            },
         }
 
     if len(fingerprints) != 1 or len(file_counts) != 1:
@@ -206,7 +291,7 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
     if len(python_environments) != 1:
         raise ValueError(
-            "selected pilot Sessions span different resolved Python build environments; "
+            "selected pilot Sessions span different resolved Python build environments/artifacts; "
             "do not mix evidence from dependency-drifted packaged runtimes"
         )
 
@@ -228,7 +313,7 @@ def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         ],
         "sessions": len(sessions),
         "claim_boundary": (
-            "SAME_NORMALIZED_RUNTIME_SOURCE_AND_RESOLVED_PYTHON_ENVIRONMENT_"
+            "SAME_NORMALIZED_RUNTIME_SOURCE_RESOLVED_PYTHON_ENVIRONMENT_AND_WHEEL_ARTIFACTS_"
             "NOT_BEHAVIORAL_EQUIVALENCE_OR_REAL_USER_IDENTITY_PROOF"
         ),
     }
@@ -239,7 +324,7 @@ def _require_runtime_baseline(metadata: dict[str, Any], snapshot: dict[str, Any]
     if not isinstance(frozen, dict):
         raise ValueError(
             "pilot workspace has no frozen packaged runtime baseline; "
-            "historical workspace remains historical evidence and cannot be upgraded to workspace contract v6"
+            "historical workspace remains historical evidence and cannot be upgraded to workspace contract v7"
         )
     current = _runtime_baseline_from_snapshot(snapshot)
     if frozen != current:

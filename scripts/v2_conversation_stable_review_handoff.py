@@ -2,7 +2,7 @@
 """Create a privacy-minimized Stable release-review handoff from a PASS pilot workspace.
 
 This tool runs *after* the frozen evaluator has completed. It does not change
-Pilot Workspace v5 evaluator semantics, publish a release, verify human identity
+Pilot Workspace v7 evaluator/runtime semantics, publish a release, verify human identity
 or participant consent, or prove PMF.
 
 A handoff may be created only when the immutable workspace evaluation says

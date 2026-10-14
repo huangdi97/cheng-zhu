@@ -83,6 +83,8 @@ def _python_env(distributions: list[str] | None = None) -> dict:
 
 
 def _token(*, env: dict | None = None, source: str = "a" * 40, runtime: str = "b" * 64) -> str:
+    resolved_env = env if env is not None else _python_env()
+    artifact_sha = str((resolved_env.get("artifact_provenance") or {}).get("sha256") or "")
     value = {
         "contract_version": "v2.0-R1-stable-release-authorization-3",
         "decision": "GO",
@@ -94,8 +96,8 @@ def _token(*, env: dict | None = None, source: str = "a" * 40, runtime: str = "b
             "sha256": runtime,
             "files": 42,
         },
-        "pilot_python_environment": env or _python_env(),
-        "pilot_python_artifact_provenance_sha256": (env or _python_env())["artifact_provenance"]["sha256"],
+        "pilot_python_environment": resolved_env,
+        "pilot_python_artifact_provenance_sha256": artifact_sha,
         "candidate_runtime_fingerprint": {
             "contract_version": "v2.0-R1-runtime-fingerprint-1",
             "sha256": runtime,

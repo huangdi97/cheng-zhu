@@ -133,13 +133,21 @@ def _runtime_equivalence(repo_root: Path, handoff: dict[str, Any]) -> dict[str, 
             "Stable candidate runtime differs from the packaged runtime that produced the pilot evidence; "
             "run a new prerelease pilot before Stable promotion"
         )
+    pilot_python_environment = pilot.get("python_environment")
+    if not isinstance(pilot_python_environment, dict):
+        raise ValueError("handoff pilot Python environment baseline missing")
+    pilot_env_sha = str(pilot_python_environment.get("sha256") or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", pilot_env_sha):
+        raise ValueError("handoff pilot Python environment SHA256 invalid")
+
     return {
-        "contract_version": "v2.0-R1-stable-runtime-equivalence-1",
+        "contract_version": "v2.0-R1-stable-runtime-equivalence-2",
         "pilot_runtime_fingerprint": {
             "contract_version": runtime_fingerprint.CONTRACT_VERSION,
             "sha256": pilot_sha,
             "files": int(pilot_runtime.get("files") or 0),
         },
+        "pilot_python_environment": pilot_python_environment,
         "candidate_runtime_fingerprint": candidate,
         "runtime_baseline_match": True,
         "interpretation": (
@@ -369,6 +377,7 @@ def finalize_review(
         "handoff_contract_version": handoff["contract_version"],
         "handoff_json_sha256": hashes["handoff_json_sha256"],
         "pilot_runtime_fingerprint": runtime_equivalence["pilot_runtime_fingerprint"],
+        "pilot_python_environment": runtime_equivalence["pilot_python_environment"],
         "candidate_runtime_fingerprint": runtime_equivalence["candidate_runtime_fingerprint"],
         "runtime_baseline_match": True,
         "review_check_digest": authorization_check_digest,

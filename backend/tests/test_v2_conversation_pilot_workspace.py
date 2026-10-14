@@ -1,6 +1,7 @@
 """Pilot workspace orchestration must reduce operator error without inventing evidence."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -24,7 +25,28 @@ def _load():
     return mod
 
 
-def _packaged_runtime(runtime_sha: str = "b" * 64) -> dict:
+def _python_env(*, marker: str = "baseline") -> dict:
+    distributions = [f"fastapi==0.999.0+{marker}", "pydantic==2.12.5", "pyinstaller==6.16.0"]
+    material = {
+        "python_version": "3.11.14",
+        "implementation": "CPython",
+        "architecture": "AMD64",
+        "distributions": distributions,
+    }
+    raw = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {
+        "contract_version": "v2.0-R1-python-build-environment-1",
+        **material,
+        "distributions_count": len(distributions),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def _packaged_runtime(
+    runtime_sha: str = "b" * 64,
+    *,
+    python_env: dict | None = None,
+) -> dict:
     return {
         "contract_version": "v2.0-R1-build-provenance-1",
         "app_version": "2.0.0-beta.10",
@@ -35,15 +57,25 @@ def _packaged_runtime(runtime_sha: str = "b" * 64) -> dict:
             "sha256": runtime_sha,
             "files": 42,
         },
+        "python_environment": python_env or _python_env(),
         "runtime_origin": "PACKAGED_EMBEDDED",
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
     }
 
 
-def _ended_session(space_id: str, *, title: str, runtime_sha: str = "b" * 64) -> dict:
+def _ended_session(
+    space_id: str,
+    *,
+    title: str,
+    runtime_sha: str = "b" * 64,
+    python_env: dict | None = None,
+) -> dict:
     session = conversations.create_session(space_id, title=title, consent_ack=True)
     original = build_provenance.current_build_provenance
-    build_provenance.current_build_provenance = lambda: _packaged_runtime(runtime_sha)
+    build_provenance.current_build_provenance = lambda: _packaged_runtime(
+        runtime_sha,
+        python_env=python_env,
+    )
     try:
         conversations.start_session(session["id"])
     finally:
@@ -185,6 +217,7 @@ def test_init_workspace_is_selected_session_only_and_fail_closed(product_env, tm
     assert result["runtime_baseline"]["contract_version"] == mod.RUNTIME_BASELINE_CONTRACT
     assert result["runtime_baseline"]["runtime_origin"] == "PACKAGED_EMBEDDED"
     assert result["runtime_baseline"]["runtime_fingerprint"]["sha256"] == "b" * 64
+    assert result["runtime_baseline"]["python_environment"]["sha256"] == _python_env()["sha256"]
     assert result["runtime_baseline"]["sessions"] == 2
     assert result["toolchain"]["contract_version"] == mod.TOOLCHAIN_FINGERPRINT_CONTRACT
     assert result["toolchain"]["workspace_contract"] == mod.WORKSPACE_CONTRACT
@@ -1045,6 +1078,24 @@ def test_workspace_rejects_pre_v13_or_source_checkout_session_provenance(product
             Path(store.DB_PATH),
             [(session["id"], "pilot-user-historical")],
             tmp_path / "historical-workspace",
+        )
+
+
+def test_workspace_rejects_mixed_resolved_python_environments(product_env, tmp_path):
+    mod = _load()
+    project = conversations.create_space("Python Env A", "PROJECT_SYNC")
+    design = conversations.create_space("Python Env B", "DESIGN_REVIEW")
+    first = _ended_session(project["id"], title="A", python_env=_python_env(marker="a"))
+    second = _ended_session(design["id"], title="B", python_env=_python_env(marker="b"))
+
+    with pytest.raises(ValueError, match="different resolved Python build environments"):
+        mod.init_workspace(
+            Path(store.DB_PATH),
+            [
+                (first["id"], "pilot-user-a"),
+                (second["id"], "pilot-user-b"),
+            ],
+            tmp_path / "mixed-python-env-workspace",
         )
 
 

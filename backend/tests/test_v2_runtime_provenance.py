@@ -84,11 +84,33 @@ def _python_env(*, version: str = "3.11.14", distributions: list[str] | None = N
     }
 
 
+def _node_env(
+    *,
+    node_version: str = "22.20.0",
+    npm_version: str = "10.9.3",
+    platform: str = "win32",
+    architecture: str = "x64",
+) -> dict:
+    material = {
+        "node_version": node_version,
+        "npm_version": npm_version,
+        "platform": platform,
+        "architecture": architecture,
+    }
+    raw = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {
+        "contract_version": "v2.0-R1-node-build-environment-1",
+        **material,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
 def _packaged(
     version: str = "2.0.0-beta.10",
     *,
     runtime_sha: str = "b" * 64,
     python_env: dict | None = None,
+    node_env: dict | None = None,
 ) -> dict:
     return {
         "contract_version": "v2.0-R1-build-provenance-1",
@@ -101,6 +123,7 @@ def _packaged(
             "files": 42,
         },
         "python_environment": python_env or _python_env(),
+        "node_environment": node_env or _node_env(),
         "runtime_origin": "PACKAGED_EMBEDDED",
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
     }
@@ -173,6 +196,7 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     assert loaded["source_sha"] == "a" * 40
     assert loaded["runtime_fingerprint"]["sha256"] == "b" * 64
     assert loaded["python_environment"]["sha256"] == _python_env()["sha256"]
+    assert loaded["node_environment"]["sha256"] == _node_env()["sha256"]
     assert build_provenance.packaged_build_provenance() == loaded
 
     broken = json.loads(path.read_text(encoding="utf-8"))
@@ -200,6 +224,23 @@ def test_packaged_build_provenance_reader_is_fail_closed(tmp_path, monkeypatch):
     path.write_text(json.dumps(value), encoding="utf-8")
     build_provenance.current_build_provenance.cache_clear()
     with pytest.raises(ValueError, match="environment SHA256"):
+        build_provenance.current_build_provenance()
+    build_provenance.current_build_provenance.cache_clear()
+
+    value = _packaged()
+    value.pop("runtime_origin", None)
+    value.pop("node_environment", None)
+    path.write_text(json.dumps(value), encoding="utf-8")
+    build_provenance.current_build_provenance.cache_clear()
+    with pytest.raises(ValueError, match="node_environment missing"):
+        build_provenance.current_build_provenance()
+
+    value = _packaged()
+    value.pop("runtime_origin", None)
+    value["node_environment"]["npm_version"] = "99.0.0"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    build_provenance.current_build_provenance.cache_clear()
+    with pytest.raises(ValueError, match="Node build environment SHA256"):
         build_provenance.current_build_provenance()
     build_provenance.current_build_provenance.cache_clear()
 

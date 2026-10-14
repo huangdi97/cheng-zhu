@@ -50,23 +50,14 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, cwd=ROOT)
 
 
-def constrained_bootstrap_packages() -> list[str]:
-    constraint = str(os.environ.get("PIP_CONSTRAINT") or "").strip()
-    if not constraint:
-        return ["pip"]
-    path = Path(constraint)
+def _existing_file_from_env(name: str) -> Path | None:
+    value = str(os.environ.get(name) or "").strip()
+    if not value:
+        return None
+    path = Path(value).resolve()
     if not path.is_file():
-        raise RuntimeError(f"PIP_CONSTRAINT does not exist: {path}")
-    names = {
-        re.sub(r"[-_.]+", "-", line.split("==", 1)[0].strip()).lower()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and "==" in line
-    }
-    # These may be seeded by venv rather than pulled as normal dependencies.
-    # Explicitly requesting the ones present in the pilot constraint set makes
-    # their resolved versions reproducible too. Constraints still prevent any
-    # version from drifting.
-    return [name for name in ("pip", "setuptools", "wheel") if name in names] or ["pip"]
+        raise RuntimeError(f"{name} does not exist: {path}")
+    return path
 
 
 def main() -> int:
@@ -98,12 +89,70 @@ def main() -> int:
             f"existing sidecar venv uses Python {venv_version}, expected {required}; "
             "re-run with --clean"
         )
-    bootstrap = constrained_bootstrap_packages()
-    run([str(py), "-m", "pip", "install", "--upgrade", *bootstrap, "--quiet"])
-    run([str(py), "-m", "pip", "install", "-r", "backend/requirements.txt", "pyinstaller>=6.10,<7", "--quiet"])
+    provenance_dir = ROOT / "build" / "provenance"
+    provenance_dir.mkdir(parents=True, exist_ok=True)
+    bootstrap_report = provenance_dir / "pip-bootstrap-install-report.json"
+    runtime_report = provenance_dir / "pip-runtime-install-report.json"
+    for report in (bootstrap_report, runtime_report):
+        if report.exists():
+            report.unlink()
 
-    provenance_path = ROOT / "build" / "provenance" / "build-provenance.json"
-    python_env = runtime_fingerprint.python_environment(py)
+    stable_bootstrap = _existing_file_from_env("CHENGZHU_STABLE_PYTHON_BOOTSTRAP_REQUIREMENTS")
+    stable_runtime = _existing_file_from_env("CHENGZHU_STABLE_PYTHON_RUNTIME_REQUIREMENTS")
+    if bool(stable_bootstrap) != bool(stable_runtime):
+        raise RuntimeError("Stable Python hash replay requires both bootstrap and runtime requirement files")
+
+    common_install = [
+        "--no-cache-dir",
+        "--only-binary",
+        ":all:",
+    ]
+    if stable_bootstrap and stable_runtime:
+        run([
+            str(py), "-m", "pip", "install",
+            "--force-reinstall",
+            "--require-hashes",
+            *common_install,
+            "--report", str(bootstrap_report),
+            "-r", str(stable_bootstrap),
+            "--quiet",
+        ])
+        run([
+            str(py), "-m", "pip", "install",
+            "--require-hashes",
+            *common_install,
+            "--report", str(runtime_report),
+            "-r", str(stable_runtime),
+            "--quiet",
+        ])
+    else:
+        # Force a network-resolved pip wheel into the report as well.  The
+        # final artifact provenance must cover every distribution in pip freeze,
+        # including the build installer itself.
+        run([
+            str(py), "-m", "pip", "install",
+            "--upgrade",
+            "--force-reinstall",
+            *common_install,
+            "--report", str(bootstrap_report),
+            "pip",
+            "--quiet",
+        ])
+        run([
+            str(py), "-m", "pip", "install",
+            *common_install,
+            "--report", str(runtime_report),
+            "-r", "backend/requirements.txt",
+            "pyinstaller>=6.10,<7",
+            "--quiet",
+        ])
+
+    provenance_path = provenance_dir / "build-provenance.json"
+    python_env = runtime_fingerprint.python_environment(
+        py,
+        install_report_paths=[bootstrap_report, runtime_report],
+        require_artifact_provenance=True,
+    )
     expected_env_sha = str(
         os.environ.get("CHENGZHU_EXPECTED_PYTHON_ENVIRONMENT_SHA256") or ""
     ).strip().lower()
@@ -111,6 +160,16 @@ def main() -> int:
         raise RuntimeError(
             "resolved sidecar Python environment does not match the Stable pilot baseline: "
             f"{python_env['sha256']} != {expected_env_sha}"
+        )
+    expected_artifact_sha = str(
+        os.environ.get("CHENGZHU_EXPECTED_PYTHON_ARTIFACT_PROVENANCE_SHA256") or ""
+    ).strip().lower()
+    artifact = python_env.get("artifact_provenance") or {}
+    artifact_sha = str(artifact.get("sha256") or "").strip().lower()
+    if expected_artifact_sha and artifact_sha != expected_artifact_sha:
+        raise RuntimeError(
+            "resolved sidecar Python artifacts do not match the Stable pilot baseline: "
+            f"{artifact_sha or 'MISSING'} != {expected_artifact_sha}"
         )
     provenance = runtime_fingerprint.build_provenance(
         ROOT,
@@ -124,6 +183,7 @@ def main() -> int:
         provenance["source_sha"],
         provenance["runtime_fingerprint"]["sha256"],
         provenance["python_environment"]["sha256"],
+        provenance["python_environment"]["artifact_provenance"]["sha256"],
         flush=True,
     )
 

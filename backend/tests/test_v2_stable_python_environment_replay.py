@@ -132,7 +132,7 @@ def test_prepare_replay_generates_hash_checked_wheel_requirements():
         required_python_version="3.13.16",
         current_python=_current(),
     )
-    assert result["contract_version"] == "v2.0-R1-stable-python-environment-replay-1"
+    assert result["contract_version"] == "v2.0-R1-stable-python-environment-replay-2"
     assert result["python_version"] == "3.13.16"
     hashes = {
         row["name"]: row["sha256"]

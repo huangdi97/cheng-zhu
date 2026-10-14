@@ -6,6 +6,7 @@ origin stays SOURCE_CHECKOUT and is not eligible for Stable pilot evidence.
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os

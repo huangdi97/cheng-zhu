@@ -38,10 +38,12 @@ def main() -> int:
 
     provenance_path = ROOT / "build" / "provenance" / "build-provenance.json"
     python_env = runtime_fingerprint.python_environment(py)
+    node_env = runtime_fingerprint.node_environment()
     provenance = runtime_fingerprint.build_provenance(
         ROOT,
         exact_source_sha=(os.environ.get("CHENGZHU_RELEASE_SOURCE_SHA") or None),
         python_environment_value=python_env,
+        node_environment_value=node_env,
     )
     runtime_fingerprint.write_json(provenance_path, provenance)
     print(
@@ -50,6 +52,7 @@ def main() -> int:
         provenance["source_sha"],
         provenance["runtime_fingerprint"]["sha256"],
         provenance["python_environment"]["sha256"],
+        provenance["node_environment"]["sha256"],
         flush=True,
     )
 

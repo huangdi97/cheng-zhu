@@ -102,6 +102,32 @@ def _require_runtime_baseline(value: Any, label: str) -> dict[str, Any]:
         raise ValueError(f"{label}: runtime baseline is not packaged")
     if str(value.get("release_channel") or "") != "PRERELEASE":
         raise ValueError(f"{label}: runtime baseline is not prerelease")
+    python_env = value.get("python_environment")
+    if not isinstance(python_env, dict):
+        raise ValueError(f"{label}: packaged Python environment baseline missing")
+    if str(python_env.get("contract_version") or "") != "v2.0-R1-python-build-environment-1":
+        raise ValueError(f"{label}: Python environment contract mismatch")
+    distributions = python_env.get("distributions")
+    if not isinstance(distributions, list) or any(not isinstance(item, str) for item in distributions):
+        raise ValueError(f"{label}: Python environment distributions invalid")
+    if int(python_env.get("distributions_count") or -1) != len(distributions):
+        raise ValueError(f"{label}: Python environment distribution count mismatch")
+    env_material = {
+        "python_version": str(python_env.get("python_version") or ""),
+        "implementation": str(python_env.get("implementation") or ""),
+        "architecture": str(python_env.get("architecture") or ""),
+        "distributions": list(distributions),
+    }
+    expected_env_sha = hashlib.sha256(
+        json.dumps(
+            env_material,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if str(python_env.get("sha256") or "").strip().lower() != expected_env_sha:
+        raise ValueError(f"{label}: Python environment SHA256 mismatch")
     return value
 
 

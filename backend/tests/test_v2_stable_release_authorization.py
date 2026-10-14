@@ -343,6 +343,10 @@ def test_release_workflows_enforce_stable_v2_human_authorization_contract():
         "scripts/verify_stable_release_authorization.py",
         "VERIFIED_HUMAN_STABLE_RELEASE_REVIEW_GO",
         "RELEASE_AUTHORIZATION.json",
+        "--runtime-fingerprint-sha256",
+        "CHENGZHU_RUNTIME_FINGERPRINT_SHA256",
+        "BUILD_PROVENANCE.json",
+        "--pattern \"BUILD_PROVENANCE.json\"",
         "--pattern \"RELEASE_AUTHORIZATION.json\"",
     ):
         assert token in release

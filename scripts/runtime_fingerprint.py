@@ -22,10 +22,13 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from typing import Iterable
+from urllib.parse import unquote, urlparse
 
 
 CONTRACT_VERSION = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+PYTHON_ARTIFACT_PROVENANCE_CONTRACT = "v2.0-R1-python-artifact-provenance-1"
 
 # Runtime-bearing tracked paths. Keep evaluator/release/tests/docs out; include
 # packaging/build inputs that can change the shipped product.
@@ -196,7 +199,136 @@ def app_version(repo: Path) -> str:
     return version
 
 
-def python_environment(python_executable: Path | str) -> dict[str, object]:
+def _normalize_distribution_name(value: str) -> str:
+    return re.sub(r"[-_.]+", "-", str(value or "").strip()).lower()
+
+
+def _distribution_pairs(distributions: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for raw in distributions:
+        value = str(raw or "").strip()
+        match = re.fullmatch(
+            r"(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)==(?P<version>[^\s;]+)",
+            value,
+        )
+        if not match:
+            raise ValueError(
+                "packaged Python environment requires exact name==version distributions; "
+                f"unsupported freeze entry: {value!r}"
+            )
+        name = _normalize_distribution_name(match.group("name"))
+        version = match.group("version")
+        previous = out.get(name)
+        if previous is not None and previous != version:
+            raise ValueError(f"conflicting packaged Python distribution versions: {name}")
+        out[name] = version
+    return out
+
+
+def python_artifact_provenance(
+    install_report_paths: Iterable[Path | str],
+    *,
+    distributions: list[str],
+) -> dict[str, object]:
+    expected = _distribution_pairs(distributions)
+    artifacts_by_name: dict[str, dict[str, str]] = {}
+
+    for raw_path in install_report_paths:
+        path = Path(raw_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"pip installation report missing: {path}")
+        report = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(report, dict) or str(report.get("version") or "") != "1":
+            raise ValueError(f"unsupported pip installation report: {path}")
+        install = report.get("install")
+        if not isinstance(install, list):
+            raise ValueError(f"pip installation report has no install list: {path}")
+
+        for row in install:
+            if not isinstance(row, dict):
+                raise ValueError(f"pip installation report row is invalid: {path}")
+            metadata = row.get("metadata")
+            download = row.get("download_info")
+            if not isinstance(metadata, dict) or not isinstance(download, dict):
+                raise ValueError("pip report entry is missing metadata/download_info")
+            if bool(row.get("is_direct")):
+                raise ValueError("direct/VCS/local Python distributions are not replay-safe")
+            if bool(row.get("is_yanked")):
+                raise ValueError("yanked Python distributions are not accepted for pilot baseline")
+
+            name = _normalize_distribution_name(str(metadata.get("name") or ""))
+            version = str(metadata.get("version") or "").strip()
+            if not name or not version:
+                raise ValueError("pip report entry is missing package name/version")
+
+            archive = download.get("archive_info")
+            hashes = archive.get("hashes") if isinstance(archive, dict) else None
+            sha256 = str((hashes or {}).get("sha256") or "").strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+                raise ValueError(
+                    f"{name}=={version}: pip report is missing archive sha256"
+                )
+
+            url = str(download.get("url") or "").strip()
+            filename = unquote(Path(urlparse(url).path).name)
+            if not filename.lower().endswith(".whl"):
+                raise ValueError(
+                    f"{name}=={version}: only wheel artifacts are accepted for replay"
+                )
+
+            artifact = {
+                "name": name,
+                "version": version,
+                "filename": filename,
+                "sha256": sha256,
+            }
+            previous = artifacts_by_name.get(name)
+            if previous is not None and previous != artifact:
+                raise ValueError(f"conflicting artifact provenance for distribution: {name}")
+            artifacts_by_name[name] = artifact
+
+    missing = sorted(set(expected) - set(artifacts_by_name))
+    unexpected = sorted(set(artifacts_by_name) - set(expected))
+    if missing:
+        raise ValueError(
+            "pip artifact provenance does not cover final environment distributions: "
+            + ", ".join(missing)
+        )
+    if unexpected:
+        raise ValueError(
+            "pip artifact provenance contains packages absent from final environment: "
+            + ", ".join(unexpected)
+        )
+    for name, version in expected.items():
+        if artifacts_by_name[name]["version"] != version:
+            raise ValueError(
+                f"artifact version differs from final environment: {name} "
+                f"{artifacts_by_name[name]['version']} != {version}"
+            )
+
+    artifacts = [artifacts_by_name[name] for name in sorted(artifacts_by_name)]
+    material = {"artifacts": artifacts}
+    raw = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "contract_version": PYTHON_ARTIFACT_PROVENANCE_CONTRACT,
+        "artifacts": artifacts,
+        "artifacts_count": len(artifacts),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "install_mode": "WHEEL_SHA256_PINNED",
+    }
+
+
+def python_environment(
+    python_executable: Path | str,
+    *,
+    install_report_paths: Iterable[Path | str] | None = None,
+    require_artifact_provenance: bool = False,
+) -> dict[str, object]:
     python_executable = str(python_executable)
     meta_raw = subprocess.check_output(
         [
@@ -239,12 +371,21 @@ def python_environment(python_executable: Path | str) -> dict[str, object]:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    return {
+    result: dict[str, object] = {
         "contract_version": PYTHON_ENVIRONMENT_CONTRACT,
         **material,
         "distributions_count": len(distributions),
         "sha256": hashlib.sha256(raw).hexdigest(),
     }
+    report_paths = list(install_report_paths or [])
+    if report_paths:
+        result["artifact_provenance"] = python_artifact_provenance(
+            report_paths,
+            distributions=distributions,
+        )
+    elif require_artifact_provenance:
+        raise ValueError("packaged build requires pip artifact provenance reports")
+    return result
 
 
 def build_provenance(

@@ -27,7 +27,7 @@ import runtime_fingerprint
 import v2_stable_release_review_decision as decision_tool
 
 
-CONTRACT_VERSION = "v2.0-R1-stable-python-environment-replay-1"
+CONTRACT_VERSION = "v2.0-R1-stable-python-environment-replay-2"
 _PIN_RE = re.compile(
     r"^(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)=="
     r"(?P<version>[A-Za-z0-9][A-Za-z0-9.!+_-]*)$"

@@ -897,7 +897,7 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 当前公开下载仍是 `v2.0.0-beta.7`，但 post-beta.7 审计已经冻结 Stable Policy v8 的 COMPLETE_FROZEN_ELIGIBLE_POPULATION 规则；**新的 Stable-readiness pilot workspace 不再以 Policy v7 作为 canonical 基线**。等待 `v2.0.0-beta.8` exact-SHA prerelease 完成后，优先使用 beta.8 进行授权 Project Sync / Design Review dogfood / real pilot；
+1. 当前公开下载是 `v2.0.0-beta.9`；post-beta.9 source 已继续关闭 Stable release handoff / human GO / current-main、schema v13 packaged runtime provenance、exact Python 3.13.16 environment 与 exact wheel SHA256 replay。**新的 Stable-readiness pilot 不应再以 beta.9 作为当前 source Stable handoff 的 canonical runtime baseline**；等待 `v2.0.0-beta.10` exact-SHA prerelease 成功后，使用 beta.10（Workspace v7 / Runtime Baseline v2 / Python Artifact Provenance v1）创建新的授权 Project Sync / Design Review pilot evidence；
 2. 进行真实 Project Sync / Design Review 小规模使用；
 3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；

@@ -50,6 +50,25 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, cwd=ROOT)
 
 
+def constrained_bootstrap_packages() -> list[str]:
+    constraint = str(os.environ.get("PIP_CONSTRAINT") or "").strip()
+    if not constraint:
+        return ["pip"]
+    path = Path(constraint)
+    if not path.is_file():
+        raise RuntimeError(f"PIP_CONSTRAINT does not exist: {path}")
+    names = {
+        re.sub(r"[-_.]+", "-", line.split("==", 1)[0].strip()).lower()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and "==" in line
+    }
+    # These may be seeded by venv rather than pulled as normal dependencies.
+    # Explicitly requesting the ones present in the pilot constraint set makes
+    # their resolved versions reproducible too. Constraints still prevent any
+    # version from drifting.
+    return [name for name in ("pip", "setuptools", "wheel") if name in names] or ["pip"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--python", default=sys.executable, help="interpreter used to create the venv")
@@ -79,11 +98,20 @@ def main() -> int:
             f"existing sidecar venv uses Python {venv_version}, expected {required}; "
             "re-run with --clean"
         )
-    run([str(py), "-m", "pip", "install", "--upgrade", "pip", "--quiet"])
+    bootstrap = constrained_bootstrap_packages()
+    run([str(py), "-m", "pip", "install", "--upgrade", *bootstrap, "--quiet"])
     run([str(py), "-m", "pip", "install", "-r", "backend/requirements.txt", "pyinstaller>=6.10,<7", "--quiet"])
 
     provenance_path = ROOT / "build" / "provenance" / "build-provenance.json"
     python_env = runtime_fingerprint.python_environment(py)
+    expected_env_sha = str(
+        os.environ.get("CHENGZHU_EXPECTED_PYTHON_ENVIRONMENT_SHA256") or ""
+    ).strip().lower()
+    if expected_env_sha and python_env["sha256"] != expected_env_sha:
+        raise RuntimeError(
+            "resolved sidecar Python environment does not match the Stable pilot baseline: "
+            f"{python_env['sha256']} != {expected_env_sha}"
+        )
     provenance = runtime_fingerprint.build_provenance(
         ROOT,
         exact_source_sha=(os.environ.get("CHENGZHU_RELEASE_SOURCE_SHA") or None),

@@ -39,6 +39,7 @@ ROOT_FILES = (
     "desktop/package-lock.json",
     "packaging/chengzhu-backend.spec",
     "scripts/build_sidecar.py",
+    "scripts/runtime_fingerprint.py",
 )
 ROOT_PREFIXES = (
     "backend/api/",

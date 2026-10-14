@@ -20,6 +20,7 @@ from typing import Any
 BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+NODE_ENVIRONMENT_CONTRACT = "v2.0-R1-node-build-environment-1"
 
 
 def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
@@ -72,6 +73,41 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
     if env_sha != expected_env_sha:
         raise ValueError("Python build environment SHA256 mismatch")
 
+    node_env = value.get("node_environment")
+    normalized_node_env: dict[str, Any] | None = None
+    if node_env is None:
+        if origin == "PACKAGED_EMBEDDED":
+            raise ValueError("packaged build provenance node_environment missing")
+    else:
+        if not isinstance(node_env, dict):
+            raise ValueError("build provenance node_environment invalid")
+        if str(node_env.get("contract_version") or "") != NODE_ENVIRONMENT_CONTRACT:
+            raise ValueError("Node build environment contract mismatch")
+        node_material = {
+            "node_version": str(node_env.get("node_version") or ""),
+            "npm_version": str(node_env.get("npm_version") or ""),
+            "platform": str(node_env.get("platform") or ""),
+            "architecture": str(node_env.get("architecture") or ""),
+        }
+        if not all(node_material.values()):
+            raise ValueError("Node build environment metadata missing")
+        node_sha = str(node_env.get("sha256") or "").strip().lower()
+        expected_node_sha = hashlib.sha256(
+            json.dumps(
+                node_material,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        if node_sha != expected_node_sha:
+            raise ValueError("Node build environment SHA256 mismatch")
+        normalized_node_env = {
+            "contract_version": NODE_ENVIRONMENT_CONTRACT,
+            **node_material,
+            "sha256": node_sha,
+        }
+
     channel = str(value.get("release_channel") or "").upper()
     expected_channel = "PRERELEASE" if "-" in version else "STABLE"
     if channel != expected_channel:
@@ -92,6 +128,7 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
             "distributions_count": len(distributions),
             "sha256": env_sha,
         },
+        "node_environment": normalized_node_env,
         "runtime_origin": origin,
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
     }
@@ -139,9 +176,18 @@ def _source_checkout_provenance() -> dict[str, Any]:
         raise RuntimeError("cannot load runtime fingerprint tool")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    node_env = None
+    try:
+        node_env = module.node_environment()
+    except Exception:
+        # Source checkout usage must not require Node merely to run the backend.
+        # Missing Node provenance keeps this runtime ineligible for packaged
+        # Stable pilot evidence; packaged builds fail closed above.
+        node_env = None
     return module.build_provenance(
         repo,
         python_environment_value=module.python_environment(Path(sys.executable)),
+        node_environment_value=node_env,
     )
 
 

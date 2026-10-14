@@ -226,3 +226,42 @@ def _minimal_runtime_repo(root: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
     return root
+
+
+def _load_build_sidecar():
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    path = SCRIPTS / "build_sidecar.py"
+    spec = importlib.util.spec_from_file_location("build_sidecar_replay_test", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_build_sidecar_reads_exact_python_pin_and_bootstrap_constraints(tmp_path, monkeypatch):
+    mod = _load_build_sidecar()
+    version_file = tmp_path / "sidecar-python-version.txt"
+    version_file.write_text("3.13.16\n", encoding="utf-8")
+    monkeypatch.setattr(mod, "PYTHON_VERSION_FILE", version_file)
+    assert mod.required_python_version() == "3.13.16"
+
+    constraints = tmp_path / "constraints.txt"
+    constraints.write_text(
+        "fastapi==0.999.0\npip==25.2\npyinstaller==6.22.3\nsetuptools==65.5.0\nwheel==0.45.1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PIP_CONSTRAINT", str(constraints))
+    assert mod.constrained_bootstrap_packages() == ["pip", "setuptools", "wheel"]
+
+    monkeypatch.delenv("PIP_CONSTRAINT")
+    assert mod.constrained_bootstrap_packages() == ["pip"]
+
+
+def test_build_sidecar_rejects_non_exact_python_pin(tmp_path, monkeypatch):
+    mod = _load_build_sidecar()
+    version_file = tmp_path / "sidecar-python-version.txt"
+    version_file.write_text("3.13\n", encoding="utf-8")
+    monkeypatch.setattr(mod, "PYTHON_VERSION_FILE", version_file)
+    with pytest.raises(RuntimeError, match="major.minor.patch"):
+        mod.required_python_version()

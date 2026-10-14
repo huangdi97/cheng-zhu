@@ -356,7 +356,7 @@ jobs:
           Copy-Item THIRD_PARTY_NOTICES.md dist/release/
           $version = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
           Copy-Item "docs/RELEASE_NOTES_v$version.md" dist/release/
-          $hashFiles = @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip')
+          $hashFiles = @('Chengzhu-Setup-x64.exe','Chengzhu-Portable-x64.zip','BUILD_PROVENANCE.json')
           if (Test-Path "dist/release/RELEASE_AUTHORIZATION.json") {
             $hashFiles += 'RELEASE_AUTHORIZATION.json'
           }
@@ -407,6 +407,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/BUILD_PROVENANCE.json `
               dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
@@ -422,6 +423,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/BUILD_PROVENANCE.json `
               dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
@@ -468,7 +470,7 @@ jobs:
           $downloaded = $false
           for ($i = 1; $i -le 5; $i++) {
             try {
-              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt" --pattern "RELEASE_AUTHORIZATION.json"
+              gh release download $tag --dir $download --clobber --pattern "Chengzhu-Setup-x64.exe" --pattern "Chengzhu-Portable-x64.zip" --pattern "SHA256SUMS.txt" --pattern "BUILD_PROVENANCE.json" --pattern "RELEASE_AUTHORIZATION.json"
               $downloaded = $true
               break
             } catch {
@@ -555,6 +557,13 @@ jobs:
             }
             if ($authorization.version -ne $version -or $authorization.source_sha -ne $sourceSha) {
               throw "Stable v2+ publish refused: authorization candidate drift"
+            }
+            if ([string]$authorization.runtime_fingerprint_sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) {
+              throw "Stable v2+ publish refused: authorization runtime fingerprint drift"
+            }
+            $publicBuild = Get-Content dist/release/BUILD_PROVENANCE.json -Raw | ConvertFrom-Json
+            if ([string]$publicBuild.runtime_fingerprint.sha256 -ne $env:CHENGZHU_RUNTIME_FINGERPRINT_SHA256) {
+              throw "Stable v2+ publish refused: public build provenance runtime fingerprint drift"
             }
           }
 
@@ -980,6 +989,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/BUILD_PROVENANCE.json `
               dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `
@@ -995,6 +1005,7 @@ jobs:
               dist/release/LICENSE.txt `
               dist/release/THIRD_PARTY_NOTICES.md `
               "dist/release/RELEASE_NOTES_v$version.md" `
+              dist/release/BUILD_PROVENANCE.json `
               dist/release/RELEASE_AUTHORIZATION.json `
               --target $sourceSha `
               --draft `

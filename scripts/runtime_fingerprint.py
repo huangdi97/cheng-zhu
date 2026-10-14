@@ -25,6 +25,7 @@ from pathlib import Path
 
 
 CONTRACT_VERSION = "v2.0-R1-runtime-fingerprint-1"
+PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
 
 # Runtime-bearing tracked paths. Keep evaluator/release/tests/docs out; include
 # packaging/build inputs that can change the shipped product.
@@ -195,11 +196,63 @@ def app_version(repo: Path) -> str:
     return version
 
 
+def python_environment(python_executable: Path | str) -> dict[str, object]:
+    python_executable = str(python_executable)
+    meta_raw = subprocess.check_output(
+        [
+            python_executable,
+            "-c",
+            (
+                "import json,platform,sys;"
+                "print(json.dumps({"
+                "'python_version':platform.python_version(),"
+                "'implementation':platform.python_implementation(),"
+                "'architecture':platform.machine() or 'UNKNOWN'"
+                "},sort_keys=True))"
+            ),
+        ],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    meta = json.loads(meta_raw)
+    freeze_raw = subprocess.check_output(
+        [python_executable, "-m", "pip", "freeze", "--all"],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    )
+    distributions = sorted(
+        line.strip()
+        for line in freeze_raw.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+    material = {
+        "python_version": str(meta.get("python_version") or ""),
+        "implementation": str(meta.get("implementation") or ""),
+        "architecture": str(meta.get("architecture") or ""),
+        "distributions": distributions,
+    }
+    if not material["python_version"] or not material["implementation"]:
+        raise ValueError("could not determine Python build environment")
+    raw = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "contract_version": PYTHON_ENVIRONMENT_CONTRACT,
+        **material,
+        "distributions_count": len(distributions),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
 def build_provenance(
     repo: Path,
     *,
     exact_source_sha: str | None = None,
     exact_version: str | None = None,
+    python_environment_value: dict[str, object] | None = None,
 ) -> dict[str, object]:
     repo = repo.resolve()
     sha = str(exact_source_sha or source_sha(repo)).strip().lower()
@@ -219,6 +272,8 @@ def build_provenance(
             "sha256": runtime["sha256"],
             "files": runtime["files"],
         },
+        "python_environment": python_environment_value,
+        "provenance_level": "PACKAGED_BUILD" if python_environment_value else "SOURCE_CANDIDATE",
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",
     }
 

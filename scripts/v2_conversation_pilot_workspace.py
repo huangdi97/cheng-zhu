@@ -30,12 +30,13 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-5"
-MIN_PRODUCT_SCHEMA = 12
+WORKSPACE_CONTRACT = "v2.0-R1-pilot-workspace-6"
+MIN_PRODUCT_SCHEMA = 13
 DEFAULT_POLICY = ROOT / "docs" / "evals" / "V2_CONVERSATION_STABLE_PROMOTION_POLICY.json"
 
-TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-1"
+TOOLCHAIN_FINGERPRINT_CONTRACT = "v2.0-R1-pilot-toolchain-2"
 TOOLCHAIN_RELATIVE_PATHS = (
+    "scripts/runtime_fingerprint.py",
     "scripts/v2_conversation_pilot_workspace.py",
     "scripts/v2_conversation_label_seed.py",
     "scripts/v2_conversation_feedback_export.py",
@@ -68,7 +69,7 @@ def _require_toolchain(metadata: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(frozen, dict):
         raise ValueError(
             "pilot workspace has no frozen evaluator toolchain; historical workspace remains historical evidence "
-            "and cannot be re-evaluated under workspace contract v5"
+            "and cannot be re-evaluated under workspace contract v6"
         )
     current = _toolchain_fingerprint()
     if frozen != current:
@@ -105,6 +106,99 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+RUNTIME_BASELINE_CONTRACT = "v2.0-R1-pilot-runtime-baseline-1"
+BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
+RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
+
+
+def _runtime_baseline_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    sessions = list(snapshot.get("sessions") or [])
+    if not sessions:
+        raise ValueError("selected cohort has no Sessions for runtime baseline")
+
+    fingerprints: set[str] = set()
+    builds: set[tuple[str, str]] = set()
+    file_counts: set[int] = set()
+    for row in sessions:
+        session_id = str(row.get("session_id") or "<unknown>")
+        provenance = row.get("runtime_provenance")
+        if not isinstance(provenance, dict) or not provenance:
+            raise ValueError(
+                f"{session_id}: Stable pilot requires packaged runtime provenance; "
+                "historical pre-v13 Session cannot be upgraded after the fact"
+            )
+        if str(provenance.get("contract_version") or "") != BUILD_PROVENANCE_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported packaged build provenance contract")
+        if str(provenance.get("runtime_origin") or "") != "PACKAGED_EMBEDDED":
+            raise ValueError(
+                f"{session_id}: Stable pilot requires PACKAGED_EMBEDDED runtime provenance"
+            )
+        if str(provenance.get("release_channel") or "") != "PRERELEASE":
+            raise ValueError(
+                f"{session_id}: initial v2 Stable pilot baseline must come from a published prerelease runtime"
+            )
+        source_sha = str(provenance.get("source_sha") or "").strip().lower()
+        version = str(provenance.get("app_version") or "").strip()
+        if len(source_sha) != 40 or any(ch not in "0123456789abcdef" for ch in source_sha):
+            raise ValueError(f"{session_id}: packaged runtime source SHA is invalid")
+        if not version:
+            raise ValueError(f"{session_id}: packaged runtime app version is missing")
+        runtime = provenance.get("runtime_fingerprint")
+        if not isinstance(runtime, dict):
+            raise ValueError(f"{session_id}: packaged runtime fingerprint is missing")
+        if str(runtime.get("contract_version") or "") != RUNTIME_FINGERPRINT_CONTRACT:
+            raise ValueError(f"{session_id}: unsupported runtime fingerprint contract")
+        runtime_sha = str(runtime.get("sha256") or "").strip().lower()
+        if len(runtime_sha) != 64 or any(ch not in "0123456789abcdef" for ch in runtime_sha):
+            raise ValueError(f"{session_id}: runtime fingerprint SHA256 is invalid")
+        files = runtime.get("files")
+        if isinstance(files, bool) or not isinstance(files, int) or files <= 0:
+            raise ValueError(f"{session_id}: runtime fingerprint file count is invalid")
+        fingerprints.add(runtime_sha)
+        file_counts.add(files)
+        builds.add((version, source_sha))
+
+    if len(fingerprints) != 1 or len(file_counts) != 1:
+        raise ValueError(
+            "selected pilot Sessions span different product runtime fingerprints; "
+            "do not use old pilot evidence for changed runtime behavior"
+        )
+
+    runtime_sha = next(iter(fingerprints))
+    return {
+        "contract_version": RUNTIME_BASELINE_CONTRACT,
+        "runtime_origin": "PACKAGED_EMBEDDED",
+        "release_channel": "PRERELEASE",
+        "runtime_fingerprint": {
+            "contract_version": RUNTIME_FINGERPRINT_CONTRACT,
+            "sha256": runtime_sha,
+            "files": next(iter(file_counts)),
+        },
+        "source_builds": [
+            {"app_version": version, "source_sha": source_sha}
+            for version, source_sha in sorted(builds)
+        ],
+        "sessions": len(sessions),
+        "claim_boundary": (
+            "SAME_NORMALIZED_RUNTIME_SOURCE_FINGERPRINT_NOT_BEHAVIORAL_EQUIVALENCE_"
+            "OR_REAL_USER_IDENTITY_PROOF"
+        ),
+    }
+
+
+def _require_runtime_baseline(metadata: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    frozen = metadata.get("runtime_baseline")
+    if not isinstance(frozen, dict):
+        raise ValueError(
+            "pilot workspace has no frozen packaged runtime baseline; "
+            "historical workspace remains historical evidence and cannot be upgraded to workspace contract v6"
+        )
+    current = _runtime_baseline_from_snapshot(snapshot)
+    if frozen != current:
+        raise ValueError("pilot packaged runtime baseline drift detected")
+    return current
 
 
 def _schema_version(db: Path) -> int:
@@ -773,7 +867,7 @@ This directory is **local evidence workspace**, not a release artifact and not p
    favorable self-report or independent-review subsets, leaving required labels
    null, or using a disallowed source fails closed before Stable evaluation.
 3. Keep raw labels and review seeds local. Do not commit them to a public repository.
-4. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v5 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
+4. Keep the exact evaluator checkout/toolchain used to initialize this workspace. Contract v6 freezes SHA256 for the workspace orchestrator and all evidence-evaluator helper scripts; finalize/evaluate fail closed if they drift.
 5. Finalize only after you can truthfully make every required operator attestation.
 6. Evaluate with the finalized manifest plus independent-review file(s).
 

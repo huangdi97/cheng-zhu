@@ -20,6 +20,7 @@ from typing import Any
 BUILD_PROVENANCE_CONTRACT = "v2.0-R1-build-provenance-1"
 RUNTIME_FINGERPRINT_CONTRACT = "v2.0-R1-runtime-fingerprint-1"
 PYTHON_ENVIRONMENT_CONTRACT = "v2.0-R1-python-build-environment-1"
+PYTHON_ARTIFACT_PROVENANCE_CONTRACT = "v2.0-R1-python-artifact-provenance-1"
 
 
 def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
@@ -72,6 +73,60 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
     if env_sha != expected_env_sha:
         raise ValueError("Python build environment SHA256 mismatch")
 
+    artifact = python_env.get("artifact_provenance")
+    validated_artifact: dict[str, Any] | None = None
+    if artifact is not None:
+        if not isinstance(artifact, dict):
+            raise ValueError("Python artifact provenance invalid")
+        if str(artifact.get("contract_version") or "") != PYTHON_ARTIFACT_PROVENANCE_CONTRACT:
+            raise ValueError("Python artifact provenance contract mismatch")
+        artifacts = artifact.get("artifacts")
+        if not isinstance(artifacts, list) or not artifacts:
+            raise ValueError("Python artifact provenance artifacts missing")
+        if int(artifact.get("artifacts_count") or -1) != len(artifacts):
+            raise ValueError("Python artifact provenance count mismatch")
+        normalized: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for row in artifacts:
+            if not isinstance(row, dict):
+                raise ValueError("Python artifact provenance row invalid")
+            name = re.sub(r"[-_.]+", "-", str(row.get("name") or "").strip()).lower()
+            version_value = str(row.get("version") or "").strip()
+            filename = str(row.get("filename") or "").strip()
+            sha256 = str(row.get("sha256") or "").strip().lower()
+            if not name or not version_value or not filename.lower().endswith(".whl"):
+                raise ValueError("Python artifact provenance row metadata invalid")
+            if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+                raise ValueError("Python artifact provenance row SHA256 invalid")
+            if name in seen:
+                raise ValueError("Python artifact provenance duplicate distribution")
+            seen.add(name)
+            normalized.append({
+                "name": name,
+                "version": version_value,
+                "filename": filename,
+                "sha256": sha256,
+            })
+        normalized.sort(key=lambda row: row["name"])
+        expected_artifact_sha = hashlib.sha256(
+            json.dumps(
+                {"artifacts": normalized},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        artifact_sha = str(artifact.get("sha256") or "").strip().lower()
+        if artifact_sha != expected_artifact_sha:
+            raise ValueError("Python artifact provenance SHA256 mismatch")
+        validated_artifact = {
+            "contract_version": PYTHON_ARTIFACT_PROVENANCE_CONTRACT,
+            "artifacts": normalized,
+            "artifacts_count": len(normalized),
+            "sha256": artifact_sha,
+            "install_mode": "WHEEL_SHA256_PINNED",
+        }
+
     channel = str(value.get("release_channel") or "").upper()
     expected_channel = "PRERELEASE" if "-" in version else "STABLE"
     if channel != expected_channel:
@@ -91,6 +146,7 @@ def _validate(value: dict[str, Any], *, origin: str) -> dict[str, Any]:
             **material,
             "distributions_count": len(distributions),
             "sha256": env_sha,
+            **({"artifact_provenance": validated_artifact} if validated_artifact else {}),
         },
         "runtime_origin": origin,
         "claim_boundary": "SOURCE_BUILD_PROVENANCE_NOT_REAL_USER_OR_BEHAVIORAL_EQUIVALENCE_PROOF",

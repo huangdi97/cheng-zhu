@@ -261,7 +261,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
 
         before = product_migrations.ensure_schema(conn)
         assert before == 7
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 12
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
 
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {
@@ -274,7 +274,7 @@ def test_v8_integration_migration_is_additive_over_v7_screen_context():
         assert "time_semantics_json" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_item)")}
         assert "text" in {row[1] for row in conn.execute("PRAGMA table_info(conversation_screen_context)")}
 
-        assert product_migrations.ensure_schema(conn) == 12
+        assert product_migrations.ensure_schema(conn) == 13
     finally:
         conn.close()
 

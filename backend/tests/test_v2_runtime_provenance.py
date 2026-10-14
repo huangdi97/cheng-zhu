@@ -31,6 +31,12 @@ def _fixture_repo(tmp_path: Path) -> Path:
         "backend/services/x.py": "VALUE = 1\n",
         "backend/tests/ignored.py": "SHOULD_NOT_COUNT = 1\n",
         "frontend/src/main.ts": "export const value = 1\n",
+        "frontend/src/main.test.ts": "test-only frontend source\n",
+        "frontend/index.html": "<div id='root'></div>\n",
+        "frontend/vite.config.ts": "export default { base: './' }\n",
+        "frontend/tsconfig.json": json.dumps({"compilerOptions": {"target": "ES2022"}}),
+        "frontend/tailwind.config.js": "export default {}\n",
+        "frontend/postcss.config.js": "export default {}\n",
         "frontend/package.json": json.dumps({"name": "x", "version": "2.0.0-beta.10", "dependencies": {"a": "1.0.0"}}),
         "frontend/package-lock.json": json.dumps({
             "name": "x",
@@ -39,6 +45,8 @@ def _fixture_repo(tmp_path: Path) -> Path:
             "packages": {"": {"name": "x", "version": "2.0.0-beta.10", "dependencies": {"a": "1.0.0"}}},
         }),
         "desktop/main.js": "console.log('desktop')\n",
+        "desktop/main.test.js": "test-only desktop source\n",
+        "desktop/window.html": "<html></html>\n",
         "desktop/package.json": json.dumps({"name": "desktop", "version": "2.0.0-beta.10", "dependencies": {"e": "2"}}),
         "desktop/package-lock.json": json.dumps({
             "name": "desktop",
@@ -96,6 +104,8 @@ def test_runtime_fingerprint_ignores_only_release_version_and_non_runtime_files(
     )
     (repo / "docs/ignored.md").write_text("completely different release docs\n", encoding="utf-8")
     (repo / "backend/tests/ignored.py").write_text("SHOULD_NOT_COUNT = 999\n", encoding="utf-8")
+    (repo / "frontend/src/main.test.ts").write_text("test-only frontend source changed\n", encoding="utf-8")
+    (repo / "desktop/main.test.js").write_text("test-only desktop source changed\n", encoding="utf-8")
 
     second = mod.fingerprint(repo)
     assert second["sha256"] == first["sha256"]
@@ -104,6 +114,11 @@ def test_runtime_fingerprint_ignores_only_release_version_and_non_runtime_files(
     (repo / "frontend/src/main.ts").write_text("export const value = 2\n", encoding="utf-8")
     changed = mod.fingerprint(repo)
     assert changed["sha256"] != first["sha256"]
+
+    repo = _fixture_repo(tmp_path / "build-config")
+    baseline = mod.fingerprint(repo)
+    (repo / "frontend/vite.config.ts").write_text("export default { base: '/changed/' }\n", encoding="utf-8")
+    assert mod.fingerprint(repo)["sha256"] != baseline["sha256"]
 
 
 def test_runtime_fingerprint_changes_when_algorithm_or_dependency_changes(tmp_path):

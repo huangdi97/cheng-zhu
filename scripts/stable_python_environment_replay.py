@@ -102,6 +102,8 @@ def _hashed_requirements(
         raise ValueError("pilot Python artifact provenance is empty")
     if int(provenance.get("artifacts_count") or -1) != len(artifacts):
         raise ValueError("pilot Python artifact count mismatch")
+    if str(provenance.get("install_mode") or "") != "WHEEL_SHA256_PINNED":
+        raise ValueError("pilot Python artifact install mode mismatch")
 
     by_name: dict[str, dict[str, str]] = {}
     for raw in artifacts:

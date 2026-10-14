@@ -22,7 +22,6 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Iterable
 
 
 CONTRACT_VERSION = "v2.0-R1-runtime-fingerprint-1"
@@ -35,6 +34,11 @@ ROOT_FILES = (
     "backend/requirements.txt",
     "frontend/package.json",
     "frontend/package-lock.json",
+    "frontend/index.html",
+    "frontend/vite.config.ts",
+    "frontend/tsconfig.json",
+    "frontend/tailwind.config.js",
+    "frontend/postcss.config.js",
     "desktop/package.json",
     "desktop/package-lock.json",
     "packaging/chengzhu-backend.spec",
@@ -51,7 +55,7 @@ ROOT_PREFIXES = (
     "desktop/",
     "packaging/",
 )
-DESKTOP_RUNTIME_EXTENSIONS = {".js", ".json", ".png", ".ico"}
+DESKTOP_RUNTIME_EXTENSIONS = {".js", ".json", ".html", ".css", ".png", ".ico", ".svg"}
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -82,8 +86,20 @@ def _include(relative: str) -> bool:
     if relative.startswith("backend/"):
         return any(relative.startswith(prefix) for prefix in ROOT_PREFIXES)
     if relative.startswith("frontend/"):
-        return any(relative.startswith(prefix) for prefix in ROOT_PREFIXES)
+        if relative.startswith((
+            "frontend/e2e/",
+            "frontend/scripts/",
+            "frontend/src/test/",
+        )):
+            return False
+        name = Path(relative).name
+        if ".test." in name or ".spec." in name:
+            return False
+        return relative.startswith(("frontend/src/", "frontend/public/"))
     if relative.startswith("desktop/"):
+        name = Path(relative).name
+        if ".test." in name or ".spec." in name:
+            return False
         if relative in {"desktop/package.json", "desktop/package-lock.json"}:
             return True
         return Path(relative).suffix.lower() in DESKTOP_RUNTIME_EXTENSIONS

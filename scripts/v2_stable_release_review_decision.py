@@ -111,6 +111,10 @@ def _runtime_equivalence(repo_root: Path, handoff: dict[str, Any]) -> dict[str, 
     pilot = handoff.get("pilot_runtime_baseline")
     if not isinstance(pilot, dict):
         raise ValueError("handoff is missing packaged pilot runtime baseline")
+    pilot = handoff_tool._require_runtime_baseline(
+        pilot,
+        "handoff pilot_runtime_baseline",
+    )
     pilot_runtime = pilot.get("runtime_fingerprint")
     if not isinstance(pilot_runtime, dict):
         raise ValueError("handoff pilot runtime fingerprint missing")

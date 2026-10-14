@@ -22,6 +22,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import re
 import shutil
 import sqlite3
 from datetime import datetime, timezone

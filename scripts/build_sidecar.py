@@ -15,6 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import runtime_fingerprint
+
 ROOT = Path(__file__).resolve().parents[1]
 VENV = ROOT / "build" / "sidecar-venv"
 
@@ -33,6 +35,21 @@ def main() -> int:
     py = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run([str(py), "-m", "pip", "install", "--upgrade", "pip", "--quiet"])
     run([str(py), "-m", "pip", "install", "-r", "backend/requirements.txt", "pyinstaller>=6.10,<7", "--quiet"])
+
+    provenance_path = ROOT / "build" / "provenance" / "build-provenance.json"
+    provenance = runtime_fingerprint.build_provenance(
+        ROOT,
+        exact_source_sha=(os.environ.get("CHENGZHU_RELEASE_SOURCE_SHA") or None),
+    )
+    runtime_fingerprint.write_json(provenance_path, provenance)
+    print(
+        "build provenance:",
+        provenance["app_version"],
+        provenance["source_sha"],
+        provenance["runtime_fingerprint"]["sha256"],
+        flush=True,
+    )
+
     run([
         str(py), "-m", "PyInstaller", "packaging/chengzhu-backend.spec", "--noconfirm",
         "--distpath", "build/sidecar", "--workpath", "build/pyinstaller",

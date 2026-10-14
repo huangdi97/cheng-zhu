@@ -320,7 +320,7 @@ def build_provenance(
         raise ValueError("version is required")
     runtime = fingerprint(repo)
     return {
-        "contract_version": "v2.0-R1-build-provenance-1",
+        "contract_version": "v2.0-R1-build-provenance-2",
         "app_version": version,
         "source_sha": sha,
         "release_channel": "PRERELEASE" if "-" in version else "STABLE",

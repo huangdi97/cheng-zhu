@@ -21,7 +21,7 @@ from core.logger import get_logger
 
 _log = get_logger("storage.product_migrations")
 
-LATEST_SCHEMA_VERSION = 12
+LATEST_SCHEMA_VERSION = 13
 
 _V1_TABLES: tuple[str, ...] = (
     # --- Goal (long-lived job target) ---
@@ -841,6 +841,20 @@ def _apply_v12(conn: sqlite3.Connection) -> None:
         )
 
 
+# --- v2.0 Stable evidence: freeze packaged runtime provenance per Session ---
+# Scheduled Sessions may cross an application upgrade boundary, so provenance
+# is written at Session Start, not at creation/scheduling time.
+def _apply_v13(conn: sqlite3.Connection) -> None:
+    session_cols = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(conversation_session)").fetchall()
+    }
+    if "runtime_provenance_json" not in session_cols:
+        conn.execute(
+            "ALTER TABLE conversation_session "
+            "ADD COLUMN runtime_provenance_json TEXT NOT NULL DEFAULT '{}'"
+        )
+
+
 def _apply_statements(conn: sqlite3.Connection, statements: tuple[str, ...]) -> None:
     for statement in statements:
         conn.execute(statement)
@@ -859,6 +873,7 @@ _MIGRATIONS: dict[int, tuple[Callable[[sqlite3.Connection], None], str]] = {
     10: (_apply_v10, "v2.0 immutable AI prediction snapshots and local pilot human feedback"),
     11: (_apply_v11, "v2.0 immutable direct-question transcript prediction provenance"),
     12: (_apply_v12, "v2.0 immutable Guidance auto-runtime origin provenance"),
+    13: (_apply_v13, "v2.0 immutable packaged runtime baseline provenance per Conversation Session"),
 }
 
 

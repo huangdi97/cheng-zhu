@@ -10,7 +10,6 @@ import importlib.util
 import json
 import os
 import re
-import subprocess
 import sys
 from functools import lru_cache
 from pathlib import Path

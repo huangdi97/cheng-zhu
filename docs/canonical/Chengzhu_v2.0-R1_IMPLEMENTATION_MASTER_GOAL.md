@@ -897,8 +897,8 @@ PR #19 后，以下已经进入 main，不再列为未来项：
 
 当前下一阶段按顺序是：
 
-1. 当前公开下载是 `v2.0.0-beta.9`；post-beta.9 source 已继续关闭 Stable release handoff / human GO / current-main、schema v13 packaged runtime provenance、exact Python 3.13.16 environment 与 exact wheel SHA256 replay。**新的 Stable-readiness pilot 不应再以 beta.9 作为当前 source Stable handoff 的 canonical runtime baseline**；等待 `v2.0.0-beta.10` exact-SHA prerelease 成功后，使用 beta.10（Workspace v7 / Runtime Baseline v2 / Python Artifact Provenance v1）创建新的授权 Project Sync / Design Review pilot evidence；
-2. 进行真实 Project Sync / Design Review 小规模使用；
+1. 当前公开下载已是 `v2.0.0-beta.10 @ a6a673326f64e1b6b78e06992e1e2a196bab9076`；它已把 Stable release handoff / human GO / current-main gate、schema v13 packaged runtime provenance、exact Python 3.13.16 environment 与 exact wheel SHA256 replay打进公开 prerelease。**新的 Stable-readiness pilot 现在应以 beta.10（Workspace v7 / Runtime Baseline v2 / Python Artifact Provenance v1）作为 canonical runtime baseline**；pre-beta.10 evidence 不得事后升级为该 provenance contract；
+2. 立即进行真实授权的 Project Sync / Design Review 小规模使用，不再用“再做一个 Beta 功能周期”替代真实验证；
 3. 用现有 human-label tooling 标注 Recall Precision、Opportunity Precision、Interruption Regret、Useful Silence、continuity value 与 cognitive load；
 4. 只有真实证据满足门槛后，才决定是否进入 stable v2 发布门禁；
 5. 根据真实使用再决定六类 Profile 的专属行为优化优先级；

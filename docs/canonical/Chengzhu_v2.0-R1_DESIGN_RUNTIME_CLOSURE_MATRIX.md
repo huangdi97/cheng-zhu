@@ -2258,3 +2258,91 @@ BETA_10_VERSION_BUMP != BETA_10_PUBLISHED
 GREEN_PR != PUBLIC_RELEASE
 PUBLIC_BETA = v2.0.0-beta.9
 ```
+
+
+---
+
+## beta.10 publication closure · 2026-10-17
+
+beta.10 已从 release candidate 转为公开 prerelease truth。
+
+```text
+PUBLIC_BETA = v2.0.0-beta.10
+PUBLIC_BETA_SOURCE_SHA = a6a673326f64e1b6b78e06992e1e2a196bab9076
+PUBLIC_BETA_TAG_SHA = a6a673326f64e1b6b78e06992e1e2a196bab9076
+MAIN_CI = #1074 SUCCESS
+WINDOWS_RELEASE = #404 SUCCESS
+RELEASE_CHANNEL = PRERELEASE
+STABLE_LATEST = v1.4.2
+
+PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-8
+PACKAGED_PRODUCT_SCHEMA = 13
+PACKAGED_PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-7
+PACKAGED_TOOLCHAIN_CONTRACT = v2.0-R1-pilot-toolchain-3
+PACKAGED_RUNTIME_BASELINE_CONTRACT = v2.0-R1-pilot-runtime-baseline-2
+PACKAGED_PYTHON_ARTIFACT_PROVENANCE = v2.0-R1-python-artifact-provenance-1
+PACKAGED_STABLE_REPLAY_CONTRACT = v2.0-R1-stable-python-environment-replay-2
+PACKAGED_STABLE_REVIEW_HANDOFF = v2.0-R1-stable-review-handoff-4
+SIDE_CAR_PYTHON = 3.13.16
+
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+### Exact release evidence
+
+Main CI #1074 completed dependency-security, Backend, Frontend, Desktop, Playwright, visual, e2e smoke, Windows packaged smoke and aggregate `ci-gate` on the exact merged main SHA.
+
+Release #404 then used the same SHA and completed:
+
+```text
+exact-source pin
+→ runtime build provenance
+→ exact green-main gate
+→ Python wheel-artifact replay
+→ clean-venv sidecar build
+→ embedded provenance equality
+→ packaged smoke
+→ installer + portable
+→ packaged UI evidence
+→ clean-install replay
+→ installed-layout smoke
+→ SHA256 collection
+→ draft Release
+→ GitHub download-back verification
+→ publish
+→ Release-body regression
+→ metadata regression
+→ post-publish verification artifact
+```
+
+GitHub API independently confirms:
+
+```text
+prerelease = true
+draft = false
+tag SHA = release target SHA = a6a673326f64e1b6b78e06992e1e2a196bab9076
+Stable Latest = v1.4.2
+```
+
+Publication provenance: `docs/releases/V2_0_0_BETA_10_PUBLICATION_PROVENANCE.md`.
+
+### Canonical next phase
+
+beta.10 is now the canonical packaged runtime for **new** Stable-readiness Project Sync / Design Review pilots.
+
+The engineering program should not continue generating beta.11/beta.12 merely to accumulate feature breadth. The next evidence-producing sequence is:
+
+```text
+beta.10 installed prerelease
+→ authorized real Project Sync / Design Review use
+→ Workspace v7 freeze
+→ complete frozen eligible-population review
+→ Stable Policy v8 evaluation
+→ if PASS: separate Stable release-review handoff + human GO
+→ if NO_GO: fix the measured product/evidence defect, then decide whether a new prerelease is justified
+```
+
+A future beta is justified by a material defect or necessary correction found through real use, not by the absence of a higher version number. Stable/real-user/PMF claims remain unchanged until their independent evidence gates are actually satisfied.

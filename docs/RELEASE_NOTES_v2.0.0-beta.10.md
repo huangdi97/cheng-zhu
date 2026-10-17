@@ -195,14 +195,16 @@ PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW
 
 It still requires a separate human release review, exact-current-main authorization, successful Stable release workflow and public tag/assets. PMF remains a separate longer-horizon question.
 
-## Publication boundary
+## Published baseline and next step
 
-Until the full beta.10 release workflow succeeds:
+The full beta.10 release workflow has now succeeded:
 
 ```text
-CURRENT_PUBLIC_BETA = v2.0.0-beta.9
-NEXT_BETA_CANDIDATE = v2.0.0-beta.10
+CURRENT_PUBLIC_BETA = v2.0.0-beta.10
+PUBLIC_BETA_SOURCE_SHA = a6a673326f64e1b6b78e06992e1e2a196bab9076
+MAIN_CI = #1074 SUCCESS
+RELEASE = #404 SUCCESS
 STABLE_LATEST = v1.4.2
 ```
 
-Do not rewrite public/downloadable truth to beta.10 from a version bump or green PR alone.
+Use beta.10 as the canonical packaged baseline for **new** Stable-readiness Project Sync / Design Review pilots. Do not create another Beta merely to continue engineering; a later prerelease should be driven by a material defect or necessary correction discovered through real pilot evidence. Stable v2, real-user validation and PMF remain unclaimed.

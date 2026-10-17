@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
 import tempfile
@@ -28,9 +29,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from services.storage.product_migrations import LATEST_SCHEMA_VERSION, _MIGRATIONS, ensure_schema  # noqa: E402
+from services.storage.product_migrations import (
+    _MIGRATIONS,
+    LATEST_SCHEMA_VERSION,
+    ensure_schema,
+)
 
 CASES = ("fresh", "v1", "v2", "v4", "v7", "v8", "v9", "v10", "v11", "v12", "v13")
+
+
+def _case_version(name: str) -> int:
+    """Resolve a matrix case to the schema version it must be built at.
+
+    Derive this from the case name instead of a second hand-maintained map:
+    a hard-coded map silently stops covering a newly shipped schema version.
+    """
+    if name == "fresh":
+        return 0
+    match = re.fullmatch(r"v(\d+)", str(name))
+    if not match:
+        raise ValueError(f"unsupported migration-matrix case: {name!r}")
+    version = int(match.group(1))
+    if version > LATEST_SCHEMA_VERSION:
+        raise ValueError(
+            f"migration-matrix case {name!r} is newer than the shipped schema "
+            f"v{LATEST_SCHEMA_VERSION}"
+        )
+    return version
 
 
 def _build_at(conn: sqlite3.Connection, upto: int) -> None:
@@ -118,7 +143,7 @@ def _row_survives(conn: sqlite3.Connection, table: str, marker: str) -> bool:
 
 
 def run_case(name: str, workdir: Path) -> dict:
-    upto = {"fresh": 0, "v1": 1, "v2": 2, "v4": 4, "v7": 7, "v8": 8, "v9": 9, "v10": 10, "v11": 11, "v12": 12}[name]
+    upto = _case_version(name)
     db_path = workdir / f"{name}.db"
     result: dict = {"case": name, "built_at_version": upto}
 

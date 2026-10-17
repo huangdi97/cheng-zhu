@@ -1,8 +1,8 @@
 # Chengzhu v2 Real Pilot Operator Runbook
 
-**Status**: BETA.9 PUBLISHED · NEXT STABLE-PILOT BASELINE PENDING · STABLE POLICY v8 · SOURCE WORKSPACE v7  
-**Public Beta**: v2.0.0-beta.9  
-**Published source/tag SHA**: `146db913a4467e179d547b37fc006753f64655bb`  
+**Status**: BETA.10 PUBLISHED · CANONICAL STABLE-PILOT BASELINE · STABLE POLICY v8 · WORKSPACE v7  
+**Public Beta**: v2.0.0-beta.10  
+**Published source/tag SHA**: `a6a673326f64e1b6b78e06992e1e2a196bab9076`  
 **Stable v2**: NOT CLAIMED  
 **REAL_USER_VALIDATED**: FALSE  
 **PMF_PROVEN**: FALSE
@@ -13,9 +13,11 @@ It does not change any release or evidence claim by itself.
 
 ## 1. Preconditions
 
-The currently published participant-facing/runtime product remains `v2.0.0-beta.9`. **Do not start a new Stable-readiness pilot on beta.9 if you expect that evidence to enter the current source Stable handoff.** beta.9 predates packaged runtime provenance v13 and the wheel-artifact SHA256 baseline required by current source.
+The canonical participant-facing/runtime baseline for **new Stable-readiness pilots is now `v2.0.0-beta.10`**, published from exact source/tag SHA `a6a673326f64e1b6b78e06992e1e2a196bab9076`.
 
-Current source requires the next canonical Stable-pilot prerelease to package all of the following together:
+Do not initialize a new Stable-readiness workspace from beta.9 or earlier if you expect it to enter the current Stable handoff. Those releases predate the complete packaged runtime / wheel-artifact provenance baseline and remain immutable historical evidence.
+
+beta.10 packages all of the following together:
 
 ```text
 Stable Policy = v2.0-R1-stable-promotion-8
@@ -28,7 +30,7 @@ Stable Handoff = v2.0-R1-stable-review-handoff-4
 Stable Authorization = v2.0-R1-stable-release-authorization-3
 ```
 
-Workspace v7 freezes evaluator implementation, exact packaged runtime/source provenance, resolved Python package versions **and the SHA256 of every installed wheel artifact**. A pre-v7 workspace or pre-artifact packaged Session remains valid historical evidence but cannot be upgraded after the fact into this baseline. The next prerelease that actually packages these contracts (target: beta.10; publication not yet claimed here) should be used to create fresh Stable-readiness evidence.
+Workspace v7 freezes evaluator implementation, exact packaged runtime/source provenance, resolved Python package versions **and the SHA256 of every installed wheel artifact**. A pre-v7 workspace or pre-artifact packaged Session remains valid historical evidence but cannot be upgraded after the fact into this baseline. **beta.10 is the first public prerelease that packages this canonical baseline and should be used for fresh Stable-readiness evidence unless a later prerelease explicitly preserves or strengthens the same contracts.**
 
 This runbook represents an operator workflow, not ordinary participant-facing Conversation UI, and its availability does not turn structurally selectable Sessions into authorized real use.
 

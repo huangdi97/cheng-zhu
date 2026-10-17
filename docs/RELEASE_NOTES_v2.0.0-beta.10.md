@@ -1,6 +1,6 @@
 # Chengzhu v2.0.0-beta.10
 
-Status: **PRERELEASE CANDIDATE — not published until the exact green main SHA completes the full release workflow.**
+Status: **PUBLISHED PRERELEASE** · exact source/tag SHA `a6a673326f64e1b6b78e06992e1e2a196bab9076` · Main CI #1074 SUCCESS · Release #404 SUCCESS · Stable Latest remains `v1.4.2`.
 
 ## Why beta.10 exists
 

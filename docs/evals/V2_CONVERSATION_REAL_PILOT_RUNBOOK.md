@@ -479,24 +479,22 @@ Stable Gate PASS
 
 ## 13. Current product truth
 
-After beta.9 publication:
+After beta.10 publication:
 
 ```text
-PUBLIC_BETA = v2.0.0-beta.9
-PUBLIC_BETA_SOURCE_SHA = 146db913a4467e179d547b37fc006753f64655bb
+PUBLIC_BETA = v2.0.0-beta.10
+PUBLIC_BETA_SOURCE_SHA = a6a673326f64e1b6b78e06992e1e2a196bab9076
 PILOT_RUNTIME_AVAILABLE = TRUE
 PILOT_EVIDENCE_CAPTURE_RUNTIME = TRUE
 AUTHORIZED_PILOT_MANIFEST_BUILDER = TRUE
 PILOT_WORKSPACE_ORCHESTRATOR = AVAILABLE
 PILOT_SESSION_INVENTORY = PRIVACY_MINIMIZED
 PUBLIC_BETA_PACKAGED_STABLE_POLICY = v2.0-R1-stable-promotion-8
-PUBLIC_BETA_PACKAGED_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-5
+PUBLIC_BETA_PACKAGED_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-7
+PUBLIC_BETA_PACKAGED_TOOLCHAIN_CONTRACT = v2.0-R1-pilot-toolchain-3
+PUBLIC_BETA_PACKAGED_RUNTIME_BASELINE = v2.0-R1-pilot-runtime-baseline-2
+PUBLIC_BETA_PACKAGED_PYTHON_ARTIFACT_PROVENANCE = v2.0-R1-python-artifact-provenance-1
 CURRENT_OPERATOR_STABLE_POLICY = v2.0-R1-stable-promotion-8
-CURRENT_SOURCE_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-7
-CURRENT_SOURCE_TOOLCHAIN_CONTRACT = v2.0-R1-pilot-toolchain-3
-CURRENT_SOURCE_RUNTIME_BASELINE = v2.0-R1-pilot-runtime-baseline-2
-CURRENT_SOURCE_PYTHON_ARTIFACT_PROVENANCE = v2.0-R1-python-artifact-provenance-1
-TARGET_NEXT_STABLE_PILOT_PRERELEASE = v2.0.0-beta.10
 EVALUATOR_TOOLCHAIN_AND_RUNTIME_FINGERPRINT = REQUIRED_FOR_NEW_V7_WORKSPACES
 PRODUCT_VALIDATION_INFRA_COMPLETE = TRUE
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
@@ -505,9 +503,9 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Publication provenance: `docs/releases/V2_0_0_BETA_9_PUBLICATION_PROVENANCE.md`.
+Publication provenance: `docs/releases/V2_0_0_BETA_10_PUBLICATION_PROVENANCE.md`.
 
-Workspace contract v5 and evaluator-toolchain SHA256 provenance are **published beta.9 truth**. Current source has advanced to workspace v7 with packaged runtime/Python wheel-artifact provenance; that source truth becomes a participant-facing canonical Stable-pilot baseline only after beta.10 completes the full prerelease publication gate. beta.9/beta.8 remain immutable historical evidence and must not be rewritten as containing those later capture-time provenance fields.
+Workspace v7, Toolchain v3, Runtime Baseline v2 and Python Artifact Provenance v1 are now **published beta.10 truth**. New Stable-readiness workspaces should be initialized from beta.10 (or a later prerelease explicitly retaining/elevating these contracts). beta.9 and earlier prereleases remain immutable historical evidence and must not be rewritten as if they had beta.10 capture-time runtime / wheel-artifact provenance.
 
 
 ### Finalize 的双重 cohort revalidation

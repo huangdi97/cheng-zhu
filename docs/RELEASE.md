@@ -27,16 +27,15 @@ Current channel truth:
 
 ```text
 Stable Latest = v1.4.2
-Conversation Beta Published = v2.0.0-beta.9
-Published Beta tag/source SHA = 146db913a4467e179d547b37fc006753f64655bb
+Conversation Beta Published = v2.0.0-beta.10
+Published Beta tag/source SHA = a6a673326f64e1b6b78e06992e1e2a196bab9076
 Published Beta packaged Stable Policy = v2.0-R1-stable-promotion-8
-Published Pilot Workspace Contract = v2.0-R1-pilot-workspace-5
-Published Toolchain Fingerprint Contract = v2.0-R1-pilot-toolchain-1
-Next Conversation Beta Candidate = v2.0.0-beta.10
-Candidate Pilot Workspace Contract = v2.0-R1-pilot-workspace-7
-Candidate Toolchain Contract = v2.0-R1-pilot-toolchain-3
-Candidate Runtime Baseline Contract = v2.0-R1-pilot-runtime-baseline-2
-Candidate Python Artifact Provenance Contract = v2.0-R1-python-artifact-provenance-1
+Published Pilot Workspace Contract = v2.0-R1-pilot-workspace-7
+Published Toolchain Contract = v2.0-R1-pilot-toolchain-3
+Published Runtime Baseline Contract = v2.0-R1-pilot-runtime-baseline-2
+Published Python Artifact Provenance Contract = v2.0-R1-python-artifact-provenance-1
+Published Stable Replay Contract = v2.0-R1-stable-python-environment-replay-2
+Published Stable Review Handoff Contract = v2.0-R1-stable-review-handoff-4
 V2_BETA_PRERELEASE_PUBLISHED = TRUE
 Stable v2 = NOT CLAIMED
 PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
@@ -44,9 +43,9 @@ REAL_USER_VALIDATED = FALSE
 PMF_PROVEN = FALSE
 ```
 
-Published beta.9 provenance is recorded in `docs/releases/V2_0_0_BETA_9_PUBLICATION_PROVENANCE.md`. beta.9 is the current **public** Stable-evidence reproducibility prerelease. It packages Stable Policy v8 plus Pilot Workspace contract v5 / toolchain fingerprint contract v1, so new Stable-readiness workspaces freeze the evaluator implementation SHA256 set as well as cohort/policy/seed evidence. beta.9 was published from exact green main SHA `146db913a4467e179d547b37fc006753f64655bb` after CI #1021 and Release #328 completed successfully; Stable Latest remains `v1.4.2`.
+Published beta.10 provenance is recorded in `docs/releases/V2_0_0_BETA_10_PUBLICATION_PROVENANCE.md`. beta.10 is the current **public** Stable-runtime reproducibility prerelease. It was published from exact green main/tag SHA `a6a673326f64e1b6b78e06992e1e2a196bab9076` after main CI #1074 and Windows Release #404 both completed successfully; Stable Latest remains `v1.4.2`.
 
-Post-beta.9 source has additionally closed Stable runtime/build replay gaps: schema v13 packaged runtime provenance, fail-closed Stable handoff + explicit human GO, current-green-main publication equality, exact Python 3.13.16 environment replay, and exact wheel artifact-set SHA256 provenance/replay. Because published beta.9 does **not** contain these capture-time runtime/artifact contracts, `v2.0.0-beta.10` is the next prerelease candidate. Until beta.10 completes the full exact-SHA Windows release path, public/downloadable truth remains beta.9; pre-beta.10 pilot runtime must not be retroactively relabeled as workspace-v7 artifact provenance.
+beta.10 packages Stable Policy v8 together with Pilot Workspace v7 / Toolchain v3 / Runtime Baseline v2, schema v13 packaged runtime provenance, exact Python 3.13.16 environment, exact wheel artifact-set SHA256 provenance/replay, fail-closed Stable handoff, explicit human Stable-review authorization controls and current-green-main publication equality. New canonical Stable-readiness pilots should start from beta.10 (or a later prerelease that explicitly preserves/elevates these contracts). beta.9 and earlier releases remain immutable historical baselines and must not be retroactively relabeled as containing beta.10 capture-time runtime/artifact provenance.
 
 beta.8 / beta.7 / beta.6 / beta.5 / beta.4 / beta.3 remain immutable historical prereleases. Do not rewrite older workspaces/releases as if they had workspace-v5 evaluator-toolchain provenance.
 

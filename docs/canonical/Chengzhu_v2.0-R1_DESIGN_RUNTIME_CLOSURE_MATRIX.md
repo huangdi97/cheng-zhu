@@ -35,7 +35,7 @@ REAL_CONVERSATION_USER_EVIDENCE_PENDING = TRUE
 PMF_PROVEN = FALSE
 ```
 
-`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前主线已经具备 Windows packaged Conversation Beta engineering evidence 与独立 screenshot evidence，并且 `v2.0.0-beta.2` 已于 2026-10-09 公开发布为 GitHub Prerelease；tag/source SHA = `cac605edf413ec248babf02ea9f73da708d156f8`，Stable Latest 仍为 v1.4.2。这仍不等于 stable v2，也不等于真实用户价值已经验证。
+`RUNTIME_AVAILABLE` 只说明存在真实 route / persistence / UI / runtime path。当前公开 Conversation Beta 已推进到 **`v2.0.0-beta.10`**，于 2026-10-17 从 exact source/tag SHA `a6a673326f64e1b6b78e06992e1e2a196bab9076` 发布；Stable Latest 仍为 `v1.4.2`。beta.10 已把 schema v13 packaged runtime provenance、Stable Policy v8、Pilot Workspace v7 / Toolchain v3 / Runtime Baseline v2、exact Python 3.13.16 与 wheel-artifact SHA256 replay 打进公开下载。历史 beta.2 仍是早期公开里程碑，但不再代表当前 Beta。以上仍不等于 stable v2，也不等于真实用户价值已经验证。
 
 ---
 

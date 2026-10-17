@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 
@@ -213,3 +214,40 @@ def test_release_replays_pilot_python_wheel_hashes_before_stable_sidecar_build()
 
     assert "python scripts/build_sidecar.py --clean" in text
     assert "python scripts/build_sidecar.py --clean" in ci
+
+
+def test_current_published_beta_operator_docs_follow_publication_provenance() -> None:
+    """Once current-version publication provenance exists, operator docs must not stay on the prior Beta.
+
+    During a new release-candidate phase the current package version may
+    legitimately be ahead of the public Beta, so the strict check activates
+    only after that version's publication-provenance file exists.
+    """
+    package = json.loads((ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))
+    version = str(package["version"])
+    assert "-" in version, "this contract currently targets prerelease current-version truth"
+
+    provenance_name = (
+        "V" + version.upper().replace(".", "_").replace("-", "_")
+        + "_PUBLICATION_PROVENANCE.md"
+    )
+    provenance = ROOT / "docs" / "releases" / provenance_name
+    if not provenance.exists():
+        # Candidate source may intentionally retain the prior public-Beta truth
+        # until exact-SHA publication succeeds.
+        return
+
+    runbook = (ROOT / "docs" / "evals" / "V2_CONVERSATION_REAL_PILOT_RUNBOOK.md").read_text(encoding="utf-8")
+    closure = (
+        ROOT / "docs" / "canonical" / "Chengzhu_v2.0-R1_DESIGN_RUNTIME_CLOSURE_MATRIX.md"
+    ).read_text(encoding="utf-8")
+    release = (ROOT / "docs" / "RELEASE.md").read_text(encoding="utf-8")
+
+    tag = f"v{version}"
+    prerelease_label = version.split("-", 1)[1].upper()
+    assert f"**Status**: {prerelease_label} PUBLISHED" in runbook
+    assert f"**Public Beta**: {tag}" in runbook
+    assert f"canonical participant-facing/runtime baseline for **new Stable-readiness pilots is now `{tag}`**" in runbook
+    assert "publication not yet claimed here" not in runbook.split("## 2. Evidence boundaries", 1)[0]
+    assert f"当前公开 Conversation Beta 已推进到 **`{tag}`**" in closure
+    assert f"Conversation Beta Published = {tag}" in release

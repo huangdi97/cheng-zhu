@@ -2187,3 +2187,74 @@ PMF_PROVEN = FALSE
 ```
 
 只有后续 prerelease 真正通过 exact-SHA Windows build、packaged smoke、clean-install、download-back、tag/source 和 publication provenance，并把该 artifact provenance contract 打进下载包，才允许它成为新的 Stable-readiness pilot baseline。
+
+
+---
+
+## beta.10 Stable runtime-artifact reproducibility release candidate · 2026-10-14
+
+beta.9 已公开冻结 Stable Policy v8 与 Pilot Workspace v5 evaluator-toolchain provenance。随后源码继续关闭了 Stable promotion 的 runtime/build provenance 缺口，因此不能继续把 beta.9 当作下一轮 artifact-provenance pilot baseline。
+
+当前候选真值：
+
+```text
+CURRENT_PUBLIC_BETA = v2.0.0-beta.9
+CURRENT_PUBLIC_BETA_SOURCE_SHA = 146db913a4467e179d547b37fc006753f64655bb
+CURRENT_PUBLIC_PACKAGED_POLICY = v2.0-R1-stable-promotion-8
+
+NEXT_BETA_CANDIDATE = v2.0.0-beta.10
+CANDIDATE_STABLE_POLICY = v2.0-R1-stable-promotion-8
+CANDIDATE_PRODUCT_SCHEMA = 13
+CANDIDATE_PILOT_WORKSPACE_CONTRACT = v2.0-R1-pilot-workspace-7
+CANDIDATE_TOOLCHAIN_CONTRACT = v2.0-R1-pilot-toolchain-3
+CANDIDATE_RUNTIME_BASELINE_CONTRACT = v2.0-R1-pilot-runtime-baseline-2
+CANDIDATE_PYTHON_ARTIFACT_PROVENANCE = v2.0-R1-python-artifact-provenance-1
+CANDIDATE_STABLE_REPLAY_CONTRACT = v2.0-R1-stable-python-environment-replay-2
+CANDIDATE_STABLE_REVIEW_HANDOFF = v2.0-R1-stable-review-handoff-4
+
+SIDE_CAR_PYTHON = 3.13.16
+CLEAN_VENV_REQUIRED = TRUE
+WHEEL_ONLY_ARTIFACTS = TRUE
+WHEEL_SHA256_SET_FROZEN = TRUE
+STABLE_HASH_CHECKING_REPLAY = TRUE
+CURRENT_MAIN_EQUALITY_GATE_FOR_STABLE = TRUE
+EXPLICIT_HUMAN_STABLE_GO_REQUIRED = TRUE
+
+STABLE_POLICY_THRESHOLDS_CHANGED_FROM_BETA9 = FALSE
+MIN_N_CHANGED_FROM_BETA9 = FALSE
+PROFILE_FLOORS_CHANGED_FROM_BETA9 = FALSE
+
+PRODUCT_EVIDENCE_READY_FOR_STABLE_RELEASE_REVIEW = FALSE
+V2_STABLE_RELEASE = FALSE
+REAL_USER_VALIDATED = FALSE
+PMF_PROVEN = FALSE
+```
+
+### Candidate purpose
+
+beta.10 不是功能扩张，而是把 beta.9 之后已经完成的以下 fail-closed 链路打包成可下载的真实 pilot baseline：
+
+```text
+packaged prerelease
+→ exact source/runtime fingerprint
+→ exact Python interpreter + resolved environment
+→ exact wheel filename/hash set
+→ Session schema-v13 packaged provenance
+→ Workspace v7
+→ Stable Policy v8 evidence
+→ Stable handoff
+→ explicit human GO
+→ current-main exact-SHA gate
+→ Stable --require-hashes wheel replay
+→ post-build environment/artifact equivalence
+```
+
+只有 beta.10 的 exact green main SHA 完成 Windows build、packaged smoke、clean-install、draft download-back、asset SHA256、downloaded-install replay、prerelease-channel / Stable-Latest preservation、tag/source invariant 与 post-publish verification 后，才允许把公开 Beta truth 从 beta.9 改写为 beta.10。
+
+在此之前：
+
+```text
+BETA_10_VERSION_BUMP != BETA_10_PUBLISHED
+GREEN_PR != PUBLIC_RELEASE
+PUBLIC_BETA = v2.0.0-beta.9
+```

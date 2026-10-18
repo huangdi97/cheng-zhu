@@ -9,6 +9,8 @@
 
 This runbook defines the operator path from a real Conversation pilot to a Stable Promotion evidence review.
 
+For a continuous local-Agent execution handoff that preserves the same evidence and release boundaries, use [`V2_BETA10_REAL_PILOT_LOCAL_AGENT_GOAL.md`](./V2_BETA10_REAL_PILOT_LOCAL_AGENT_GOAL.md). The GOAL is subordinate to this runbook and current repository/release truth.
+
 It does not change any release or evidence claim by itself.
 
 ## 1. Preconditions

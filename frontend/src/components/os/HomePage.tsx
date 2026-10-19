@@ -36,10 +36,10 @@ export default function HomePage() {
 
   const goalId = data.next_interview?.goal_id ?? data.focus_goal?.id ?? null
   const heroTitle = data.next_interview
-    ? [data.next_interview.company, data.next_interview.role].filter(Boolean).join(' · ') || data.next_interview.title
+    ? data.next_interview.title || [data.next_interview.company, data.next_interview.role].filter(Boolean).join(' · ')
     : data.focus_goal?.title ?? '当前目标'
   const heroMeta = data.next_interview
-    ? [data.next_interview.round, formatWhen(data.next_interview.scheduled_at)].filter(Boolean).join(' · ')
+    ? [data.next_interview.role, data.next_interview.round, formatWhen(data.next_interview.scheduled_at)].filter(Boolean).join(' · ')
     : '还没有安排下一轮时间'
 
   return (
@@ -62,7 +62,7 @@ export default function HomePage() {
             {data.next_interview ? (
               <>
                 <PrimaryButton onClick={() => runActionKey('continue_prepare', { goalId: data.next_interview!.goal_id })}>继续准备</PrimaryButton>
-                <SecondaryButton onClick={() => runActionKey('start_practice', { goalId: data.next_interview!.goal_id })}>练习模拟</SecondaryButton>
+                <SecondaryButton onClick={() => runActionKey('start_practice', { goalId: data.next_interview!.goal_id })}>开始练习</SecondaryButton>
                 <SecondaryButton onClick={() => runActionKey('preflight', { goalId: data.next_interview!.goal_id })}>上场检查</SecondaryButton>
               </>
             ) : (

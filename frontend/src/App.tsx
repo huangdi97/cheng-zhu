@@ -76,10 +76,9 @@ type NavItem = { key: string; label: StringKey; Icon: typeof Home; path: string;
 const INTERVIEW_NAV_ITEMS: NavItem[] = [
   { key: 'home', label: 'nav.home', Icon: Home, path: paths.home(), match: ['home'] },
   { key: 'goals', label: 'nav.goals', Icon: Flag, path: paths.goals(), match: ['goals', 'goal'] },
-  { key: 'me', label: 'nav.me', Icon: FileText, path: paths.me(), match: ['me'] },
   { key: 'practice', label: 'nav.practice', Icon: BookOpenCheck, path: paths.practice(), match: ['practice'] },
-  { key: 'library', label: 'nav.library', Icon: Library, path: paths.library(), match: ['library'] },
   { key: 'history', label: 'nav.history', Icon: ClipboardList, path: paths.history(), match: ['history', 'reflection'] },
+  { key: 'me', label: 'nav.me', Icon: FileText, path: paths.me(), match: ['me'] },
 ]
 
 const CONVERSATION_NAV_ITEMS: NavItem[] = [
@@ -96,25 +95,25 @@ function AppNavRail({ current, profile }: { current: RouteName; profile: Product
   const t = useT()
   const items = profile === 'conversation' ? CONVERSATION_NAV_ITEMS : INTERVIEW_NAV_ITEMS
   return (
-    <nav aria-label={t('nav.label')} className="hidden md:flex flex-col items-center gap-1 w-[76px] flex-shrink-0 border-r border-bg-tertiary/70 bg-bg-secondary/40 py-3 px-1.5 overflow-y-auto scrollbar-none">
-      <ul className="flex flex-col items-center gap-1 w-full">
+    <nav aria-label={t('nav.label')} className="hidden md:flex flex-col gap-1 w-[168px] flex-shrink-0 border-r border-bg-tertiary/70 bg-bg-secondary/28 py-4 px-3 overflow-y-auto scrollbar-none">
+      <ul className="flex flex-col gap-0.5 w-full">
         {items.map(({ key, label, Icon, path, match }) => {
           const active = match.includes(current)
           return (
             <li key={key} className="w-full">
               <button type="button" aria-current={active ? 'page' : undefined} onClick={() => navigate(path)} title={t(label)}
-                className={`flex flex-col items-center justify-center gap-1.5 w-full py-2.5 rounded-2xl transition-colors ${active ? 'bg-container-primary text-container-on-primary font-semibold' : 'text-text-muted hover:bg-bg-hover/60 hover:text-text-primary'}`}>
-                <Icon className="w-5 h-5" aria-hidden />
-                <span className="text-[10px] leading-none">{t(label)}</span>
+                className={`group flex items-center gap-2.5 w-full min-h-[38px] px-2.5 rounded-lg text-left transition-colors ${active ? 'bg-bg-tertiary/85 text-text-primary font-semibold' : 'text-text-muted hover:bg-bg-hover/45 hover:text-text-primary'}`}>
+                <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-accent-blue' : 'text-text-muted group-hover:text-text-secondary'}`} aria-hidden />
+                <span className="text-[13px] leading-none">{t(label)}</span>
               </button>
             </li>
           )
         })}
       </ul>
       <button type="button" aria-current={current === 'settings' ? 'page' : undefined} onClick={() => navigate(paths.settings())} title={t('nav.settings')}
-        className={`mt-auto flex flex-col items-center justify-center gap-1.5 w-full py-2.5 rounded-2xl ${current === 'settings' ? 'bg-container-primary text-container-on-primary font-semibold' : 'text-text-muted hover:bg-bg-hover/60 hover:text-text-primary'}`}>
-        <Settings className="w-5 h-5" aria-hidden />
-        <span className="text-[10px] leading-none">{t('nav.settings')}</span>
+        className={`mt-auto group flex items-center gap-2.5 w-full min-h-[38px] px-2.5 rounded-lg text-left transition-colors ${current === 'settings' ? 'bg-bg-tertiary/85 text-text-primary font-semibold' : 'text-text-muted hover:bg-bg-hover/45 hover:text-text-primary'}`}>
+        <Settings className={`w-4 h-4 flex-shrink-0 ${current === 'settings' ? 'text-accent-blue' : 'text-text-muted group-hover:text-text-secondary'}`} aria-hidden />
+        <span className="text-[13px] leading-none">{t('nav.settings')}</span>
       </button>
     </nav>
   )

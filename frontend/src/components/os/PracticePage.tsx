@@ -100,7 +100,7 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
     <Page testId="practice-setup" wide>
       <PageHeader title="练习" subtitle="面试官会根据你的回答追问；回答前不显示参考答案。" />
       {focus ? (
-        <div className="mb-3 rounded-2xl border border-accent-blue/30 bg-accent-blue/5 px-3 py-2 text-xs">
+        <div className="mb-4 border-l-2 border-accent-blue/55 py-1 pl-4 text-xs">
           <span className="font-semibold text-text-primary">本次聚焦：{focus.title}</span>
           <span className="block text-text-secondary">{focus.reason}</span>
         </div>
@@ -270,7 +270,7 @@ function PracticeSession({ practiceId }: { practiceId: string }) {
       {last?.feedback ? <FeedbackSplit feedback={last.feedback} /> : null}
 
       {current ? (
-        <section aria-label="当前问题" className="mt-3 rounded-2xl border border-bg-hover/60 bg-bg-secondary/60 p-4">
+        <section aria-label="当前问题" className="mt-3 rounded-xl border border-bg-hover/60 bg-bg-secondary/45 p-4">
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
             {current.persona_label ? <span className="font-semibold text-text-secondary">{current.persona_label}</span> : null}
             <StatusBadge tone={current.move === 'OPEN' ? 'muted' : 'warn'}>{MOVE_LABEL[current.move] ?? current.move}</StatusBadge>
@@ -327,7 +327,7 @@ export function FeedbackSplit({ feedback }: { feedback: PracticeFeedback }) {
   const findings = feedback.content.findings ?? []
   return (
     <div className="grid gap-3 md:grid-cols-2" aria-label="上一题反馈">
-      <section aria-label="内容" className="rounded-2xl border border-bg-hover/60 p-3">
+      <section aria-label="内容" className="rounded-xl border border-bg-hover/60 p-3">
         <h2 className="text-xs font-semibold text-text-primary">内容</h2>
         {findings.length ? (
           <ul className="mt-1.5 space-y-2">
@@ -342,7 +342,7 @@ export function FeedbackSplit({ feedback }: { feedback: PracticeFeedback }) {
           </ul>
         ) : <p className="mt-1 text-xs text-text-secondary">这一题的内容维度都比较完整。</p>}
       </section>
-      <section aria-label="表达" className="rounded-2xl border border-bg-hover/60 p-3">
+      <section aria-label="表达" className="rounded-xl border border-bg-hover/60 p-3">
         <h2 className="text-xs font-semibold text-text-primary">表达</h2>
         {feedback.delivery ? (
           <>

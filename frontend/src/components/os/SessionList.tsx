@@ -12,13 +12,13 @@ const ROUND_LABEL: Record<string, string> = {
 export function SessionList({ items, emptyText, showGoal = false }: { items: HistoryItem[]; emptyText: string; showGoal?: boolean }) {
   if (!items.length) return <EmptyState title={emptyText} />
   return (
-    <ul className="space-y-1.5">
+    <ul className="border-y border-bg-tertiary/70">
       {items.map((item) => {
         const Icon = item.type === 'REAL' ? Mic : item.panel ? Users : ClipboardList
         return (
           <li key={item.key}>
             <button type="button" onClick={() => navigate(paths.reflection(item.reflection_ref.session_kind, item.reflection_ref.session_ref))}
-              className="flex w-full items-center gap-3 rounded-xl border border-bg-hover/50 px-3 py-2 text-left hover:bg-bg-hover/40">
+              className="group flex w-full items-center gap-3 border-b border-bg-tertiary/70 px-1 py-3 text-left transition-colors last:border-b-0 hover:bg-bg-hover/25">
               <Icon className="h-4 w-4 flex-shrink-0 text-text-muted" aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-text-primary">
@@ -28,7 +28,7 @@ export function SessionList({ items, emptyText, showGoal = false }: { items: His
                 </span>
                 <span className="block text-[11px] text-text-muted">{formatWhen(item.started_at)}{item.has_reflection_actions ? ' · 已处理复盘' : ''}</span>
               </span>
-              <span className="text-[11px] text-accent-blue">复盘</span>
+              <span className="text-[11px] text-text-muted transition-colors group-hover:text-text-primary">复盘</span>
             </button>
           </li>
         )

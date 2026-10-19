@@ -67,8 +67,8 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
   }
 
   return (
-    <div className="grid gap-x-6 lg:grid-cols-[1.3fr_1fr]">
-      <div>
+    <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.7fr)]">
+      <div className="min-w-0">
         <Section title="下一步重点"><NextFocusList goalId={goal.id} items={data.next_focus} onChanged={reload} /></Section>
         {!data.has_jd ? (
           <Section title="补充 JD">
@@ -84,7 +84,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
               {data.gap_map.map((g) => {
                 const meta = GAP_STATUS[g.status] ?? { label: g.status, tone: 'muted' as const }
                 return (
-                  <li key={g.topic} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                  <li key={g.topic} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                     <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-text-primary">{g.topic}</span><StatusBadge tone={meta.tone}>{meta.label}</StatusBadge></div>
                     <p className="text-[11px] text-text-muted">{g.reason}</p>
                   </li>
@@ -97,7 +97,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
           {data.attack_surface.length ? (
             <ul className="space-y-2">
               {data.attack_surface.map((a) => (
-                <li key={a.claim_id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                <li key={a.claim_id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                   <p className="text-sm text-text-primary">{a.text}</p>
                   {a.risks.length ? <p className="text-[11px] text-status-inferred">{a.risks.join(' · ')}</p> : null}
                   {a.probes.length ? <ul className="mt-1 list-disc pl-4 text-[11px] text-text-secondary">{a.probes.map((p) => <li key={p}>{p}</li>)}</ul> : null}
@@ -110,7 +110,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
           {data.question_graph.length ? <QuestionTree nodes={data.question_graph} /> : <EmptyState title="暂无追问建议" />}
         </Section>
       </div>
-      <div>
+      <aside className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
         <Section title="技能与故事">
           <div className="flex flex-wrap gap-1.5">
             {data.stories.coverage.categories.map((c) => (
@@ -158,7 +158,7 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
             {data.materials.skipped.length ? <li className="text-status-inferred">未就绪，不会进入：{data.materials.skipped.map((s) => s.title).join('、')}</li> : null}
           </ul>
         </Section>
-      </div>
+      </aside>
     </div>
   )
 }

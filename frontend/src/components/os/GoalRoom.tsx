@@ -59,14 +59,15 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
 
   return (
     <Page testId="goal-room" wide>
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-bg-tertiary/80 pb-5 pt-1">
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-text-primary break-words">{goal.title}</h1>
-          <p className="text-xs text-text-muted">{nextLine}{goal.status !== 'ACTIVE' ? ` · ${GOAL_STATUS_LABELS[goal.status] ?? goal.status}` : ''}</p>
+          <p className="mb-1 text-[11px] font-medium text-text-muted">求职目标</p>
+          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-text-primary break-words md:text-[32px]">{goal.title}</h1>
+          <p className="mt-1.5 text-sm text-text-muted">{nextLine}{goal.status !== 'ACTIVE' ? ` · ${GOAL_STATUS_LABELS[goal.status] ?? goal.status}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PrimaryButton testId="goal-start-practice" onClick={() => startPractice(goal.id)}>开始练习</PrimaryButton>
-          <SecondaryButton testId="goal-go-live" onClick={() => goLive(goal.id)}>上场</SecondaryButton>
+          <SecondaryButton testId="goal-start-practice" onClick={() => startPractice(goal.id)}>练习模拟</SecondaryButton>
+          <PrimaryButton testId="goal-go-live" onClick={() => goLive(goal.id)}>进入面试</PrimaryButton>
           <ActionMenu label="目标操作" actions={[
             { key: 'edit', label: '编辑目标信息', onSelect: () => setEditOpen(true) },
             { key: 'settings', label: '目标默认设置', onSelect: () => navigate(`${paths.settings('language')}?goal=${goal.id}`) },
@@ -83,8 +84,10 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
           ]} />
         </div>
       </header>
-      <Tabs<GoalTab> label="目标视图" value={tab} onChange={(t) => navigate(paths.goal(goal.id, t), { replace: true })}
-        tabs={[['overview', '概览'], ['prepare', '准备'], ['interviews', '面试', goal.interviews.filter((i) => i.status === 'UPCOMING').length], ['offer', '录用']]} />
+      <div className="pt-1">
+        <Tabs<GoalTab> label="目标视图" value={tab} onChange={(t) => navigate(paths.goal(goal.id, t), { replace: true })}
+          tabs={[['overview', '概览'], ['prepare', '准备'], ['interviews', '会话', goal.interviews.filter((i) => i.status === 'UPCOMING').length], ['offer', '录用']]} />
+      </div>
       <div className="pt-3">
         {tab === 'overview' ? <Overview goal={goal} reload={reload} /> : null}
         {tab === 'prepare' ? <GoalPrepare goal={goal} reload={reload} /> : null}
@@ -102,17 +105,22 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
   const jdLines = goal.jd.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 4)
   const upcoming = goal.interviews.filter((i) => i.status === 'UPCOMING')
   return (
-    <div className="grid gap-x-6 md:grid-cols-[1.4fr_1fr]">
-      <div>
-        <Section title="下一步重点">
+    <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.7fr)]">
+      <div className="min-w-0">
+        <Section title="接下来最值得准备">
           <NextFocusList goalId={goal.id} items={goal.next_focus} onChanged={reload} />
         </Section>
-        <Section title="最近场次" action={<SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>全部</SecondaryButton>}>
+        <Section title="最近的会话" action={<SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>全部</SecondaryButton>}>
           <SessionList items={goal.sessions.slice(0, 4)} emptyText="还没有练习或面试记录。" />
         </Section>
-        <ProgressTrends goalId={goal.id} />
+        <details className="border-t border-bg-tertiary/70 py-3">
+          <summary className="cursor-pointer list-none text-xs font-medium text-text-muted transition-colors hover:text-text-primary">
+            查看进展趋势
+          </summary>
+          <div className="pt-2"><ProgressTrends goalId={goal.id} /></div>
+        </details>
       </div>
-      <div>
+      <aside className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
         <Section title="下一场">
           {upcoming.length ? (
             <ul className="space-y-1 text-sm">
@@ -122,7 +130,7 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
             <SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>安排下一轮</SecondaryButton>
           )}
         </Section>
-        <Section title="已知信息">
+        <Section title="目标简介">
           <dl className="space-y-1.5 text-xs">
             <div><dt className="inline text-text-muted">岗位：</dt><dd className="inline text-text-primary">{goal.role || '未填写'}</dd></div>
             <div><dt className="inline text-text-muted">阶段：</dt><dd className="inline text-text-primary">{goal.stage || '未记录'}</dd></div>
@@ -148,7 +156,7 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
             )}
           </div>
         </Section>
-      </div>
+      </aside>
     </div>
   )
 }

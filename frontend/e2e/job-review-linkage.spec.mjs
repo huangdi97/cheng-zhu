@@ -73,7 +73,7 @@ test.describe('Goal and History linkage', () => {
     await page.goto('/#/goals')
     await page.getByRole('button', { name: /MiniMax · AI 产品工程师/ }).click()
     await expect(page.getByTestId('goal-room')).toBeVisible()
-    await page.getByRole('tab', { name: /面试/ }).click()
+    await page.getByRole('tab', { name: /会话/ }).click()
 
     const realSection = page.getByRole('heading', { name: /真实面试 · 1/ })
     await expect(realSection).toBeVisible()

@@ -50,7 +50,7 @@ export default function GoalsPage() {
           {showDone ? <ul className="border-y border-bg-tertiary/70">{done.map((g) => <GoalRow key={g.id} goal={g} />)}</ul> : null}
         </Section>
       ) : null}
-      <p className="pt-3 text-[11px] text-text-muted">状态：{Object.values(STATUS_LABEL).join(' / ')}。旧版投递看板仍可在目标的「面试」页打开。</p>
+      <p className="pt-3 text-[11px] text-text-muted">状态：{Object.values(STATUS_LABEL).join(' / ')}。旧版投递看板仍可在目标的「会话」页打开。</p>
     </Page>
   )
 }

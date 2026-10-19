@@ -1,4 +1,4 @@
-/** Action Home (canonical §6): next interview · next focus · needs attention · recent session. */
+/** Action Home (canonical §6): one current Goal, one next action, supporting history. */
 import { CalendarClock, ClipboardList, Flag } from 'lucide-react'
 import { navigate, paths } from '@/lib/router'
 import { productApi } from '@/lib/productApi'
@@ -17,11 +17,11 @@ export default function HomePage() {
 
   if (data.state === 'NO_GOAL' || (!data.focus_goal && !data.next_interview)) {
     return (
-      <Page testId="action-home">
+      <Page testId="action-home" wide>
         <h1 className="sr-only">首页</h1>
-        <div className="py-10">
+        <div className="mx-auto max-w-2xl py-16">
           <EmptyState testId="home-empty" title="从一个具体的求职目标开始"
-            body="告诉成竹你要面的公司和岗位，它会围绕这个目标安排准备、练习、上场和复盘。"
+            body="告诉成竹你要面的公司和岗位。之后的准备、练习、上场和复盘都围绕这个目标推进。"
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <PrimaryButton onClick={openCreateGoal} testId="create-first-goal">创建第一个求职目标</PrimaryButton>
@@ -34,61 +34,83 @@ export default function HomePage() {
     )
   }
 
-  const goalId = data.focus_goal?.id ?? null
+  const goalId = data.next_interview?.goal_id ?? data.focus_goal?.id ?? null
+  const heroTitle = data.next_interview
+    ? [data.next_interview.company, data.next_interview.role].filter(Boolean).join(' · ') || data.next_interview.title
+    : data.focus_goal?.title ?? '当前目标'
+  const heroMeta = data.next_interview
+    ? [data.next_interview.round, formatWhen(data.next_interview.scheduled_at)].filter(Boolean).join(' · ')
+    : '还没有安排下一轮时间'
+
   return (
-    <Page testId="action-home">
+    <Page testId="action-home" wide>
       <h1 className="sr-only">首页</h1>
-      {data.next_interview ? (
-        <section aria-label="下一场" className="rounded-2xl border border-bg-hover/60 bg-bg-secondary/60 p-4">
-          <div className="flex items-center gap-2 text-[11px] font-medium text-text-muted">
-            <CalendarClock className="h-3.5 w-3.5" aria-hidden /> 下一场
-          </div>
-          <div className="mt-1 text-lg font-semibold text-text-primary break-words">
-            {data.next_interview.company}{data.next_interview.round ? ` · ${data.next_interview.round}` : ''}
-          </div>
-          <div className="text-sm text-text-secondary">{formatWhen(data.next_interview.scheduled_at)}{data.next_interview.role ? ` · ${data.next_interview.role}` : ''}</div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <PrimaryButton onClick={() => runActionKey('continue_prepare', { goalId: data.next_interview!.goal_id })}>继续准备</PrimaryButton>
-            <SecondaryButton onClick={() => runActionKey('start_practice', { goalId: data.next_interview!.goal_id })}>开始练习</SecondaryButton>
-            <SecondaryButton onClick={() => runActionKey('preflight', { goalId: data.next_interview!.goal_id })}>上场检查</SecondaryButton>
-          </div>
-        </section>
-      ) : data.focus_goal ? (
-        <section aria-label="当前目标" className="rounded-2xl border border-bg-hover/60 bg-bg-secondary/60 p-4">
-          <div className="flex items-center gap-2 text-[11px] font-medium text-text-muted"><Flag className="h-3.5 w-3.5" aria-hidden /> 当前目标</div>
-          <div className="mt-1 text-lg font-semibold text-text-primary break-words">{data.focus_goal.title}</div>
-          <div className="text-sm text-text-secondary">还没有安排下一轮时间</div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <PrimaryButton onClick={() => runActionKey(data.primary_action.key, { goalId: data.primary_action.goal_id })}>{data.primary_action.label}</PrimaryButton>
-            <SecondaryButton onClick={() => goalId && navigate(paths.goal(goalId, 'interviews'))}>安排下一轮</SecondaryButton>
-          </div>
-        </section>
-      ) : null}
 
-      {goalId ? (
-        <Section title={`下一步重点 · ${data.focus_goal?.title ?? ''}`}>
-          <NextFocusList goalId={goalId} items={data.next_focus} onChanged={reload} />
-        </Section>
-      ) : null}
+      <section aria-label={data.next_interview ? '下一场' : '当前目标'} className="border-b border-bg-tertiary/80 pb-6 pt-2">
+        <div className="flex items-center gap-2 text-[11px] font-medium text-text-muted">
+          {data.next_interview ? <CalendarClock className="h-3.5 w-3.5" aria-hidden /> : <Flag className="h-3.5 w-3.5" aria-hidden />}
+          {data.next_interview ? '下一场面试' : '当前目标'}
+        </div>
+        <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-text-primary break-words md:text-[32px]">
+              {heroTitle}
+            </h2>
+            <p className="mt-1.5 text-sm text-text-muted">{heroMeta}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {data.next_interview ? (
+              <>
+                <PrimaryButton onClick={() => runActionKey('continue_prepare', { goalId: data.next_interview!.goal_id })}>继续准备</PrimaryButton>
+                <SecondaryButton onClick={() => runActionKey('start_practice', { goalId: data.next_interview!.goal_id })}>练习模拟</SecondaryButton>
+                <SecondaryButton onClick={() => runActionKey('preflight', { goalId: data.next_interview!.goal_id })}>上场检查</SecondaryButton>
+              </>
+            ) : (
+              <>
+                <PrimaryButton onClick={() => runActionKey(data.primary_action.key, { goalId: data.primary_action.goal_id })}>{data.primary_action.label}</PrimaryButton>
+                <SecondaryButton onClick={() => goalId && navigate(paths.goal(goalId, 'interviews'))}>安排下一轮</SecondaryButton>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
 
-      <Attention items={data.needs_attention} />
+      <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.7fr)]">
+        <div className="min-w-0">
+          {goalId ? (
+            <Section title="接下来最值得准备">
+              <NextFocusList goalId={goalId} items={data.next_focus} onChanged={reload} />
+            </Section>
+          ) : null}
 
-      <Section title="最近一场">
-        {data.recent_session ? (
-          <button type="button" onClick={() => navigate(paths.reflection(data.recent_session!.reflection_ref.session_kind, data.recent_session!.reflection_ref.session_ref))}
-            className="flex w-full items-center gap-3 rounded-2xl border border-bg-hover/60 p-3 text-left hover:bg-bg-hover/40">
-            <ClipboardList className="h-4 w-4 text-text-muted" aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-text-primary truncate">{data.recent_session.title}{data.recent_session.goal_title ? ` · ${data.recent_session.goal_title}` : ''}</span>
-              <span className="block text-[11px] text-text-muted">{formatWhen(data.recent_session.started_at)} · {data.recent_session.type === 'REAL' ? '真实面试' : '练习'}</span>
-            </span>
-            <span className="text-xs text-accent-blue">查看复盘</span>
-          </button>
-        ) : (
-          <EmptyState title="还没有场次" body="完成第一次练习后，复盘会出现在这里。"
-            action={<SecondaryButton onClick={() => runActionKey('start_practice', { goalId })}>开始练习</SecondaryButton>} />
-        )}
-      </Section>
+          <Section title="最近的会话">
+            {data.recent_session ? (
+              <button type="button" onClick={() => navigate(paths.reflection(data.recent_session!.reflection_ref.session_kind, data.recent_session!.reflection_ref.session_ref))}
+                className="group flex w-full items-center gap-3 border-y border-bg-tertiary/70 px-1 py-3 text-left transition-colors hover:bg-bg-hover/25">
+                <ClipboardList className="h-4 w-4 flex-shrink-0 text-text-muted" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-text-primary truncate">{data.recent_session.title}{data.recent_session.goal_title ? ` · ${data.recent_session.goal_title}` : ''}</span>
+                  <span className="mt-0.5 block text-[11px] text-text-muted">{formatWhen(data.recent_session.started_at)} · {data.recent_session.type === 'REAL' ? '真实面试' : '练习'}</span>
+                </span>
+                <span className="text-xs text-text-muted transition-colors group-hover:text-text-primary">查看复盘</span>
+              </button>
+            ) : (
+              <EmptyState title="还没有场次" body="完成第一次练习后，复盘会出现在这里。"
+                action={<SecondaryButton onClick={() => runActionKey('start_practice', { goalId })}>开始练习</SecondaryButton>} />
+            )}
+          </Section>
+        </div>
+
+        <aside className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <Section title="目标状态">
+            <div className="space-y-2 text-xs">
+              <p className="text-text-primary">{data.focus_goal?.title ?? heroTitle}</p>
+              <p className="text-text-muted">当前共有 {data.active_goal_count} 个进行中的目标。首页只突出一个当前目标，其他目标在「目标」中查看。</p>
+            </div>
+          </Section>
+          <Attention items={data.needs_attention} />
+        </aside>
+      </div>
     </Page>
   )
 }
@@ -99,9 +121,9 @@ function Attention({ items }: { items?: Array<{ kind: string; text: string; acti
   if (!items?.length) return null
   return (
     <Section title="需要处理">
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {items.map((item) => (
-          <li key={item.kind} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-hover/50 px-3 py-2">
+          <li key={item.kind} className="flex flex-wrap items-center justify-between gap-2 border-b border-bg-tertiary/70 pb-2 last:border-b-0">
             <StatusBadge tone={item.kind === 'MODEL' ? 'risk' : 'warn'}>{item.text}</StatusBadge>
             <SecondaryButton onClick={() => runActionKey(item.action.key, { goalId: item.action.goal_id, target: item.action.target })}>{item.action.label}</SecondaryButton>
           </li>

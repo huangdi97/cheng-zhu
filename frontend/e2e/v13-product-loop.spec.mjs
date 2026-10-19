@@ -189,6 +189,8 @@ test.describe('v1.3 Goal-centered product loop', () => {
     })
     await page.goto('/#/goals/goal-v13')
     const trends = page.getByTestId('goal-progress-trends')
+    await expect(trends).toBeHidden()
+    await page.getByText('查看进展趋势', { exact: true }).click()
     await expect(trends).toBeVisible()
     await expect(trends).toContainText('技术深度')
     await expect(trends).toContainText('在改善')

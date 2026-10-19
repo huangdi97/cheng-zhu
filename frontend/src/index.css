@@ -1769,6 +1769,29 @@ select:focus-visible {
   font-weight: 650;
 }
 
+.ov-focus-section h2::before {
+  background: #7fae98;
+}
+
+.ov-focus-omitted {
+  color: rgba(225, 231, 227, 0.58);
+}
+
+.ov-focus-content .ov-markdown h1,
+.ov-focus-content .ov-markdown h2,
+.ov-focus-content .ov-markdown h3 {
+  color: rgba(242, 244, 243, 0.92);
+}
+
+.ov-focus-content .ov-markdown pre {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.ov-focus-content .ov-markdown blockquote {
+  border-left-color: rgba(127, 174, 152, 0.68);
+}
+
 .ov-review-line {
   border-bottom-color: rgba(255, 255, 255, 0.08);
   color: rgba(225, 231, 227, 0.60);

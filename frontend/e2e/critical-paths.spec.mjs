@@ -12,18 +12,19 @@
 import { test, expect } from '@playwright/test'
 import { installMocks, COMMON_WS_BOOTSTRAP } from './fixtures/setup.mjs'
 
-/** The canonical §3 IA: 首页 / 求职目标 / 我的成竹 / 练习 / 资料库 / 历史 / 设置. */
-const NAV_ITEMS = ['首页', '求职目标', '我的成竹', '练习', '资料库', '历史', '设置']
+/** UI v2 primary IA: Goal-centered work, not a capability/module directory. */
+const NAV_ITEMS = ['首页', '求职目标', '练习', '历史', '我的成竹', '设置']
+/** Capabilities/routes that remain available but are not persistent primary navigation. */
+const CONTEXTUAL_ONLY_NAV_ITEMS = ['资料库']
 /** v1.2 module-centric destinations that must no longer be top-level. */
 const RETIRED_NAV_ITEMS = ['准备', '复盘', '上场']
 
 const ROUTES = [
   ['/home', '首页'],
   ['/goals', '求职目标'],
-  ['/me', '我的成竹'],
   ['/practice', '练习'],
-  ['/library', '资料库'],
   ['/history', '历史'],
+  ['/me', '我的成竹'],
   ['/settings', '设置'],
 ]
 
@@ -80,7 +81,7 @@ test.describe('v1.3 goal-centered navigation', () => {
     for (const label of NAV_ITEMS) {
       await expect(nav.getByRole('button', { name: label })).toBeVisible()
     }
-    for (const label of RETIRED_NAV_ITEMS) {
+    for (const label of [...CONTEXTUAL_ONLY_NAV_ITEMS, ...RETIRED_NAV_ITEMS]) {
       await expect(nav.getByRole('button', { name: label })).toHaveCount(0)
     }
 

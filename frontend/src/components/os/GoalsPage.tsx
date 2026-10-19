@@ -11,9 +11,9 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: '进行中', PAUSED: '暂
 function GoalRow({ goal }: { goal: Goal }) {
   const next = goal.next_interview_at ? `${goal.interview_round || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
   return (
-    <li>
+    <li className="border-b border-bg-tertiary/70 last:border-b-0">
       <button type="button" onClick={() => navigate(paths.goal(goal.id))}
-        className="group flex w-full items-center gap-3 border-b border-bg-tertiary/70 px-1 py-3.5 text-left transition-colors last:border-b-0 hover:bg-bg-hover/25">
+        className="group flex w-full items-center gap-3 px-1 py-3.5 text-left transition-colors hover:bg-bg-hover/25">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-text-primary break-words">{goal.title}</span>
           <span className="block text-xs text-text-muted">{next}{goal.offer_state !== 'NONE' ? ` · Offer：${goal.offer_state}` : ''}</span>

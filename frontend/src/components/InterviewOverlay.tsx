@@ -30,8 +30,8 @@ type VisionVerifyState = {
 }
 
 const FOCUS_TAB_CACHE_LIMIT = 20
-const COMPACT_AFTER_MS = 25000
-const FOCUS_TEXT_COLOR = '#263241'
+const COMPACT_AFTER_MS = 12000
+const FOCUS_TEXT_COLOR = '#F2F4F3'
 
 const OVERLAY_MARKDOWN_COMPONENTS: Components = {
   a({ children }) {
@@ -595,7 +595,7 @@ function OverlayCue({ question, cue, onExpand }: { question: string; cue: FastCu
     <div className="ov-cue" data-testid="overlay-cue">
       {question && <div className="ov-cue-question">{question}</div>}
       <ul className="ov-cue-list">
-        {cue.cues.map((item, idx) => (
+        {cue.cues.slice(0, 3).map((item, idx) => (
           <li key={idx}>
             <span aria-hidden>•</span> {item.text}
           </li>

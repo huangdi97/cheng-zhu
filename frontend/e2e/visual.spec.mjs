@@ -12,9 +12,9 @@ import { test, expect } from '@playwright/test'
 import { installMocks, COMMON_WS_BOOTSTRAP } from './fixtures/setup.mjs'
 
 const UI_V2_R1_DIFF_BUDGET = {
-  home: 16_000,
-  goals: 25_000,
-  meResume: 47_000,
+  home: { pixels: 16_000, ratio: 0.018 },
+  goals: { pixels: 25_000, ratio: 0.027 },
+  meResume: { pixels: 47_000, ratio: 0.052 },
 }
 
 async function expectInterviewStudioNav(page) {
@@ -42,7 +42,8 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page).toHaveScreenshot('action-home.png', {
       fullPage: false,
       timeout: 30_000,
-      maxDiffPixels: UI_V2_R1_DIFF_BUDGET.home,
+      maxDiffPixels: UI_V2_R1_DIFF_BUDGET.home.pixels,
+      maxDiffPixelRatio: UI_V2_R1_DIFF_BUDGET.home.ratio,
     })
   })
 
@@ -54,7 +55,8 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page).toHaveScreenshot('goals.png', {
       fullPage: false,
       timeout: 30_000,
-      maxDiffPixels: UI_V2_R1_DIFF_BUDGET.goals,
+      maxDiffPixels: UI_V2_R1_DIFF_BUDGET.goals.pixels,
+      maxDiffPixelRatio: UI_V2_R1_DIFF_BUDGET.goals.ratio,
     })
   })
 
@@ -67,7 +69,8 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page).toHaveScreenshot('me-resume.png', {
       fullPage: false,
       timeout: 30_000,
-      maxDiffPixels: UI_V2_R1_DIFF_BUDGET.meResume,
+      maxDiffPixels: UI_V2_R1_DIFF_BUDGET.meResume.pixels,
+      maxDiffPixelRatio: UI_V2_R1_DIFF_BUDGET.meResume.ratio,
     })
   })
 })

@@ -79,12 +79,24 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
           </div>
         } />
 
-      <Section title="下一步">
+      <section aria-label="复盘重点" className="border-b border-bg-tertiary/80 py-5">
+        <p className="text-[11px] font-medium text-text-muted">这场复盘的重点</p>
+        <p className="mt-1 max-w-3xl text-lg font-medium leading-7 text-text-primary">
+          {fs.next_step
+            ? `最值得继续处理的是「${fs.next_step.title}」。`
+            : fs.to_improve.length
+              ? '这场已经留下了明确的改进证据，先处理最反复出现的问题。'
+              : '这场没有出现需要被夸大的结论，保留有效证据并继续下一轮即可。'}
+        </p>
+        {fs.next_step?.reason ? <p className="mt-1.5 max-w-3xl text-sm leading-6 text-text-secondary">{fs.next_step.reason}</p> : null}
+      </section>
+
+      <Section title="下一步建议">
         {fs.next_step ? (
-          <div className="rounded-2xl border border-accent-blue/30 bg-accent-blue/5 p-3">
+          <div className="border-l-2 border-accent-blue/55 py-1 pl-4">
             <p className="text-sm font-semibold text-text-primary">{fs.next_step.title}</p>
-            <p className="text-xs text-text-secondary">{fs.next_step.reason}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="mt-0.5 text-xs leading-5 text-text-secondary">{fs.next_step.reason}</p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {data.goal_id ? (
                 <>
                   <PrimaryButton testId="reflection-practice-next" onClick={() => void act('PRACTICE_THIS', { ...fs.next_step!, id: fs.next_step!.finding_id ?? fs.next_step!.pin_id })}>练这个</PrimaryButton>
@@ -102,7 +114,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         {fs.pinned_moments.length ? (
           <ul className="space-y-1.5">
             {fs.pinned_moments.map((p) => (
-              <li key={p.id} className="rounded-xl border border-accent-amber/30 bg-accent-amber/5 px-3 py-2">
+              <li key={p.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                 <div className="flex flex-wrap items-center gap-2"><Pin className="h-3.5 w-3.5 text-accent-amber" aria-hidden /><StatusBadge tone="warn">{p.tag_label ?? p.tag}</StatusBadge></div>
                 {p.question ? <p className="mt-1 text-sm text-text-primary">{p.question}</p> : null}
                 {p.note ? <p className="text-xs text-text-secondary">备注：{p.note}</p> : null}

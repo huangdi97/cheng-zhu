@@ -16,9 +16,9 @@ export function SessionList({ items, emptyText, showGoal = false }: { items: His
       {items.map((item) => {
         const Icon = item.type === 'REAL' ? Mic : item.panel ? Users : ClipboardList
         return (
-          <li key={item.key}>
+          <li key={item.key} className="border-b border-bg-tertiary/70 last:border-b-0">
             <button type="button" onClick={() => navigate(paths.reflection(item.reflection_ref.session_kind, item.reflection_ref.session_ref))}
-              className="group flex w-full items-center gap-3 border-b border-bg-tertiary/70 px-1 py-3 text-left transition-colors last:border-b-0 hover:bg-bg-hover/25">
+              className="group flex w-full items-center gap-3 px-1 py-3 text-left transition-colors hover:bg-bg-hover/25">
               <Icon className="h-4 w-4 flex-shrink-0 text-text-muted" aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-text-primary">

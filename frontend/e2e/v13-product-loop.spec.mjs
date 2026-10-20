@@ -156,9 +156,10 @@ test.describe('v1.3 Goal-centered product loop', () => {
 
     await page.goto('/#/practice')
     await page.getByLabel('求职目标').selectOption(GOAL.id)
-    await page.getByText('小组面（2–3 位面试官轮流提问）').click()
-    await page.getByText('Tech Lead', { exact: true }).click()
-    await page.getByText('Hiring Manager', { exact: true }).click()
+    await page.getByRole('checkbox', { name: '小组面' }).check()
+    const techLead = page.getByRole('checkbox', { name: /Tech Lead/ })
+    await expect(techLead).toBeChecked()
+    await page.getByRole('checkbox', { name: /Hiring Manager/ }).check()
     await page.getByTestId('practice-start').click()
 
     await expect(page).toHaveURL(/#\/practice\/practice-1/)

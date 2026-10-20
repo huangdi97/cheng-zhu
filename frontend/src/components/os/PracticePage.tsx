@@ -37,7 +37,7 @@ function Chips({ label, options, value, onChange }: { label: string; options: Ar
       <div role="radiogroup" aria-label={label} className="mt-1 flex flex-wrap gap-1.5">
         {options.map((o) => (
           <button key={o.key} type="button" role="radio" aria-checked={value === o.key} onClick={() => onChange(o.key)}
-            className={`rounded-full border px-3 py-1 text-xs ${value === o.key ? 'border-accent-blue/50 bg-container-primary text-container-on-primary font-semibold' : 'border-bg-hover text-text-secondary hover:text-text-primary'}`}>
+            className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${value === o.key ? 'border-accent-blue/45 bg-container-primary text-container-on-primary font-semibold' : 'border-bg-hover/70 bg-bg-primary text-text-secondary hover:bg-bg-hover/35 hover:text-text-primary'}`}>
             {o.label}
           </button>
         ))}
@@ -68,8 +68,14 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
   // Next Focus drives the defaults (round / demeanor) unless the URL picked a round
   useEffect(() => {
     if (!defaults) return
-    setCfg((c) => ({ ...c, round: query.round || defaults.round || c.round, demeanor: defaults.demeanor || c.demeanor, sources: defaults.sources?.length ? defaults.sources : c.sources }))
-  }, [defaults, query.round])
+    setCfg((c) => ({
+      ...c,
+      round: query.round || defaults.round || c.round,
+      demeanor: defaults.demeanor || c.demeanor,
+      sources: defaults.sources?.length ? defaults.sources : c.sources,
+      personas: c.personas.length ? c.personas : (opts.data?.personas[0]?.key ? [opts.data.personas[0].key] : []),
+    }))
+  }, [defaults, opts.data?.personas, query.round])
 
   const set = <K extends keyof PracticeConfig>(k: K, v: PracticeConfig[K]) => setCfg((c) => ({ ...c, [k]: v }))
   const togglePersona = (key: string) => {
@@ -98,74 +104,112 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
   const panelInvalid = panel && (cfg.personas.length < 2 || cfg.personas.length > 3)
   return (
     <Page testId="practice-setup" wide>
-      <PageHeader title="练习" subtitle="面试官会根据你的回答追问；回答前不显示参考答案。" />
+      <PageHeader title="练习" subtitle="围绕一个明确目标练；面试官会根据你的回答继续追问，回答前不显示参考答案。" />
+
       {focus ? (
-        <div className="mb-4 border-l-2 border-accent-blue/55 py-1 pl-4 text-xs">
-          <span className="font-semibold text-text-primary">本次聚焦：{focus.title}</span>
-          <span className="block text-text-secondary">{focus.reason}</span>
-        </div>
+        <section aria-label="本次练习重点" className="mb-5 border-y border-bg-tertiary/75 py-3">
+          <p className="text-[11px] font-medium text-text-muted">本次练习重点</p>
+          <p className="mt-0.5 text-base font-semibold text-text-primary">{focus.title}</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-text-secondary">{focus.reason}</p>
+        </section>
       ) : null}
-      <div className="grid gap-x-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-4">
+
+      <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.72fr)]">
+        <div className="min-w-0 space-y-5">
           <Field label="求职目标">
             <select className={inputCls} value={goalId} onChange={(e) => setGoalId(e.target.value)}>
               <option value="">不关联目标（用岗位题库）</option>
               {(goals.data?.items ?? []).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
             </select>
           </Field>
-          <Chips label="轮次" options={o.rounds} value={cfg.round} onChange={(v) => set('round', v)} />
-          <fieldset>
-            <legend className="text-xs font-medium text-text-secondary">面试官</legend>
-            <label className="mt-1 flex items-center gap-2 text-xs text-text-primary">
-              <input type="checkbox" checked={panel} onChange={(e) => setPanel(e.target.checked)} />
-              <Users className="h-3.5 w-3.5" aria-hidden /> 小组面（2–3 位面试官轮流提问）
-            </label>
-            <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+
+          <Chips label="这轮模拟什么" options={o.rounds} value={cfg.round} onChange={(v) => set('round', v)} />
+
+          <section aria-labelledby="practice-interviewer-heading">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 id="practice-interviewer-heading" className="text-xs font-semibold text-text-secondary">谁来问你</h2>
+                <p className="mt-0.5 text-[11px] text-text-muted">选一个主要面试官；需要时再切成 2–3 人小组面。</p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-xs text-text-secondary">
+                <input type="checkbox" checked={panel} onChange={(e) => setPanel(e.target.checked)} />
+                <Users className="h-3.5 w-3.5" aria-hidden /> 小组面
+              </label>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
               {o.personas.map((p) => {
                 const checked = cfg.personas.includes(p.key)
                 return (
-                  <label key={p.key} className={`flex items-start gap-2 rounded-xl border px-2.5 py-2 text-xs ${checked ? 'border-accent-blue/50 bg-accent-blue/5' : 'border-bg-hover'}`}>
+                  <label key={p.key} className={`flex min-h-[64px] items-start gap-2.5 rounded-xl border px-3 py-2.5 text-xs transition-colors ${checked ? 'border-accent-blue/45 bg-accent-blue/5' : 'border-bg-hover/65 bg-bg-primary hover:bg-bg-hover/25'}`}>
                     <input type={panel ? 'checkbox' : 'radio'} name="persona" checked={checked}
                       onChange={() => (panel ? togglePersona(p.key) : set('personas', [p.key]))} className="mt-0.5" />
-                    <span><span className="font-medium text-text-primary">{p.label}</span><span className="block text-[11px] text-text-muted">{p.followup_style}</span></span>
+                    <span className="min-w-0">
+                      <span className="font-semibold text-text-primary">{p.label}</span>
+                      <span className="mt-0.5 block leading-4 text-text-muted">{p.followup_style}</span>
+                    </span>
                   </label>
                 )
               })}
             </div>
-            {panelInvalid ? <p className="mt-1 text-[11px] text-status-inferred">小组面需要选 2–3 位面试官。</p> : null}
-          </fieldset>
-          <Chips label="风格" options={o.demeanors} value={cfg.demeanor} onChange={(v) => set('demeanor', v)} />
-          <Chips label="难度" options={o.difficulties} value={cfg.difficulty} onChange={(v) => set('difficulty', v)} />
+            {panelInvalid ? <p className="mt-1.5 text-[11px] text-status-inferred">小组面需要选 2–3 位面试官。</p> : null}
+          </section>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Chips label="追问风格" options={o.demeanors} value={cfg.demeanor} onChange={(v) => set('demeanor', v)} />
+            <Chips label="难度" options={o.difficulties} value={cfg.difficulty} onChange={(v) => set('difficulty', v)} />
+          </div>
         </div>
-        <div className="space-y-4">
-          <fieldset>
-            <legend className="text-xs font-medium text-text-secondary">题目来源</legend>
-            <div className="mt-1 space-y-1">
+
+        <aside className="mt-6 min-w-0 lg:mt-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-text-primary">本次设置</h2>
+              <p className="mt-1 text-[11px] leading-5 text-text-muted">这些设置只影响这一轮练习，不会改动你的求职目标。</p>
+            </div>
+            <div className="flex-shrink-0 whitespace-nowrap [&>button]:whitespace-nowrap">
+              <PrimaryButton testId="practice-start" onClick={() => void start()} disabled={busy || !cfg.sources.length || panelInvalid}>{busy ? '准备题目…' : '开始练习'}</PrimaryButton>
+            </div>
+          </div>
+
+          <fieldset className="mt-4">
+            <legend className="text-xs font-medium text-text-secondary">题目从哪里来</legend>
+            <div className="mt-1.5 divide-y divide-bg-tertiary/60 border-y border-bg-tertiary/70">
               {o.sources.map((s) => (
-                <label key={s.key} className="flex items-center gap-2 text-xs text-text-primary">
-                  <input type="checkbox" checked={cfg.sources.includes(s.key)} onChange={() => toggleSource(s.key)} /> {s.label}
+                <label key={s.key} className="flex items-center gap-2 py-2 text-xs text-text-primary">
+                  <input type="checkbox" checked={cfg.sources.includes(s.key)} onChange={() => toggleSource(s.key)} />
+                  <span>{s.label}</span>
                 </label>
               ))}
             </div>
           </fieldset>
-          <Field label={`题目数量：${cfg.questions}`}>
-            <input type="range" min={1} max={12} value={cfg.questions} aria-label="题目数量" onChange={(e) => set('questions', Number(e.target.value))} className="w-full" />
-          </Field>
-          <Chips label="语言" options={[{ key: 'zh', label: '中文' }, { key: 'en', label: 'English' }]} value={cfg.language} onChange={(v) => set('language', v as 'zh' | 'en')} />
-          <label className="flex items-center gap-2 text-xs text-text-primary">
-            <input type="checkbox" checked={cfg.delivery_analytics !== false} onChange={(e) => set('delivery_analytics', e.target.checked)} />
-            本地表达分析（语速、结论时间等，只在本机）
-          </label>
-          <label className="flex items-center gap-2 text-xs text-text-primary">
-            <input type="checkbox" checked={!!cfg.human_coach} onChange={(e) => set('human_coach', e.target.checked)} />
-            邀请真人教练一起练
-          </label>
-          {cfg.human_coach ? <Suspense fallback={<Loading />}><CoachPanel sessionKind="practice" /></Suspense> : null}
-        </div>
-      </div>
-      {error ? <p role="alert" className="mt-3 text-xs text-status-risk">{error}</p> : null}
-      <div className="mt-4 flex gap-2">
-        <PrimaryButton testId="practice-start" onClick={() => void start()} disabled={busy || !cfg.sources.length || panelInvalid}>{busy ? '准备题目…' : '开始练习'}</PrimaryButton>
+
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xs font-medium text-text-secondary">题目数量</span>
+              <span className="text-sm font-semibold tabular-nums text-text-primary">{cfg.questions} 题</span>
+            </div>
+            <input type="range" min={1} max={12} value={cfg.questions} aria-label="题目数量" onChange={(e) => set('questions', Number(e.target.value))} className="mt-2 w-full" />
+          </div>
+
+          <div className="mt-4">
+            <Chips label="回答语言" options={[{ key: 'zh', label: '中文' }, { key: 'en', label: 'English' }]} value={cfg.language} onChange={(v) => set('language', v as 'zh' | 'en')} />
+          </div>
+
+          <div className="mt-4 divide-y divide-bg-tertiary/60 border-y border-bg-tertiary/70">
+            <label className="flex items-start gap-2 py-2.5 text-xs text-text-primary">
+              <input type="checkbox" checked={cfg.delivery_analytics !== false} onChange={(e) => set('delivery_analytics', e.target.checked)} className="mt-0.5" />
+              <span><span className="font-medium">本地表达分析</span><span className="mt-0.5 block text-[11px] text-text-muted">语速、结论时间等，只在本机计算。</span></span>
+            </label>
+            <label className="flex items-start gap-2 py-2.5 text-xs text-text-primary">
+              <input type="checkbox" aria-label="邀请真人教练一起练" checked={!!cfg.human_coach} onChange={(e) => set('human_coach', e.target.checked)} className="mt-0.5" />
+              <span><span className="font-medium">真人教练</span><span className="mt-0.5 block text-[11px] text-text-muted">练习时允许教练单独给建议，不混入你的个人证据。</span></span>
+            </label>
+          </div>
+
+          {cfg.human_coach ? <div className="mt-3"><Suspense fallback={<Loading />}><CoachPanel sessionKind="practice" /></Suspense></div> : null}
+          {error ? <p role="alert" className="mt-3 text-xs text-status-risk">{error}</p> : null}
+
+        </aside>
       </div>
     </Page>
   )

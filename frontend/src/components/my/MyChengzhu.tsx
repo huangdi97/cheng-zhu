@@ -27,24 +27,66 @@ export function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
     api.intelStories().then(setStories).catch(() => setStories([]))
     api.intelSkillCards().then(setCards).catch(() => setCards([]))
   }, [])
+
   const list = facts?.facts ?? []
-  const count = (pred: (f: (typeof list)[number]) => boolean) => list.filter(pred).length
-  const tiles: Array<[string, number, TabKey]> = [
-    ['有直接证据', count((f) => f.provenance_status === 'DIRECT_EVIDENCE'), 'facts'],
-    ['暂无证据', count((f) => f.provenance_status === 'NO_EVIDENCE'), 'facts'],
-    ['用户已确认', count((f) => f.user_assertion_status === 'USER_CONFIRMED'), 'facts'],
-    ['Stories', stories.length, 'stories'],
-    ['已确认技能卡', cards.filter((c) => c.user_reviewed).length, 'skills'],
-  ]
+  const direct = list.filter((f) => f.provenance_status === 'DIRECT_EVIDENCE').length
+  const unsupported = list.filter((f) => f.provenance_status === 'NO_EVIDENCE').length
+  const confirmed = list.filter((f) => f.user_assertion_status === 'USER_CONFIRMED').length
+  const reviewedSkills = cards.filter((c) => c.user_reviewed).length
+
   return (
-    <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-3" data-testid="my-overview">
-      {tiles.map(([label, value, tab]) => (
-        <button key={label} type="button" onClick={() => onJump(tab)}
-          className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-4 text-left hover:border-accent-blue/40">
-          <div className="text-2xl font-semibold text-text-primary tabular-nums">{value}</div>
-          <div className="mt-1 text-xs text-text-muted">{label}</div>
-        </button>
-      ))}
+    <div className="p-4 space-y-5" data-testid="my-overview">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.75fr)]">
+        <section aria-labelledby="my-facts-heading" className="min-w-0">
+          <p className="text-[11px] font-medium text-text-muted">PERSONAL TRUTH</p>
+          <h2 id="my-facts-heading" className="mt-1 text-base font-semibold text-text-primary">个人事实与证据</h2>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-text-secondary">上场时，成竹只把有来源或经你确认的内容当作你的个人经历；没有证据的说法会继续保持边界。</p>
+          <div className="mt-4 grid grid-cols-3 divide-x divide-bg-tertiary/70 border-y border-bg-tertiary/70 py-3">
+            <button type="button" onClick={() => onJump('facts')} className="px-3 text-left first:pl-0">
+              <span className="block text-2xl font-semibold tabular-nums text-text-primary">{direct}</span>
+              <span className="mt-0.5 block text-[11px] text-text-muted">有直接证据</span>
+            </button>
+            <button type="button" onClick={() => onJump('facts')} className="px-3 text-left">
+              <span className="block text-2xl font-semibold tabular-nums text-text-primary">{confirmed}</span>
+              <span className="mt-0.5 block text-[11px] text-text-muted">你已确认</span>
+            </button>
+            <button type="button" onClick={() => onJump('facts')} className="px-3 text-left">
+              <span className="block text-2xl font-semibold tabular-nums text-text-primary">{unsupported}</span>
+              <span className="mt-0.5 block text-[11px] text-text-muted">暂无证据</span>
+            </button>
+          </div>
+        </section>
+
+        <section aria-labelledby="my-assets-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-6">
+          <p className="text-[11px] font-medium text-text-muted">REUSABLE EXPRESSION</p>
+          <h2 id="my-assets-heading" className="mt-1 text-base font-semibold text-text-primary">可复用表达资产</h2>
+          <div className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            <button type="button" onClick={() => onJump('stories')} className="flex w-full items-center justify-between gap-4 py-3 text-left">
+              <span><span className="block text-sm font-medium text-text-primary">Stories</span><span className="mt-0.5 block text-[11px] text-text-muted">真实经历整理成可复用故事</span></span>
+              <span className="text-xl font-semibold tabular-nums text-text-primary">{stories.length}</span>
+            </button>
+            <button type="button" onClick={() => onJump('skills')} className="flex w-full items-center justify-between gap-4 py-3 text-left">
+              <span><span className="block text-sm font-medium text-text-primary">已确认技能卡</span><span className="mt-0.5 block text-[11px] text-text-muted">确认后才会进入 Interview Pack</span></span>
+              <span className="text-xl font-semibold tabular-nums text-text-primary">{reviewedSkills}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <section aria-label="下一步" className="border-t border-bg-tertiary/70 pt-4">
+        <p className="text-[11px] font-medium text-text-muted">下一步</p>
+        {unsupported > 0 ? (
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-text-primary">先处理 {unsupported} 条暂无证据的个人事实</p>
+              <p className="mt-0.5 text-xs text-text-secondary">确认、否认或补来源，避免面试中把不确定内容说成既定事实。</p>
+            </div>
+            <button type="button" onClick={() => onJump('facts')} className="btn-subtle rounded-lg px-3 py-1.5 text-xs">去待确认</button>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-text-secondary">当前事实边界没有明显缺口，可以继续补充 Stories 或进入练习。</p>
+        )}
+      </section>
     </div>
   )
 }

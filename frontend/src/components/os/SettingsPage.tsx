@@ -71,12 +71,12 @@ function LayeredRow({ k, layer, goalId, onChanged }: { k: string; layer: Setting
         <StatusBadge tone={layer.origin === 'GOAL' ? 'info' : 'muted'}>当前：{layer.origin_label}</StatusBadge>
       </div>
       <Field label="全局默认">
-        <select className={inputCls} value={encode(layer.global_value)} onChange={(e) => setGlobal(e.target.value)}>
+        <select aria-label={layer.label} className={inputCls} value={encode(layer.global_value)} onChange={(e) => setGlobal(e.target.value)}>
           {options.map(([v, l]) => <option key={String(v)} value={encode(v)}>{l}</option>)}
         </select>
       </Field>
       <Field label={goalId ? '目标默认' : '目标默认（先在上方选择目标）'}>
-        <select className={inputCls} disabled={!goalId} value={layer.goal_value === null || layer.goal_value === undefined ? '' : encode(layer.goal_value)} onChange={(e) => setGoal(e.target.value)}>
+        <select aria-label={`${layer.label}（目标默认）`} className={inputCls} disabled={!goalId} value={layer.goal_value === null || layer.goal_value === undefined ? '' : encode(layer.goal_value)} onChange={(e) => setGoal(e.target.value)}>
           <option value="">沿用全局</option>
           {options.map(([v, l]) => <option key={String(v)} value={encode(v)}>{l}</option>)}
         </select>

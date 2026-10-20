@@ -518,7 +518,7 @@ test.describe('@visual v2 Studio surfaces', () => {
   test('Settings — decision-first general', async ({ page }) => {
     await page.goto('/#/settings/general')
     await expect(page.getByTestId('settings-page')).toBeVisible()
-    await expect(page.getByRole('heading', { name: '通用', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '常用偏好', exact: true })).toBeVisible()
     await expect(page.getByText('外观、回答呈现和常用运行偏好。')).toBeVisible()
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)

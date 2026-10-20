@@ -184,7 +184,7 @@ export default function PreferencesTab() {
             >
               <Icon className={`w-4 h-4 ${answerPanelLayout === key ? 'text-accent-blue' : 'text-text-muted'}`} />
               <span className="text-xs font-medium text-text-primary">{label}</span>
-              <span className="text-[10px] text-text-muted leading-snug">{hint}</span>
+              <span className="text-[10px] text-text-secondary leading-snug">{hint}</span>
             </button>
           ))}
         </div>
@@ -211,7 +211,7 @@ export default function PreferencesTab() {
                   <span className={`text-xs font-semibold ${selected ? 'text-accent-blue' : 'text-text-primary'}`}>
                     {item.label}
                   </span>
-                  <span className="block text-[10px] text-text-muted mt-1">{item.hint}</span>
+                  <span className="block text-[10px] text-text-secondary mt-1">{item.hint}</span>
                 </button>
               )
             })}

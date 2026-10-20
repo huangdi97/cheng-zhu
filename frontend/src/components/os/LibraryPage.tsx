@@ -198,7 +198,6 @@ function Materials() {
       </div>
     </div>
   )
-  )
 }
 
 function Knowledge() {

@@ -12,6 +12,7 @@ const SOURCE_LABEL: Record<string, string> = {
   FACT: '事实边界',
   GAP: '岗位要求',
   STORY: 'Story 缺口',
+  DERIVED: '综合建议',
 }
 
 /** 1–3 Next Focus items with their reason and real actions (no scores). */
@@ -49,8 +50,8 @@ export function NextFocusList({ goalId, items, onChanged, compact = false }: {
                   {(item.actions ?? []).slice(0, 3).map((a, i) => (
                     <button key={a.key} type="button" onClick={() => act(item, a.key)}
                       className={i === 0 && idx === 0
-                        ? 'btn-primary rounded-full px-3 py-1 text-xs font-semibold'
-                        : 'btn-subtle rounded-full px-3 py-1 text-xs'}>
+                        ? 'btn-primary rounded-lg px-3 py-1 text-xs font-semibold'
+                        : 'btn-subtle rounded-lg px-3 py-1 text-xs'}>
                       {a.label}
                     </button>
                   ))}

@@ -166,7 +166,9 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
               <h2 className="text-sm font-semibold text-text-primary">本次设置</h2>
               <p className="mt-1 text-[11px] leading-5 text-text-muted">这些设置只影响这一轮练习，不会改动你的求职目标。</p>
             </div>
-            <PrimaryButton testId="practice-start" onClick={() => void start()} disabled={busy || !cfg.sources.length || panelInvalid}>{busy ? '准备题目…' : '开始练习'}</PrimaryButton>
+            <div className="flex-shrink-0 whitespace-nowrap [&>button]:whitespace-nowrap">
+              <PrimaryButton testId="practice-start" onClick={() => void start()} disabled={busy || !cfg.sources.length || panelInvalid}>{busy ? '准备题目…' : '开始练习'}</PrimaryButton>
+            </div>
           </div>
 
           <fieldset className="mt-4">

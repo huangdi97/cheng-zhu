@@ -489,5 +489,4 @@ export default function SettingsPage({ group, query }: { group: string; query: R
       </div>
     </Page>
   )
-  )
 }

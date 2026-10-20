@@ -201,7 +201,7 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
               <span><span className="font-medium">本地表达分析</span><span className="mt-0.5 block text-[11px] text-text-muted">语速、结论时间等，只在本机计算。</span></span>
             </label>
             <label className="flex items-start gap-2 py-2.5 text-xs text-text-primary">
-              <input type="checkbox" checked={!!cfg.human_coach} onChange={(e) => set('human_coach', e.target.checked)} className="mt-0.5" />
+              <input type="checkbox" aria-label="邀请真人教练一起练" checked={!!cfg.human_coach} onChange={(e) => set('human_coach', e.target.checked)} className="mt-0.5" />
               <span><span className="font-medium">真人教练</span><span className="mt-0.5 block text-[11px] text-text-muted">练习时允许教练单独给建议，不混入你的个人证据。</span></span>
             </label>
           </div>

@@ -133,14 +133,14 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         </Section>
         <Section title="需要改进">
           {fs.to_improve.length ? (
-            <ul className="space-y-2">{fs.to_improve.map((f) => <FindingRow key={f.id} f={f} goalLinked={!!data.goal_id} act={act} status={status} />)}</ul>
+            <ul className="border-y border-bg-tertiary/70">{fs.to_improve.map((f) => <FindingRow key={f.id} f={f} goalLinked={!!data.goal_id} act={act} status={status} />)}</ul>
           ) : <p className="text-xs text-text-muted">暂无。</p>}
         </Section>
         <Section title={`事实核对 · ${fs.fact_checks.length}`}>
           {fs.fact_checks.length ? (
-            <ul className="space-y-2">
+            <ul className="border-y border-bg-tertiary/70">
               {fs.fact_checks.map((f) => (
-                <li key={f.id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                <li key={f.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                   <p className="text-xs text-text-primary">{f.finding}</p>
                   <Quote text={f.actual_speech} />
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -175,9 +175,9 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         </Section>
         <Section title="故事机会">
           {fs.story_opportunities.length ? (
-            <ul className="space-y-2">
+            <ul className="border-y border-bg-tertiary/70">
               {fs.story_opportunities.map((s) => (
-                <li key={s.id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                <li key={s.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                   <p className="text-xs text-text-primary">{s.question}</p>
                   <Quote text={s.actual_speech} />
                   <div className="mt-1.5"><SecondaryButton onClick={() => void act('CREATE_STORY', s as unknown as Record<string, unknown>)}>{status(s, 'CREATE_STORY') ?? '整理成故事草稿'}</SecondaryButton></div>
@@ -222,7 +222,7 @@ function FindingRow({ f, goalLinked, act, status }: {
 }) {
   const finding = f as unknown as Record<string, unknown>
   return (
-    <li className="rounded-xl border border-bg-hover/50 px-3 py-2">
+    <li className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge tone="warn">{f.kind_label ?? f.kind}</StatusBadge>
         {f.occurrences && f.occurrences > 1 ? <span className="text-[11px] text-text-muted">出现 {f.occurrences} 次</span> : null}
@@ -253,7 +253,7 @@ function Timeline({ data }: { data: Reflection }) {
       {open ? (
         <ol className="space-y-2">
           {data.timeline.map((t) => (
-            <li key={t.turn_id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+            <li key={t.turn_id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
               <p className="text-xs font-medium text-text-primary">Q{t.seq}. {t.question}</p>
               <Quote text={t.actual_speech} />
               {t.content.findings?.length ? <p className="mt-1 text-[11px] text-text-muted">{t.content.findings.map((f) => f.finding).join('；')}</p> : null}

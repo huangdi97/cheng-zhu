@@ -177,6 +177,36 @@ const REFLECTION = {
   ask_cue_feedback: false,
 }
 
+const PREFLIGHT = {
+  goal: { id: GOAL_ID, title: GOAL.title },
+  items: [
+    { key: 'goal', label: '目标', value: GOAL.title, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'resume', label: '简历', value: '当前简历', origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'ai_policy_mode', label: 'AI 辅助', value: 'AI_ALLOWED', origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'human_assistance_policy', label: '真人辅助', value: 'HUMAN_PRACTICE_ONLY', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'share_privacy_mode', label: '共享隐私', value: 'OFF', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+  ],
+  blockers: [],
+  share_privacy_note: '共享隐私默认关闭；本场设置只影响当前会话。',
+}
+
+const FROZEN_PACK = {
+  id: 'pack-ui-1',
+  session_id: 'live-ui-1',
+  revision: 1,
+  frozen: true,
+  content_hash: 'ui-v2-visual-freeze',
+  parent_id: '',
+  job: { id: GOAL_ID, title: 'AI 产品经理', company: '字节跳动' },
+  counts: { claims: 8, evidence: 6, skill_cards: 4, stories: 3 },
+  policies: {
+    ai_policy: 'AI_ALLOWED',
+    human_assistance_policy: 'HUMAN_PRACTICE_ONLY',
+    share_privacy_policy: 'OFF',
+    screen_context_policy: 'OFF',
+  },
+}
+
 const STUDIO_OVERRIDES = (pathname, method) => {
   if (method !== 'GET') return undefined
   if (pathname === '/api/product/home') return HOME
@@ -259,13 +289,15 @@ test.describe('@visual v2 Studio surfaces', () => {
 })
 
 test.describe('@visual v2 Live Cockpit', () => {
-  test('cue-first live workspace', async ({ context, page }) => {
+  test('cue-first live workspace after frozen preflight', async ({ context, page }) => {
     await installMocks(context, {
       messages: [
         ...COMMON_WS_BOOTSTRAP,
         {
           type: 'init',
           delay: 30,
+          session_id: 'live-ui-1',
+          active_id: 'live-ui-1',
           transcriptions: ['你怎么判断这个 Agent 功能真的值得上线？'],
           qa_pairs: [{
             id: 'qa-live-ui',
@@ -295,12 +327,34 @@ test.describe('@visual v2 Live Cockpit', () => {
         'ia_app_mode': 'assist',
         'ia_assist_transcript_collapsed': '1',
       },
+      apiOverrides: (pathname, method) => {
+        if (method === 'GET' && pathname === '/api/product/goals') return { items: [GOAL] }
+        if (method === 'GET' && pathname === `/api/product/goals/${GOAL_ID}`) return GOAL_DETAIL
+        if (method === 'POST' && pathname === '/api/product/live/preflight') return PREFLIGHT
+        if (method === 'POST' && pathname === '/api/product/live/start') {
+          return { session_id: 'live-ui-1', goal_id: GOAL_ID, pack: FROZEN_PACK }
+        }
+        if (method === 'GET' && pathname === '/api/intelligence/pack') {
+          return { session_id: 'live-ui-1', frozen: true, pack: FROZEN_PACK, revisions: [] }
+        }
+        if (method === 'GET' && pathname === '/api/intelligence/session-claims') return []
+        return undefined
+      },
     })
 
-    await page.goto('/#/live/demo')
+    await page.goto(`/#/goals/${GOAL_ID}`)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
+    await page.getByTestId('goal-go-live').click()
+    await expect(page.getByTestId('preflight')).toBeVisible()
+    await page.getByTestId('preflight-start').click()
+
+    await expect(page).toHaveURL(/#\/live\/live-ui-1/)
+    await expect(page.getByTestId('live-status-line')).toContainText('字节跳动')
+    await expect(page.getByTestId('live-pack-bar')).toContainText('本场资料已冻结')
     await expect(page.locator('[data-testid="fast-cue"]:visible')).toContainText('先讲用户任务是否被稳定完成')
     await expect(page.getByTestId('live-secondary-tools')).toBeHidden()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('live-cockpit.png', SNAPSHOT)
   })
 })
+

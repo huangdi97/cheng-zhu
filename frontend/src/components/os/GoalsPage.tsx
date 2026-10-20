@@ -3,13 +3,14 @@ import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { navigate, paths } from '@/lib/router'
 import { productApi, type Goal } from '@/lib/productApi'
+import { formatInterviewRound } from '@/lib/interviewRound'
 import { useOsStore } from '@/stores/osStore'
 import { EmptyState, ErrorState, formatWhen, Loading, Page, PageHeader, PrimaryButton, Section, SecondaryButton, useAsync } from './ui'
 
 const STATUS_LABEL: Record<string, string> = { ACTIVE: '进行中', PAUSED: '暂停', COMPLETED: '已结束', ARCHIVED: '已归档' }
 
 function GoalRow({ goal }: { goal: Goal }) {
-  const next = goal.next_interview_at ? `${goal.interview_round || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
+  const next = goal.next_interview_at ? `${formatInterviewRound(goal.interview_round) || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
   return (
     <li className="border-b border-bg-tertiary/70 last:border-b-0">
       <button type="button" onClick={() => navigate(paths.goal(goal.id))}
@@ -41,12 +42,12 @@ export default function GoalsPage() {
         <EmptyState title="还没有求职目标" body="创建一个目标后，成竹会给出下一步。" action={<PrimaryButton onClick={openCreateGoal}>创建第一个求职目标</PrimaryButton>} />
       ) : null}
       {active.length ? (
-        <Section title={`Active · ${active.length}`}>
+        <Section title={`进行中 · ${active.length}`}>
           <ul className="border-y border-bg-tertiary/70">{active.map((g) => <GoalRow key={g.id} goal={g} />)}</ul>
         </Section>
       ) : null}
       {done.length ? (
-        <Section title={`Completed · ${done.length}`} action={<SecondaryButton onClick={() => setShowDone((v) => !v)}>{showDone ? '收起' : '展开'}</SecondaryButton>}>
+        <Section title={`已结束 · ${done.length}`} action={<SecondaryButton onClick={() => setShowDone((v) => !v)}>{showDone ? '收起' : '展开'}</SecondaryButton>}>
           {showDone ? <ul className="border-y border-bg-tertiary/70">{done.map((g) => <GoalRow key={g.id} goal={g} />)}</ul> : null}
         </Section>
       ) : null}

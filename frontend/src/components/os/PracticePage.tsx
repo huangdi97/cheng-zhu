@@ -161,8 +161,13 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
         </div>
 
         <aside className="mt-6 min-w-0 lg:mt-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
-          <h2 className="text-sm font-semibold text-text-primary">本次设置</h2>
-          <p className="mt-1 text-[11px] leading-5 text-text-muted">这些设置只影响这一轮练习，不会改动你的求职目标。</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-text-primary">本次设置</h2>
+              <p className="mt-1 text-[11px] leading-5 text-text-muted">这些设置只影响这一轮练习，不会改动你的求职目标。</p>
+            </div>
+            <PrimaryButton testId="practice-start" onClick={() => void start()} disabled={busy || !cfg.sources.length || panelInvalid}>{busy ? '准备题目…' : '开始练习'}</PrimaryButton>
+          </div>
 
           <fieldset className="mt-4">
             <legend className="text-xs font-medium text-text-secondary">题目从哪里来</legend>
@@ -202,9 +207,6 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
           {cfg.human_coach ? <div className="mt-3"><Suspense fallback={<Loading />}><CoachPanel sessionKind="practice" /></Suspense></div> : null}
           {error ? <p role="alert" className="mt-3 text-xs text-status-risk">{error}</p> : null}
 
-          <div className="mt-5 [&>button]:w-full">
-            <PrimaryButton testId="practice-start" onClick={() => void start()} disabled={busy || !cfg.sources.length || panelInvalid}>{busy ? '准备题目…' : '开始这轮练习'}</PrimaryButton>
-          </div>
         </aside>
       </div>
     </Page>

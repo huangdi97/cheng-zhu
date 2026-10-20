@@ -601,7 +601,7 @@ test.describe('@visual v2 Studio surfaces', () => {
     await page.goto('/#/library/banks')
     await expect(page.getByTestId('library-page')).toBeVisible()
     await expect(page.getByText('题库是练习来源，不是“答案库”')).toBeVisible()
-    await expect(page.getByText('AI 产品经理 · 常见问题')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'AI 产品经理 · 常见问题' })).toBeVisible()
     await expect(page.getByText('你会怎么判断一个 AI 功能是否真的值得上线？')).toBeVisible()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('library-banks.png', SNAPSHOT)

@@ -126,7 +126,7 @@ function PrivacyGroup({ goalId }: { goalId: string }) {
   return (
     <div className="space-y-2">
       <LayerGroup keys={['share_privacy_mode', 'speech_adoption_analytics_live']} goalId={goalId} />
-      <p className="text-[11px] text-text-muted">共享隐私：减少成竹私人内容在受支持的屏幕共享/录屏路径中意外出现，不是安全或不可检测保证。</p>
+      <p className="text-[11px] text-text-muted">共享隐私：减少成竹私人内容在受支持的屏幕共享/录屏路径中意外出现。这不是安全或“不可检测”保证。</p>
       <ToggleRow label="练习的本地表达分析" hint="语速、结论时间、填充词；只在本机计算，不上传音频。" checked={config?.practice_delivery_analytics_enabled !== false}
         onChange={(v) => void updateConfigAndRefresh({ practice_delivery_analytics_enabled: v })} />
       <div className="flex items-start justify-between gap-3 border-b border-bg-tertiary/60 py-2.5">
@@ -431,7 +431,7 @@ export default function SettingsPage({ group, query }: { group: string; query: R
 
         <main className="min-w-0">
           <header className="mb-3 border-b border-bg-tertiary/70 pb-3">
-            <h2 className="text-base font-semibold text-text-primary">{GROUP_LABEL_ZH[current]}</h2>
+            <h2 className="text-base font-semibold text-text-primary">{current === 'general' ? '常用偏好' : GROUP_LABEL_ZH[current]}</h2>
             <p className="mt-1 text-xs leading-5 text-text-secondary">{GROUP_DESCRIPTION[current]}</p>
           </header>
 

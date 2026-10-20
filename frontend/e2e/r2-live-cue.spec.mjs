@@ -101,12 +101,13 @@ test.describe('R2 live cue-first', () => {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'home' },
     })
-    await page.goto('/')
-    await page.getByRole('button', { name: '设置', exact: true }).click()
+    await page.goto('/#/settings/privacy')
     await expect(page.getByLabel('共享隐私')).toHaveValue('OFF')
-    await expect(page.getByLabel('人工协助策略')).toHaveValue('HUMAN_PRACTICE_ONLY')
     await expect(page.getByText('这不是安全或“不可检测”保证')).toBeVisible()
     await expect(page.getByText(/MIT License/)).toBeVisible()
+
+    await page.goto('/#/settings/live')
+    await expect(page.getByLabel('人工协助策略')).toHaveValue('HUMAN_PRACTICE_ONLY')
   })
 })
 

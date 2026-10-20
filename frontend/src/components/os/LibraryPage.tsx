@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { navigate, paths } from '@/lib/router'
 import { productApi, type Material, type QuestionBank } from '@/lib/productApi'
+import { api } from '@/lib/api'
 import { useKbStore } from '@/stores/kbStore'
 import QuickNotesPanel from './QuickNotesPanel'
 import { MaterialStateBadge } from './MaterialStateBadge'
@@ -208,6 +209,14 @@ function Materials() {
 function Knowledge() {
   const toggleDrawer = useKbStore((s) => s.toggleDrawer)
   const status = useKbStore((s) => s.status)
+  const setStatus = useKbStore((s) => s.setStatus)
+
+  useEffect(() => {
+    let live = true
+    api.kbStatus().then((nextStatus) => { if (live) setStatus(nextStatus) }).catch(() => {})
+    return () => { live = false }
+  }, [setStatus])
+
   const enabled = status?.enabled ?? false
   const docs = status?.total_docs ?? 0
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import {
-  AlertTriangle,
   Palette,
   LayoutGrid,
   AlignVerticalSpaceAround,
@@ -24,7 +23,6 @@ import NetworkQRCode from './NetworkQRCode'
 import QuickPromptsEditor from './QuickPromptsEditor'
 import Switch from '@/components/Switch'
 import GlobalShortcutsEditor from './GlobalShortcutsEditor'
-import PolicyPrivacySection from './PolicyPrivacySection'
 
 function Collapsible({ title, searchTitle, icon, defaultOpen = false, keywords, children }: {
   title: React.ReactNode
@@ -67,12 +65,6 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 export default function PreferencesTab() {
   const config = useInterviewStore((s) => s.config)
   const options = useInterviewStore((s) => s.options)
-  const platformInfo = useInterviewStore((s) => s.platformInfo)
-  const sttLoaded = useInterviewStore((s) => s.sttLoaded)
-  const sttLoading = useInterviewStore((s) => s.sttLoading)
-  const sttActiveProvider = useInterviewStore((s) => s.sttActiveProvider)
-  const sttFallbackLoaded = useInterviewStore((s) => s.sttFallbackLoaded)
-  const setSettingsDrawerTab = useInterviewStore((s) => s.setSettingsDrawerTab)
   const [ttsEnabled, setTtsEnabledState] = useState(isTtsEnabled())
   const [ttsRate, setTtsRateState] = useState(getTtsRate())
   const pushToast = useInterviewStore((s) => s.pushToast)
@@ -164,63 +156,15 @@ export default function PreferencesTab() {
     config?.kb_asr_deadline_ms,
   ])
 
-  const sttLabel =
-    config?.stt_provider === 'doubao'
-      ? '豆包'
-      : config?.stt_provider === 'generic'
-        ? '通用 ASR'
-        : config?.stt_provider === 'whisper'
-          ? 'Whisper'
-          : `不支持 (${config?.stt_provider ?? 'unknown'})`
   const hasScreenCapture = (options?.screen_capture_regions?.length ?? 0) > 0
   const searchQuery = useSettingsSearch()
   const inSearch = searchQuery.trim().length > 0
 
   return (
-    <div className="p-5 space-y-5 pb-8" data-in-search={inSearch ? '1' : undefined}>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-hover/60 bg-bg-primary/35 px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-text-primary">常用偏好</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
-            这里的运行偏好会自动保存；外观和悬浮窗本机偏好即时生效。
-          </p>
-        </div>
+    <div className="space-y-5 pb-8" data-in-search={inSearch ? '1' : undefined}>
+      <div className="flex justify-end">
         <SaveStateBadge mode="auto" state={autoSave.state} error={autoSave.error} />
       </div>
-
-      {/* ── 系统状态 ── */}
-      {platformInfo?.needs_virtual_device && (
-        <div className="bg-accent-amber/10 border border-accent-amber/30 rounded-lg p-3 text-xs space-y-2">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-accent-amber flex-shrink-0 mt-0.5" />
-            <div className="text-text-secondary whitespace-pre-line">{platformInfo.instructions}</div>
-          </div>
-        </div>
-      )}
-
-      <Section title="运行状态" icon={<AlertTriangle className="w-3.5 h-3.5" />} keywords="status 状态 stt 语音识别 就绪">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div className="rounded-xl border border-bg-hover/60 bg-bg-tertiary/25 px-3 py-2.5">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${sttLoaded ? (sttActiveProvider === 'whisper' ? 'bg-accent-amber' : 'bg-accent-green') : sttLoading ? 'bg-accent-amber animate-pulse' : 'bg-accent-red'}`} />
-              <span className="text-xs font-medium text-text-primary">语音识别</span>
-            </div>
-            <p className="text-[11px] text-text-secondary mt-1">
-              {sttLoaded ? (sttActiveProvider === 'whisper' ? 'Whisper 降级就绪' : sttFallbackLoaded ? '就绪，降级已预备' : '就绪') : sttLoading ? '加载中' : '未就绪'} · {sttLabel}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSettingsDrawerTab('config')}
-            className="rounded-xl border border-accent-blue/30 bg-accent-blue/10 px-3 py-2.5 text-left hover:bg-accent-blue/15 transition-colors"
-          >
-            <span className="text-xs font-medium text-accent-blue">语音配置</span>
-            <p className="text-[11px] text-text-secondary mt-1">切换 STT 与断句参数</p>
-          </button>
-        </div>
-      </Section>
-
-      <PolicyPrivacySection />
 
       <Section title="回答体验" icon={<LayoutGrid className="w-3.5 h-3.5" />} keywords="布局 卡片 流式 简短 layout card stream">
         <div className="grid grid-cols-2 gap-2">

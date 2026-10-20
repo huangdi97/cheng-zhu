@@ -10,5 +10,5 @@ const INTERVIEW_ROUND_LABELS: Record<string, string> = {
 
 export function formatInterviewRound(value?: string | null): string {
   if (!value) return ''
-  return INTERVIEW_ROUND_LABELS[value] ?? value.replaceAll('_', ' ')
+  return INTERVIEW_ROUND_LABELS[value] ?? value.replace(/_/g, ' ')
 }

@@ -80,6 +80,11 @@ test.describe('v1.3 Goal-centered product loop', () => {
 
     await page.goto('/#/goals/goal-v13')
     await expect(page.getByTestId('goal-room')).toBeVisible()
+    const goalViews = page.getByRole('tablist', { name: '目标视图' })
+    for (const label of ['概览', '准备', '会话']) {
+      await expect(goalViews.getByRole('tab', { name: new RegExp(label) })).toBeVisible()
+    }
+    await expect(goalViews.getByRole('tab', { name: '录用' })).toHaveCount(0)
     await page.getByTestId('go-live').click()
     await expect(page.getByTestId('preflight')).toBeVisible()
     await expect(page.getByText('Goal 默认').first()).toBeVisible()

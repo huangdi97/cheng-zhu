@@ -40,7 +40,7 @@ export default function HomePage() {
     ? data.next_interview.title || [data.next_interview.company, data.next_interview.role].filter(Boolean).join(' · ')
     : data.focus_goal?.title ?? '当前目标'
   const heroMeta = data.next_interview
-    ? [data.next_interview.role, formatInterviewRound(data.next_interview.round), formatWhen(data.next_interview.scheduled_at)].filter(Boolean).join(' · ')
+    ? [formatInterviewRound(data.next_interview.round), formatWhen(data.next_interview.scheduled_at)].filter(Boolean).join(' · ')
     : '还没有安排下一轮时间'
 
   return (

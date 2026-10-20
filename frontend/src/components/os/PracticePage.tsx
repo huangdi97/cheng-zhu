@@ -68,8 +68,14 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
   // Next Focus drives the defaults (round / demeanor) unless the URL picked a round
   useEffect(() => {
     if (!defaults) return
-    setCfg((c) => ({ ...c, round: query.round || defaults.round || c.round, demeanor: defaults.demeanor || c.demeanor, sources: defaults.sources?.length ? defaults.sources : c.sources }))
-  }, [defaults, query.round])
+    setCfg((c) => ({
+      ...c,
+      round: query.round || defaults.round || c.round,
+      demeanor: defaults.demeanor || c.demeanor,
+      sources: defaults.sources?.length ? defaults.sources : c.sources,
+      personas: c.personas.length ? c.personas : (opts.data?.personas[0]?.key ? [opts.data.personas[0].key] : []),
+    }))
+  }, [defaults, opts.data?.personas, query.round])
 
   const set = <K extends keyof PracticeConfig>(k: K, v: PracticeConfig[K]) => setCfg((c) => ({ ...c, [k]: v }))
   const togglePersona = (key: string) => {
@@ -130,11 +136,11 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
                 <Users className="h-3.5 w-3.5" aria-hidden /> 小组面
               </label>
             </div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
               {o.personas.map((p) => {
                 const checked = cfg.personas.includes(p.key)
                 return (
-                  <label key={p.key} className={`flex min-h-[58px] items-start gap-2.5 rounded-xl border px-3 py-2.5 text-xs transition-colors ${checked ? 'border-accent-blue/45 bg-accent-blue/5' : 'border-bg-hover/65 bg-bg-primary hover:bg-bg-hover/25'}`}>
+                  <label key={p.key} className={`flex min-h-[64px] items-start gap-2.5 rounded-xl border px-3 py-2.5 text-xs transition-colors ${checked ? 'border-accent-blue/45 bg-accent-blue/5' : 'border-bg-hover/65 bg-bg-primary hover:bg-bg-hover/25'}`}>
                     <input type={panel ? 'checkbox' : 'radio'} name="persona" checked={checked}
                       onChange={() => (panel ? togglePersona(p.key) : set('personas', [p.key]))} className="mt-0.5" />
                     <span className="min-w-0">

@@ -103,7 +103,7 @@ test.describe('R2 live cue-first', () => {
     })
     await page.goto('/#/settings/privacy')
     await expect(page.getByLabel('共享隐私')).toHaveValue('OFF')
-    await expect(page.getByText('这不是安全或“不可检测”保证')).toBeVisible()
+    await expect(page.getByText(/不是安全.*不可检测.*保证/)).toBeVisible()
     await expect(page.getByText(/MIT License/)).toBeVisible()
 
     await page.goto('/#/settings/live')

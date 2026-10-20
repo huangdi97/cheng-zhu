@@ -8,7 +8,7 @@ import { productApi, type Material, type QuestionBank } from '@/lib/productApi'
 import { useKbStore } from '@/stores/kbStore'
 import QuickNotesPanel from './QuickNotesPanel'
 import { MaterialStateBadge } from './MaterialStateBadge'
-import { ActionMenu, EmptyState, ErrorState, Field, inputCls, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, Tabs, useAsync } from './ui'
+import { ActionMenu, EmptyState, ErrorState, Field, inputCls, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Tabs, useAsync } from './ui'
 
 type LibTab = 'materials' | 'knowledge' | 'notes' | 'banks'
 const LIB_TABS: LibTab[] = ['materials', 'knowledge', 'notes', 'banks']
@@ -339,36 +339,54 @@ function BankItems({ bank, onChanged, onDeleted }: { bank: QuestionBank; onChang
   const [sourceUrl, setSourceUrl] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const refresh = () => { void reload(); onChanged() }
+  const items = data?.items ?? []
+
   return (
-    <div className="space-y-3">
-      {bank.builtin ? <p className="text-[11px] text-text-muted">成竹通用题：按岗位整理的常见问题，不代表任何公司的真实面经。</p> : null}
-      <ul className="space-y-1.5">
-        {(data?.items ?? []).map((item) => (
-          <li key={item.id} className="flex items-start gap-2 rounded-xl border border-bg-hover/50 px-3 py-2">
-            <span className="min-w-0 flex-1 text-xs text-text-primary">{item.text}
-              <span className="block text-[10px] text-text-muted">{item.label}{item.source_url ? ` · ${item.source_url}` : ''} · {item.difficulty === 'WARMUP' ? '热身' : item.difficulty === 'PRESSURE' ? '压力' : '标准'}</span>
-            </span>
-            {!bank.builtin ? <button type="button" aria-label="删除这道题" className="text-[11px] text-text-muted hover:text-status-risk" onClick={() => void productApi.deleteBankItem(item.id).then(refresh)}>删除</button> : null}
-          </li>
-        ))}
-      </ul>
+    <div>
+      {items.length ? (
+        <ol className="divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+          {items.map((item, index) => (
+            <li key={item.id} className="flex items-start gap-3 py-3">
+              <span className="w-5 flex-shrink-0 pt-0.5 text-[10px] tabular-nums text-text-muted">{String(index + 1).padStart(2, '0')}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs leading-5 text-text-primary">{item.text}</p>
+                <p className="mt-0.5 text-[10px] text-text-muted">
+                  {item.label}{item.source_url ? ' · 有来源' : ''} · {item.difficulty === 'WARMUP' ? '热身' : item.difficulty === 'PRESSURE' ? '压力' : '标准'}
+                </p>
+              </div>
+              {!bank.builtin ? (
+                <button type="button" aria-label="删除这道题" className="flex-shrink-0 text-[11px] text-text-muted hover:text-status-risk"
+                  onClick={() => void productApi.deleteBankItem(item.id).then(refresh)}>删除</button>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <EmptyState title="这个来源还没有问题" body={bank.builtin ? '内置题库暂时为空。' : '先添加一道你确实想练的问题。'} />
+      )}
+
       {!bank.builtin ? (
-        <>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void productApi.addBankItem(bank.id, { text }).then(() => { setText(''); refresh() }).catch((x) => setErr(String(x))) }}>
+        <div className="mt-5 border-t border-bg-tertiary/70 pt-4">
+          <h3 className="text-xs font-semibold text-text-primary">补充问题</h3>
+          <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); void productApi.addBankItem(bank.id, { text }).then(() => { setText(''); refresh() }).catch((x) => setErr(String(x))) }}>
             <input aria-label="新题目" className={inputCls} value={text} onChange={(e) => setText(e.target.value)} placeholder="添加一道题" />
             <PrimaryButton type="submit" disabled={!text.trim()}>添加</PrimaryButton>
           </form>
-          <details className="text-xs">
-            <summary className="cursor-pointer text-text-secondary">批量导入（每行一题）</summary>
-            <div className="mt-2 space-y-1.5">
-              <textarea aria-label="批量导入题目" className={`${inputCls} min-h-[80px]`} value={bulk} onChange={(e) => setBulk(e.target.value)} />
-              <input aria-label="来源链接（可选）" className={inputCls} value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="来源链接（有来源才会标为真实面经）" />
+
+          <details className="mt-3 text-xs">
+            <summary className="cursor-pointer text-text-secondary">批量导入更多问题</summary>
+            <div className="mt-2 space-y-2">
+              <textarea aria-label="批量导入题目" className={`${inputCls} min-h-[88px]`} value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder="每行一道题" />
+              <input aria-label="来源链接（可选）" className={inputCls} value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="来源链接；有来源才会标为真实面经" />
               <SecondaryButton disabled={!bulk.trim()} onClick={() => void productApi.importBankItems(bank.id, bulk.split('\n'), sourceUrl).then(() => { setBulk(''); refresh() }).catch((x) => setErr(String(x)))}>导入</SecondaryButton>
             </div>
           </details>
-          {err ? <p role="alert" className="text-xs text-status-risk">{err}</p> : null}
-          <SecondaryButton onClick={() => void productApi.deleteBank(bank.id).then(onDeleted)}>删除这个题库</SecondaryButton>
-        </>
+
+          {err ? <p role="alert" className="mt-2 text-xs text-status-risk">{err}</p> : null}
+          <div className="mt-4">
+            <button type="button" className="text-[11px] text-text-muted hover:text-status-risk" onClick={() => void productApi.deleteBank(bank.id).then(onDeleted)}>删除这个题库</button>
+          </div>
+        </div>
       ) : null}
     </div>
   )

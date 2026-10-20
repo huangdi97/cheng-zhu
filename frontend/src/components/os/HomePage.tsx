@@ -102,10 +102,20 @@ export default function HomePage() {
         </div>
 
         <aside className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
-          <Section title="目标状态">
+          <Section title="目标上下文">
             <div className="space-y-2 text-xs">
-              <p className="text-text-primary">{data.focus_goal?.title ?? heroTitle}</p>
-              <p className="text-text-muted">当前共有 {data.active_goal_count} 个进行中的目标。首页只突出一个当前目标，其他目标在「目标」中查看。</p>
+              <p className="font-medium text-text-primary">{data.focus_goal?.title ?? heroTitle}</p>
+              <p className="leading-5 text-text-muted">
+                {data.next_interview
+                  ? `下一场已安排 · ${formatWhen(data.next_interview.scheduled_at)}`
+                  : '下一场时间还没有安排。'}
+              </p>
+              {data.active_goal_count > 1 ? (
+                <button type="button" onClick={() => navigate(paths.goals())}
+                  className="text-left text-text-secondary underline decoration-bg-hover underline-offset-2 transition-colors hover:text-text-primary">
+                  还有 {data.active_goal_count - 1} 个进行中的目标
+                </button>
+              ) : null}
             </div>
           </Section>
           <Attention items={data.needs_attention} />

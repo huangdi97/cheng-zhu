@@ -218,8 +218,16 @@ export function Stories() {
       </section>
 
       <aside aria-labelledby="story-editor-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7" data-testid="story-builder">
-        <h3 id="story-editor-heading" className="text-sm font-semibold text-text-primary">{editingId ? '编辑这个故事' : '写一个真实故事'}</h3>
-        <p className="mt-0.5 text-[11px] leading-5 text-text-muted">只写你真实经历过的事。确认后的内容可以进入 Interview Pack；成竹不会替你补造个人经历。</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 id="story-editor-heading" className="text-sm font-semibold text-text-primary">{editingId ? '编辑这个故事' : '写一个真实故事'}</h3>
+            <p className="mt-0.5 text-[11px] leading-5 text-text-muted">只写你真实经历过的事。确认后的内容可以进入 Interview Pack；成竹不会替你补造个人经历。</p>
+          </div>
+          <button type="button" onClick={() => void save()} disabled={!draft.title.trim()}
+            className="btn-primary inline-flex min-h-[32px] flex-shrink-0 items-center rounded-lg px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50">
+            {editingId ? '保存修改' : '保存故事'}
+          </button>
+        </div>
 
         <div className="mt-4 space-y-3">
           <label className="block">
@@ -245,11 +253,7 @@ export function Stories() {
             </label>
           ))}
 
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" onClick={() => void save()} disabled={!draft.title.trim()}
-              className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">{editingId ? '保存修改' : '保存故事'}</button>
-            {editingId ? <button type="button" onClick={startNew} className="text-xs text-text-muted hover:text-text-primary">取消编辑</button> : null}
-          </div>
+          {editingId ? <div className="pt-1"><button type="button" onClick={startNew} className="text-xs text-text-muted hover:text-text-primary">取消编辑</button></div> : null}
         </div>
       </aside>
     </div>

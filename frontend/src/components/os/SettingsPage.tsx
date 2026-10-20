@@ -89,9 +89,10 @@ function LayerGroup({ keys, goalId, extra }: { keys: string[]; goalId: string; e
   const { data, error, reload } = useAsync(() => productApi.settingLayers(goalId), [goalId])
   if (error) return <ErrorState message={error} onRetry={reload} />
   if (!data) return <Loading />
+  const items = data.items ?? {}
   return (
     <div>
-      {keys.map((k) => data.items[k] ? <LayeredRow key={k} k={k} layer={data.items[k]} goalId={goalId} onChanged={reload} /> : null)}
+      {keys.map((k) => items[k] ? <LayeredRow key={k} k={k} layer={items[k]} goalId={goalId} onChanged={reload} /> : null)}
       <p className="pt-2 text-[11px] text-text-muted">「本场覆盖」在上场检查里设置，只对那一场生效，不会改变这里的默认值。</p>
       {extra}
     </div>

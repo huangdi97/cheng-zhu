@@ -5,6 +5,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { navigate, paths, type GoalTab } from '@/lib/router'
 import { productApi, type GoalDetail } from '@/lib/productApi'
+import { formatInterviewRound } from '@/lib/interviewRound'
 import { useOsStore } from '@/stores/osStore'
 import { Dialog, fromLocalInput, toLocalInput } from './CreateGoalDialog'
 import { NextFocusList } from './NextFocusList'
@@ -26,21 +27,6 @@ const GOAL_STATUS_LABELS: Record<string, string> = {
   ARCHIVED: '已归档',
 }
 
-const ROUND_LABELS: Record<string, string> = {
-  TECHNICAL: '技术面',
-  PROJECT_DEEP_DIVE: '项目深挖',
-  SYSTEM_DESIGN: '系统设计',
-  HIRING_MANAGER: 'Hiring Manager',
-  HR: 'HR',
-  BEHAVIORAL: '行为面',
-  PRODUCT_CASE: '产品 / Case',
-}
-
-function roundLabel(value?: string | null) {
-  if (!value) return ''
-  return ROUND_LABELS[value] ?? value
-}
-
 export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab }) {
   const { data: goal, error, loading, reload } = useAsync(() => productApi.goal(goalId, true), [goalId])
   const setContextGoal = useOsStore((s) => s.setContextGoal)
@@ -54,7 +40,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
   if (error) return <Page><ErrorState message={error} onRetry={reload} extra={<SecondaryButton onClick={() => navigate(paths.goals())}>返回目标列表</SecondaryButton>} /></Page>
   if (!goal) return null
 
-  const nextLine = goal.next_interview_at ? `${roundLabel(goal.interview_round) || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '还没有安排下一轮')
+  const nextLine = goal.next_interview_at ? `${formatInterviewRound(goal.interview_round) || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '还没有安排下一轮')
   const setStatus = (status: string) => void productApi.patchGoal(goal.id, { status } as never).then(reload)
 
   return (
@@ -125,7 +111,7 @@ function Overview({ goal, reload }: { goal: GoalDetail; reload: () => void }) {
         <Section title="下一场">
           {upcoming.length ? (
             <ul className="space-y-1 text-sm">
-              {upcoming.slice(0, 2).map((i) => <li key={i.id} className="text-text-primary">{roundLabel(i.round) || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></li>)}
+              {upcoming.slice(0, 2).map((i) => <li key={i.id} className="text-text-primary">{formatInterviewRound(i.round) || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></li>)}
             </ul>
           ) : (
             <SecondaryButton onClick={() => navigate(paths.goal(goal.id, 'interviews'))}>安排下一轮</SecondaryButton>
@@ -234,7 +220,7 @@ function Interviews({ goal, reload }: { goal: GoalDetail; reload: () => void }) 
         <ul className="space-y-1.5">
           {goal.interviews.filter((i) => i.status === 'UPCOMING').map((i) => (
             <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bg-hover/50 px-3 py-2">
-              <span className="text-sm text-text-primary">{roundLabel(i.round) || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></span>
+              <span className="text-sm text-text-primary">{formatInterviewRound(i.round) || '面试'} · <span className="text-text-secondary">{formatWhen(i.scheduled_at) || '时间待定'}</span></span>
               <span className="flex items-center gap-1">
                 <SecondaryButton onClick={() => goLive(goal.id)}>上场检查</SecondaryButton>
                 <ActionMenu label="轮次操作" actions={[

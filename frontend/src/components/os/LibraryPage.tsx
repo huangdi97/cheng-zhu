@@ -6,10 +6,9 @@ import { useEffect, useState } from 'react'
 import { navigate, paths } from '@/lib/router'
 import { productApi, type Material, type QuestionBank } from '@/lib/productApi'
 import { useKbStore } from '@/stores/kbStore'
-import KbStatusHeader from '@/components/kb/KbStatusHeader'
 import QuickNotesPanel from './QuickNotesPanel'
 import { MaterialStateBadge } from './MaterialStateBadge'
-import { ActionMenu, EmptyState, ErrorState, Field, inputCls, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, StatusBadge, Tabs, useAsync } from './ui'
+import { ActionMenu, EmptyState, ErrorState, Field, inputCls, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, Section, Tabs, useAsync } from './ui'
 
 type LibTab = 'materials' | 'knowledge' | 'notes' | 'banks'
 const LIB_TABS: LibTab[] = ['materials', 'knowledge', 'notes', 'banks']
@@ -208,11 +207,52 @@ function Materials() {
 
 function Knowledge() {
   const toggleDrawer = useKbStore((s) => s.toggleDrawer)
+  const status = useKbStore((s) => s.status)
+  const enabled = status?.enabled ?? false
+  const docs = status?.total_docs ?? 0
+
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-text-secondary">知识库是技术参考：上场时可以被检索引用，但<strong>不会</strong>被当作你本人的经历或证据。</p>
-      <div className="rounded-2xl border border-bg-hover/60 overflow-hidden"><KbStatusHeader /></div>
-      <PrimaryButton onClick={toggleDrawer}>管理知识库文件</PrimaryButton>
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.7fr)]">
+      <section aria-labelledby="knowledge-purpose-heading">
+        <p className="text-[11px] font-medium text-text-muted">REFERENCE ONLY</p>
+        <h2 id="knowledge-purpose-heading" className="mt-1 text-base font-semibold text-text-primary">只作为技术参考，不作为你的经历</h2>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-text-secondary">
+          上场和练习时，成竹可以从这里检索概念、框架和技术资料；它们不会被写成“你做过”“你负责过”的个人事实。
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 divide-x divide-bg-tertiary/70 border-y border-bg-tertiary/70 py-3">
+          <div className="pr-4">
+            <p className="text-lg font-semibold text-text-primary">{enabled ? '已启用' : '未启用'}</p>
+            <p className="mt-0.5 text-[10px] text-text-muted">知识检索</p>
+          </div>
+          <div className="pl-4">
+            <p className="text-lg font-semibold tabular-nums text-text-primary">{docs}</p>
+            <p className="mt-0.5 text-[10px] text-text-muted">参考文档</p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <PrimaryButton onClick={toggleDrawer}>查看和管理参考文档</PrimaryButton>
+        </div>
+      </section>
+
+      <aside className="lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+        <h3 className="text-sm font-semibold text-text-primary">什么时候会用到</h3>
+        <div className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+          <div className="py-2.5">
+            <p className="text-xs font-medium text-text-primary">回答技术问题</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-text-muted">补概念、方法、框架和术语背景。</p>
+          </div>
+          <div className="py-2.5">
+            <p className="text-xs font-medium text-text-primary">辅助追问</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-text-muted">给出知识参考，但仍优先使用你自己的项目事实。</p>
+          </div>
+          <div className="py-2.5">
+            <p className="text-xs font-medium text-text-primary">不会自动变成个人证据</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-text-muted">技术文档、博客和论文不会因为被检索到就进入“我的成竹”。</p>
+          </div>
+        </div>
+      </aside>
     </div>
   )
 }
@@ -221,32 +261,73 @@ function Banks() {
   const { data, error, loading, reload } = useAsync(() => productApi.banks(), [])
   const [selected, setSelected] = useState<QuestionBank | null>(null)
   const [name, setName] = useState('')
+  const banks = data?.items ?? []
+
+  useEffect(() => {
+    if (!selected && banks.length) setSelected(banks[0])
+    if (selected && !banks.some((b) => b.id === selected.id)) setSelected(banks[0] ?? null)
+  }, [banks, selected])
+
   if (loading && !data) return <Loading />
   if (error) return <ErrorState message={error} onRetry={reload} />
-  const banks = data?.items ?? []
+
   return (
-    <div className="grid gap-x-6 lg:grid-cols-[1fr_1.4fr]">
-      <Section title="题库">
-        <ul className="space-y-1.5">
-          {banks.map((b) => (
-            <li key={b.id}>
-              <button type="button" onClick={() => setSelected(b)} aria-pressed={selected?.id === b.id}
-                className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left ${selected?.id === b.id ? 'border-accent-blue/50 bg-accent-blue/5' : 'border-bg-hover/50 hover:bg-bg-hover/40'}`}>
-                <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{b.name}</span>
-                <StatusBadge tone={b.builtin ? 'info' : 'muted'}>{b.builtin ? '内置 · 只读' : b.source_type === 'PREVIOUS_SESSION' ? '历史场次' : '我的'}</StatusBadge>
-                <span className="text-[11px] text-text-muted">{b.item_count}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void productApi.createBank({ name }).then(() => { setName(''); void reload() }) }}>
-          <input aria-label="新题库名称" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="新题库名称" />
-          <PrimaryButton type="submit" disabled={!name.trim()}>新建</PrimaryButton>
-        </form>
-      </Section>
-      <Section title={selected ? selected.name : '题目'}>
-        {selected ? <BankItems bank={selected} onChanged={reload} onDeleted={() => { setSelected(null); void reload() }} /> : <EmptyState title="选择左侧的题库查看题目" />}
-      </Section>
+    <div>
+      <section aria-label="题库用途" className="mb-5 border-y border-bg-tertiary/70 py-3">
+        <p className="text-sm font-semibold text-text-primary">题库是练习来源，不是“答案库”</p>
+        <p className="mt-0.5 max-w-3xl text-xs leading-5 text-text-secondary">
+          内置题用于常见岗位练习；历史场次题只表示“曾经被问过”；只有带明确来源的内容才可以标成真实面经。题库不会替你生成个人经历。
+        </p>
+      </section>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
+        <aside aria-labelledby="bank-list-heading">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 id="bank-list-heading" className="text-sm font-semibold text-text-primary">练习来源</h2>
+              <p className="mt-0.5 text-[11px] text-text-muted">先选来源，再看具体问题。</p>
+            </div>
+            <span className="text-[11px] tabular-nums text-text-muted">{banks.length} 个</span>
+          </div>
+
+          <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            {banks.map((b) => (
+              <li key={b.id}>
+                <button type="button" onClick={() => setSelected(b)} aria-pressed={selected?.id === b.id}
+                  className={`flex w-full items-start gap-3 py-3 text-left ${selected?.id === b.id ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}>
+                  <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${selected?.id === b.id ? 'bg-accent-blue' : 'bg-bg-hover'}`} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{b.name}</span>
+                    <span className="mt-0.5 block text-[10px] text-text-muted">
+                      {b.builtin ? '成竹内置 · 只读' : b.source_type === 'PREVIOUS_SESSION' ? '历史场次' : '我的题库'} · {b.item_count} 题
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <details className="mt-4 text-xs">
+            <summary className="cursor-pointer font-medium text-text-secondary">新建自己的题库</summary>
+            <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); void productApi.createBank({ name }).then(() => { setName(''); void reload() }) }}>
+              <input aria-label="新题库名称" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：AI 产品 Case" />
+              <PrimaryButton type="submit" disabled={!name.trim()}>新建</PrimaryButton>
+            </form>
+          </details>
+        </aside>
+
+        <section aria-labelledby="bank-items-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <div className="mb-3">
+            <h2 id="bank-items-heading" className="text-sm font-semibold text-text-primary">{selected ? selected.name : '选择一个练习来源'}</h2>
+            {selected ? (
+              <p className="mt-0.5 text-[11px] text-text-muted">
+                {selected.builtin ? '常见岗位问题，只读；不代表任何公司的真实面经。' : selected.source_type === 'PREVIOUS_SESSION' ? '来自历史场次，用于复练曾经被问过的问题。' : '你自己维护的练习问题。'}
+              </p>
+            ) : null}
+          </div>
+          {selected ? <BankItems bank={selected} onChanged={reload} onDeleted={() => { setSelected(null); void reload() }} /> : <EmptyState title="还没有可用题库" body="可以新建一个自己的练习来源。" />}
+        </section>
+      </div>
     </div>
   )
 }

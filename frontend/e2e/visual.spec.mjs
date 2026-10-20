@@ -387,8 +387,9 @@ test.describe('@visual v2 Studio surfaces', () => {
   test('Practice setup — focused Goal', async ({ page }) => {
     await page.goto(`/#/practice?goal=${GOAL_ID}`)
     await expect(page.getByTestId('practice-setup')).toBeVisible()
-    await expect(page.getByText('本次聚焦：把 AI 产品判断讲到可验证')).toBeVisible()
-    await expect(page.getByText('产品负责人')).toBeVisible()
+    await expect(page.getByText('把 AI 产品判断讲到可验证', { exact: true })).toBeVisible()
+    await expect(page.getByText('产品负责人', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('practice-start')).toBeVisible()
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('practice-setup.png', SNAPSHOT)

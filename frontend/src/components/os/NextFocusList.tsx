@@ -33,9 +33,9 @@ export function NextFocusList({ goalId, items, onChanged, compact = false }: {
     runActionKey(key, { goalId, focusTitle: item.title })
   }
   return (
-    <ol className="space-y-2" aria-label="Next Focus">
+    <ol className="border-y border-bg-tertiary/70" aria-label="Next Focus">
       {items.slice(0, 3).map((item, idx) => (
-        <li key={item.id} className="rounded-2xl border border-bg-hover/60 bg-bg-secondary/60 p-3">
+        <li key={item.id} className="border-b border-bg-tertiary/70 px-1 py-3.5 last:border-b-0">
           <div className="flex items-start gap-2">
             <Target className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-blue" aria-hidden />
             <div className="min-w-0 flex-1">

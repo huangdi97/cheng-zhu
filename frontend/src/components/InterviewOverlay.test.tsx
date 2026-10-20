@@ -542,14 +542,14 @@ describe('InterviewOverlay', () => {
     })
   })
 
-  it('uses a readable dark text color in focus mode regardless of the regular overlay font color', () => {
+  it('uses the fixed high-contrast Cockpit text color in focus mode regardless of the regular overlay font color', () => {
     useInterviewStore.setState({
-      qaPairs: [{ ...qa, answer: '## 结论\n浅色用户字体不应该影响专注面板。' }],
+      qaPairs: [{ ...qa, answer: '## 结论\n普通悬浮字幕颜色不应该影响深色专注面板。' }],
     })
     useUiPrefsStore.setState({
       interviewOverlayMode: 'focus',
       interviewOverlayShowBg: true,
-      interviewOverlayFontColor: '#e2e8f0',
+      interviewOverlayFontColor: '#263241',
     })
     localStorage.setItem('ia_overlay_mode', 'focus')
     localStorage.setItem('ia_overlay_show_bg', '1')
@@ -557,7 +557,7 @@ describe('InterviewOverlay', () => {
 
     render(<InterviewOverlay />)
 
-    expect(document.querySelector('.ov-focus-content')).toHaveStyle({ color: '#263241' })
+    expect(document.querySelector('.ov-focus-content')).toHaveStyle({ color: '#F2F4F3' })
   })
 
   it('renders model-provided markdown sections as dynamic focus tabs', () => {

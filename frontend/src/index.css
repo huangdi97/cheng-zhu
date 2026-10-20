@@ -1664,6 +1664,187 @@ select:focus-visible {
   background: #22c55e;
 }
 
+/* ========== UI v2 Live Cockpit visual freeze ==========
+ * Overlay is intentionally independent from Studio themes: graphite glass,
+ * quiet chrome, bamboo only as a state/evidence accent.
+ */
+.ov-shell--bg,
+.ov-shell--focus {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(20, 23, 22, 0.90);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(20px) saturate(1.08);
+  -webkit-backdrop-filter: blur(20px) saturate(1.08);
+  border-radius: 12px;
+}
+
+.ov-shell--focus {
+  color: #f2f4f3;
+}
+
+.ov-focus-toolbar,
+.ov-focus-tabs {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  color: rgba(225, 231, 227, 0.62);
+}
+
+.ov-focus-toolbar {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ov-focus-tool {
+  color: rgba(225, 231, 227, 0.62);
+  font-weight: 500;
+}
+
+.ov-focus-tool:hover {
+  color: #f2f4f3;
+}
+
+.ov-focus-tool:disabled {
+  color: rgba(225, 231, 227, 0.34);
+}
+
+.ov-focus-tool:focus-visible,
+.ov-focus-tab:focus-visible {
+  outline-color: rgba(127, 174, 152, 0.62);
+}
+
+.ov-focus-tool kbd,
+.ov-focus-tab-keys kbd,
+.ov-focus-question-strip kbd {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(225, 231, 227, 0.62);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.ov-focus-tabs {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.ov-focus-tab {
+  color: rgba(225, 231, 227, 0.64);
+  font-weight: 600;
+}
+
+.ov-focus-tab--active {
+  color: #f2f4f3;
+  background: rgba(127, 174, 152, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(127, 174, 152, 0.24);
+}
+
+.ov-focus-question-strip {
+  border-top-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.018);
+  color: rgba(225, 231, 227, 0.58);
+}
+
+.ov-focus-question-strip strong,
+.ov-focus-key-label,
+.ov-focus-question-strip kbd {
+  color: rgba(242, 244, 243, 0.78);
+}
+
+.ov-focus-live-hint {
+  background: rgba(127, 174, 152, 0.12);
+  color: #a9c8b9;
+}
+
+.ov-focus-live-hint::before {
+  background: #7fae98;
+  animation: none;
+}
+
+.ov-focus-content {
+  font-weight: 500;
+  scrollbar-color: rgba(127, 174, 152, 0.28) transparent;
+}
+
+.ov-focus-content::-webkit-scrollbar-thumb {
+  background: rgba(127, 174, 152, 0.28);
+}
+
+.ov-focus-section h2 {
+  color: rgba(242, 244, 243, 0.9);
+  font-weight: 650;
+}
+
+.ov-focus-section h2::before {
+  background: #7fae98;
+}
+
+.ov-focus-omitted {
+  color: rgba(225, 231, 227, 0.58);
+}
+
+.ov-focus-content .ov-markdown h1,
+.ov-focus-content .ov-markdown h2,
+.ov-focus-content .ov-markdown h3 {
+  color: rgba(242, 244, 243, 0.92);
+}
+
+.ov-focus-content .ov-markdown pre {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.ov-focus-content .ov-markdown blockquote {
+  border-left-color: rgba(127, 174, 152, 0.68);
+}
+
+.ov-review-line {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  color: rgba(225, 231, 227, 0.60);
+  font-weight: 600;
+}
+
+.ov-cue {
+  gap: 0.48em;
+}
+
+.ov-cue-question {
+  color: rgba(242, 244, 243, 0.94);
+  font-weight: 650;
+  line-height: 1.42;
+}
+
+.ov-cue-list {
+  gap: 0.28em;
+  line-height: 1.5;
+}
+
+.ov-cue-sources {
+  color: #9fbeaf;
+  opacity: 0.88;
+}
+
+.ov-cue-toggle {
+  margin-top: 0.18em;
+  padding: 0.12em 0;
+  border: 0;
+  border-radius: 0;
+  color: #a9c8b9;
+  font-weight: 600;
+}
+
+.ov-compact {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(20, 23, 22, 0.92);
+  color: #f2f4f3;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px) saturate(1.06);
+  -webkit-backdrop-filter: blur(18px) saturate(1.06);
+}
+
+.ov-compact-dot {
+  background: #7d8781;
+}
+
+.ov-compact-dot--on {
+  background: #7fae98;
+  box-shadow: 0 0 0 3px rgba(127, 174, 152, 0.12);
+}
+
 /* ========== v1.3 Accessibility ========== */
 /* Font scaling: Settings → General can set --app-font-scale (1 = default). */
 html {

@@ -79,12 +79,24 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
           </div>
         } />
 
-      <Section title="下一步">
+      <section aria-label="复盘重点" className="border-b border-bg-tertiary/80 py-5">
+        <p className="text-[11px] font-medium text-text-muted">这场复盘的重点</p>
+        <p className="mt-1 max-w-3xl text-lg font-medium leading-7 text-text-primary">
+          {fs.next_step
+            ? `最值得继续处理的是「${fs.next_step.title}」。`
+            : fs.to_improve.length
+              ? '这场已经留下了明确的改进证据，先处理最反复出现的问题。'
+              : '这场没有出现需要被夸大的结论，保留有效证据并继续下一轮即可。'}
+        </p>
+        {fs.next_step?.reason ? <p className="mt-1.5 max-w-3xl text-sm leading-6 text-text-secondary">{fs.next_step.reason}</p> : null}
+      </section>
+
+      <Section title="下一步建议">
         {fs.next_step ? (
-          <div className="rounded-2xl border border-accent-blue/30 bg-accent-blue/5 p-3">
+          <div className="border-l-2 border-accent-blue/55 py-1 pl-4">
             <p className="text-sm font-semibold text-text-primary">{fs.next_step.title}</p>
-            <p className="text-xs text-text-secondary">{fs.next_step.reason}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="mt-0.5 text-xs leading-5 text-text-secondary">{fs.next_step.reason}</p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {data.goal_id ? (
                 <>
                   <PrimaryButton testId="reflection-practice-next" onClick={() => void act('PRACTICE_THIS', { ...fs.next_step!, id: fs.next_step!.finding_id ?? fs.next_step!.pin_id })}>练这个</PrimaryButton>
@@ -102,7 +114,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         {fs.pinned_moments.length ? (
           <ul className="space-y-1.5">
             {fs.pinned_moments.map((p) => (
-              <li key={p.id} className="rounded-xl border border-accent-amber/30 bg-accent-amber/5 px-3 py-2">
+              <li key={p.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                 <div className="flex flex-wrap items-center gap-2"><Pin className="h-3.5 w-3.5 text-accent-amber" aria-hidden /><StatusBadge tone="warn">{p.tag_label ?? p.tag}</StatusBadge></div>
                 {p.question ? <p className="mt-1 text-sm text-text-primary">{p.question}</p> : null}
                 {p.note ? <p className="text-xs text-text-secondary">备注：{p.note}</p> : null}
@@ -121,14 +133,14 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         </Section>
         <Section title="需要改进">
           {fs.to_improve.length ? (
-            <ul className="space-y-2">{fs.to_improve.map((f) => <FindingRow key={f.id} f={f} goalLinked={!!data.goal_id} act={act} status={status} />)}</ul>
+            <ul className="border-y border-bg-tertiary/70">{fs.to_improve.map((f) => <FindingRow key={f.id} f={f} goalLinked={!!data.goal_id} act={act} status={status} />)}</ul>
           ) : <p className="text-xs text-text-muted">暂无。</p>}
         </Section>
         <Section title={`事实核对 · ${fs.fact_checks.length}`}>
           {fs.fact_checks.length ? (
-            <ul className="space-y-2">
+            <ul className="border-y border-bg-tertiary/70">
               {fs.fact_checks.map((f) => (
-                <li key={f.id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                <li key={f.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                   <p className="text-xs text-text-primary">{f.finding}</p>
                   <Quote text={f.actual_speech} />
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -163,9 +175,9 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         </Section>
         <Section title="故事机会">
           {fs.story_opportunities.length ? (
-            <ul className="space-y-2">
+            <ul className="border-y border-bg-tertiary/70">
               {fs.story_opportunities.map((s) => (
-                <li key={s.id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+                <li key={s.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
                   <p className="text-xs text-text-primary">{s.question}</p>
                   <Quote text={s.actual_speech} />
                   <div className="mt-1.5"><SecondaryButton onClick={() => void act('CREATE_STORY', s as unknown as Record<string, unknown>)}>{status(s, 'CREATE_STORY') ?? '整理成故事草稿'}</SecondaryButton></div>
@@ -210,7 +222,7 @@ function FindingRow({ f, goalLinked, act, status }: {
 }) {
   const finding = f as unknown as Record<string, unknown>
   return (
-    <li className="rounded-xl border border-bg-hover/50 px-3 py-2">
+    <li className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge tone="warn">{f.kind_label ?? f.kind}</StatusBadge>
         {f.occurrences && f.occurrences > 1 ? <span className="text-[11px] text-text-muted">出现 {f.occurrences} 次</span> : null}
@@ -241,7 +253,7 @@ function Timeline({ data }: { data: Reflection }) {
       {open ? (
         <ol className="space-y-2">
           {data.timeline.map((t) => (
-            <li key={t.turn_id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
+            <li key={t.turn_id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
               <p className="text-xs font-medium text-text-primary">Q{t.seq}. {t.question}</p>
               <Quote text={t.actual_speech} />
               {t.content.findings?.length ? <p className="mt-1 text-[11px] text-text-muted">{t.content.findings.map((f) => f.finding).join('；')}</p> : null}

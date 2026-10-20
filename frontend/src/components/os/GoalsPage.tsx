@@ -11,9 +11,9 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: '进行中', PAUSED: '暂
 function GoalRow({ goal }: { goal: Goal }) {
   const next = goal.next_interview_at ? `${goal.interview_round || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
   return (
-    <li>
+    <li className="border-b border-bg-tertiary/70 last:border-b-0">
       <button type="button" onClick={() => navigate(paths.goal(goal.id))}
-        className="flex w-full items-center gap-3 rounded-2xl border border-bg-hover/60 px-4 py-3 text-left hover:bg-bg-hover/40">
+        className="group flex w-full items-center gap-3 px-1 py-3.5 text-left transition-colors hover:bg-bg-hover/25">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-text-primary break-words">{goal.title}</span>
           <span className="block text-xs text-text-muted">{next}{goal.offer_state !== 'NONE' ? ` · Offer：${goal.offer_state}` : ''}</span>
@@ -32,7 +32,7 @@ export default function GoalsPage() {
   const active = items.filter((g) => g.status === 'ACTIVE' || g.status === 'PAUSED')
   const done = items.filter((g) => g.status === 'COMPLETED' || g.status === 'ARCHIVED')
   return (
-    <Page testId="goals-page">
+    <Page testId="goals-page" wide>
       <PageHeader title="求职目标" subtitle="每个目标对应一个岗位：准备、练习、上场和复盘都围绕它进行。"
         actions={<PrimaryButton onClick={openCreateGoal} testId="create-goal">新建目标</PrimaryButton>} />
       {loading && !data ? <Loading /> : null}
@@ -42,15 +42,15 @@ export default function GoalsPage() {
       ) : null}
       {active.length ? (
         <Section title={`Active · ${active.length}`}>
-          <ul className="space-y-2">{active.map((g) => <GoalRow key={g.id} goal={g} />)}</ul>
+          <ul className="border-y border-bg-tertiary/70">{active.map((g) => <GoalRow key={g.id} goal={g} />)}</ul>
         </Section>
       ) : null}
       {done.length ? (
         <Section title={`Completed · ${done.length}`} action={<SecondaryButton onClick={() => setShowDone((v) => !v)}>{showDone ? '收起' : '展开'}</SecondaryButton>}>
-          {showDone ? <ul className="space-y-2">{done.map((g) => <GoalRow key={g.id} goal={g} />)}</ul> : null}
+          {showDone ? <ul className="border-y border-bg-tertiary/70">{done.map((g) => <GoalRow key={g.id} goal={g} />)}</ul> : null}
         </Section>
       ) : null}
-      <p className="pt-3 text-[11px] text-text-muted">状态：{Object.values(STATUS_LABEL).join(' / ')}。旧版投递看板仍可在目标的「面试」页打开。</p>
+      <p className="pt-3 text-[11px] text-text-muted">状态：{Object.values(STATUS_LABEL).join(' / ')}。旧版投递看板仍可在目标的「会话」页打开。</p>
     </Page>
   )
 }

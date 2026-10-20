@@ -8,6 +8,7 @@ import { useOsStore } from '@/stores/osStore'
 import { EmptyState, ErrorState, formatWhen, Loading, Page, PageHeader, PrimaryButton, Section, SecondaryButton, useAsync } from './ui'
 
 const STATUS_LABEL: Record<string, string> = { ACTIVE: '进行中', PAUSED: '暂停', COMPLETED: '已结束', ARCHIVED: '已归档' }
+const OFFER_LABEL: Record<string, string> = { PENDING: '等待结果', RECEIVED: '已收到', NEGOTIATING: '谈判中', ACCEPTED: '已接受', DECLINED: '已拒绝' }
 
 function GoalRow({ goal }: { goal: Goal }) {
   const next = goal.next_interview_at ? `${formatInterviewRound(goal.interview_round) || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
@@ -17,7 +18,7 @@ function GoalRow({ goal }: { goal: Goal }) {
         className="group flex w-full items-center gap-3 px-1 py-3.5 text-left transition-colors hover:bg-bg-hover/25">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-text-primary break-words">{goal.title}</span>
-          <span className="block text-xs text-text-muted">{next}{goal.offer_state !== 'NONE' ? ` · Offer：${goal.offer_state}` : ''}</span>
+          <span className="block text-xs text-text-muted">{next}{goal.offer_state !== 'NONE' ? ` · 录用：${OFFER_LABEL[goal.offer_state] ?? goal.offer_state}` : ''}</span>
         </span>
         <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
       </button>

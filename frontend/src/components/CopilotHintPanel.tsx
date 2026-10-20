@@ -10,7 +10,7 @@ export default function CopilotHintPanel() {
   const config = useInterviewStore((s) => s.config)
   const isRecording = useInterviewStore((s) => s.isRecording)
 
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [hasTree, setHasTree] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -18,16 +18,23 @@ export default function CopilotHintPanel() {
   const loadTree = useCallback(async () => {
     try {
       const res = await api.copilotStrategyGet(null)
-      setHasTree(Boolean(res.tree))
+      const nextHasTree = Boolean(res.tree)
+      setHasTree(nextHasTree)
+      setCollapsed(!nextHasTree)
       if (!res.tree) setCopilotHint(null)
     } catch {
       setHasTree(false)
+      setCollapsed(true)
     }
   }, [setCopilotHint])
 
   useEffect(() => {
     void loadTree()
   }, [loadTree])
+
+  useEffect(() => {
+    if (copilotHint) setCollapsed(false)
+  }, [copilotHint])
 
   const handleGenerate = async () => {
     setGenerating(true)

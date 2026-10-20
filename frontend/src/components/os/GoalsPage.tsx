@@ -3,20 +3,22 @@ import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { navigate, paths } from '@/lib/router'
 import { productApi, type Goal } from '@/lib/productApi'
+import { formatInterviewRound } from '@/lib/interviewRound'
 import { useOsStore } from '@/stores/osStore'
 import { EmptyState, ErrorState, formatWhen, Loading, Page, PageHeader, PrimaryButton, Section, SecondaryButton, useAsync } from './ui'
 
 const STATUS_LABEL: Record<string, string> = { ACTIVE: '进行中', PAUSED: '暂停', COMPLETED: '已结束', ARCHIVED: '已归档' }
+const OFFER_LABEL: Record<string, string> = { PENDING: '等待结果', RECEIVED: '已收到', NEGOTIATING: '谈判中', ACCEPTED: '已接受', DECLINED: '已拒绝' }
 
 function GoalRow({ goal }: { goal: Goal }) {
-  const next = goal.next_interview_at ? `${goal.interview_round || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
+  const next = goal.next_interview_at ? `${formatInterviewRound(goal.interview_round) || '下一轮'} · ${formatWhen(goal.next_interview_at)}` : (goal.stage || '待安排')
   return (
     <li className="border-b border-bg-tertiary/70 last:border-b-0">
       <button type="button" onClick={() => navigate(paths.goal(goal.id))}
         className="group flex w-full items-center gap-3 px-1 py-3.5 text-left transition-colors hover:bg-bg-hover/25">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-text-primary break-words">{goal.title}</span>
-          <span className="block text-xs text-text-muted">{next}{goal.offer_state !== 'NONE' ? ` · Offer：${goal.offer_state}` : ''}</span>
+          <span className="block text-xs text-text-muted">{next}{goal.offer_state !== 'NONE' ? ` · 录用：${OFFER_LABEL[goal.offer_state] ?? goal.offer_state}` : ''}</span>
         </span>
         <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
       </button>
@@ -41,16 +43,16 @@ export default function GoalsPage() {
         <EmptyState title="还没有求职目标" body="创建一个目标后，成竹会给出下一步。" action={<PrimaryButton onClick={openCreateGoal}>创建第一个求职目标</PrimaryButton>} />
       ) : null}
       {active.length ? (
-        <Section title={`Active · ${active.length}`}>
+        <Section title={`进行中 · ${active.length}`}>
           <ul className="border-y border-bg-tertiary/70">{active.map((g) => <GoalRow key={g.id} goal={g} />)}</ul>
         </Section>
       ) : null}
       {done.length ? (
-        <Section title={`Completed · ${done.length}`} action={<SecondaryButton onClick={() => setShowDone((v) => !v)}>{showDone ? '收起' : '展开'}</SecondaryButton>}>
+        <Section title={`已结束 · ${done.length}`} action={<SecondaryButton onClick={() => setShowDone((v) => !v)}>{showDone ? '收起' : '展开'}</SecondaryButton>}>
           {showDone ? <ul className="border-y border-bg-tertiary/70">{done.map((g) => <GoalRow key={g.id} goal={g} />)}</ul> : null}
         </Section>
       ) : null}
-      <p className="pt-3 text-[11px] text-text-muted">状态：{Object.values(STATUS_LABEL).join(' / ')}。旧版投递看板仍可在目标的「会话」页打开。</p>
+      <p className="pt-3 text-[11px] text-text-muted">状态：{Object.values(STATUS_LABEL).join(' / ')}</p>
     </Page>
   )
 }

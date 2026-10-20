@@ -1,6 +1,6 @@
 /**
- * Reflection 3.0 (canonical §18). First screen: Next Step · Pinned moments ·
- * What went well · What to improve · Fact checks · Story opportunities.
+ * Reflection 3.0 (canonical §18). First screen: grounded review focus ·
+ * What went well · What was exposed · Pinned evidence · one next action.
  * Turn timeline is the second layer. Every action writes back for real.
  */
 import { lazy, Suspense, useState } from 'react'
@@ -91,6 +91,34 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         {fs.next_step?.reason ? <p className="mt-1.5 max-w-3xl text-sm leading-6 text-text-secondary">{fs.next_step.reason}</p> : null}
       </section>
 
+      <div className="grid gap-x-6 lg:grid-cols-2">
+        <Section title="做得好">
+          {fs.went_well.length ? (
+            <ul className="space-y-2">{fs.went_well.map((w, i) => <li key={i} className="text-xs"><span className="font-medium text-status-direct">{w.dimension_label}</span><Quote text={w.actual_speech} /></li>)}</ul>
+          ) : <p className="text-xs text-text-muted">暂无。</p>}
+        </Section>
+        <Section title="需要改进">
+          {fs.to_improve.length ? (
+            <ul className="border-y border-bg-tertiary/70">{fs.to_improve.map((f) => <FindingRow key={f.id} f={f} goalLinked={!!data.goal_id} act={act} status={status} />)}</ul>
+          ) : <p className="text-xs text-text-muted">暂无。</p>}
+        </Section>
+      </div>
+
+      <Section title={`你标记的时刻 · ${fs.pinned_moments.length}`}>
+        {fs.pinned_moments.length ? (
+          <ul className="space-y-1.5">
+            {fs.pinned_moments.map((p) => (
+              <li key={p.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
+                <div className="flex flex-wrap items-center gap-2"><Pin className="h-3.5 w-3.5 text-accent-amber" aria-hidden /><StatusBadge tone="warn">{p.tag_label ?? p.tag}</StatusBadge></div>
+                {p.question ? <p className="mt-1 text-sm text-text-primary">{p.question}</p> : null}
+                {p.note ? <p className="text-xs text-text-secondary">备注：{p.note}</p> : null}
+                {data.goal_id ? <div className="mt-1.5"><SecondaryButton onClick={() => void act('SET_NEXT_FOCUS', { id: p.id, pin_id: p.id, kind: 'USER_PIN' })}>{status({ id: p.id }, 'SET_NEXT_FOCUS') ?? '设为下一步重点'}</SecondaryButton></div> : null}
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-xs text-text-muted">这场没有标记。下次在练习或上场中按 Ctrl+P 标记重要时刻。</p>}
+      </Section>
+
       <Section title="下一步建议">
         {fs.next_step ? (
           <div className="border-l-2 border-accent-blue/55 py-1 pl-4">
@@ -110,32 +138,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
         ) : <EmptyState title="这场没有明显需要改进的地方" />}
       </Section>
 
-      <Section title={`你标记的时刻 · ${fs.pinned_moments.length}`}>
-        {fs.pinned_moments.length ? (
-          <ul className="space-y-1.5">
-            {fs.pinned_moments.map((p) => (
-              <li key={p.id} className="border-b border-bg-tertiary/70 px-1 py-2.5 last:border-b-0">
-                <div className="flex flex-wrap items-center gap-2"><Pin className="h-3.5 w-3.5 text-accent-amber" aria-hidden /><StatusBadge tone="warn">{p.tag_label ?? p.tag}</StatusBadge></div>
-                {p.question ? <p className="mt-1 text-sm text-text-primary">{p.question}</p> : null}
-                {p.note ? <p className="text-xs text-text-secondary">备注：{p.note}</p> : null}
-                {data.goal_id ? <div className="mt-1.5"><SecondaryButton onClick={() => void act('SET_NEXT_FOCUS', { id: p.id, pin_id: p.id, kind: 'USER_PIN' })}>{status({ id: p.id }, 'SET_NEXT_FOCUS') ?? '设为下一步重点'}</SecondaryButton></div> : null}
-              </li>
-            ))}
-          </ul>
-        ) : <p className="text-xs text-text-muted">这场没有标记。下次在练习或上场中按 Ctrl+P 标记重要时刻。</p>}
-      </Section>
-
       <div className="grid gap-x-6 lg:grid-cols-2">
-        <Section title="做得好">
-          {fs.went_well.length ? (
-            <ul className="space-y-2">{fs.went_well.map((w, i) => <li key={i} className="text-xs"><span className="font-medium text-status-direct">{w.dimension_label}</span><Quote text={w.actual_speech} /></li>)}</ul>
-          ) : <p className="text-xs text-text-muted">暂无。</p>}
-        </Section>
-        <Section title="需要改进">
-          {fs.to_improve.length ? (
-            <ul className="border-y border-bg-tertiary/70">{fs.to_improve.map((f) => <FindingRow key={f.id} f={f} goalLinked={!!data.goal_id} act={act} status={status} />)}</ul>
-          ) : <p className="text-xs text-text-muted">暂无。</p>}
-        </Section>
         <Section title={`事实核对 · ${fs.fact_checks.length}`}>
           {fs.fact_checks.length ? (
             <ul className="border-y border-bg-tertiary/70">

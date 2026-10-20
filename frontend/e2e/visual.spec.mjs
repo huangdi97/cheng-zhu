@@ -207,12 +207,114 @@ const FROZEN_PACK = {
   },
 }
 
+
+const PRACTICE_OPTIONS = {
+  rounds: [
+    { key: 'PRODUCT_CASE', label: '产品 / Case' },
+    { key: 'BEHAVIORAL', label: '行为面' },
+    { key: 'HIRING_MANAGER', label: 'Hiring Manager' },
+  ],
+  demeanors: [
+    { key: 'NEUTRAL', label: '正常' },
+    { key: 'PRESSURE', label: '追问更紧' },
+    { key: 'FRIENDLY', label: '友好' },
+  ],
+  difficulties: [
+    { key: 'STANDARD', label: '标准' },
+    { key: 'HARD', label: '偏难' },
+  ],
+  sources: [
+    { key: 'GOAL_GRAPH', label: '当前目标' },
+    { key: 'RECENT_WEAKNESS', label: '最近暴露的问题' },
+    { key: 'ROLE_BANK', label: '岗位题库' },
+  ],
+  personas: [
+    { key: 'PRODUCT_LEAD', label: '产品负责人', concern: '产品判断', followup_style: '追问取舍、验证和失败回退', demeanor: 'NEUTRAL' },
+    { key: 'CROSS_FUNCTION', label: '跨职能面试官', concern: '协作', followup_style: '追问推进过程与冲突处理', demeanor: 'NEUTRAL' },
+    { key: 'BUSINESS', label: '业务负责人', concern: '结果', followup_style: '追问业务价值与指标', demeanor: 'NEUTRAL' },
+  ],
+  defaults: {
+    round: 'PRODUCT_CASE',
+    focus: FOCUS,
+    demeanor: 'NEUTRAL',
+    difficulty: 'STANDARD',
+    sources: ['GOAL_GRAPH', 'RECENT_WEAKNESS', 'ROLE_BANK'],
+  },
+}
+
+const HISTORY_ITEMS = {
+  items: [
+    RECENT_SESSION,
+    {
+      key: 'practice:ui-1',
+      type: 'PRACTICE',
+      guided: true,
+      reflection_ref: { session_kind: 'PRACTICE', session_ref: 'practice-ui-1' },
+      review_session_id: null,
+      goal_id: GOAL_ID,
+      goal_title: GOAL.title,
+      round: 'PRODUCT_CASE',
+      title: '产品 Case · 针对产品判断',
+      panel: false,
+      started_at: T - 172_800,
+      ended_at: T - 170_400,
+      turn_count: 5,
+      has_reflection_actions: true,
+    },
+    {
+      key: 'review:901',
+      type: 'REAL',
+      guided: false,
+      reflection_ref: { session_kind: 'REVIEW', session_ref: '901' },
+      review_session_id: 901,
+      goal_id: GOAL_ID,
+      goal_title: GOAL.title,
+      round: 'BEHAVIORAL',
+      title: 'AI 产品经理 · HR 初筛',
+      panel: false,
+      started_at: T - 604_800,
+      ended_at: T - 601_200,
+      turn_count: 6,
+      has_reflection_actions: false,
+    },
+  ],
+}
+
+const MY_FACTS = {
+  candidate_id: 'candidate-ui-v2',
+  facts: [
+    { id: 'fact-1', text: '主导 AI 产品从需求到灰度上线', type: 'PROJECT', source: 'WenNian', provenance_status: 'DIRECT_EVIDENCE', provenance_label: '有直接证据', user_assertion_status: 'USER_CONFIRMED', user_assertion_label: '用户已确认', source_ids: ['src-1'] },
+    { id: 'fact-2', text: '负责 Agent 评测体系设计', type: 'PROJECT', source: 'Chengzhu', provenance_status: 'DIRECT_EVIDENCE', provenance_label: '有直接证据', user_assertion_status: 'USER_CONFIRMED', user_assertion_label: '用户已确认', source_ids: ['src-2'] },
+    { id: 'fact-3', text: '有企业客户实际交付经验', type: 'CLAIM', source: 'resume', provenance_status: 'NO_EVIDENCE', provenance_label: '暂无证据', user_assertion_status: 'UNREVIEWED', user_assertion_label: '待确认', source_ids: [] },
+  ],
+  evidence: [
+    { id: 'src-1', source: '项目文档', text: 'WenNian 产品设计与上线记录' },
+    { id: 'src-2', source: '项目文档', text: 'Chengzhu 评测与发布记录' },
+  ],
+}
+
+const MY_STORIES = [
+  { id: 'story-1', title: '从错误方向切回最小可验证产品', situation: '方向过大', challenge: '资源不足', action: '缩小范围并重设验证指标', result: '按期交付', reflection: '先验证核心问题', tags: ['Trade-off'] },
+  { id: 'story-2', title: '跨团队推动一次高风险改版', situation: '目标不一致', challenge: '排期冲突', action: '明确共同指标', result: '完成上线', reflection: '先对齐决策边界', tags: ['Collaboration'] },
+]
+
+const MY_SKILLS = [
+  { id: 11, space_id: 1, space_title: GOAL.title, project_name: 'WenNian', status: 'READY', user_reviewed: true, card: { background: 'Healthspan 产品与算法设计' } },
+  { id: 12, space_id: 1, space_title: GOAL.title, project_name: 'Chengzhu', status: 'READY', user_reviewed: true, card: { background: 'Interview Intelligence 产品与工程' } },
+]
+
 const STUDIO_OVERRIDES = (pathname, method) => {
   if (method !== 'GET') return undefined
   if (pathname === '/api/product/home') return HOME
   if (pathname === '/api/product/goals') return { items: [GOAL] }
   if (pathname === `/api/product/goals/${GOAL_ID}`) return GOAL_DETAIL
   if (pathname === '/api/product/reflection/review/902') return REFLECTION
+  if (pathname === '/api/product/practice/options') return PRACTICE_OPTIONS
+  if (pathname === '/api/product/history') return HISTORY_ITEMS
+  if (pathname === '/api/intelligence/facts') return MY_FACTS
+  if (pathname === '/api/intelligence/stories') return MY_STORIES
+  if (pathname === '/api/intelligence/skill-cards') return MY_SKILLS
+  if (pathname === '/api/product/fact-inbox') return { count: 1, items: [], batch: null, merge_suggestions: [], policy: { mode: 'STANDARD', reasons: [] } }
   return undefined
 }
 
@@ -279,6 +381,38 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page.getByText('把“为什么这样设计”提前到答案第一句').first()).toBeVisible()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('reflection.png', SNAPSHOT)
+  })
+
+
+  test('Practice setup — focused Goal', async ({ page }) => {
+    await page.goto(`/#/practice?goal=${GOAL_ID}`)
+    await expect(page.getByTestId('practice-setup')).toBeVisible()
+    await expect(page.getByText('本次聚焦：把 AI 产品判断讲到可验证')).toBeVisible()
+    await expect(page.getByText('产品负责人')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('practice-setup.png', SNAPSHOT)
+  })
+
+  test('History — mixed real and practice sessions', async ({ page }) => {
+    await page.goto('/#/history')
+    await expect(page.getByTestId('history-page')).toBeVisible()
+    await expect(page.getByText('AI 产品经理 · 一面')).toBeVisible()
+    await expect(page.getByText('产品 Case · 针对产品判断')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('history.png', SNAPSHOT)
+  })
+
+  test('My Chengzhu — overview', async ({ page }) => {
+    await page.goto('/#/me')
+    await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
+    await expect(page.getByTestId('my-overview')).toBeVisible()
+    await expect(page.getByText('有直接证据')).toBeVisible()
+    await expect(page.getByText('Stories')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-overview.png', SNAPSHOT)
   })
 
   test('Person resume workspace', async ({ page }) => {

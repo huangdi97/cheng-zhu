@@ -184,7 +184,13 @@ function Materials() {
               </div>
             </fieldset>
             <Field label="上传文件">
-              <input type="file" accept=".md,.txt,.pdf,.docx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-xs text-text-secondary" />
+              <div className="flex min-w-0 items-center gap-2">
+                <label className="btn-subtle inline-flex min-h-[32px] flex-shrink-0 cursor-pointer items-center rounded-lg px-3 py-1.5 text-xs font-medium">
+                  选择文件
+                  <input aria-label="选择项目资料文件" type="file" accept=".md,.txt,.pdf,.docx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="sr-only" />
+                </label>
+                <span className="min-w-0 truncate text-[11px] text-text-muted">{file?.name || '未选择文件'}</span>
+              </div>
             </Field>
             <Field label="或直接粘贴文本">
               <textarea className={`${inputCls} min-h-[92px]`} value={text} onChange={(e) => setText(e.target.value)} placeholder="适合短材料、周报片段或复盘摘要。" />

@@ -24,6 +24,7 @@ export default function CopilotHintPanel() {
       if (!res.tree) setCopilotHint(null)
     } catch {
       setHasTree(false)
+      setCollapsed(true)
     }
   }, [setCopilotHint])
 

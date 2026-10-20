@@ -372,9 +372,54 @@ const PROJECT_MATERIALS = {
 }
 
 const MY_SKILLS = [
-  { id: 11, space_id: 1, space_title: GOAL.title, project_name: 'WenNian', status: 'READY', user_reviewed: true, card: { background: 'Healthspan 产品与算法设计' } },
-  { id: 12, space_id: 1, space_title: GOAL.title, project_name: 'Chengzhu', status: 'READY', user_reviewed: true, card: { background: 'Interview Intelligence 产品与工程' } },
+  { id: 11, space_id: 1, space_title: GOAL.title, project_name: 'WenNian', status: 'READY', user_reviewed: true, card: { background: '从用户任务和健康数据边界出发，设计 Healthspan 产品与算法验证路径。' } },
+  { id: 12, space_id: 1, space_title: GOAL.title, project_name: 'Chengzhu', status: 'READY', user_reviewed: true, card: { background: '把 Interview Intelligence 的产品闭环、评测与工程约束落到可验证版本。' } },
+  { id: 13, space_id: 1, space_title: GOAL.title, project_name: 'PDIG / DepMap', status: 'READY', user_reviewed: false, card: { background: '围绕数字基础设施依赖关系设计 consumer-facing 产品体验。' } },
 ]
+
+const KB_STATUS = {
+  enabled: true,
+  trigger_modes: ['manual', 'question'],
+  top_k: 4,
+  deadline_ms: 150,
+  asr_deadline_ms: 80,
+  total_docs: 4,
+  total_chunks: 126,
+  last_mtime: T,
+  deps: { docx: true, pdf: true, ocr: false, vision: false },
+}
+
+const QUESTION_BANKS = {
+  items: [
+    { id: 'bank-built-in', name: 'AI 产品经理 · 常见问题', scope: 'GLOBAL', role: 'AI 产品经理', company: '', source_type: 'BUILTIN', goal_id: null, builtin: true, item_count: 4 },
+    { id: 'bank-history', name: '上一轮真实面试追问', scope: 'GOAL', role: 'AI 产品经理', company: '字节跳动', source_type: 'PREVIOUS_SESSION', goal_id: GOAL_ID, builtin: false, item_count: 3 },
+    { id: 'bank-mine', name: '我想重点练的 Case', scope: 'GOAL', role: 'AI 产品经理', company: '字节跳动', source_type: 'USER', goal_id: GOAL_ID, builtin: false, item_count: 2 },
+  ],
+}
+
+const QUESTION_BANK_ITEMS = {
+  'bank-built-in': {
+    items: [
+      { id: 'q-1', bank_id: 'bank-built-in', text: '你会怎么判断一个 AI 功能是否真的值得上线？', category: 'PRODUCT', difficulty: 'STANDARD', origin: 'BUILTIN', source_url: '', label: '通用产品判断', rounds: ['PRODUCT_CASE'] },
+      { id: 'q-2', bank_id: 'bank-built-in', text: '如果离线评测很好，但线上用户仍频繁回退，你会怎么定位？', category: 'PRODUCT', difficulty: 'PRESSURE', origin: 'BUILTIN', source_url: '', label: '追问', rounds: ['PRODUCT_CASE'] },
+      { id: 'q-3', bank_id: 'bank-built-in', text: '资源有限时，你会先验证模型能力还是用户任务价值？', category: 'PRODUCT', difficulty: 'STANDARD', origin: 'BUILTIN', source_url: '', label: '取舍', rounds: ['PRODUCT_CASE'] },
+      { id: 'q-4', bank_id: 'bank-built-in', text: '讲一次你主动停止一个看起来很有潜力的方向。', category: 'BEHAVIORAL', difficulty: 'WARMUP', origin: 'BUILTIN', source_url: '', label: '行为面', rounds: ['BEHAVIORAL'] },
+    ],
+  },
+  'bank-history': {
+    items: [
+      { id: 'q-h1', bank_id: 'bank-history', text: '你说评测体系是你负责的，具体哪些指标是你定义的？', category: 'PROJECT', difficulty: 'PRESSURE', origin: 'SESSION', source_url: 'session://review-902', label: '真实场次追问', rounds: ['PRODUCT_CASE'] },
+      { id: 'q-h2', bank_id: 'bank-history', text: '为什么不用一个更简单的规则系统？', category: 'PRODUCT', difficulty: 'STANDARD', origin: 'SESSION', source_url: 'session://review-902', label: '真实场次追问', rounds: ['PRODUCT_CASE'] },
+      { id: 'q-h3', bank_id: 'bank-history', text: '如果上线后效果不及预期，你的回退方案是什么？', category: 'PRODUCT', difficulty: 'STANDARD', origin: 'SESSION', source_url: 'session://review-902', label: '真实场次追问', rounds: ['PRODUCT_CASE'] },
+    ],
+  },
+  'bank-mine': {
+    items: [
+      { id: 'q-m1', bank_id: 'bank-mine', text: '设计一个面向研发团队的 Agent 评测平台。', category: 'CASE', difficulty: 'STANDARD', origin: 'USER', source_url: '', label: '我的题', rounds: ['PRODUCT_CASE'] },
+      { id: 'q-m2', bank_id: 'bank-mine', text: '怎么证明这个平台比人工 review 更值得投入？', category: 'CASE', difficulty: 'PRESSURE', origin: 'USER', source_url: '', label: '我的题', rounds: ['PRODUCT_CASE'] },
+    ],
+  },
+}
 
 const STUDIO_OVERRIDES = (pathname, method) => {
   if (method !== 'GET') return undefined
@@ -389,6 +434,12 @@ const STUDIO_OVERRIDES = (pathname, method) => {
   if (pathname === '/api/product/stories/coverage') return STORY_COVERAGE
   if (pathname === '/api/product/materials') return PROJECT_MATERIALS
   if (pathname === '/api/intelligence/skill-cards') return MY_SKILLS
+  if (pathname === '/api/kb/status') return KB_STATUS
+  if (pathname === '/api/product/question-banks') return QUESTION_BANKS
+  if (pathname.startsWith('/api/product/question-banks/') && pathname.endsWith('/items')) {
+    const bankId = pathname.split('/')[4]
+    return QUESTION_BANK_ITEMS[bankId] ?? { items: [] }
+  }
   if (pathname === '/api/product/fact-inbox') return { count: 0, items: [], batch: null, merge_suggestions: [], policy: { mode: 'STANDARD', reasons: [] } }
   return undefined
 }
@@ -523,6 +574,37 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('settings-general.png', SNAPSHOT)
+  })
+
+
+  test('My Chengzhu — reusable skill evidence', async ({ page }) => {
+    await page.goto('/#/me/skills')
+    await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
+    await expect(page.getByTestId('skills-library')).toBeVisible()
+    await expect(page.getByText('确认的是“我确实做过什么”')).toBeVisible()
+    await expect(page.getByText('PDIG / DepMap')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-skills.png', SNAPSHOT)
+  })
+
+  test('Library — knowledge reference boundary', async ({ page }) => {
+    await page.goto('/#/library/knowledge')
+    await expect(page.getByTestId('library-page')).toBeVisible()
+    await expect(page.getByText('只作为技术参考，不作为你的经历')).toBeVisible()
+    await expect(page.getByText('已启用', { exact: true })).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('library-knowledge.png', SNAPSHOT)
+  })
+
+  test('Library — question banks as practice sources', async ({ page }) => {
+    await page.goto('/#/library/banks')
+    await expect(page.getByTestId('library-page')).toBeVisible()
+    await expect(page.getByText('题库是练习来源，不是“答案库”')).toBeVisible()
+    await expect(page.getByText('AI 产品经理 · 常见问题')).toBeVisible()
+    await expect(page.getByText('你会怎么判断一个 AI 功能是否真的值得上线？')).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('library-banks.png', SNAPSHOT)
   })
 
   test('Person resume workspace', async ({ page }) => {

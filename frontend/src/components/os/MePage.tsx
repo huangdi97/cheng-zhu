@@ -15,15 +15,29 @@ const ME_TABS: MeTab[] = ['overview', 'resume', 'projects', 'inbox', 'stories', 
 function StoriesCoverage() {
   const { data } = useAsync(() => productApi.storyCoverage(), [])
   if (!data) return null
+  const covered = data.categories.filter((c) => c.story_ids.length).length
+  const total = data.categories.length
+  const nextGap = data.missing[0] ?? null
   return (
-    <div className="px-4 pt-4">
-      <div className="flex flex-wrap gap-1.5" aria-label="Story 能力分类">
-        {data.categories.map((c) => <StatusBadge key={c.key} tone={c.story_ids.length ? 'ok' : 'muted'}>{c.label}{c.story_ids.length ? ` · ${c.story_ids.length}` : ''}</StatusBadge>)}
+    <section aria-label="Story 覆盖" className="mx-4 mt-4 grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[auto_1fr] sm:items-center">
+      <div className="min-w-[110px]">
+        <p className="text-lg font-semibold tabular-nums text-text-primary">{covered} / {total}</p>
+        <p className="text-[10px] text-text-muted">已覆盖能力情境</p>
       </div>
-      {data.missing.length ? (
-        <p className="mt-2 text-xs text-text-secondary">你还没有「{data.missing[0].label}」故事。在下面的 Story Builder 里用 5 分钟写下一个真实经历，标题里带上分类即可。</p>
-      ) : null}
-    </div>
+      <div>
+        {nextGap ? (
+          <>
+            <p className="text-xs font-medium text-text-primary">下一块最值得补：{nextGap.label}</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-text-muted">不用为了“凑分类”编故事；只从真实经历里补一个能经得住追问的例子。</p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-medium text-text-primary">常见能力情境已有覆盖</p>
+            <p className="mt-0.5 text-[11px] text-text-muted">继续优先补证据、结果和失败后的反思，而不是继续堆数量。</p>
+          </>
+        )}
+      </div>
+    </section>
   )
 }
 

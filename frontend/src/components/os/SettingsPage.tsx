@@ -142,7 +142,7 @@ function PrivacyGroup({ goalId }: { goalId: string }) {
         <SecondaryButton onClick={() => { if (window.confirm('清空本机记录的产品使用事件？')) void productApi.clearEvents().then((r) => setCleared(r.deleted)) }}>清空本地分析记录</SecondaryButton>
         {cleared !== null ? <span role="status" className="text-xs text-status-direct">已清空 {cleared} 条</span> : null}
       </div>
-      <Suspense fallback={<Loading />}><PolicyPrivacySection /></Suspense>
+      <Suspense fallback={<Loading />}><PolicyPrivacySection mode="about" /></Suspense>
     </div>
   )
 }

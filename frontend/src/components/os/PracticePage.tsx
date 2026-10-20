@@ -203,7 +203,6 @@ function PracticeSetup({ query }: { query: Record<string, string> }) {
       </div>
     </Page>
   )
-  )
 }
 
 interface Turn {

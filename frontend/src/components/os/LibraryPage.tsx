@@ -24,7 +24,7 @@ export default function LibraryPage({ tab }: { tab: string }) {
   const current = (LIB_TABS as string[]).includes(tab) ? (tab as LibTab) : 'materials'
   return (
     <Page testId="library-page" wide>
-      <PageHeader title="资料库" subtitle="简历在「我的成竹」，JD 在各自的求职目标里。" />
+      <PageHeader title="资料库" subtitle="把「关于你的事实来源」和「只供回答参考的知识」分开保存；简历仍在「我的成竹」，JD 仍属于具体求职目标。" />
       <Tabs<LibTab> label="资料库" value={current} onChange={(t) => navigate(paths.library(t), { replace: true })}
         tabs={[['materials', '项目资料'], ['knowledge', '知识库'], ['notes', '速记'], ['banks', '题库']]} />
       <div className="pt-3">
@@ -80,66 +80,124 @@ function Materials() {
     input.click()
   }
 
+  const items = data?.items ?? []
+  const factsCount = items.filter((m) => m.usage === 'FACTS' || m.usage === 'BOTH').length
+  const referenceCount = items.filter((m) => m.usage === 'REFERENCE' || m.usage === 'BOTH').length
+
   return (
-    <div className="grid gap-x-6 lg:grid-cols-[1fr_1.2fr]">
-      <Section title="添加项目资料">
-        <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); void add() }}>
-          <Field label="名称"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如 WenNian 设计文档" /></Field>
-          <fieldset>
-            <legend className="text-xs font-medium text-text-secondary">主要用于</legend>
-            <div className="mt-1 space-y-1">
-              {USAGE.map(([key, label, hint]) => (
-                <label key={key} className="flex items-start gap-2 text-xs">
-                  <input type="radio" name="usage" value={key} checked={usage === key} onChange={() => setUsage(key)} className="mt-0.5" />
-                  <span><span className="font-medium text-text-primary">{label}</span><span className="block text-[11px] text-text-muted">{hint}</span></span>
-                </label>
-              ))}
+    <div>
+      <section aria-label="资料用途说明" className="mb-5 grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">项目资料先决定“怎么被使用”</p>
+          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-text-secondary">
+            作为事实来源的内容可以帮助确认你真实做过什么；技术参考只用于回答知识问题，不会被成竹写成你的个人经历。
+          </p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{factsCount}</p>
+          <p className="text-[10px] text-text-muted">可作为事实来源</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{referenceCount}</p>
+          <p className="text-[10px] text-text-muted">可作为技术参考</p>
+        </div>
+      </section>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.72fr)]">
+        <section aria-labelledby="material-list-heading" className="min-w-0">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 id="material-list-heading" className="text-sm font-semibold text-text-primary">已保存资料</h2>
+              <p className="mt-0.5 text-[11px] text-text-muted">每份资料的用途可以随时改；版本替换不会偷偷改变它的事实边界。</p>
             </div>
-          </fieldset>
-          <Field label="文件（.md / .txt / .pdf / .docx）"><input type="file" accept=".md,.txt,.pdf,.docx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-xs" /></Field>
-          <Field label="或直接粘贴文本"><textarea className={`${inputCls} min-h-[80px]`} value={text} onChange={(e) => setText(e.target.value)} /></Field>
-          {formError ? <p role="alert" className="text-xs text-status-risk">{formError}</p> : null}
-          <PrimaryButton type="submit" disabled={busy || (!file && !text.trim())}>{busy ? '上传中…' : '添加'}</PrimaryButton>
-        </form>
-      </Section>
-      <Section title="项目资料">
-        {loading && !data ? <Loading /> : null}
-        {error ? <ErrorState message={error} onRetry={reload} /> : null}
-        {data && !data.items.length ? <EmptyState title="还没有项目资料" body="上传设计文档、周报或复盘，成竹会用它们确认你的事实边界。" /> : null}
-        <ul className="space-y-2">
-          {(data?.items ?? []).map((m) => (
-            <li key={m.id} className="rounded-xl border border-bg-hover/50 px-3 py-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">{m.title}</span>
-                <MaterialStateBadge state={m.lifecycle.state} />
-                <ActionMenu label={`${m.title} 的操作`} actions={[
-                  ...(m.lifecycle.actions.includes('view_reason') ? [{ key: 'reason', label: '查看原因', onSelect: () => setReasonFor(reasonFor === m.id ? null : m.id) }] : []),
-                  ...(m.lifecycle.actions.includes('retry') ? [{ key: 'retry', label: '重试（重新选择文件）', onSelect: () => replaceWith(m, true) }] : []),
-                  { key: 'replace', label: '替换文件', disabled: m.lifecycle.state === 'PROCESSING' || m.lifecycle.state === 'REPLACING', onSelect: () => replaceWith(m) },
-                  ...USAGE.filter(([k]) => k !== m.usage).map(([k, l]) => ({ key: `usage-${k}`, label: `改为：${l}`, onSelect: () => void productApi.setMaterialUsage(m.id, k).then(reload) })),
-                  { key: 'delete', label: '删除', danger: true, onSelect: () => void productApi.deleteMaterial(m.id).then(reload) },
-                ]} />
+            {items.length ? <span className="text-[11px] tabular-nums text-text-muted">{items.length} 份</span> : null}
+          </div>
+
+          <div className="mt-3">
+            {loading && !data ? <Loading /> : null}
+            {error ? <ErrorState message={error} onRetry={reload} /> : null}
+            {data && !items.length ? <EmptyState title="还没有项目资料" body="把项目文档、周报或复盘放进来，并先告诉成竹它是个人事实来源还是技术参考。" /> : null}
+            {items.length ? (
+              <ul className="divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+                {items.map((m) => {
+                  const usageMeta = USAGE.find(([k]) => k === m.usage)
+                  return (
+                    <li key={m.id} className="py-3">
+                      <div className="flex items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-text-primary">{m.title}</span>
+                            <MaterialStateBadge state={m.lifecycle.state} />
+                          </div>
+                          <p className="mt-1 text-xs text-text-secondary">{usageMeta?.[1]}</p>
+                          <p className="mt-0.5 text-[11px] leading-4 text-text-muted">
+                            {usageMeta?.[2]}
+                            {m.lifecycle.active_version ? ` · v${m.lifecycle.active_version.version} · ${m.lifecycle.active_version.chars} 字` : ''}
+                          </p>
+                        </div>
+                        <ActionMenu label={`${m.title} 的操作`} actions={[
+                          ...(m.lifecycle.actions.includes('view_reason') ? [{ key: 'reason', label: '查看原因', onSelect: () => setReasonFor(reasonFor === m.id ? null : m.id) }] : []),
+                          ...(m.lifecycle.actions.includes('retry') ? [{ key: 'retry', label: '重试（重新选择文件）', onSelect: () => replaceWith(m, true) }] : []),
+                          { key: 'replace', label: '替换文件', disabled: m.lifecycle.state === 'PROCESSING' || m.lifecycle.state === 'REPLACING', onSelect: () => replaceWith(m) },
+                          ...USAGE.filter(([k]) => k !== m.usage).map(([k, l]) => ({ key: `usage-${k}`, label: `改为：${l}`, onSelect: () => void productApi.setMaterialUsage(m.id, k).then(reload) })),
+                          { key: 'delete', label: '删除', danger: true, onSelect: () => void productApi.deleteMaterial(m.id).then(reload) },
+                        ]} />
+                      </div>
+                      {m.lifecycle.state === 'FAILED' || reasonFor === m.id ? (
+                        <div role="alert" className="mt-2 border-l-2 border-status-risk/45 pl-3 text-[11px] text-text-secondary">
+                          原因：{m.lifecycle.error || '未知'}
+                          {m.lifecycle.state === 'FAILED' ? (
+                            <div className="mt-1.5 flex gap-2">
+                              <SecondaryButton onClick={() => replaceWith(m, true)}>重试</SecondaryButton>
+                              <SecondaryButton onClick={() => replaceWith(m)}>替换</SecondaryButton>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+          </div>
+        </section>
+
+        <aside aria-labelledby="material-add-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <h2 id="material-add-heading" className="text-sm font-semibold text-text-primary">添加一份资料</h2>
+          <p className="mt-0.5 text-[11px] leading-5 text-text-muted">先选用途，再上传文件或直接粘贴文本。支持 Markdown、TXT、PDF、DOCX。</p>
+          <form className="mt-4 space-y-3" onSubmit={(e) => { e.preventDefault(); void add() }}>
+            <Field label="名称">
+              <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：WenNian 产品设计文档" />
+            </Field>
+            <fieldset>
+              <legend className="text-xs font-medium text-text-secondary">这份资料主要用来</legend>
+              <div className="mt-1.5 divide-y divide-bg-tertiary/60 border-y border-bg-tertiary/70">
+                {USAGE.map(([key, label, hint]) => (
+                  <label key={key} className="flex items-start gap-2.5 py-2.5 text-xs">
+                    <input type="radio" name="usage" value={key} checked={usage === key} onChange={() => setUsage(key)} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-text-primary">{label}</span>
+                      <span className="mt-0.5 block leading-4 text-text-muted">{hint}</span>
+                    </span>
+                  </label>
+                ))}
               </div>
-              <div className="text-[11px] text-text-muted">
-                {USAGE.find(([k]) => k === m.usage)?.[1]}
-                {m.lifecycle.active_version ? ` · v${m.lifecycle.active_version.version} · ${m.lifecycle.active_version.chars} 字` : ''}
-              </div>
-              {m.lifecycle.state === 'FAILED' || reasonFor === m.id ? (
-                <div role="alert" className="mt-1.5 rounded-lg border border-status-risk/25 bg-status-risk/5 p-2 text-[11px] text-text-secondary">
-                  原因：{m.lifecycle.error || '未知'}
-                  {m.lifecycle.state === 'FAILED' ? (
-                    <div className="mt-1 flex gap-2">
-                      <SecondaryButton onClick={() => replaceWith(m, true)}>重试</SecondaryButton>
-                      <SecondaryButton onClick={() => replaceWith(m)}>替换</SecondaryButton>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Section>
+            </fieldset>
+            <Field label="上传文件">
+              <input type="file" accept=".md,.txt,.pdf,.docx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-xs text-text-secondary" />
+            </Field>
+            <Field label="或直接粘贴文本">
+              <textarea className={`${inputCls} min-h-[92px]`} value={text} onChange={(e) => setText(e.target.value)} placeholder="适合短材料、周报片段或复盘摘要。" />
+            </Field>
+            {formError ? <p role="alert" className="text-xs text-status-risk">{formError}</p> : null}
+            <div className="[&>button]:w-full">
+              <PrimaryButton type="submit" disabled={busy || (!file && !text.trim())}>{busy ? '处理中…' : '添加到资料库'}</PrimaryButton>
+            </div>
+          </form>
+        </aside>
+      </div>
     </div>
+  )
   )
 }
 

@@ -294,9 +294,82 @@ const MY_FACTS = {
 }
 
 const MY_STORIES = [
-  { id: 'story-1', title: '从错误方向切回最小可验证产品', situation: '方向过大', challenge: '资源不足', action: '缩小范围并重设验证指标', result: '按期交付', reflection: '先验证核心问题', tags: ['Trade-off'] },
-  { id: 'story-2', title: '跨团队推动一次高风险改版', situation: '目标不一致', challenge: '排期冲突', action: '明确共同指标', result: '完成上线', reflection: '先对齐决策边界', tags: ['Collaboration'] },
+  { id: 'story-1', title: '从错误方向切回最小可验证产品', situation: '最初把产品范围铺得过大', challenge: '时间和数据都不足以支撑完整方案', action: '缩小到核心任务并重设验证指标', result: '按期完成验证并避免继续投入错误方向', reflection: '先验证最关键的不确定性，再扩范围', tags: ['Trade-off'], source_ids: ['src-1'], skill_ids: ['skill-1'], last_used_session: 'review-902' },
+  { id: 'story-2', title: '跨团队推动一次高风险改版', situation: '产品、算法和工程目标不一致', challenge: '排期冲突且上线风险高', action: '先明确共同指标和回退边界', result: '完成上线并保留可回滚路径', reflection: '先对齐决策边界，再讨论实现偏好', tags: ['Collaboration'], source_ids: ['src-2'], skill_ids: ['skill-2'] },
 ]
+
+
+const STORY_COVERAGE = {
+  categories: [
+    { key: 'Ownership', label: 'Ownership 担当', story_ids: [] },
+    { key: 'Conflict', label: '冲突处理', story_ids: [] },
+    { key: 'Failure', label: '失败与反思', story_ids: [] },
+    { key: 'Leadership', label: '领导力', story_ids: [] },
+    { key: 'Ambiguity', label: '模糊情境决策', story_ids: [] },
+    { key: 'Collaboration', label: '协作', story_ids: ['story-2'] },
+    { key: 'Difficult Problem', label: '解决困难问题', story_ids: [] },
+    { key: 'Influence', label: '影响他人', story_ids: [] },
+    { key: 'Trade-off', label: '取舍', story_ids: ['story-1'] },
+    { key: 'Learning', label: '学习成长', story_ids: [] },
+  ],
+  missing: [
+    { key: 'Failure', label: '失败与反思' },
+    { key: 'Ownership', label: 'Ownership 担当' },
+  ],
+}
+
+const PROJECT_MATERIALS = {
+  items: [
+    {
+      id: 'mat-ui-1',
+      kind: 'PROJECT',
+      usage: 'FACTS',
+      title: 'WenNian 产品设计与上线记录',
+      active_version_id: 'mv-1',
+      created_at: T - 864000,
+      updated_at: T - 7200,
+      lifecycle: {
+        state: 'READY',
+        active_version: { id: 'mv-1', version: 3, filename: 'wennian-product.md', status: 'READY', error: '', chars: 18420, created_at: T - 7200 },
+        latest_version: { id: 'mv-1', version: 3, filename: 'wennian-product.md', status: 'READY', error: '', chars: 18420, created_at: T - 7200 },
+        error: '',
+        actions: ['replace'],
+      },
+    },
+    {
+      id: 'mat-ui-2',
+      kind: 'PROJECT',
+      usage: 'REFERENCE',
+      title: 'Agent 评测方法与指标参考',
+      active_version_id: 'mv-2',
+      created_at: T - 604800,
+      updated_at: T - 10800,
+      lifecycle: {
+        state: 'READY',
+        active_version: { id: 'mv-2', version: 1, filename: 'agent-eval-reference.pdf', status: 'READY', error: '', chars: 9630, created_at: T - 10800 },
+        latest_version: { id: 'mv-2', version: 1, filename: 'agent-eval-reference.pdf', status: 'READY', error: '', chars: 9630, created_at: T - 10800 },
+        error: '',
+        actions: ['replace'],
+      },
+    },
+    {
+      id: 'mat-ui-3',
+      kind: 'PROJECT',
+      usage: 'BOTH',
+      title: 'Chengzhu 设计复盘与评测记录',
+      active_version_id: 'mv-3',
+      created_at: T - 432000,
+      updated_at: T - 5400,
+      lifecycle: {
+        state: 'READY',
+        active_version: { id: 'mv-3', version: 2, filename: 'chengzhu-review.md', status: 'READY', error: '', chars: 12750, created_at: T - 5400 },
+        latest_version: { id: 'mv-3', version: 2, filename: 'chengzhu-review.md', status: 'READY', error: '', chars: 12750, created_at: T - 5400 },
+        error: '',
+        actions: ['replace'],
+      },
+    },
+  ],
+}
 
 const MY_SKILLS = [
   { id: 11, space_id: 1, space_title: GOAL.title, project_name: 'WenNian', status: 'READY', user_reviewed: true, card: { background: 'Healthspan 产品与算法设计' } },
@@ -313,6 +386,8 @@ const STUDIO_OVERRIDES = (pathname, method) => {
   if (pathname === '/api/product/history') return HISTORY_ITEMS
   if (pathname === '/api/intelligence/facts') return MY_FACTS
   if (pathname === '/api/intelligence/stories') return MY_STORIES
+  if (pathname === '/api/product/stories/coverage') return STORY_COVERAGE
+  if (pathname === '/api/product/materials') return PROJECT_MATERIALS
   if (pathname === '/api/intelligence/skill-cards') return MY_SKILLS
   if (pathname === '/api/product/fact-inbox') return { count: 0, items: [], batch: null, merge_suggestions: [], policy: { mode: 'STANDARD', reasons: [] } }
   return undefined
@@ -416,6 +491,38 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-overview.png', SNAPSHOT)
+  })
+
+
+  test('Library — project material boundaries', async ({ page }) => {
+    await page.goto('/#/library/materials')
+    await expect(page.getByTestId('library-page')).toBeVisible()
+    await expect(page.getByText('项目资料先决定“怎么被使用”')).toBeVisible()
+    await expect(page.getByText('WenNian 产品设计与上线记录')).toBeVisible()
+    await expect(page.getByText('Agent 评测方法与指标参考')).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('library-materials.png', SNAPSHOT)
+  })
+
+  test('Stories — reusable personal evidence', async ({ page }) => {
+    await page.goto('/#/me/stories')
+    await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
+    await expect(page.getByText('2 / 10')).toBeVisible()
+    await expect(page.getByText('从错误方向切回最小可验证产品')).toBeVisible()
+    await expect(page.getByTestId('story-builder')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-stories.png', SNAPSHOT)
+  })
+
+  test('Settings — decision-first general', async ({ page }) => {
+    await page.goto('/#/settings/general')
+    await expect(page.getByTestId('settings-page')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '通用', exact: true })).toBeVisible()
+    await expect(page.getByText('外观、回答呈现和常用运行偏好。')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('settings-general.png', SNAPSHOT)
   })
 
   test('Person resume workspace', async ({ page }) => {

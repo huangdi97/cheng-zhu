@@ -123,11 +123,11 @@ const STORY_CATEGORIES: Array<[string, string]> = [
 const EMPTY_STORY: Omit<StoryItem, 'id' | 'updated_at' | 'tags'> = { title: '', situation: '', challenge: '', action: '', result: '', reflection: '' }
 const STORY_FIELDS: Array<[keyof typeof EMPTY_STORY, string]> = [
   ['title', '标题'],
-  ['situation', 'Situation 情境'],
-  ['challenge', 'Challenge 挑战'],
-  ['action', 'Action 你的行动'],
-  ['result', 'Result 结果'],
-  ['reflection', 'Reflection 反思'],
+  ['situation', '情境'],
+  ['challenge', '挑战'],
+  ['action', '你的行动'],
+  ['result', '结果'],
+  ['reflection', '复盘'],
 ]
 
 export function Stories() {
@@ -156,67 +156,106 @@ export function Stories() {
     }
   }
 
+  const startNew = () => {
+    setEditingId(null)
+    setDraft(EMPTY_STORY)
+    setEditingRelations({ source_ids: [], skill_ids: [], last_used_session: '' })
+    setCategory('')
+  }
+
   return (
-    <div className="p-4 grid md:grid-cols-2 gap-4">
-      <div className="rounded-2xl border border-bg-hover/50 bg-bg-secondary p-4 space-y-2" data-testid="story-builder">
-        <h3 className="text-sm font-semibold text-text-primary">{editingId ? '编辑 Story' : 'Story Builder'}</h3>
-        <p className="text-[11px] text-text-muted">只写你真实经历过的事。成竹不会替你编造经历；这里的内容会冻结进 Interview Pack 作为个人来源。</p>
-        <label className="block">
-          <span className="text-[11px] text-text-muted">能力分类</span>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Story 能力分类"
-            className="mt-0.5 w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-sm text-text-primary">
-            <option value="">未分类</option>
-            {STORY_CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-          </select>
-        </label>
-        {STORY_FIELDS.map(([key, label]) => (
-          <label key={key} className="block">
-            <span className="text-[11px] text-text-muted">{label}</span>
-            {key === 'title' ? (
-              <input value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                className="mt-0.5 w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-sm text-text-primary" />
-            ) : (
-              <textarea rows={2} value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                className="mt-0.5 w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-sm text-text-primary" />
-            )}
-          </label>
-        ))}
-        <div className="flex gap-2">
-          <button type="button" onClick={() => void save()} disabled={!draft.title.trim()}
-            className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">保存</button>
-          {editingId && (
-            <button type="button" onClick={() => { setEditingId(null); setDraft(EMPTY_STORY); setEditingRelations({ source_ids: [], skill_ids: [], last_used_session: '' }) }}
-              className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs text-text-muted">取消</button>
-          )}
+    <div className="grid gap-8 p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+      <section aria-labelledby="story-library-heading" className="min-w-0">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h3 id="story-library-heading" className="text-sm font-semibold text-text-primary">故事素材</h3>
+            <p className="mt-0.5 max-w-2xl text-[11px] leading-5 text-text-muted">
+              这里不是“标准答案库”。每个故事都应该来自真实经历，并保留足够的情境、行动和结果，方便下一场按问题重组表达。
+            </p>
+          </div>
+          <button type="button" onClick={startNew} className="btn-subtle flex-shrink-0 rounded-lg px-3 py-1.5 text-xs">写新故事</button>
         </div>
-      </div>
-      <ul className="space-y-2">
-        {items.length === 0 && <li className="text-sm text-text-muted">还没有 Story。</li>}
-        {items.map((story) => (
-          <li key={story.id} className="rounded-xl border border-bg-hover/50 bg-bg-secondary p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold text-text-primary">{story.title}</span>
-              <span className="flex gap-2 text-[11px]">
-                <button type="button" className="text-accent-blue" onClick={() => {
-                  setEditingId(story.id)
-                  setCategory((story.tags ?? [])[0] ?? '')
-                  setEditingRelations({ source_ids: story.source_ids ?? [], skill_ids: story.skill_ids ?? [], last_used_session: story.last_used_session ?? '' })
-                  setDraft({ title: story.title, situation: story.situation, challenge: story.challenge, action: story.action, result: story.result, reflection: story.reflection })
-                }}>编辑</button>
-                <button type="button" className="text-text-muted hover:text-status-risk" onClick={() => api.intelDeleteStory(story.id).then(load)}>删除</button>
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-text-secondary">{[story.situation, story.action, story.result].filter(Boolean).join(' → ')}</p>
-            {(story.source_ids?.length || story.skill_ids?.length || story.last_used_session) ? (
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-text-muted" aria-label="Story 关联">
-                {story.source_ids?.length ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">来源 {story.source_ids.length}</span> : null}
-                {story.skill_ids?.length ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">技能 {story.skill_ids.length}</span> : null}
-                {story.last_used_session ? <span className="rounded-full bg-bg-tertiary px-2 py-0.5">最近用于场次 {story.last_used_session.slice(0, 12)}</span> : null}
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+
+        {items.length === 0 ? (
+          <p className="mt-4 border-y border-bg-tertiary/70 py-5 text-sm text-text-muted">还没有故事。先从一个最近被追问过、你确实亲历的项目开始。</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            {items.map((story) => {
+              const tag = (story.tags ?? [])[0] ?? ''
+              const categoryLabel = STORY_CATEGORIES.find(([key]) => key === tag)?.[1] ?? tag
+              const summary = [story.situation, story.action, story.result].filter(Boolean).join(' → ')
+              return (
+                <li key={story.id} className="py-3">
+                  <div className="flex items-start gap-3">
+                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => {
+                      setEditingId(story.id)
+                      setCategory(tag)
+                      setEditingRelations({ source_ids: story.source_ids ?? [], skill_ids: story.skill_ids ?? [], last_used_session: story.last_used_session ?? '' })
+                      setDraft({ title: story.title, situation: story.situation, challenge: story.challenge, action: story.action, result: story.result, reflection: story.reflection })
+                    }}>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-text-primary">{story.title}</span>
+                        {categoryLabel ? <span className="text-[10px] text-text-muted">{categoryLabel}</span> : null}
+                      </span>
+                      {summary ? <span className="mt-1 block text-xs leading-5 text-text-secondary">{summary}</span> : null}
+                      {(story.source_ids?.length || story.skill_ids?.length || story.last_used_session) ? (
+                        <span className="mt-1.5 block text-[10px] text-text-muted">
+                          {story.source_ids?.length ? `来源 ${story.source_ids.length}` : '来源未关联'}
+                          {story.skill_ids?.length ? ` · 技能 ${story.skill_ids.length}` : ''}
+                          {story.last_used_session ? ` · 最近用于场次 ${story.last_used_session.slice(0, 12)}` : ''}
+                        </span>
+                      ) : (
+                        <span className="mt-1.5 block text-[10px] text-text-muted">尚未关联来源或技能</span>
+                      )}
+                    </button>
+                    <button type="button" className="flex-shrink-0 text-[11px] text-text-muted hover:text-status-risk" onClick={() => api.intelDeleteStory(story.id).then(load)}>删除</button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <aside aria-labelledby="story-editor-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7" data-testid="story-builder">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 id="story-editor-heading" className="text-sm font-semibold text-text-primary">{editingId ? '编辑这个故事' : '写一个真实故事'}</h3>
+            <p className="mt-0.5 text-[11px] leading-5 text-text-muted">只写你真实经历过的事。确认后的内容可以进入 Interview Pack；成竹不会替你补造个人经历。</p>
+          </div>
+          <button type="button" onClick={() => void save()} disabled={!draft.title.trim()}
+            className="btn-primary inline-flex min-h-[32px] flex-shrink-0 items-center rounded-lg px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50">
+            {editingId ? '保存修改' : '保存故事'}
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <label className="block">
+            <span className="text-[11px] font-medium text-text-secondary">能力情境</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Story 能力分类"
+              className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-2.5 py-1.5 text-sm text-text-primary">
+              <option value="">未分类</option>
+              {STORY_CATEGORIES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </label>
+
+          {STORY_FIELDS.map(([key, label]) => (
+            <label key={key} className="block">
+              <span className="text-[11px] font-medium text-text-secondary">{label}</span>
+              {key === 'title' ? (
+                <input value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                  placeholder="一句话说明这是什么经历"
+                  className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-2.5 py-1.5 text-sm text-text-primary" />
+              ) : (
+                <textarea rows={key === 'action' ? 3 : 2} value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                  className="mt-1 w-full resize-y rounded-lg border border-bg-hover bg-bg-primary px-2.5 py-1.5 text-sm leading-5 text-text-primary" />
+              )}
+            </label>
+          ))}
+
+          {editingId ? <div className="pt-1"><button type="button" onClick={startNew} className="text-xs text-text-muted hover:text-text-primary">取消编辑</button></div> : null}
+        </div>
+      </aside>
     </div>
   )
 }

@@ -100,13 +100,41 @@ test.describe('R2 live cue-first', () => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'home' },
+      apiOverrides: {
+        'GET /api/product/settings/layers': {
+          items: {
+            share_privacy_mode: {
+              value: 'OFF', origin: 'SYSTEM', origin_label: '系统默认', label: '共享隐私', group: 'privacy',
+              goal_value: null, session_value: null, global_value: 'OFF',
+            },
+            speech_adoption_analytics_live: {
+              value: false, origin: 'SYSTEM', origin_label: '系统默认', label: 'Live 表达分析', group: 'privacy',
+              goal_value: null, session_value: null, global_value: false,
+            },
+            ai_policy_mode: {
+              value: 'AI_ALLOWED', origin: 'SYSTEM', origin_label: '系统默认', label: 'AI 辅助', group: 'live',
+              goal_value: null, session_value: null, global_value: 'AI_ALLOWED',
+            },
+            human_assistance_policy: {
+              value: 'HUMAN_PRACTICE_ONLY', origin: 'SYSTEM', origin_label: '系统默认', label: '人工协助策略', group: 'live',
+              goal_value: null, session_value: null, global_value: 'HUMAN_PRACTICE_ONLY',
+            },
+            proactive_guidance_enabled: {
+              value: true, origin: 'SYSTEM', origin_label: '系统默认', label: '主动提示', group: 'live',
+              goal_value: null, session_value: null, global_value: true,
+            },
+          },
+          origin_labels: {},
+        },
+      },
     })
-    await page.goto('/')
-    await page.getByRole('button', { name: '设置', exact: true }).click()
-    await expect(page.getByLabel('共享隐私')).toHaveValue('OFF')
-    await expect(page.getByLabel('人工协助策略')).toHaveValue('HUMAN_PRACTICE_ONLY')
-    await expect(page.getByText('这不是安全或“不可检测”保证')).toBeVisible()
+    await page.goto('/#/settings/privacy')
+    await expect(page.getByLabel('共享隐私', { exact: true })).toHaveValue(JSON.stringify('OFF'))
+    await expect(page.getByText(/不是安全.*不可检测.*保证/).first()).toBeVisible()
     await expect(page.getByText(/MIT License/)).toBeVisible()
+
+    await page.goto('/#/settings/live')
+    await expect(page.getByLabel('人工协助策略', { exact: true })).toHaveValue(JSON.stringify('HUMAN_PRACTICE_ONLY'))
   })
 })
 

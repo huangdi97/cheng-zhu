@@ -24,6 +24,19 @@ const GlobalShortcutsEditor = lazy(() => import('@/components/settings/GlobalSho
 const PolicyPrivacySection = lazy(() => import('@/components/settings/PolicyPrivacySection'))
 
 type Opt = [string | boolean | number, string]
+const GROUP_DESCRIPTION: Record<SettingsGroup, string> = {
+  general: '外观、回答呈现和常用运行偏好。',
+  models: '选择回答模型与凭据；模型能力不改变个人事实边界。',
+  speech: '语音识别、麦克风、系统音频与断句。',
+  language: '分别设置界面、识别、回答和技术术语语言。',
+  live: '控制上场时 AI / 真人辅助，以及浮窗如何出现。',
+  privacy: '决定什么留在本机、什么可以共享，以及哪些分析默认关闭。',
+  knowledge: '控制技术参考的检索；知识库不会被当作你的个人经历。',
+  shortcuts: '调整全局快捷键与快速操作。',
+  data: '导出、备份和检查本机数据完整性。',
+  diagnostics: '查看运行健康与产品闭环证据；这里不用于日常配置。',
+}
+
 const LAYER_OPTIONS: Record<string, Opt[]> = {
   answer_language: [['中文', '中文'], ['English', 'English'], ['FOLLOW_INTERVIEW', '跟随面试语言']],
   whisper_language: [['auto', '自动识别'], ['zh', '中文'], ['en', 'English']],
@@ -381,91 +394,100 @@ export default function SettingsPage({ group, query }: { group: string; query: R
 
   return (
     <Page testId="settings-page" wide>
-      <PageHeader title="设置" subtitle="每个值都标明来源：全局默认 / 目标默认 / 本场覆盖。" />
-      <div className="relative mb-3">
+      <PageHeader title="设置" subtitle="先改会影响下一场的默认行为；诊断、原始指标和底层细节放在最后。" />
+
+      <div className="relative mb-5 max-w-3xl">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" aria-hidden />
-        <input type="search" aria-label="搜索设置" placeholder="搜索设置，例如：回答语言、浮窗、共享、快捷键" value={search} onChange={(e) => setSearch(e.target.value)}
+        <input type="search" aria-label="搜索设置" placeholder="搜索：回答语言、浮窗、隐私、快捷键…" value={search} onChange={(e) => setSearch(e.target.value)}
           className={`${inputCls} pl-8`} data-testid="settings-search" />
         {search ? (
           <ul role="listbox" aria-label="搜索结果" className="absolute inset-x-0 top-[calc(100%+4px)] z-30 max-h-72 overflow-auto rounded-xl border border-bg-hover bg-bg-primary p-1 shadow-lg">
             {hits.length ? hits.map((h) => (
               <li key={h.key} role="option" aria-selected={false}>
-                <button type="button" className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-bg-hover"
+                <button type="button" className="flex w-full items-center justify-between gap-4 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-bg-hover"
                   onClick={() => { navigate(paths.settings(h.group)); setSearch(''); window.setTimeout(() => document.querySelector(`[data-setting="${h.key}"]`)?.scrollIntoView({ block: 'center' }), 80) }}>
-                  <span className="text-text-primary">{h.label}</span>
-                  <span className="text-text-muted">{GROUP_LABEL_ZH[h.group]}{h.layered ? ' · 可按目标/本场覆盖' : ''}</span>
+                  <span className="font-medium text-text-primary">{h.label}</span>
+                  <span className="text-right text-[10px] text-text-muted">{GROUP_LABEL_ZH[h.group]}{h.layered ? ' · 可按目标覆盖' : ''}</span>
                 </button>
               </li>
             )) : <li className="px-2.5 py-2 text-xs text-text-muted">没有匹配的设置</li>}
           </ul>
         ) : null}
       </div>
-      <div className="grid gap-4 md:grid-cols-[180px_1fr]">
-        <nav aria-label="设置分组">
-          <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
-            {SETTINGS_GROUPS.map(([g, en]) => (
+
+      <div className="grid gap-7 md:grid-cols-[190px_minmax(0,1fr)]">
+        <nav aria-label="设置分组" className="self-start md:sticky md:top-4">
+          <ul className="flex gap-1 overflow-x-auto border-b border-bg-tertiary/70 pb-2 md:block md:overflow-visible md:border-b-0 md:pb-0">
+            {SETTINGS_GROUPS.map(([g]) => (
               <li key={g}>
                 <button type="button" aria-current={current === g ? 'page' : undefined} onClick={() => navigate(paths.settings(g), { replace: true })}
-                  className={`w-full whitespace-nowrap rounded-xl px-3 py-1.5 text-left text-xs ${current === g ? 'bg-container-primary text-container-on-primary font-semibold' : 'text-text-secondary hover:bg-bg-hover'}`}>
-                  {/* WCAG AA: the hint must not be dimmed with opacity — the active
-                      row already has a coloured background, so 70% text fails
-                      contrast. Weight carries the hierarchy instead. */}
-                  {GROUP_LABEL_ZH[g]}<span className="ml-1 text-[10px] font-normal">{en}</span>
+                  className={`w-full whitespace-nowrap border-l-2 px-3 py-2 text-left text-xs transition-colors ${current === g ? 'border-accent-blue bg-bg-tertiary/35 font-semibold text-text-primary' : 'border-transparent text-text-secondary hover:bg-bg-tertiary/20 hover:text-text-primary'}`}>
+                  {GROUP_LABEL_ZH[g]}
                 </button>
               </li>
             ))}
           </ul>
         </nav>
-        <div className="min-w-0">
+
+        <main className="min-w-0">
+          <header className="mb-3 border-b border-bg-tertiary/70 pb-3">
+            <h2 className="text-base font-semibold text-text-primary">{GROUP_LABEL_ZH[current]}</h2>
+            <p className="mt-1 text-xs leading-5 text-text-secondary">{GROUP_DESCRIPTION[current]}</p>
+          </header>
+
           <SettingsSearchContext.Provider value="">
             <Suspense fallback={<Loading />}>
               {current === 'general' ? (
-                <Section title="通用">
-                  <div className="flex flex-wrap gap-2 pb-3"><SecondaryButton onClick={openOnboarding}>重新运行首次引导</SecondaryButton></div>
+                <div>
+                  <div className="flex flex-wrap gap-2 pb-2">
+                    <SecondaryButton onClick={openOnboarding}>重新运行首次引导</SecondaryButton>
+                  </div>
                   <PreferencesTab />
-                </Section>
+                </div>
               ) : null}
               {current === 'models' ? <ModelsTab /> : null}
               {current === 'speech' ? <SpeechTab /> : null}
               {current === 'language' ? (
-                <Section title="语言（五层彼此独立）">
+                <div className="space-y-3">
                   {goalPicker}
                   <UiLanguageRow />
                   <LayerGroup keys={['whisper_language', 'answer_language', 'language', 'technical_term_policy']} goalId={goalId} />
-                </Section>
+                </div>
               ) : null}
               {current === 'live' ? (
-                <Section title="上场与浮窗">
+                <div className="space-y-3">
                   {goalPicker}
                   <LayerGroup keys={['ai_policy_mode', 'human_assistance_policy', 'proactive_guidance_enabled']} goalId={goalId} />
-                  <div className="pt-3" data-setting="overlay"><OverlayPrefs /></div>
-                </Section>
+                  <div className="pt-2" data-setting="overlay"><OverlayPrefs /></div>
+                </div>
               ) : null}
-              {current === 'privacy' ? <Section title="隐私">{goalPicker}<PrivacyGroup goalId={goalId} /></Section> : null}
+              {current === 'privacy' ? <div>{goalPicker}<PrivacyGroup goalId={goalId} /></div> : null}
               {current === 'knowledge' ? (
-                <Section title="知识库">
+                <div className="space-y-3">
                   {goalPicker}
                   <LayerGroup keys={['kb_enabled']} goalId={goalId} />
-                  <div className="pt-2"><PrimaryButton onClick={toggleKb}>管理知识库文件</PrimaryButton></div>
-                </Section>
+                  <PrimaryButton onClick={toggleKb}>管理知识库文件</PrimaryButton>
+                </div>
               ) : null}
               {current === 'shortcuts' ? (
-                <Section title="快捷键" id="shortcuts">
+                <div id="shortcuts">
                   <ul className="mb-3 space-y-1 text-xs text-text-secondary" data-setting="shortcuts">
                     <li><kbd className="rounded border border-bg-hover px-1">Ctrl+K</kbd> 命令面板</li>
                     <li><kbd className="rounded border border-bg-hover px-1">Ctrl+,</kbd> 设置</li>
                     <li><kbd className="rounded border border-bg-hover px-1">Ctrl+P</kbd> 标记这一刻（练习 / 上场中）</li>
                   </ul>
                   <GlobalShortcutsEditor />
-                </Section>
+                </div>
               ) : null}
-              {current === 'data' ? <Section title="数据与导出"><DataGroup /></Section> : null}
-              {current === 'diagnostics' ? <Section title="诊断"><DiagnosticsGroup /></Section> : null}
+              {current === 'data' ? <DataGroup /> : null}
+              {current === 'diagnostics' ? <DiagnosticsGroup /> : null}
             </Suspense>
           </SettingsSearchContext.Provider>
-          <p className="pt-4 text-[11px] text-text-muted">共 {CATALOG.length} 项可搜索设置。</p>
-        </div>
+
+          <p className="pt-5 text-[10px] text-text-muted">可搜索 {CATALOG.length} 项设置；本场临时覆盖仍在上场检查里设置，不会偷偷改这里的默认值。</p>
+        </main>
       </div>
     </Page>
+  )
   )
 }

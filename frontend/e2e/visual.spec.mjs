@@ -314,7 +314,7 @@ const STUDIO_OVERRIDES = (pathname, method) => {
   if (pathname === '/api/intelligence/facts') return MY_FACTS
   if (pathname === '/api/intelligence/stories') return MY_STORIES
   if (pathname === '/api/intelligence/skill-cards') return MY_SKILLS
-  if (pathname === '/api/product/fact-inbox') return { count: 1, items: [], batch: null, merge_suggestions: [], policy: { mode: 'STANDARD', reasons: [] } }
+  if (pathname === '/api/product/fact-inbox') return { count: 0, items: [], batch: null, merge_suggestions: [], policy: { mode: 'STANDARD', reasons: [] } }
   return undefined
 }
 
@@ -397,8 +397,8 @@ test.describe('@visual v2 Studio surfaces', () => {
   test('History — mixed real and practice sessions', async ({ page }) => {
     await page.goto('/#/history')
     await expect(page.getByTestId('history-page')).toBeVisible()
-    await expect(page.getByText('AI 产品经理 · 一面')).toBeVisible()
-    await expect(page.getByText('产品 Case · 针对产品判断')).toBeVisible()
+    await expect(page.getByText('真实面试 · 产品 / Case · 字节跳动 · AI 产品经理')).toBeVisible()
+    await expect(page.getByText('引导练习 · 产品 / Case · 字节跳动 · AI 产品经理')).toBeVisible()
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('history.png', SNAPSHOT)
@@ -408,8 +408,9 @@ test.describe('@visual v2 Studio surfaces', () => {
     await page.goto('/#/me')
     await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
     await expect(page.getByTestId('my-overview')).toBeVisible()
-    await expect(page.getByText('有直接证据')).toBeVisible()
-    await expect(page.getByText('Stories')).toBeVisible()
+    const overview = page.getByTestId('my-overview')
+    await expect(overview.getByText('有直接证据', { exact: true })).toBeVisible()
+    await expect(overview.getByText('Stories', { exact: true })).toBeVisible()
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-overview.png', SNAPSHOT)

@@ -70,6 +70,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
           <PrimaryButton testId="goal-go-live" onClick={() => goLive(goal.id)}>进入面试</PrimaryButton>
           <ActionMenu label="目标操作" actions={[
             { key: 'edit', label: '编辑目标信息', onSelect: () => setEditOpen(true) },
+            { key: 'offer', label: goal.offer_state !== 'NONE' ? `录用状态 · ${OFFER_STATES.find(([key]) => key === goal.offer_state)?.[1] ?? goal.offer_state}` : '录用状态', onSelect: () => navigate(paths.goal(goal.id, 'offer')) },
             { key: 'settings', label: '目标默认设置', onSelect: () => navigate(`${paths.settings('language')}?goal=${goal.id}`) },
             { key: 'export', label: '导出这个目标', onSelect: () => void productApi.exportData({ kind: 'goal', goal_id: goal.id }).then((r) => window.alert(`已导出到 ${r.path}`)) },
             goal.status === 'ACTIVE'
@@ -86,7 +87,7 @@ export default function GoalRoom({ goalId, tab }: { goalId: string; tab: GoalTab
       </header>
       <div className="pt-1">
         <Tabs<GoalTab> label="目标视图" value={tab} onChange={(t) => navigate(paths.goal(goal.id, t), { replace: true })}
-          tabs={[['overview', '概览'], ['prepare', '准备'], ['interviews', '会话', goal.interviews.filter((i) => i.status === 'UPCOMING').length], ['offer', '录用']]} />
+          tabs={[['overview', '概览'], ['prepare', '准备'], ['interviews', '会话', goal.interviews.filter((i) => i.status === 'UPCOMING').length]]} />
       </div>
       <div className="pt-3">
         {tab === 'overview' ? <Overview goal={goal} reload={reload} /> : null}

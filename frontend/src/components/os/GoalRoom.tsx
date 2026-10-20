@@ -1,6 +1,6 @@
 /**
- * Goal Room (canonical §6) — the main Studio page. Header + 概览 / 准备 / 面试 / Offer.
- * [开始练习] is the page's primary action; [上场] opens Go Live → Preflight.
+ * Goal Room (canonical §6) — the main Studio page. Primary views are 概览 / 准备 / 会话.
+ * [进入面试] is the primary action; Offer remains a secondary lifecycle surface.
  */
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { navigate, paths, type GoalTab } from '@/lib/router'

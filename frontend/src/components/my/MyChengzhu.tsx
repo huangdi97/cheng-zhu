@@ -264,24 +264,105 @@ export function Skills() {
   const [cards, setCards] = useState<SkillCardOverview[]>([])
   const load = useCallback(() => { api.intelSkillCards().then(setCards).catch(() => setCards([])) }, [])
   useEffect(() => { load() }, [load])
-  if (!cards.length) return <p className="p-6 text-sm text-text-muted">还没有技能卡。在「求职 → 岗位目标」的技能卡工作台里生成。</p>
+
+  const reviewed = cards.filter((c) => c.user_reviewed)
+  const pending = cards.filter((c) => !c.user_reviewed)
+  const readCardText = (card: Record<string, unknown>) => {
+    const keys = ['background', 'summary', 'evidence', 'impact', 'skill']
+    for (const key of keys) {
+      const value = card[key]
+      if (typeof value === 'string' && value.trim()) return value.trim()
+    }
+    return ''
+  }
+
+  if (!cards.length) {
+    return (
+      <div className="p-5">
+        <p className="text-sm font-medium text-text-primary">还没有可复用的技能证据</p>
+        <p className="mt-1 max-w-xl text-xs leading-5 text-text-muted">
+          技能卡从具体求职目标和项目材料中生成。只有你确认内容属实后，它才会进入 Interview Pack。
+        </p>
+      </div>
+    )
+  }
+
   return (
-    <ul className="p-4 space-y-2">
-      <li className="text-[11px] text-text-muted">技能卡链路：生成草稿 → 你确认内容属实 → 进入 Interview Pack。未确认的草稿不会被上场使用。</li>
-      {cards.map((c) => (
-        <li key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-bg-hover/50 bg-bg-secondary p-3">
-          <div>
-            <div className="text-sm font-semibold text-text-primary">{c.project_name}</div>
-            <div className="text-[11px] text-text-muted">{c.space_title}</div>
+    <div className="p-4" data-testid="skills-library">
+      <section aria-label="技能卡边界" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">确认的是“我确实做过什么”</p>
+          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-text-secondary">
+            技能卡不是能力评分，也不是证书。它把项目事实整理成下一场可复用的表达证据；未确认内容不会进入 Interview Pack。
+          </p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{reviewed.length}</p>
+          <p className="text-[10px] text-text-muted">已确认 · 可进入 Pack</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{pending.length}</p>
+          <p className="text-[10px] text-text-muted">待你确认</p>
+        </div>
+      </section>
+
+      <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.75fr)]">
+        <section aria-labelledby="skills-ready-heading">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h3 id="skills-ready-heading" className="text-sm font-semibold text-text-primary">可复用能力证据</h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">按项目保留来源，不跨项目把相似经历自动合并成一条“能力结论”。</p>
+            </div>
+            <span className="text-[11px] text-text-muted">{cards.length} 张</span>
           </div>
-          <button type="button" aria-pressed={c.user_reviewed}
-            onClick={() => api.prepReviewSkillCard(c.id, !c.user_reviewed).then(load)}
-            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${c.user_reviewed ? 'border-status-direct/40 text-status-direct' : 'border-bg-hover text-text-muted'}`}>
-            {c.user_reviewed ? '已确认 · 进入 Pack' : '确认内容属实'}
-          </button>
-        </li>
-      ))}
-    </ul>
+
+          <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            {cards.map((card) => {
+              const detail = readCardText(card.card)
+              return (
+                <li key={card.id} className="py-3">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-text-primary">{card.project_name}</span>
+                        <span className={`text-[10px] ${card.user_reviewed ? 'text-status-direct' : 'text-text-muted'}`}>
+                          {card.user_reviewed ? '已确认' : '待确认'}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-text-muted">{card.space_title}</p>
+                      {detail ? <p className="mt-1.5 text-xs leading-5 text-text-secondary">{detail}</p> : null}
+                    </div>
+                    <button type="button" aria-pressed={card.user_reviewed}
+                      onClick={() => api.prepReviewSkillCard(card.id, !card.user_reviewed).then(load)}
+                      className={`flex-shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium ${card.user_reviewed ? 'border-status-direct/35 text-status-direct' : 'border-bg-hover text-text-secondary hover:bg-bg-hover/35'}`}>
+                      {card.user_reviewed ? '移出 Pack' : '确认内容属实'}
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+
+        <aside className="lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <h3 className="text-sm font-semibold text-text-primary">进入 Pack 前的检查</h3>
+          <div className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70 text-xs">
+            <div className="py-2.5">
+              <p className="font-medium text-text-primary">事实可追溯</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">能指回具体项目、材料或你本人确认过的事实。</p>
+            </div>
+            <div className="py-2.5">
+              <p className="font-medium text-text-primary">措辞不过度</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">“参与 / 负责 / 主导”要与真实责任范围一致。</p>
+            </div>
+            <div className="py-2.5">
+              <p className="font-medium text-text-primary">能经得住追问</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">确认后它会被练习和上场引用，不要只确认一句漂亮结论。</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
   )
 }
 

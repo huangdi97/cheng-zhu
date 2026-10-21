@@ -3,6 +3,7 @@ name: update-visual-snapshots
 # Manually triggered workflow that regenerates Playwright screenshot
 # baselines on the same Linux runner CI uses, then opens a PR with the
 # new images. Use this when intentional UI changes break the
+# One-shot Goal Prepare R6 freeze trigger; remove before final PR.
 # visual-regression check on a feature PR.
 
 on:

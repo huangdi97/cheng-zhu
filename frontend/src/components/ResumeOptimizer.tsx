@@ -131,7 +131,8 @@ export default function ResumeOptimizer() {
             <ResumeMountPanel
               title="当前简历"
               description="准备、练习和复盘共用这份当前简历。"
-              sharedNote="切换简历后，只会影响之后新冻结的 Interview Pack；旧场次保持原样。"
+              sharedNote="切换只影响之后新冻结的 Interview Pack；旧场次保持原样。"
+              historyMode="popover"
               variant="light"
             />
           </div>

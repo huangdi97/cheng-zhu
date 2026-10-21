@@ -669,12 +669,30 @@ test.describe('@visual v2 Studio surfaces', () => {
   })
 
   test('Person resume workspace', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('ia-resume-opt-jd-draft', '负责 AI 产品规划、Agent 场景设计与评测体系落地；需要跨团队推动产品从验证走到上线，并能解释关键取舍。')
+    })
     await page.goto('/#/me/resume')
     await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
     await expectInterviewStudioNav(page)
+    await expect(page.getByTestId('resume-workspace')).toBeVisible()
+    await expect(page.getByText('当前履历事实')).toBeVisible()
+    await expect(page.getByText('这份履历对这个岗位怎么讲')).toBeVisible()
     await expect(page.getByTestId('resume-mount-panel')).toBeVisible({ timeout: 8000 })
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-resume.png', SNAPSHOT)
+  })
+
+  test('My Chengzhu — project evidence context', async ({ page }) => {
+    await page.goto('/#/me/projects')
+    await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
+    await expect(page.getByTestId('projects-evidence')).toBeVisible()
+    await expect(page.getByText('项目不是作品集条目，而是个人事实的上下文')).toBeVisible()
+    await expect(page.getByText('WenNian', { exact: true })).toBeVisible()
+    await expect(page.getByText('PDIG / DepMap', { exact: true })).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-projects.png', SNAPSHOT)
   })
 })
 

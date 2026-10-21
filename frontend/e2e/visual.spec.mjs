@@ -668,11 +668,30 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page).toHaveScreenshot('library-notes.png', SNAPSHOT)
   })
 
+  test('My Chengzhu — project assets', async ({ page }) => {
+    await page.goto('/#/me/projects')
+    await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
+    await expect(page.getByTestId('projects-library')).toBeVisible()
+    await expect(page.getByText('项目不是履历目录，是可被追问的证据集合')).toBeVisible()
+    await expect(page.getByText('WenNian', { exact: true })).toBeVisible()
+    await expect(page.getByText('PDIG / DepMap', { exact: true })).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-projects.png', SNAPSHOT)
+  })
+
   test('Person resume workspace', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('ia-resume-opt-jd-draft', '负责 AI 产品从用户问题定义、评测体系到上线验证；能够与算法和工程团队协作，并用真实业务指标判断功能是否值得继续投入。')
+    })
     await page.goto('/#/me/resume')
     await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()
     await expectInterviewStudioNav(page)
     await expect(page.getByTestId('resume-mount-panel')).toBeVisible({ timeout: 8000 })
+    await expect(page.getByTestId('resume-workspace')).toBeVisible()
+    await expect(page.getByText('一份当前简历，对照一个目标岗位')).toBeVisible()
+    await expect(page.getByTestId('resume-analyze')).toBeVisible()
+    await expect(page.getByTestId('resume-analyze')).toBeInViewport()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-resume.png', SNAPSHOT)
   })

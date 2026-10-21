@@ -94,24 +94,105 @@ export function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
 export function Projects() {
   const [cards, setCards] = useState<SkillCardOverview[]>([])
   useEffect(() => { api.intelSkillCards().then(setCards).catch(() => setCards([])) }, [])
-  const projects = Array.from(new Map(cards.map((c) => [c.project_name, c])).values())
-  if (!projects.length) {
-    return <p className="p-6 text-sm text-text-muted">还没有项目。在「求职 → 岗位目标」里生成技能卡后，项目会出现在这里。</p>
+
+  const grouped = Array.from(
+    cards.reduce((map, card) => {
+      const current = map.get(card.project_name) ?? []
+      current.push(card)
+      map.set(card.project_name, current)
+      return map
+    }, new Map<string, SkillCardOverview[]>()),
+  ).map(([name, items]) => ({
+    name,
+    items,
+    reviewed: items.filter((item) => item.user_reviewed).length,
+    goals: Array.from(new Set(items.map((item) => item.space_title))),
+    summary: items.map((item) => item.card.background).find((value) => typeof value === 'string' && value.trim()) as string | undefined,
+  }))
+
+  if (!grouped.length) {
+    return (
+      <div className="p-5">
+        <p className="text-sm font-medium text-text-primary">还没有项目资产</p>
+        <p className="mt-1 max-w-xl text-xs leading-5 text-text-muted">
+          当某个求职目标从项目材料生成技能卡后，项目会出现在这里。这里展示的是“你能从这个项目拿什么去回答”，不是项目管理列表。
+        </p>
+      </div>
+    )
   }
+
+  const readyProjects = grouped.filter((project) => project.reviewed > 0).length
+
   return (
-    <ul className="p-4 space-y-2">
-      {projects.map((p) => (
-        <li key={p.id} className="rounded-xl border border-bg-hover/50 bg-bg-secondary p-3">
-          <div className="text-sm font-semibold text-text-primary">{p.project_name}</div>
-          <div className="mt-0.5 text-[11px] text-text-muted">来自岗位目标：{p.space_title} · {p.user_reviewed ? '已确认' : '待确认'}</div>
-          {typeof p.card.background === 'string' && p.card.background && (
-            <p className="mt-1 text-xs text-text-secondary">{p.card.background}</p>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="p-4" data-testid="projects-library">
+      <section aria-label="项目资产说明" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">项目不是履历目录，是可被追问的证据集合</p>
+          <p className="mt-0.5 max-w-3xl text-xs leading-5 text-text-secondary">
+            同一个项目可以服务多个求职目标，但只有你确认过的事实和能力表达才能进入 Interview Pack。项目名相同，不代表不同目标下的表述可以自动合并。
+          </p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{grouped.length}</p>
+          <p className="text-[10px] text-text-muted">项目资产</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{readyProjects}</p>
+          <p className="text-[10px] text-text-muted">已有确认内容</p>
+        </div>
+      </section>
+
+      <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.72fr)]">
+        <section aria-labelledby="project-assets-heading" className="min-w-0">
+          <div>
+            <h3 id="project-assets-heading" className="text-sm font-semibold text-text-primary">我的项目资产</h3>
+            <p className="mt-0.5 text-[11px] text-text-muted">先看每个项目已经能支撑什么，再决定下一场该讲哪一段。</p>
+          </div>
+
+          <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            {grouped.map((project) => (
+              <li key={project.name} className="py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-text-primary">{project.name}</span>
+                      <span className={`text-[10px] ${project.reviewed ? 'text-status-direct' : 'text-text-muted'}`}>
+                        {project.reviewed ? `${project.reviewed} 条已确认` : '尚未确认'}
+                      </span>
+                    </div>
+                    {project.summary ? <p className="mt-1 text-xs leading-5 text-text-secondary">{project.summary}</p> : null}
+                    <p className="mt-1.5 text-[10px] leading-4 text-text-muted">
+                      用于 {project.goals.length} 个目标 · {project.goals.slice(0, 2).join('、')}{project.goals.length > 2 ? ' 等' : ''}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <aside className="lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <h3 className="text-sm font-semibold text-text-primary">下一场怎么选项目</h3>
+          <div className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            <div className="py-2.5">
+              <p className="text-xs font-medium text-text-primary">先匹配问题，不先匹配项目名</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">同一个项目可以回答取舍、协作、失败或技术决策，但每次只拿最相关的一段。</p>
+            </div>
+            <div className="py-2.5">
+              <p className="text-xs font-medium text-text-primary">优先选能追问到底的经历</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">能说清责任边界、关键决策、结果和复盘，比“听起来更大”更重要。</p>
+            </div>
+            <div className="py-2.5">
+              <p className="text-xs font-medium text-text-primary">缺口回到来源补</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">项目事实不够时，去“事实与来源”补证据，不在这里把空白补成漂亮故事。</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
   )
 }
+
 
 // v1.3 Stories 3.0 capability categories (canonical §6)
 const STORY_CATEGORIES: Array<[string, string]> = [

@@ -4,6 +4,7 @@ name: update-visual-snapshots
 # baselines on the same Linux runner CI uses, then opens a PR with the
 # new images. Use this when intentional UI changes break the
 # One-shot Goal Prepare R6 freeze trigger; remove before final PR.
+# trigger-attempt: 2
 # visual-regression check on a feature PR.
 
 on:

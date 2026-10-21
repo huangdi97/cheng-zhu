@@ -634,7 +634,9 @@ test.describe('@visual v2 Studio surfaces', () => {
 
 
   test('My Chengzhu — facts boundary queue', async ({ page }) => {
-    await page.goto('/#/me/facts')
+    await page.goto('/#/me/inbox')
+    await expect(page.getByTestId('fact-inbox')).toBeVisible()
+    await page.getByRole('button', { name: '全部事实与来源' }).click()
     await expect(page.getByTestId('facts-sources')).toBeVisible()
     await expect(page.getByText('先处理会影响上场表述的事实边界')).toBeVisible()
     await expect(page.getByText('曾主导一个 8 人跨职能团队')).toBeVisible()

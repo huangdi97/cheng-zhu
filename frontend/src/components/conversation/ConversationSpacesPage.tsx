@@ -5,6 +5,14 @@ import type { ConversationProfile } from '@/lib/conversationContracts'
 import { navigate, paths } from '@/lib/router'
 import { EmptyState, ErrorState, Field, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, StatusBadge, formatWhen, inputCls, useAsync } from '@/components/os/ui'
 
+const MODE_LABEL: Record<string, string> = {
+  QUIET: '安静',
+  BALANCED: '平衡',
+  ACTIVE: '主动',
+  PRESENTATION: '演示',
+  ONE_ON_ONE: '1:1',
+}
+
 export default function ConversationSpacesPage({ query = {} }: { query?: Record<string, string> }) {
   const spaces = useAsync(() => conversationApi.spaces(), [])
   const templates = useAsync(() => conversationApi.templates(), [])
@@ -124,7 +132,7 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
           </div>
           <div className="mt-3"><Field label="希望持续达成什么（可选）"><input className={inputCls} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="例如：把 conflict merge strategy 做成明确 Decision" /></Field></div>
           <div className="mt-3 border-l-2 border-bg-tertiary/80 pl-3 text-[11px] text-text-muted">
-            <p>默认帮助方式：{templateMap.get(profile)?.default_mode ?? 'BALANCED'}；每一场开始前都可以单独调整。</p>
+            <p>默认帮助方式：{MODE_LABEL[templateMap.get(profile)?.default_mode ?? 'BALANCED'] ?? templateMap.get(profile)?.default_mode ?? '平衡'}；每一场开始前都可以单独调整。</p>
             {templateMap.get(profile)?.playbook?.closing_objective ? (
               <p className="mt-1 text-text-secondary">这个场景通常希望最后留下：{templateMap.get(profile)!.playbook.closing_objective}</p>
             ) : null}
@@ -155,7 +163,7 @@ export default function ConversationSpacesPage({ query = {} }: { query?: Record<
                         {space.next_session ? <StatusBadge tone="busy">{formatWhen(space.next_session.scheduled_at)}</StatusBadge> : null}
                       </div>
                       <p className="mt-1 truncate text-xs text-text-secondary">{space.default_goal || '尚未设置长期目标'}</p>
-                      <p className="mt-1 text-[11px] text-text-muted">{space.open_commitments_count ?? 0} 个未完成承诺 · {space.open_questions_count ?? 0} 个开放问题 · {space.default_mode}</p>
+                      <p className="mt-1 text-[11px] text-text-muted">{space.open_commitments_count ?? 0} 个未完成承诺 · {space.open_questions_count ?? 0} 个开放问题 · {MODE_LABEL[space.default_mode] ?? space.default_mode}</p>
                     </div>
                     <ArrowRight className="h-4 w-4 flex-shrink-0 text-text-muted group-hover:text-text-primary" />
                   </button>

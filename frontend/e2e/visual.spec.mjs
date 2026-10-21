@@ -577,6 +577,7 @@ test.describe('@visual v2 Studio surfaces', () => {
   })
 
 
+  // R5 extends the frozen UI v2 acceptance set with evidence, reference, and practice-source boundaries.
   test('My Chengzhu — reusable skill evidence', async ({ page }) => {
     await page.goto('/#/me/skills')
     await expect(page.getByRole('heading', { name: '我的成竹', exact: true })).toBeVisible()

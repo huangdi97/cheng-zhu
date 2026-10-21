@@ -779,6 +779,8 @@ test.describe('@visual v2 setup boundaries', () => {
     await expect(preflight).toBeVisible()
     await expect(preflight.getByText('开始前需要处理')).toBeVisible()
     await expect(preflight.getByText('没有检测到可用的系统音频输入；请在设置里完成测试后重试。')).toBeVisible()
+    await expect(preflight.getByText('1 项待处理', { exact: true })).toBeVisible()
+    await expect(preflight.getByText('未修改本场默认值', { exact: true })).toBeVisible()
     await expect(page.getByTestId('preflight-start')).toBeDisabled()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('preflight-blocked.png', SNAPSHOT)

@@ -77,14 +77,15 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
   const readyCount = pre?.items.filter((item) => item.ok).length ?? 0
   const overrideCount = Object.keys(overrides).length
   const hasBlockers = blockers.length > 0
-  const contentKeys = ['goal', 'resume', 'skill_cards', 'stories', 'knowledge', 'materials', 'quick_notes']
+  const primaryContentKeys = ['goal', 'resume', 'skill_cards', 'stories']
+  const secondaryContentKeys = ['knowledge', 'materials', 'quick_notes']
   const deviceKeys = ['audio', 'stt', 'screen_context']
   const overrideKeys = ['answer_language', 'whisper_language', 'ai_policy_mode', 'human_assistance_policy', 'share_privacy_mode']
   const detailKeys = ['language', 'technical_term_policy', 'active_model']
 
   return (
-    <Dialog title="上场前检查（Preflight）" onClose={close} labelledBy="golive-title" wide>
-      <div className="space-y-5" data-testid="preflight">
+    <Dialog title="上场前检查（Preflight）" onClose={close} labelledBy="golive-title" extraWide>
+      <div className="space-y-4" data-testid="preflight">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <Field label="这一场属于哪个求职目标？">
             <select className={inputCls} value={goalId} onChange={(e) => { setGoalId(e.target.value); setOverrides({}) }}>
@@ -121,7 +122,7 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
             </section>
 
             {hasBlockers ? (
-              <section aria-labelledby="preflight-blockers-heading" className="border-l-2 border-status-risk/45 bg-status-risk/[0.035] px-4 py-3">
+              <section aria-labelledby="preflight-blockers-heading" className="border-l-2 border-status-risk/45 bg-status-risk/[0.035] px-4 py-2.5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <h3 id="preflight-blockers-heading" className="text-sm font-semibold text-text-primary">开始前需要处理</h3>
@@ -157,7 +158,7 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
                     </div>
                   </div>
                   <ul className="mt-2 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
-                    {contentKeys.filter((key) => byKey[key]).map((key) => {
+                    {primaryContentKeys.filter((key) => byKey[key]).map((key) => {
                       const item = byKey[key]
                       return (
                         <li key={key} className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 text-xs">
@@ -169,6 +170,22 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
                       )
                     })}
                   </ul>
+                  <details className="mt-2 border-b border-bg-tertiary/70 pb-2 text-xs">
+                    <summary className="cursor-pointer text-text-secondary">其他本场上下文</summary>
+                    <ul className="mt-2 divide-y divide-bg-tertiary/60 border-t border-bg-tertiary/60">
+                      {secondaryContentKeys.filter((key) => byKey[key]).map((key) => {
+                        const item = byKey[key]
+                        return (
+                          <li key={key} className="grid grid-cols-[92px_minmax(0,1fr)_auto] items-center gap-3 py-2 text-xs">
+                            <span className="text-text-muted">{item.label}</span>
+                            <span className="min-w-0 truncate font-medium text-text-primary">{String(item.value)}</span>
+                            <span className="text-[10px] text-text-muted">{item.origin_label}</span>
+                            {item.hint ? <span className={`col-start-2 col-span-2 text-[10px] ${item.ok ? 'text-text-muted' : 'text-status-risk'}`}>{item.hint}</span> : null}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </details>
                 </section>
 
                 <section aria-labelledby="preflight-device-heading">
@@ -200,13 +217,16 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
                 <h3 className="text-sm font-semibold text-text-primary">本场覆盖</h3>
                 <p className="mt-0.5 text-[11px] leading-5 text-text-muted">只在这一场生效；不改 Goal，也不改全局设置。</p>
 
-                <div className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+                <div className="mt-3 grid gap-x-5 border-y border-bg-tertiary/70 sm:grid-cols-2">
                   {overrideKeys.filter((key) => byKey[key]).map((key) => {
                     const item = byKey[key]
                     const opts = OVERRIDABLE[key]
                     return (
-                      <label key={key} className="grid grid-cols-[92px_1fr] items-center gap-3 py-2.5 text-xs">
-                        <span className="text-text-muted">{item.label}</span>
+                      <label key={key} className="border-b border-bg-tertiary/60 py-2.5 text-xs">
+                        <span className="mb-1 flex items-center justify-between gap-2">
+                          <span className="font-medium text-text-secondary">{item.label}</span>
+                          <span className="text-[10px] text-text-muted">{item.origin_label}</span>
+                        </span>
                         <span>
                           {opts ? (
                             <select aria-label={`${item.label}（本场）`} className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-xs text-text-primary" value={String(item.value)}
@@ -214,7 +234,6 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
                               {opts.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             </select>
                           ) : <span className="text-text-primary">{String(item.value)}</span>}
-                          <span className="mt-0.5 block text-[10px] text-text-muted">{item.origin_label}</span>
                         </span>
                       </label>
                     )
@@ -246,7 +265,7 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
           </>
         ) : null}
 
-        <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-1 flex flex-wrap justify-between gap-2 border-t border-bg-tertiary/70 bg-bg-primary/95 px-4 pb-4 pt-3 backdrop-blur">
+        <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-0 flex flex-wrap justify-between gap-2 border-t border-bg-tertiary/70 bg-bg-primary/95 px-4 pb-4 pt-3 backdrop-blur">
           <SecondaryButton onClick={withoutGoal}>不选目标，直接进入</SecondaryButton>
           <div className="flex gap-2">
             <SecondaryButton onClick={close}>取消</SecondaryButton>

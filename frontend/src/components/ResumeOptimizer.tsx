@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useUiPrefsStore } from '@/stores/uiPrefsStore'
 import { isLightColorScheme } from '@/lib/colorScheme'
 import { api } from '@/lib/api'
-import { Clipboard, FileSearch, Sparkles, X } from 'lucide-react'
+import { Clipboard, FileSearch, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { ResumeMountPanel } from '@/components/resume/ResumeMount'
 
@@ -106,177 +106,130 @@ export default function ResumeOptimizer() {
   }
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]">
-      {/* Left: input area */}
-      <div className="md:w-[35%] md:min-w-[320px] border-b md:border-b-0 md:border-r border-bg-tertiary flex flex-col p-4 gap-3 flex-shrink-0 bg-bg-secondary/25">
-        <div className="rounded-2xl border border-bg-hover/40 bg-bg-secondary p-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-blue/10 border border-accent-blue/20">
-              <Sparkles className="w-4 h-4 text-accent-blue" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary">简历优化工作台</h3>
-              <p className="text-[11px] text-text-muted">把简历、JD 和修改建议收在同一屏里。</p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-[11px]">
-            <div className="rounded-xl border border-bg-hover/40 bg-bg-primary/60 px-3 py-2">
-              <p className="text-text-muted">简历状态</p>
-              <p className={`mt-1 font-medium ${config?.has_resume ? 'text-accent-green' : 'text-text-primary'}`}>
-                {config?.has_resume ? '已选用' : '未上传'}
-              </p>
-            </div>
-            <div className="rounded-xl border border-bg-hover/40 bg-bg-primary/60 px-3 py-2">
-              <p className="text-text-muted">JD 字数</p>
-              <p className="mt-1 font-medium text-text-primary">{jdText.trim().length}</p>
-            </div>
-            <div className="rounded-xl border border-bg-hover/40 bg-bg-primary/60 px-3 py-2">
-              <p className="text-text-muted">当前阶段</p>
-              <p className="mt-1 font-medium text-accent-blue">{analysisState}</p>
-            </div>
-          </div>
+    <div className="flex-1 min-h-0 overflow-y-auto p-4" data-testid="resume-workspace">
+      <section aria-label="简历边界" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">一份当前简历，对照一个目标岗位</p>
+          <p className="mt-0.5 max-w-3xl text-xs leading-5 text-text-secondary">
+            这里不维护第二份“AI 简历”。成竹只读取你当前选中的简历，用目标 JD 找出该强调、补证据或改写得更清楚的地方。
+          </p>
         </div>
-
-        <ResumeMountPanel
-          title="当前简历"
-          description="这里的分析直接使用你当前选中的简历，不会另外维护一份副本。"
-          sharedNote="准备、练习和复盘都会使用同一份当前简历；切换后会在新的 Interview Pack 中生效。"
-          variant="light"
-        />
-
-        {uploadError && (
-          <div className="flex items-center gap-2 bg-accent-red/10 text-accent-red text-xs px-3 py-2 rounded-lg">
-            <span className="flex-1">{uploadError}</span>
-            <button onClick={() => setUploadError(null)}><X className="w-3 h-3" /></button>
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col gap-2 min-h-0 rounded-2xl border border-bg-hover/40 bg-bg-secondary p-4">
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-xs text-text-muted">粘贴目标岗位 JD</label>
-            <span className="text-[11px] text-text-muted">{jdText.length} chars</span>
-          </div>
-          <textarea
-            value={jdText}
-            onChange={e => setJdText(e.target.value)}
-            placeholder="将招聘 JD 粘贴到这里..."
-            className="flex-1 min-h-[180px] md:min-h-0 bg-bg-tertiary text-text-primary text-xs rounded-xl p-3 border border-bg-hover focus:outline-none focus:border-accent-blue resize-none"
-          />
-          <div className="flex flex-wrap gap-2 text-[11px] text-text-muted">
-            <span className="rounded-full border border-bg-hover/50 bg-bg-primary/70 px-2.5 py-1">职责范围</span>
-            <span className="rounded-full border border-bg-hover/50 bg-bg-primary/70 px-2.5 py-1">技术关键词</span>
-            <span className="rounded-full border border-bg-hover/50 bg-bg-primary/70 px-2.5 py-1">结果导向</span>
-          </div>
+        <div className="text-left sm:text-right">
+          <p className={`text-sm font-semibold ${config?.has_resume ? 'text-status-direct' : 'text-text-primary'}`}>
+            {config?.has_resume ? '当前简历已就绪' : '先选择一份简历'}
+          </p>
+          <p className="mt-0.5 text-[10px] text-text-muted">分析不会直接修改原文件</p>
         </div>
+      </section>
 
-        <button
-          onClick={handleAnalyze}
-          disabled={isAnalyzing || !jdText.trim() || !config?.has_resume}
-          className="w-full py-2.5 bg-accent-blue text-white text-xs font-medium rounded-lg hover:bg-accent-blue/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isAnalyzing ? '分析中...' : '开始分析'}
-        </button>
-      </div>
+      <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(320px,0.78fr)_minmax(0,1.22fr)]">
+        <aside aria-labelledby="resume-input-heading" className="min-w-0">
+          <h3 id="resume-input-heading" className="text-sm font-semibold text-text-primary">这次要投什么</h3>
+          <p className="mt-0.5 text-[11px] leading-5 text-text-muted">先确认当前简历，再把目标岗位要求放进来。JD 只用于这次简历对照，不会被写成你的个人事实。</p>
 
-      {/* Right: result */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="rounded-2xl border border-bg-hover/40 bg-bg-secondary/40 min-h-full">
-          <div className="flex items-center justify-between gap-3 border-b border-bg-hover/30 px-4 py-3">
-            <div>
-              <p className="text-xs font-medium text-accent-blue">分析结果</p>
-              <h4 className="mt-1 text-sm font-semibold text-text-primary">优化建议</h4>
+          <div className="mt-4">
+            <ResumeMountPanel
+              title="当前简历"
+              description="准备、练习和复盘共用这份当前简历。"
+              sharedNote="切换简历后，只会影响之后新冻结的 Interview Pack；旧场次保持原样。"
+              variant="light"
+            />
+          </div>
+
+          {uploadError ? (
+            <div role="alert" className="mt-3 flex items-center gap-2 border-l-2 border-status-risk/45 pl-3 text-xs text-status-risk">
+              <span className="flex-1">{uploadError}</span>
+              <button type="button" aria-label="关闭错误提示" onClick={() => setUploadError(null)}><X className="h-3 w-3" /></button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-bg-hover/50 bg-bg-primary/70 px-3 py-1 text-[11px] text-text-secondary">
-                {analysisState}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopy}
-                disabled={!displayText}
-                className="inline-flex items-center gap-1 rounded-lg border border-bg-hover/50 px-3 py-1.5 text-[11px] text-text-secondary hover:text-text-primary hover:bg-bg-hover/40 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Clipboard className="w-3.5 h-3.5" />
-                复制
-              </button>
-              {displayText && (
-                <button
-                  type="button"
-                  onClick={handleCopyRewrite}
-                  className="inline-flex items-center gap-1 rounded-lg border border-bg-hover/50 px-3 py-1.5 text-[11px] text-text-secondary hover:text-text-primary hover:bg-bg-hover/40"
-                >
-                  <Clipboard className="w-3.5 h-3.5" />
-                  复制改写建议
+          ) : null}
+
+          <label className="mt-5 block">
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="text-xs font-medium text-text-secondary">目标岗位 JD</span>
+              <span className="text-[10px] tabular-nums text-text-muted">{jdText.trim().length} 字</span>
+            </span>
+            <textarea
+              value={jdText}
+              onChange={(e) => setJdText(e.target.value)}
+              placeholder="粘贴这个岗位真正会考察的职责、要求和加分项…"
+              className="mt-1.5 min-h-[220px] w-full resize-y rounded-xl border border-bg-hover bg-bg-primary px-3 py-2.5 text-xs leading-5 text-text-primary focus:border-accent-blue focus:outline-none"
+            />
+          </label>
+
+          <div className="mt-3 [&>button]:w-full">
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || !jdText.trim() || !config?.has_resume}
+              className="w-full rounded-lg bg-accent-blue px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-blue/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isAnalyzing ? '正在对照简历与岗位…' : '分析这份简历'}
+            </button>
+          </div>
+        </aside>
+
+        <main aria-labelledby="resume-result-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-bg-tertiary/70 pb-3">
+            <div>
+              <p className="text-[11px] font-medium text-text-muted">FOR THIS ROLE</p>
+              <h3 id="resume-result-heading" className="mt-1 text-base font-semibold text-text-primary">这份简历该怎么更贴近岗位</h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">关注岗位真正要求的能力、你已有的证据，以及哪些表达需要更具体。</p>
+            </div>
+            {displayText ? (
+              <div className="flex gap-2">
+                <button type="button" onClick={handleCopy}
+                  className="inline-flex items-center gap-1 rounded-lg border border-bg-hover px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-bg-hover/35 hover:text-text-primary">
+                  <Clipboard className="h-3.5 w-3.5" />复制全部
                 </button>
-              )}
-            </div>
-          </div>
-          <div className="p-4">
-        {!displayText && isAnalyzing ? (
-          <div className="space-y-3 max-w-xl mx-auto" aria-busy="true" aria-live="polite">
-            <span className="sr-only">正在分析简历与 JD 的匹配度…</span>
-            <div className="flex items-center gap-2 text-xs text-accent-blue">
-              <span className="inline-block w-2 h-2 rounded-full bg-accent-blue animate-pulse" />
-              正在分析简历与 JD 的匹配度…
-            </div>
-            {/* 模拟"标题 + 段落 + 小节"骨架 */}
-            {[0.7, 0.95, 0.85, 0.6, 0.9, 0.8].map((w, i) => (
-              <div key={i} className="space-y-1.5">
-                <div className="h-3 w-1/4 rounded bg-bg-tertiary/60 animate-pulse" style={{ animationDelay: `${i * 120}ms` }} />
-                <div className="h-2 rounded bg-bg-tertiary/40 animate-pulse" style={{ animationDelay: `${i * 120 + 40}ms`, width: `${w * 100}%` }} />
-                <div className="h-2 rounded bg-bg-tertiary/40 animate-pulse" style={{ animationDelay: `${i * 120 + 80}ms`, width: `${(w - 0.15) * 100}%` }} />
+                <button type="button" onClick={handleCopyRewrite}
+                  className="inline-flex items-center gap-1 rounded-lg border border-bg-hover px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-bg-hover/35 hover:text-text-primary">
+                  <Clipboard className="h-3.5 w-3.5" />只复制改写
+                </button>
               </div>
-            ))}
+            ) : null}
           </div>
-        ) : !displayText ? (
-          <div className="h-full flex items-center justify-center text-text-muted text-xs">
-            <div className="text-center space-y-3 max-w-md">
-              <FileSearch className="w-8 h-8 mx-auto opacity-30" />
-              <p className="text-sm text-text-primary">先把材料放齐，再开始分析。</p>
-              <div className="grid gap-2 text-left">
-                {[
-                  '1. 上传或选中当前简历。',
-                  '2. 粘贴目标岗位 JD，把关键词和职责写完整。',
-                  '3. 点击“开始分析”，等待模型生成修改建议。',
-                ].map((item) => (
-                  <div key={item} className="rounded-xl border border-bg-hover/40 bg-bg-primary/60 px-3 py-2 text-[11px]">
-                    {item}
+
+          <div className="pt-4">
+            {!displayText && isAnalyzing ? (
+              <div className="max-w-2xl space-y-4" aria-busy="true" aria-live="polite">
+                <p className="text-xs font-medium text-accent-blue">正在找岗位要求与你已有证据之间的差距…</p>
+                {[0.78, 0.94, 0.66, 0.86].map((w, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="h-3 w-1/4 rounded bg-bg-tertiary/70 animate-pulse" />
+                    <div className="h-2 rounded bg-bg-tertiary/45 animate-pulse" style={{ width: `${w * 100}%` }} />
+                    <div className="h-2 rounded bg-bg-tertiary/45 animate-pulse" style={{ width: `${Math.max(0.42, w - 0.18) * 100}%` }} />
                   </div>
                 ))}
               </div>
-              <p className="text-[10px]">结果会聚焦匹配度、改写方向和更像“能投出去”的表达。</p>
-            </div>
+            ) : !displayText ? (
+              <div className="max-w-xl border-y border-bg-tertiary/70 py-5">
+                <FileSearch className="h-6 w-6 text-text-muted" aria-hidden />
+                <p className="mt-2 text-sm font-medium text-text-primary">先选简历，再给一个具体岗位</p>
+                <p className="mt-1 text-xs leading-5 text-text-secondary">
+                  成竹会把结果拆成：岗位真正看重什么、你的简历已经证明了什么、哪些地方只是写得不够清楚，以及哪些要求目前没有证据。
+                </p>
+                <p className="mt-2 text-[11px] leading-5 text-text-muted">
+                  “没有证据”不会被自动补成经历；它只会被明确标出来。
+                </p>
+              </div>
+            ) : (
+              <div
+                className={`prose prose-sm max-w-none markdown-body
+                ${lightMarkdown ? '' : 'prose-invert'}
+                prose-headings:text-text-primary prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-5 prose-headings:mb-2
+                prose-p:text-text-secondary prose-p:text-xs prose-p:leading-relaxed
+                prose-li:text-text-secondary prose-li:text-xs
+                prose-strong:text-text-primary
+                prose-table:text-xs
+                prose-th:text-text-primary prose-th:bg-bg-tertiary prose-th:px-2 prose-th:py-1
+                prose-td:text-text-secondary prose-td:px-2 prose-td:py-1 prose-td:border-bg-hover`}
+              >
+                <ReactMarkdown>{displayText}</ReactMarkdown>
+                {isAnalyzing ? <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse rounded-sm bg-accent-blue" /> : null}
+              </div>
+            )}
           </div>
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-text-muted">
-              {['JD 关键能力', '命中 / 缺失', '改写建议'].map((label) => (
-                <span key={label} className="rounded-full border border-bg-hover/50 bg-bg-primary/70 px-2.5 py-1">
-                  {label}
-                </span>
-              ))}
-            </div>
-            <div
-              className={`prose prose-sm max-w-none markdown-body
-              ${lightMarkdown ? '' : 'prose-invert'}
-              prose-headings:text-text-primary prose-headings:text-sm prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
-              prose-p:text-text-secondary prose-p:text-xs prose-p:leading-relaxed
-              prose-li:text-text-secondary prose-li:text-xs
-              prose-strong:text-text-primary
-              prose-table:text-xs
-              prose-th:text-text-primary prose-th:bg-bg-tertiary prose-th:px-2 prose-th:py-1
-              prose-td:text-text-secondary prose-td:px-2 prose-td:py-1 prose-td:border-bg-hover
-            `}
-            >
-              <ReactMarkdown>{displayText}</ReactMarkdown>
-              {isAnalyzing && (
-                <span className="inline-block w-1.5 h-3 bg-accent-blue animate-pulse rounded-sm ml-0.5" />
-              )}
-            </div>
-          </>
-        )}
-          </div>
-        </div>
+        </main>
       </div>
     </div>
   )

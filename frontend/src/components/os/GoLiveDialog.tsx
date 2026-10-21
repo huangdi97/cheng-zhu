@@ -107,7 +107,7 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
                 <p className="mt-0.5 text-[11px] text-text-muted">确认本场带入内容、设备状态与 session-only 覆盖，然后再开始。</p>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:justify-end">
-                <span className={hasBlockers ? 'font-medium text-status-risk' : 'font-medium text-status-direct'}>
+                <span role="status" className={hasBlockers ? 'text-sm font-semibold text-status-risk' : 'text-sm font-semibold text-status-direct'}>
                   {hasBlockers ? `${blockers.length} 项待处理` : '可以开始'}
                 </span>
                 <span className="text-text-muted">{overrideCount ? `${overrideCount} 项本场覆盖` : '未修改本场默认值'}</span>

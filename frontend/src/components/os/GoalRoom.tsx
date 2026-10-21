@@ -179,7 +179,7 @@ function ProgressTrends({ goalId }: { goalId: string }) {
                 </div>
                 <p className="mt-1 text-[11px] text-text-secondary">{d.text}</p>
                 {d.series.length >= 2 ? (
-                  <div className="mt-1 flex items-center gap-1.5 text-[10px] text-text-muted" aria-label={`${d.label} 趋势，从 ${first} 到 ${latest}`}>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-muted" aria-label={`${d.label} 趋势，从 ${first} 到 ${latest}`}>
                     <span>{first}</span>
                     <span aria-hidden>→</span>
                     <span className="font-medium text-text-primary">{latest}</span>
@@ -202,7 +202,7 @@ function ProgressTrends({ goalId }: { goalId: string }) {
           ) : null}
         </ul>
       ) : null}
-      <p className="mt-2 text-[10px] text-text-muted">这些只反映同一求职目标下的练习和复盘变化，不是录用概率，也不和其他候选人比较。</p>
+      <p className="mt-2 text-[11px] text-text-muted">这些只反映同一求职目标下的练习和复盘变化，不是录用概率，也不和其他候选人比较。</p>
     </Section>
   )
 }
@@ -246,7 +246,7 @@ function Interviews({ goal, reload }: { goal: GoalDetail; reload: () => void }) 
       <Section title={`已处理复盘 · ${reflected.length}`}><SessionList items={reflected} emptyText="复盘中执行过的动作会在这里汇总。" /></Section>
       {goal.application_id ? (
         <Section title="投递记录（旧版看板）" action={<SecondaryButton onClick={() => setBoardOpen((v) => !v)}>{boardOpen ? '收起' : '打开'}</SecondaryButton>}>
-          {boardOpen ? <div className="h-[520px] flex flex-col rounded-2xl border border-bg-hover/50 overflow-hidden"><Suspense fallback={<Loading />}><JobTracker /></Suspense></div> : null}
+          {boardOpen ? <div className="h-[520px] flex flex-col rounded-xl border border-bg-hover/50 overflow-hidden"><Suspense fallback={<Loading />}><JobTracker /></Suspense></div> : null}
         </Section>
       ) : null}
     </div>

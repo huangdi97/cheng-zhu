@@ -91,7 +91,7 @@ export default function FactInboxView({ onShowAll }: { onShowAll?: () => void })
         {data.items.map((card) => {
           const [tone, label] = RISK[card.risk] ?? RISK.LOW
           return (
-            <li key={card.id} className="rounded-2xl border border-bg-hover/60 bg-bg-secondary/50 p-3" aria-busy={busy === card.id}>
+            <li key={card.id} className="rounded-xl border border-bg-hover/60 bg-bg-secondary/50 p-3" aria-busy={busy === card.id}>
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
                 {card.project ? <span className="font-semibold text-text-primary">{card.project}</span> : null}
                 <StatusBadge tone={tone}>{label}</StatusBadge>
@@ -163,7 +163,7 @@ export default function FactInboxView({ onShowAll }: { onShowAll?: () => void })
         })}
       </ul>
       {data.batch ? (
-        <div className="rounded-2xl border border-dashed border-bg-hover p-3">
+        <div className="rounded-xl border border-dashed border-bg-hover p-3">
           <p className="text-sm text-text-primary">还有 {data.batch.count} 条低风险说法</p>
           <p className="text-[11px] text-text-muted">都有材料支持或风险较低，可以一次确认。</p>
           <div className="mt-2 flex gap-2">

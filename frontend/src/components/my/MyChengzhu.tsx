@@ -43,15 +43,15 @@ export function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
           <p className="mt-1 max-w-2xl text-xs leading-5 text-text-secondary">上场时，成竹只把有来源或经你确认的内容当作你的个人经历；没有证据的说法会继续保持边界。</p>
           <div className="mt-4 grid grid-cols-3 divide-x divide-bg-tertiary/70 border-y border-bg-tertiary/70 py-3">
             <button type="button" onClick={() => onJump('facts')} className="px-3 text-left first:pl-0">
-              <span className="block text-2xl font-semibold tabular-nums text-text-primary">{direct}</span>
+              <span className="block text-xl font-semibold tabular-nums text-text-primary">{direct}</span>
               <span className="mt-0.5 block text-[11px] text-text-muted">有直接证据</span>
             </button>
             <button type="button" onClick={() => onJump('facts')} className="px-3 text-left">
-              <span className="block text-2xl font-semibold tabular-nums text-text-primary">{confirmed}</span>
+              <span className="block text-xl font-semibold tabular-nums text-text-primary">{confirmed}</span>
               <span className="mt-0.5 block text-[11px] text-text-muted">你已确认</span>
             </button>
             <button type="button" onClick={() => onJump('facts')} className="px-3 text-left">
-              <span className="block text-2xl font-semibold tabular-nums text-text-primary">{unsupported}</span>
+              <span className="block text-xl font-semibold tabular-nums text-text-primary">{unsupported}</span>
               <span className="mt-0.5 block text-[11px] text-text-muted">暂无证据</span>
             </button>
           </div>

@@ -106,7 +106,9 @@ export const CUE_SOURCE_LABELS: Record<CueSource, string> = {
   HUMAN_COACH: '教练建议',
 }
 
-const CUE_CAP = 5
+// The Cue first layer is a glanceable instrument: at most three speakable
+// bullets. Anything longer belongs behind the explicit Deep expansion.
+const CUE_CAP = 3
 const KNOWN_SOURCES = new Set<CueSource>(['PERSONAL_EVIDENCE', 'KB_KNOWLEDGE', 'WORLD_KNOWLEDGE', 'HUMAN_COACH'])
 
 export function buildFastCueViewModel(payload: unknown): FastCueViewModel | null {

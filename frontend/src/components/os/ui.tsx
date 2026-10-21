@@ -114,7 +114,7 @@ export function EmptyState({ title, body, action, testId }: { title: ReactNode; 
 /** Every error offers a next step (canonical §19). */
 export function ErrorState({ message, onRetry, extra }: { message: string; onRetry?: () => void; extra?: ReactNode }) {
   return (
-    <div role="alert" className="rounded-2xl border border-status-risk/30 bg-status-risk/5 p-4 text-sm">
+    <div role="alert" className="rounded-xl border border-status-risk/30 bg-status-risk/5 p-4 text-sm">
       <div className="flex items-start gap-2 text-status-risk">
         <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
         <span className="break-words">{message}</span>

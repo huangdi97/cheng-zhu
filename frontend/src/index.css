@@ -69,6 +69,7 @@ code, pre, .font-mono {
   --c-accent-blue: 47 107 87;      /* Bamboo #2F6B57; token name retained */
   --c-accent-green: 37 106 75;
   --c-accent-red: 173 69 69;
+  --c-on-accent: 255 255 255;
   --c-accent-amber: 134 85 31;
   --c-grad-from: 47 107 87;
   --c-grad-to: 63 100 117;         /* Ink Blue #3F6475 */
@@ -129,6 +130,7 @@ code, pre, .font-mono {
   --c-accent-blue: 120 182 157;    /* #78B69D */
   --c-accent-green: 111 207 159;
   --c-accent-red: 242 143 143;
+  --c-on-accent: 15 21 18;
   --c-accent-amber: 224 169 106;
   --c-grad-from: 120 182 157;
   --c-grad-to: 113 151 168;
@@ -179,6 +181,7 @@ code, pre, .font-mono {
   --c-accent-blue: 58 150 221;
   --c-accent-green: 106 185 48;
   --c-accent-red: 255 80 80;
+  --c-on-accent: 0 0 0;
   --c-accent-amber: 255 198 0;
   --c-grad-from: 58 150 221;
   --c-grad-to: 129 140 248;
@@ -232,6 +235,7 @@ code, pre, .font-mono {
   --c-accent-blue: 136 192 208;
   --c-accent-green: 163 190 140;
   --c-accent-red: 191 97 106;
+  --c-on-accent: 15 21 18;
   --c-accent-amber: 235 203 139;
   --c-grad-from: 136 192 208;
   --c-grad-to: 94 129 172;
@@ -282,6 +286,7 @@ code, pre, .font-mono {
   --c-accent-blue: 43 92 169;
   --c-accent-green: 46 105 75;
   --c-accent-red: 158 63 77;
+  --c-on-accent: 255 255 255;
   --c-accent-amber: 140 94 30;
   --c-grad-from: 43 92 169;
   --c-grad-to: 109 78 163;
@@ -335,6 +340,7 @@ code, pre, .font-mono {
   --c-accent-blue: 38 139 210;
   --c-accent-green: 133 153 0;
   --c-accent-red: 220 50 47;
+  --c-on-accent: 15 21 18;
   --c-accent-amber: 181 137 0;
   --c-grad-from: 38 139 210;
   --c-grad-to: 108 113 196;
@@ -538,9 +544,8 @@ code, pre, .font-mono {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: rgb(var(--c-on-accent, 255 255 255));
   background: rgb(var(--c-accent-blue));
-  box-shadow: 0 2px 8px -2px rgb(var(--c-accent-blue) / 0.45);
 }
 
 /* ========== Unified glass floating layer (popover / dropdown) ========== */
@@ -629,7 +634,6 @@ code, pre, .font-mono {
 .header-gradient {
   background: rgb(var(--c-bg-secondary) / 0.94);
   border-bottom: 1px solid rgb(var(--c-border-subtle) / 0.7);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025);
 }
 
 /* ========== Transcription item entry ========== */
@@ -657,15 +661,13 @@ code, pre, .font-mono {
 /* ========== Improved button styles ========== */
 .btn-primary {
   background: rgb(var(--c-accent-blue));
-  color: white;
+  color: rgb(var(--c-on-accent, 255 255 255));
   border: 1px solid rgb(var(--c-accent-blue) / 0.35);
-  border-radius: 9999px;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
-  transition: filter 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 8px;
+  transition: filter 0.15s ease;
 }
 .btn-primary:hover {
   filter: brightness(1.07);
-  box-shadow: 0 2px 8px -2px rgb(var(--c-accent-blue) / 0.45);
 }
 .btn-primary:active {
   filter: brightness(0.96);
@@ -673,12 +675,10 @@ code, pre, .font-mono {
 
 .btn-danger {
   background: rgb(var(--c-accent-red));
-  color: white;
+  color: rgb(var(--c-on-accent, 255 255 255));
   border: 1px solid rgb(var(--c-accent-red) / 0.3);
+  border-radius: 8px;
   transition: filter 0.15s ease;
-}
-.btn-danger:hover {
-  filter: brightness(1.08);
 }
 
 .btn-subtle {
@@ -1579,6 +1579,15 @@ code, pre, .font-mono {
 
 /* ── reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
+  /* Quiet intelligence: motion is decoration, never information. When the OS
+     asks for reduced motion the whole surface goes still. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .ov-caret {
     animation: none;
   }

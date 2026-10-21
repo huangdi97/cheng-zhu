@@ -1,17 +1,14 @@
 name: update-visual-snapshots
 
-# One-shot r11 snapshot trigger armed.
 # Manually triggered workflow that regenerates Playwright screenshot
 # baselines on the same Linux runner CI uses, then opens a PR with the
 # new images. Use this when intentional UI changes break the
 # visual-regression check on a feature PR.
 
 on:
-  push:
+  pull_request:
     branches:
-      - refine/ui-v2-onboarding-preflight-r11
-    paths:
-      - .github/workflows/update-visual-snapshots.yml
+      - main
   workflow_dispatch:
     inputs:
       base_branch:
@@ -34,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.base_branch || github.ref_name }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.base_branch || github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4

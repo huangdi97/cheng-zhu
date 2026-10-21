@@ -142,9 +142,29 @@ const GOAL_PREPARE = {
     { id: 'prep-q4', text: '讲一次你主动停止一个方向并承担取舍的经历。', kind: 'STORY', source: 'story_gap', parent_id: '' },
   ],
   stories: {
-    items: MY_STORIES.map((item) => ({ id: item.id, title: item.title, tags: item.tags })),
+    items: [
+      { id: 'story-prepare-1', title: '从错误方向切回最小可验证产品', tags: ['Trade-off'] },
+      { id: 'story-prepare-2', title: '跨团队推动一次高风险改版', tags: ['Collaboration'] },
+    ],
     prompts: [{ competency: '失败与反思', hint: '从真实经历整理，不补造结果' }],
-    coverage: STORY_COVERAGE,
+    coverage: {
+      categories: [
+        { key: 'Ownership', label: 'Ownership 担当', story_ids: [] },
+        { key: 'Conflict', label: '冲突处理', story_ids: [] },
+        { key: 'Failure', label: '失败与反思', story_ids: [] },
+        { key: 'Leadership', label: '领导力', story_ids: [] },
+        { key: 'Ambiguity', label: '模糊情境决策', story_ids: [] },
+        { key: 'Collaboration', label: '协作', story_ids: ['story-prepare-2'] },
+        { key: 'Difficult Problem', label: '解决困难问题', story_ids: [] },
+        { key: 'Influence', label: '影响他人', story_ids: [] },
+        { key: 'Trade-off', label: '取舍', story_ids: ['story-prepare-1'] },
+        { key: 'Learning', label: '学习成长', story_ids: [] },
+      ],
+      missing: [
+        { key: 'Failure', label: '失败与反思' },
+        { key: 'Ownership', label: 'Ownership 担当' },
+      ],
+    },
   },
   has_jd: true,
   materials: {
@@ -156,7 +176,10 @@ const GOAL_PREPARE = {
     selected_ids: ['mat-ui-1', 'mat-ui-2', 'mat-ui-3'],
   },
   pack_preview: {
-    quick_notes: [QUICK_NOTES.items[0], QUICK_NOTES.items[1]],
+    quick_notes: [
+      { id: 'note-prepare-1', title: '反问面试官', content: '问清楚团队当前 Agent 评测是离线指标还是线上用户任务闭环。' },
+      { id: 'note-prepare-2', title: '别忘了这个数字', content: 'WenNian 第一版只验证核心链路，不把尚未上线的指标说成线上结果。' },
+    ],
     materials: [
       { material_id: 'mat-ui-1', version_id: 'mv-1', version: 3, title: 'WenNian 产品设计与上线记录', kind: 'PROJECT', usage: 'FACTS', is_personal_evidence: true },
       { material_id: 'mat-ui-3', version_id: 'mv-3', version: 2, title: 'Chengzhu 设计复盘与评测记录', kind: 'PROJECT', usage: 'BOTH', is_personal_evidence: true },

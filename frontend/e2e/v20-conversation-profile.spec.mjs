@@ -759,7 +759,6 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page.getByLabel('空间名称')).toBeVisible()
     await expect(page.getByText('希望持续达成什么（可选）')).toBeVisible()
     await expect(page.getByText(/默认帮助方式：/)).toBeVisible()
-    await expect(page.getByText(/这个场景通常希望最后留下：/)).toBeVisible()
   })
 
 

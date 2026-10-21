@@ -51,8 +51,8 @@ function FactRow({ fact, evidence, onChanged }: { fact: FactItem; evidence: Fact
   }
 
   return (
-    <li data-testid="fact-row" className="rounded-xl border border-bg-hover/50 bg-bg-secondary p-3">
-      <div className="flex flex-wrap items-center gap-3">
+    <li data-testid="fact-row" className="py-3.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <StatusChip {...prov} />
         <StatusChip {...user} />
         <span className="text-[10px] text-text-muted">来源：{fact.source || '—'}</span>
@@ -75,22 +75,22 @@ function FactRow({ fact, evidence, onChanged }: { fact: FactItem; evidence: Fact
       {fact.provenance_status === 'NO_EVIDENCE' && fact.user_assertion_status === 'USER_CONFIRMED' && (
         <p className="mt-1 text-[11px] text-text-muted">说明：当前没有独立资料支持。上场时只能谨慎表述，不会补充指标或细节。</p>
       )}
-      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-        <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-secondary hover:bg-bg-hover/60" onClick={() => setShowSources((v) => !v)}>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+        <button type="button" className="py-0.5 text-text-secondary hover:text-text-primary" onClick={() => setShowSources((v) => !v)}>
           查看来源（{sources.length}）
         </button>
-        <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-secondary hover:bg-bg-hover/60" onClick={() => setEditing(true)}>修改</button>
-        <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-secondary hover:bg-bg-hover/60" onClick={() => setLinking((v) => !v)}>补来源</button>
+        <button type="button" className="py-0.5 text-text-secondary hover:text-text-primary" onClick={() => setEditing(true)}>修改</button>
+        <button type="button" className="py-0.5 text-text-secondary hover:text-text-primary" onClick={() => setLinking((v) => !v)}>补来源</button>
         <button type="button" disabled={fact.user_assertion_status === 'USER_CONFIRMED'}
-          className="rounded-full border border-status-direct/40 px-2 py-0.5 text-status-direct disabled:opacity-40"
+          className="rounded-lg border border-status-direct/35 px-2.5 py-1 text-status-direct disabled:opacity-35"
           onClick={() => run(() => api.intelUpdateFact(fact.id, { user_assertion_status: 'USER_CONFIRMED' }))}>用户确认</button>
         <button type="button" disabled={fact.user_assertion_status === 'USER_DENIED'}
-          className="rounded-full border border-status-risk/40 px-2 py-0.5 text-status-risk disabled:opacity-40"
+          className="rounded-lg border border-status-risk/35 px-2.5 py-1 text-status-risk disabled:opacity-35"
           onClick={() => run(() => api.intelUpdateFact(fact.id, { user_assertion_status: 'USER_DENIED' }))}>用户否认</button>
-        <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-secondary hover:bg-bg-hover/60"
+        <button type="button" className="py-0.5 text-text-secondary hover:text-text-primary"
           onClick={() => api.intelFactSessions(fact.id).then(setSessions).catch(() => setSessions([]))}>在哪些场次使用</button>
         {fact.user_assertion_status !== 'USER_CONFIRMED' && fact.source !== 'resume' && (
-          <button type="button" className="rounded-full border border-bg-hover px-2 py-0.5 text-text-muted hover:text-status-risk"
+          <button type="button" className="py-0.5 text-text-secondary hover:text-text-primary"
             onClick={() => run(() => api.intelDeleteFact(fact.id))}>删除草稿</button>
         )}
       </div>
@@ -156,24 +156,68 @@ export default function FactsSources() {
     ['USER_DENIED', '用户已否认'],
   ]
 
+  const allFacts = data.facts
+  const directCount = allFacts.filter((f) => f.provenance_status === 'DIRECT_EVIDENCE').length
+  const confirmedCount = allFacts.filter((f) => f.user_assertion_status === 'USER_CONFIRMED').length
+  const attentionCount = allFacts.filter((f) =>
+    f.provenance_status === 'CONFLICTING_EVIDENCE'
+    || f.provenance_status === 'NO_EVIDENCE'
+    || f.user_assertion_status === 'UNREVIEWED'
+  ).length
+
+  const orderedFacts = [...facts].sort((a, b) => {
+    const rank = (fact: FactItem) => {
+      if (fact.provenance_status === 'CONFLICTING_EVIDENCE') return 0
+      if (fact.provenance_status === 'NO_EVIDENCE') return 1
+      if (fact.user_assertion_status === 'UNREVIEWED') return 2
+      if (fact.provenance_status === 'SUPPORTING_EVIDENCE') return 3
+      return 4
+    }
+    return rank(a) - rank(b)
+  })
+
   return (
-    <div className="p-4 space-y-3" data-testid="facts-sources">
-      <p className="text-xs text-text-muted">
-        “来源状态”只说明当前资料是否覆盖这句话；“用户确认”是你本人的判断。两者独立，上场时共同决定能否说“我做过”。
-      </p>
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="筛选">
-        {filters.map(([key, label]) => (
-          <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${filter === key ? 'bg-container-primary text-container-on-primary' : 'border border-bg-hover text-text-muted hover:text-text-primary'}`}>
-            {label}
-          </button>
-        ))}
+    <div className="p-4" data-testid="facts-sources">
+      <section aria-label="事实边界摘要" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">先处理会影响上场表述的事实边界</p>
+          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-text-secondary">
+            “来源状态”回答资料是否支持这句话；“用户确认”记录你本人是否认可。两条轴独立，成竹不会把“你确认了”误写成“已有独立证据”。
+          </p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{attentionCount}</p>
+          <p className="text-[10px] text-text-muted">需要关注</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{directCount}</p>
+          <p className="text-[10px] text-text-muted">直接证据</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{confirmedCount}</p>
+          <p className="text-[10px] text-text-muted">你已确认</p>
+        </div>
+      </section>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">{filter === 'all' ? '全部个人事实' : filters.find(([key]) => key === filter)?.[1]}</h3>
+          <p className="mt-0.5 text-[11px] text-text-muted">默认把冲突、暂无证据和未确认内容排在前面。</p>
+        </div>
+        <div className="flex flex-wrap gap-1" role="group" aria-label="筛选">
+          {filters.map(([key, label]) => (
+            <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}
+              className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium ${filter === key ? 'border-accent-blue/45 bg-bg-tertiary/45 text-text-primary' : 'border-transparent text-text-muted hover:border-bg-hover hover:text-text-primary'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <ul className="space-y-2">
-        {facts.map((fact) => (
+
+      <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+        {orderedFacts.map((fact) => (
           <FactRow key={fact.id} fact={fact} evidence={data.evidence} onChanged={load} />
         ))}
       </ul>
     </div>
-  )
-}
+  )}

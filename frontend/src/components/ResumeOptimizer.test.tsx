@@ -24,6 +24,7 @@ vi.mock('react-markdown', () => ({
 
 vi.mock('@/components/ResumeHistory', () => ({
   ResumeHistoryPanel: () => <div>resume-history</div>,
+  ResumeHistoryPopover: () => <button type="button">历史简历</button>,
 }))
 
 const JD_STORAGE_KEY = 'ia-resume-opt-jd-draft'

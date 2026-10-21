@@ -782,6 +782,7 @@ test.describe('@visual v2 setup boundaries', () => {
     await expect(preflight.getByText('1 项待处理', { exact: true })).toBeVisible()
     await expect(preflight.getByText('未修改本场默认值', { exact: true })).toBeVisible()
     await expect(page.getByTestId('preflight-start')).toBeDisabled()
+    await expect(preflight.getByRole('button', { name: '不选目标，直接进入' })).toBeDisabled()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('preflight-blocked.png', SNAPSHOT)
   })

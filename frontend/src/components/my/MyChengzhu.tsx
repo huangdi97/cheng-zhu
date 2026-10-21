@@ -94,22 +94,101 @@ export function Overview({ onJump }: { onJump: (tab: TabKey) => void }) {
 export function Projects() {
   const [cards, setCards] = useState<SkillCardOverview[]>([])
   useEffect(() => { api.intelSkillCards().then(setCards).catch(() => setCards([])) }, [])
-  const projects = Array.from(new Map(cards.map((c) => [c.project_name, c])).values())
-  if (!projects.length) {
-    return <p className="p-6 text-sm text-text-muted">还没有项目。在「求职 → 岗位目标」里生成技能卡后，项目会出现在这里。</p>
+
+  const grouped = Array.from(cards.reduce((map, card) => {
+    const current = map.get(card.project_name) ?? []
+    current.push(card)
+    map.set(card.project_name, current)
+    return map
+  }, new Map<string, SkillCardOverview[]>()))
+
+  if (!grouped.length) {
+    return (
+      <div className="p-5">
+        <p className="text-sm font-medium text-text-primary">还没有项目证据</p>
+        <p className="mt-1 max-w-xl text-xs leading-5 text-text-muted">项目会随着求职目标、简历和资料里的真实经历逐步出现；这里不需要手工维护另一份“项目库”。</p>
+      </div>
+    )
   }
+
+  const readSummary = (card: Record<string, unknown>) => {
+    for (const key of ['background', 'summary', 'evidence', 'impact']) {
+      const value = card[key]
+      if (typeof value === 'string' && value.trim()) return value.trim()
+    }
+    return ''
+  }
+
   return (
-    <ul className="p-4 space-y-2">
-      {projects.map((p) => (
-        <li key={p.id} className="rounded-xl border border-bg-hover/50 bg-bg-secondary p-3">
-          <div className="text-sm font-semibold text-text-primary">{p.project_name}</div>
-          <div className="mt-0.5 text-[11px] text-text-muted">来自岗位目标：{p.space_title} · {p.user_reviewed ? '已确认' : '待确认'}</div>
-          {typeof p.card.background === 'string' && p.card.background && (
-            <p className="mt-1 text-xs text-text-secondary">{p.card.background}</p>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="p-4" data-testid="projects-evidence">
+      <section className="mb-5 grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center" aria-label="项目证据说明">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">项目不是作品集条目，而是个人事实的上下文</p>
+          <p className="mt-0.5 max-w-2xl text-xs leading-5 text-text-secondary">同一个项目可以服务多个求职目标，但每次使用都必须保留来源和确认状态；不会因为“项目名相同”就自动合并成更强的结论。</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{grouped.length}</p>
+          <p className="text-[10px] text-text-muted">项目</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-semibold tabular-nums text-text-primary">{cards.filter((x) => x.user_reviewed).length}</p>
+          <p className="text-[10px] text-text-muted">已确认表达</p>
+        </div>
+      </section>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.75fr)]">
+        <section aria-labelledby="projects-list-heading">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h3 id="projects-list-heading" className="text-sm font-semibold text-text-primary">我的真实项目上下文</h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">优先看项目里能被证据支持、能经得住追问的内容。</p>
+            </div>
+          </div>
+
+          <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            {grouped.map(([name, projectCards]) => {
+              const confirmed = projectCards.filter((x) => x.user_reviewed)
+              const summary = readSummary(confirmed[0]?.card ?? projectCards[0]?.card ?? {})
+              const goals = Array.from(new Set(projectCards.map((x) => x.space_title).filter(Boolean)))
+              return (
+                <li key={name} className="py-3">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-text-primary">{name}</span>
+                        <span className={`text-[10px] ${confirmed.length ? 'text-status-direct' : 'text-text-muted'}`}>
+                          {confirmed.length ? `${confirmed.length} 条已确认` : '待确认'}
+                        </span>
+                      </div>
+                      {summary ? <p className="mt-1 text-xs leading-5 text-text-secondary">{summary}</p> : null}
+                      <p className="mt-1.5 text-[10px] text-text-muted">用于：{goals.join(' · ') || '尚未关联求职目标'}</p>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+
+        <aside className="lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+          <h3 className="text-sm font-semibold text-text-primary">项目里最重要的不是“写得完整”</h3>
+          <div className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+            <div className="py-2.5">
+              <p className="text-xs font-medium text-text-primary">你的责任边界</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">明确你负责、参与、推动了什么，不把团队结果全部归到个人。</p>
+            </div>
+            <div className="py-2.5">
+              <p className="text-xs font-medium text-text-primary">可核验结果</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">数字、上线状态、用户反馈都应保留原始来源；未知就保持未知。</p>
+            </div>
+            <div className="py-2.5">
+              <p className="text-xs font-medium text-text-primary">可被追问的过程</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-text-muted">真正能复用的是判断、取舍和行动过程，而不是一段漂亮项目简介。</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
   )
 }
 

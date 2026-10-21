@@ -67,17 +67,17 @@ describe('ResumeOptimizer', () => {
 
     render(<ResumeOptimizer />)
 
-    expect(await screen.findByPlaceholderText('将招聘 JD 粘贴到这里...')).toHaveValue(
+    expect(await screen.findByPlaceholderText('粘贴这个岗位真正会考察的职责、要求和加分项…')).toHaveValue(
       '负责后端服务、数据库设计和系统稳定性建设。',
     )
   })
 
   it('blocks analysis when no resume is mounted', async () => {
     render(<ResumeOptimizer />)
-    fireEvent.change(screen.getByPlaceholderText('将招聘 JD 粘贴到这里...'), {
+    fireEvent.change(screen.getByPlaceholderText('粘贴这个岗位真正会考察的职责、要求和加分项…'), {
       target: { value: '负责后端服务、数据库设计和系统稳定性建设。' },
     })
-    expect(screen.getByRole('button', { name: '开始分析' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '分析这份简历' })).toBeDisabled()
     expect(apiMock.resumeOptimize).not.toHaveBeenCalled()
   })
 
@@ -96,9 +96,9 @@ describe('ResumeOptimizer', () => {
     render(<ResumeOptimizer />)
 
     expect(screen.getByText('张三_后端开发.pdf')).toBeInTheDocument()
-    expect(screen.getByText('准备、练习和复盘都会使用同一份当前简历；切换后会在新的 Interview Pack 中生效。')).toBeInTheDocument()
+    expect(screen.getByText('切换简历后，只会影响之后新冻结的 Interview Pack；旧场次保持原样。')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '复制' }))
+    fireEvent.click(screen.getByRole('button', { name: '复制全部' }))
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('### 综合建议\n- 强化项目 impact 描述')
@@ -130,7 +130,7 @@ describe('ResumeOptimizer', () => {
 
     render(<ResumeOptimizer />)
 
-    fireEvent.click(screen.getByRole('button', { name: '复制改写建议' }))
+    fireEvent.click(screen.getByRole('button', { name: '只复制改写' }))
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('#### 建议 1'))

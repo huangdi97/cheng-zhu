@@ -71,7 +71,8 @@ function FactRow({ fact, evidence, onChanged }: { fact: FactItem; evidence: Fact
         </div>
       ) : (
         <p className="mt-1.5 text-sm text-text-primary leading-relaxed">{fact.text}</p>
-      )}
+      )
+}
       {fact.provenance_status === 'NO_EVIDENCE' && fact.user_assertion_status === 'USER_CONFIRMED' && (
         <p className="mt-1 text-[11px] text-text-muted">说明：当前没有独立资料支持。上场时只能谨慎表述，不会补充指标或细节。</p>
       )}

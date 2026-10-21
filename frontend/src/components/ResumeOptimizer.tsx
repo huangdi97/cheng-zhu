@@ -228,5 +228,4 @@ export default function ResumeOptimizer() {
       </div>
     </div>
   )
-  )
 }

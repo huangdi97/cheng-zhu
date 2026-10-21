@@ -74,7 +74,6 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
 
   const byKey = Object.fromEntries((pre?.items ?? []).map((i) => [i.key, i]))
   const blockers = pre ? (pre.blockers.length ? pre.blockers : pre.items.filter((item) => !item.ok)) : []
-  const readyCount = pre?.items.filter((item) => item.ok).length ?? 0
   const overrideCount = Object.keys(overrides).length
   const hasBlockers = blockers.length > 0
   const primaryContentKeys = ['goal', 'resume', 'skill_cards', 'stories']
@@ -101,23 +100,17 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
 
         {pre ? (
           <>
-            <section aria-label="本场摘要" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
+            <section aria-label="本场摘要" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold tracking-[0.14em] text-text-muted">THIS SESSION</p>
                 <h3 className="mt-0.5 truncate text-base font-semibold text-text-primary">{pre.goal.title}</h3>
                 <p className="mt-0.5 text-[11px] text-text-muted">确认本场带入内容、设备状态与 session-only 覆盖，然后再开始。</p>
               </div>
-              <div className="text-left sm:text-right">
-                <p className="text-lg font-semibold tabular-nums text-text-primary">{readyCount}</p>
-                <p className="text-[10px] text-text-muted">已就绪</p>
-              </div>
-              <div className="text-left sm:text-right">
-                <p className={`text-lg font-semibold tabular-nums ${hasBlockers ? 'text-status-risk' : 'text-status-direct'}`}>{blockers.length}</p>
-                <p className="text-[10px] text-text-muted">阻塞项</p>
-              </div>
-              <div className="text-left sm:text-right">
-                <p className="text-lg font-semibold tabular-nums text-text-primary">{overrideCount}</p>
-                <p className="text-[10px] text-text-muted">本场覆盖</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:justify-end">
+                <span className={hasBlockers ? 'font-medium text-status-risk' : 'font-medium text-status-direct'}>
+                  {hasBlockers ? `${blockers.length} 项待处理` : '可以开始'}
+                </span>
+                <span className="text-text-muted">{overrideCount ? `${overrideCount} 项本场覆盖` : '未修改本场默认值'}</span>
               </div>
             </section>
 
@@ -188,29 +181,31 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
                   </details>
                 </section>
 
-                <section aria-labelledby="preflight-device-heading">
-                  <div className="flex flex-wrap items-end justify-between gap-2">
-                    <div>
-                      <h3 id="preflight-device-heading" className="text-sm font-semibold text-text-primary">这台电脑</h3>
-                      <p className="mt-0.5 text-[11px] text-text-muted">这里只确认本场真正依赖的输入是否可用。</p>
-                    </div>
-                    <button type="button" className="text-[11px] text-accent-blue underline underline-offset-2" onClick={() => { close(); navigate(paths.settings('speech')) }}>检测麦克风与系统音频</button>
-                  </div>
-                  <ul className="mt-2 grid gap-2 sm:grid-cols-3">
-                    {deviceKeys.filter((key) => byKey[key]).map((key) => {
-                      const item = byKey[key]
-                      return (
-                        <li key={key} className="border-t border-bg-tertiary/70 pt-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-text-primary">{item.label}</span>
-                            <span className={`text-[10px] ${item.ok ? 'text-status-direct' : 'text-status-risk'}`}>{item.ok ? '就绪' : '需要处理'}</span>
-                          </div>
-                          <p className="mt-0.5 truncate text-[10px] text-text-muted">{String(item.value)}</p>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
+                {!hasBlockers ? (
+                                  <section aria-labelledby="preflight-device-heading">
+                                    <div className="flex flex-wrap items-end justify-between gap-2">
+                                      <div>
+                                        <h3 id="preflight-device-heading" className="text-sm font-semibold text-text-primary">这台电脑</h3>
+                                        <p className="mt-0.5 text-[11px] text-text-muted">这里只确认本场真正依赖的输入是否可用。</p>
+                                      </div>
+                                      <button type="button" className="text-[11px] text-accent-blue underline underline-offset-2" onClick={() => { close(); navigate(paths.settings('speech')) }}>检测麦克风与系统音频</button>
+                                    </div>
+                                    <ul className="mt-2 grid gap-2 sm:grid-cols-3">
+                                      {deviceKeys.filter((key) => byKey[key]).map((key) => {
+                                        const item = byKey[key]
+                                        return (
+                                          <li key={key} className="border-t border-bg-tertiary/70 pt-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="text-xs font-medium text-text-primary">{item.label}</span>
+                                              <span className={`text-[10px] ${item.ok ? 'text-status-direct' : 'text-status-risk'}`}>{item.ok ? '就绪' : '需要处理'}</span>
+                                            </div>
+                                            <p className="mt-0.5 truncate text-[10px] text-text-muted">{String(item.value)}</p>
+                                          </li>
+                                        )
+                                      })}
+                                    </ul>
+                                  </section>
+                ) : null}
               </div>
 
               <aside className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">

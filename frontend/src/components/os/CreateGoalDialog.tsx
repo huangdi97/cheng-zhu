@@ -5,12 +5,13 @@ import { productApi } from '@/lib/productApi'
 import { useOsStore } from '@/stores/osStore'
 import { Field, inputCls, PrimaryButton, SecondaryButton } from './ui'
 
-export function Dialog({ title, onClose, children, labelledBy, wide = false }: {
+export function Dialog({ title, onClose, children, labelledBy, wide = false, extraWide = false }: {
   title: string
   onClose: () => void
   children: React.ReactNode
   labelledBy: string
   wide?: boolean
+  extraWide?: boolean
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -37,7 +38,7 @@ export function Dialog({ title, onClose, children, labelledBy, wide = false }: {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 p-0 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy}
-        className={`w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-bg-hover bg-bg-primary p-4 shadow-xl animate-fade-up`}>
+        className={`w-full ${extraWide ? 'sm:max-w-4xl' : wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-bg-hover bg-bg-primary p-4 shadow-xl animate-fade-up`}>
         <div className="flex items-center justify-between pb-3">
           <h2 id={labelledBy} className="text-base font-semibold text-text-primary">{title}</h2>
           <button type="button" onClick={onClose} aria-label="关闭" className="rounded-lg p-1.5 text-text-muted hover:bg-bg-hover hover:text-text-primary">

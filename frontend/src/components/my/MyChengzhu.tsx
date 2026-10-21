@@ -374,6 +374,7 @@ export function Voice() {
     api.intelVoice().then((p) => { setPrefs(p); setBanned(p.banned_phrases.join('，')) }).catch(() => setPrefs(null))
   }, [])
   if (!prefs) return <p className="p-4 text-sm text-text-muted">加载中…</p>
+
   const save = async () => {
     try {
       const saved = await api.intelSaveVoice({ ...prefs, banned_phrases: banned.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean) })
@@ -383,48 +384,118 @@ export function Voice() {
       pushToast(getErrorMessage(error, '保存失败'), 'error')
     }
   }
+
+  const languageLabel = prefs.language === 'en' ? 'English' : '中文'
+  const termLabel = prefs.term_style === 'translate_terms' ? '尽量中文化术语' : '技术术语保留英文'
+  const shapeLabel = prefs.shape === 'narrative' ? '完整叙述' : '要点式'
+  const conclusionLabel = prefs.conclusion_first ? '先给结论' : '先交代背景'
+
   return (
-    <div className="p-4 max-w-xl space-y-3" data-testid="voice-preferences">
-      <label className="flex items-center gap-2 text-sm text-text-primary">
-        <input type="checkbox" checked={prefs.conclusion_first} onChange={(e) => setPrefs({ ...prefs, conclusion_first: e.target.checked })} />
-        先说结论
-      </label>
-      <label className="block text-sm text-text-primary">
-        目标时长：{prefs.target_seconds} 秒
-        <input type="range" min={15} max={180} step={5} value={prefs.target_seconds} aria-label="目标时长"
-          onChange={(e) => setPrefs({ ...prefs, target_seconds: Number(e.target.value) })} className="block w-full" />
-      </label>
-      <label className="block text-sm text-text-primary">
-        回答语言
-        <select value={prefs.language} onChange={(e) => setPrefs({ ...prefs, language: e.target.value })}
-          className="mt-1 block rounded-lg border border-bg-hover bg-bg-secondary px-2 py-1 text-sm">
-          <option value="zh-CN">中文</option>
-          <option value="en">English</option>
-        </select>
-      </label>
-      <label className="block text-sm text-text-primary">
-        中英术语
-        <select value={prefs.term_style} onChange={(e) => setPrefs({ ...prefs, term_style: e.target.value })}
-          className="mt-1 block rounded-lg border border-bg-hover bg-bg-secondary px-2 py-1 text-sm">
-          <option value="keep_english_terms">技术术语保留英文</option>
-          <option value="translate_terms">尽量用中文术语</option>
-        </select>
-      </label>
-      <fieldset className="text-sm text-text-primary">
-        <legend>表达形态</legend>
-        {(['bullet', 'narrative'] as const).map((shape) => (
-          <label key={shape} className="mr-4 inline-flex items-center gap-1">
-            <input type="radio" name="shape" checked={prefs.shape === shape} onChange={() => setPrefs({ ...prefs, shape })} />
-            {shape === 'bullet' ? '要点式' : '叙述式'}
+    <div className="grid gap-8 p-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.78fr)]" data-testid="voice-preferences">
+      <section aria-labelledby="voice-protocol-heading" className="min-w-0">
+        <p className="text-[11px] font-medium text-text-muted">DEFAULT DELIVERY</p>
+        <h3 id="voice-protocol-heading" className="mt-1 text-base font-semibold text-text-primary">我的默认表达协议</h3>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-text-secondary">
+          这些不是“人格模板”，只决定成竹怎样组织你的真实内容。它不会改变事实、补造经历，也不会覆盖具体面试中的临时要求。
+        </p>
+
+        <div className="mt-4 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+          <div className="grid grid-cols-[120px_1fr] gap-4 py-3">
+            <span className="text-[11px] text-text-muted">回答顺序</span>
+            <span className="text-sm font-medium text-text-primary">{conclusionLabel}</span>
+          </div>
+          <div className="grid grid-cols-[120px_1fr] gap-4 py-3">
+            <span className="text-[11px] text-text-muted">目标长度</span>
+            <span className="text-sm font-medium tabular-nums text-text-primary">约 {prefs.target_seconds} 秒</span>
+          </div>
+          <div className="grid grid-cols-[120px_1fr] gap-4 py-3">
+            <span className="text-[11px] text-text-muted">表达形态</span>
+            <span className="text-sm font-medium text-text-primary">{shapeLabel}</span>
+          </div>
+          <div className="grid grid-cols-[120px_1fr] gap-4 py-3">
+            <span className="text-[11px] text-text-muted">语言与术语</span>
+            <span className="text-sm font-medium text-text-primary">{languageLabel} · {termLabel}</span>
+          </div>
+          <div className="grid grid-cols-[120px_1fr] gap-4 py-3">
+            <span className="text-[11px] text-text-muted">避免表达</span>
+            <span className="text-sm text-text-primary">{prefs.banned_phrases.length ? prefs.banned_phrases.join('、') : '未设置'}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 border-l-2 border-accent-blue/35 pl-3">
+          <p className="text-xs font-medium text-text-primary">什么时候生效</p>
+          <p className="mt-0.5 text-[11px] leading-5 text-text-muted">
+            保存后不会改写旧场次；它会在下一次冻结 Interview Pack 时作为默认表达偏好写入。某一场的临时要求仍以那一场为准。
+          </p>
+        </div>
+      </section>
+
+      <aside aria-labelledby="voice-controls-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 id="voice-controls-heading" className="text-sm font-semibold text-text-primary">调整默认方式</h3>
+            <p className="mt-0.5 text-[11px] text-text-muted">只改表达组织，不改个人事实。</p>
+          </div>
+          <button type="button" onClick={() => void save()} className="btn-primary flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold">保存</button>
+        </div>
+
+        <div className="mt-4 space-y-5">
+          <label className="flex items-center justify-between gap-4 border-b border-bg-tertiary/70 pb-3 text-sm text-text-primary">
+            <span>
+              <span className="block font-medium">先说结论</span>
+              <span className="mt-0.5 block text-[11px] text-text-muted">默认先给判断，再补依据和背景。</span>
+            </span>
+            <input type="checkbox" checked={prefs.conclusion_first} onChange={(e) => setPrefs({ ...prefs, conclusion_first: e.target.checked })} />
           </label>
-        ))}
-      </fieldset>
-      <label className="block text-sm text-text-primary">
-        禁用的 AI 套话（逗号分隔）
-        <textarea rows={2} value={banned} onChange={(e) => setBanned(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1 text-sm" placeholder="赋能，抓手，闭环" />
-      </label>
-      <button type="button" onClick={() => void save()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">保存</button>
+
+          <label className="block">
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="text-xs font-medium text-text-secondary">目标时长</span>
+              <span className="text-sm font-semibold tabular-nums text-text-primary">{prefs.target_seconds} 秒</span>
+            </span>
+            <input type="range" min={15} max={180} step={5} value={prefs.target_seconds} aria-label="目标时长"
+              onChange={(e) => setPrefs({ ...prefs, target_seconds: Number(e.target.value) })} className="mt-2 block w-full" />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-text-secondary">回答语言</span>
+            <select value={prefs.language} onChange={(e) => setPrefs({ ...prefs, language: e.target.value })}
+              className="mt-1.5 block w-full rounded-lg border border-bg-hover bg-bg-primary px-2.5 py-2 text-sm text-text-primary">
+              <option value="zh-CN">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-text-secondary">中英术语</span>
+            <select value={prefs.term_style} onChange={(e) => setPrefs({ ...prefs, term_style: e.target.value })}
+              className="mt-1.5 block w-full rounded-lg border border-bg-hover bg-bg-primary px-2.5 py-2 text-sm text-text-primary">
+              <option value="keep_english_terms">技术术语保留英文</option>
+              <option value="translate_terms">尽量用中文术语</option>
+            </select>
+          </label>
+
+          <fieldset>
+            <legend className="text-xs font-medium text-text-secondary">表达形态</legend>
+            <div className="mt-1.5 grid grid-cols-2 divide-x divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+              {(['bullet', 'narrative'] as const).map((shape) => (
+                <label key={shape} className="flex items-center gap-2 px-3 py-2.5 text-xs text-text-primary first:pl-0">
+                  <input type="radio" name="shape" checked={prefs.shape === shape} onChange={() => setPrefs({ ...prefs, shape })} />
+                  {shape === 'bullet' ? '要点式' : '完整叙述'}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <label className="block">
+            <span className="text-xs font-medium text-text-secondary">避免的 AI 套话</span>
+            <span className="mt-0.5 block text-[11px] text-text-muted">只影响措辞偏好，不会因为禁用词而删掉真实信息。</span>
+            <textarea rows={3} value={banned} onChange={(e) => setBanned(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-bg-hover bg-bg-primary px-2.5 py-2 text-sm text-text-primary"
+              placeholder="赋能，抓手，闭环" />
+          </label>
+        </div>
+      </aside>
     </div>
   )
 }

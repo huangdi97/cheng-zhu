@@ -190,6 +190,34 @@ const PREFLIGHT = {
   share_privacy_note: '共享隐私默认关闭；本场设置只影响当前会话。',
 }
 
+const PREFLIGHT_BLOCKED = {
+  goal: { id: GOAL_ID, title: GOAL.title },
+  items: [
+    { key: 'goal', label: '目标', value: GOAL.title, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'resume', label: '简历', value: '郝磊-简历.pdf', origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'skill_cards', label: '技能卡', value: 4, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'stories', label: 'Stories', value: 3, origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'knowledge', label: '知识参考', value: '已启用', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'materials', label: '项目资料', value: 2, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'quick_notes', label: '速记', value: 1, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '速记只是提醒，不是个人经历证据。' },
+    { key: 'answer_language', label: '回答语言', value: 'FOLLOW_INTERVIEW', origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'whisper_language', label: '识别语言', value: 'auto', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'language', label: '界面语言', value: '中文', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'technical_term_policy', label: '技术术语', value: '保留英文', origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'active_model', label: '模型', value: 'GPT-4.1 Mini', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'audio', label: '会议音频', value: '未就绪', origin: 'SYSTEM', origin_label: '系统检查', ok: false, hint: '没有检测到可用的系统音频输入；请在设置里完成测试后重试。' },
+    { key: 'stt', label: '语音识别', value: 'Whisper · 就绪', origin: 'SYSTEM', origin_label: '系统检查', ok: true, hint: '' },
+    { key: 'screen_context', label: '屏幕上下文', value: '关闭', origin: 'SYSTEM', origin_label: '系统检查', ok: true, hint: '' },
+    { key: 'ai_policy_mode', label: 'AI 辅助', value: 'AI_ALLOWED', origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'human_assistance_policy', label: '真人辅助', value: 'HUMAN_PRACTICE_ONLY', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'share_privacy_mode', label: '共享隐私', value: 'OFF', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+  ],
+  blockers: [
+    { key: 'audio', label: '会议音频', value: '未就绪', origin: 'SYSTEM', origin_label: '系统检查', ok: false, hint: '没有检测到可用的系统音频输入；请在设置里完成测试后重试。' },
+  ],
+  share_privacy_note: '共享隐私默认关闭；它不是安全或“不可检测”保证。',
+}
+
 const FROZEN_PACK = {
   id: 'pack-ui-1',
   session_id: 'live-ui-1',
@@ -481,6 +509,69 @@ async function expectInterviewStudioNav(page) {
   }
   await expect(nav.getByRole('button', { name: '资料库' })).toHaveCount(0)
 }
+
+test.describe('@visual v2 setup boundaries', () => {
+  test('First run — three-phase orientation', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: async (pathname, method) => {
+        if (pathname === '/api/config' && method === 'GET') {
+          const { resolveApiPayload } = await import('./fixtures/sample-data.mjs')
+          return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
+        }
+        if (pathname === '/api/intelligence/diagnostics' && method === 'GET') {
+          return {
+            packaged: true,
+            data_home: 'C:/Users/u/AppData/Roaming/Chengzhu',
+            data_dir: 'C:/Users/u/AppData/Roaming/Chengzhu/data',
+            logs_dir: 'C:/Users/u/AppData/Roaming/Chengzhu/logs',
+            data_writable: true,
+            models: [{ index: 0, name: 'Primary', model: 'gpt-4.1-mini', has_key: true, enabled: true }],
+            has_usable_model: true,
+            stt_provider: 'whisper',
+            audio: { devices: [{ id: 1, name: 'Pixel Buds Microphone', is_loopback: false }, { id: 20000, name: 'Speakers (loopback)', is_loopback: true }] },
+            has_microphone: true,
+            has_system_audio: true,
+          }
+        }
+        return undefined
+      },
+    })
+    await page.goto('/#/home')
+    const wizard = page.getByTestId('onboarding')
+    await expect(wizard).toBeVisible()
+    await expect(wizard.getByText('第 1 / 11 步')).toBeVisible()
+    await expect(wizard.getByText('准备这台电脑', { exact: true }).first()).toBeVisible()
+    await expect(wizard.getByText('建立求职上下文', { exact: true })).toBeVisible()
+    await expect(wizard.getByText('跑通第一次闭环', { exact: true })).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('onboarding-welcome.png', SNAPSHOT)
+  })
+
+  test('Preflight — blocker-first session review', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: (pathname, method) => {
+        if (pathname === '/api/product/goals' && method === 'GET') return { items: [GOAL] }
+        if (pathname === `/api/product/goals/${GOAL_ID}` && method === 'GET') return GOAL_DETAIL
+        if (pathname === '/api/product/live/preflight' && method === 'POST') return PREFLIGHT_BLOCKED
+        return undefined
+      },
+    })
+    await page.goto(`/#/goals/${GOAL_ID}`)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
+    await page.getByTestId('goal-go-live').click()
+    const preflight = page.getByTestId('preflight')
+    await expect(preflight).toBeVisible()
+    await expect(preflight.getByText('开始前需要处理')).toBeVisible()
+    await expect(preflight.getByText('没有检测到可用的系统音频输入；请在设置里完成测试后重试。')).toBeVisible()
+    await expect(page.getByTestId('preflight-start')).toBeDisabled()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('preflight-blocked.png', SNAPSHOT)
+  })
+})
 
 test.describe('@visual v2 Studio surfaces', () => {
   test.beforeEach(async ({ context }) => {

@@ -242,7 +242,7 @@ test.describe('v1.3 first-run onboarding', () => {
 
     // Advance to 第一个目标 without requiring real credentials/hardware.
     for (let i = 0; i < 8; i++) await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByText('第一个目标')).toBeVisible()
+    await expect(wizard.getByRole('heading', { name: '第一个目标', exact: true })).toBeVisible()
     await wizard.getByLabel('目标公司').fill('MindRank')
     await wizard.getByLabel('目标岗位').fill('AIDD Agent Engineer')
     await wizard.getByRole('button', { name: '下一步' }).click()

@@ -34,6 +34,12 @@ interface Explained {
 
 const STEPS = ['欢迎', '本地数据', '模型', '语音识别', '麦克风', '系统音频', '共享隐私', '简历', '第一个目标', '第一次演练', '完成'] as const
 
+const PHASES = [
+  { label: '准备这台电脑', hint: '数据、模型、语音与隐私', from: 0, to: 6 },
+  { label: '建立求职上下文', hint: '简历与第一个目标', from: 7, to: 8 },
+  { label: '跑通第一次闭环', hint: '练习一次，再进入成竹', from: 9, to: 10 },
+] as const
+
 function Status({ ok, label, explain }: { ok: boolean | null; label: string; explain?: Explained | null }) {
   return (
     <div className="rounded-xl border border-bg-hover/60 bg-bg-tertiary/20 p-3 text-sm">
@@ -205,23 +211,49 @@ export default function OnboardingWizard() {
 
   const mics = (diag?.audio.devices ?? []).filter((d) => !d.is_loopback)
   const loops = (diag?.audio.devices ?? []).filter((d) => d.is_loopback)
+  const phaseIndex = PHASES.findIndex((phase) => step >= phase.from && step <= phase.to)
+  const phase = PHASES[Math.max(0, phaseIndex)]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" data-testid="onboarding">
-      <div className="w-full max-w-xl rounded-2xl bg-bg-secondary shadow-xl">
-        <div className="border-b border-bg-hover/60 px-5 py-4">
-          <p className="text-[11px] text-text-muted">第 {step + 1} / {STEPS.length} 步</p>
-          <h2 id="onboarding-title" className="text-lg font-semibold text-text-primary">{STEPS[step]}</h2>
-          <ol className="mt-2 flex gap-1" aria-hidden>
-            {STEPS.map((s, i) => <li key={s} className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-accent-blue' : 'bg-bg-hover'}`} />)}
-          </ol>
-        </div>
-        <div className="max-h-[60vh] overflow-y-auto px-5 py-4 space-y-3 text-sm text-text-secondary">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" data-testid="onboarding">
+      <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-bg-secondary shadow-2xl">
+        <header className="border-b border-bg-tertiary/70 px-6 py-5">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-text-muted">FIRST RUN · {phaseIndex + 1} / {PHASES.length}</p>
+              <p className="mt-1 text-[11px] text-text-muted">第 {step + 1} / {STEPS.length} 步 · {phase.label}</p>
+              <h2 id="onboarding-title" className="mt-0.5 text-xl font-semibold tracking-tight text-text-primary">{STEPS[step]}</h2>
+              <p className="mt-1 text-xs text-text-secondary">{phase.hint}</p>
+            </div>
+            <ol aria-label="首次引导阶段" className="grid min-w-[260px] grid-cols-3 gap-1.5">
+              {PHASES.map((item, i) => (
+                <li key={item.label} className={`border-t-2 pt-1.5 text-[10px] leading-4 ${i < phaseIndex ? 'border-status-direct text-text-secondary' : i === phaseIndex ? 'border-accent-blue font-semibold text-text-primary' : 'border-bg-hover text-text-muted'}`}>
+                  {item.label}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </header>
+        <div className="max-h-[68vh] overflow-y-auto px-6 py-5 space-y-4 text-sm text-text-secondary">
           {step === 0 && (
-            <>
-              <p>成竹是一个本机运行的面试准备与实时提示工具：先把你的真实经历整理成有来源的事实，按岗位准备和演练，上场时先给简短 Cue，再按需展开完整回答。</p>
-              <p className="text-xs text-text-muted">开源（MIT License）。请只在允许使用辅助工具的场合使用实时提示；演练和复盘不受限制。</p>
-            </>
+            <div>
+              <p className="max-w-2xl text-sm leading-6 text-text-primary">成竹只做一件事：把你的真实经历变成可追溯的准备、练习和上场提示，再把每一场复盘写回下一步。</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="border-t border-bg-tertiary/70 pt-3">
+                  <p className="text-xs font-semibold text-text-primary">01 · 准备</p>
+                  <p className="mt-1 text-[11px] leading-5 text-text-muted">简历、事实、Goal 和资料先建立边界。</p>
+                </div>
+                <div className="border-t border-bg-tertiary/70 pt-3">
+                  <p className="text-xs font-semibold text-text-primary">02 · 练习 / 上场</p>
+                  <p className="mt-1 text-[11px] leading-5 text-text-muted">只把这一场真正需要的内容带进去。</p>
+                </div>
+                <div className="border-t border-bg-tertiary/70 pt-3">
+                  <p className="text-xs font-semibold text-text-primary">03 · 复盘</p>
+                  <p className="mt-1 text-[11px] leading-5 text-text-muted">不打综合分，只把证据和下一步留下来。</p>
+                </div>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-text-muted">数据默认留在本机。实时提示只应在允许使用辅助工具的场合使用；演练和复盘不受限制。成竹开源（MIT License）。</p>
+            </div>
           )}
           {step === 1 && (
             <>
@@ -307,7 +339,7 @@ export default function OnboardingWizard() {
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-bg-hover/60 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-bg-tertiary/70 bg-bg-primary/35 px-6 py-3.5">
           <button type="button" data-testid="onboarding-skip" onClick={() => void finish()} className="text-xs text-text-muted hover:text-text-primary">跳过引导</button>
           <div className="flex gap-2">
             {step > 0 && (

@@ -6,6 +6,11 @@ name: update-visual-snapshots
 # visual-regression check on a feature PR.
 
 on:
+  push:
+    branches:
+      - refine/ui-v2-onboarding-preflight-r7
+    paths:
+      - .github/workflows/update-visual-snapshots.yml
   workflow_dispatch:
     inputs:
       base_branch:
@@ -28,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.base_branch }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.base_branch || github.ref_name }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4

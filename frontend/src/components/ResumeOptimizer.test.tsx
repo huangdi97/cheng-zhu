@@ -96,7 +96,7 @@ describe('ResumeOptimizer', () => {
     render(<ResumeOptimizer />)
 
     expect(screen.getByText('张三_后端开发.pdf')).toBeInTheDocument()
-    expect(screen.getByText('切换简历后，只会影响之后新冻结的 Interview Pack；旧场次保持原样。')).toBeInTheDocument()
+    expect(screen.getByText('切换只影响之后新冻结的 Interview Pack；旧场次保持原样。')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '复制全部' }))
 

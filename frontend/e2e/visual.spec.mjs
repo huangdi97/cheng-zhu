@@ -690,6 +690,8 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page.getByTestId('resume-mount-panel')).toBeVisible({ timeout: 8000 })
     await expect(page.getByTestId('resume-workspace')).toBeVisible()
     await expect(page.getByText('一份当前简历，对照一个目标岗位')).toBeVisible()
+    await expect(page.getByTestId('resume-analyze')).toBeVisible()
+    await expect(page.getByTestId('resume-analyze')).toBeInViewport()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-resume.png', SNAPSHOT)
   })

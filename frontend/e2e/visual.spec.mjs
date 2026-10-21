@@ -443,6 +443,121 @@ const QUESTION_BANK_ITEMS = {
   },
 }
 
+
+const CONVERSATION_SPACE = {
+  id: 'cs-ui-1',
+  profile: 'DESIGN_REVIEW',
+  title: 'PDIG · Android Architecture',
+  description: '持续设计评审',
+  status: 'ACTIVE',
+  project_id: 'pdig',
+  relationship_key: '',
+  default_goal: '形成 Android conflict merge strategy 决策',
+  default_mode: 'BALANCED',
+  selected_source_ids: [],
+  selected_quick_note_ids: [],
+  selected_connector_snapshot_ids: [],
+  retention_policy: { preset: 'STANDARD', connector_snapshot_days: 30 },
+  created_at: T - 864000,
+  updated_at: T - 3600,
+  open_commitments_count: 1,
+  open_questions_count: 1,
+  next_session: {
+    id: 'cv-ui-next',
+    space_id: 'cs-ui-1',
+    title: 'Android Architecture Review',
+    scheduled_at: T + 7200,
+    assistance_mode: 'BALANCED',
+  },
+  last_session: { id: 'cv-ui-last', title: 'Architecture Review #4', ended_at: T - 7200 },
+}
+
+const CONVERSATION_COMMITMENT = {
+  id: 'ci-ui-commitment',
+  space_id: 'cs-ui-1',
+  session_id: 'cv-ui-last',
+  type: 'Commitment',
+  state: 'COMMITTED',
+  title: '我来补 rollout plan 和回退条件',
+  owner_id: 'me',
+  due_at: '2026-10-23',
+  source_refs: [{ kind: 'TRANSCRIPT_SEGMENT', excerpt: '我来补 rollout plan' }],
+  review_status: 'USER_CONFIRMED',
+}
+
+const CONVERSATION_OPEN = {
+  id: 'ci-ui-open',
+  space_id: 'cs-ui-1',
+  session_id: 'cv-ui-last',
+  type: 'OpenQuestion',
+  state: 'OPEN',
+  title: 'rollback owner 还没有明确',
+  source_refs: [{ kind: 'TRANSCRIPT_SEGMENT', excerpt: 'rollback 谁来负责还没定' }],
+  review_status: 'USER_CONFIRMED',
+}
+
+const CONVERSATION_DECISION = {
+  id: 'ci-ui-decision',
+  space_id: 'cs-ui-1',
+  session_id: 'cv-ui-last',
+  type: 'Decision',
+  state: 'AGREED',
+  title: 'offline migration 采用 v2',
+  source_refs: [{ kind: 'TRANSCRIPT_SEGMENT', excerpt: '那我们就按 v2 做' }],
+  review_status: 'USER_CONFIRMED',
+}
+
+const CONVERSATION_HOME = {
+  state: 'ACTIVE',
+  spaces: [CONVERSATION_SPACE],
+  next_session: CONVERSATION_SPACE.next_session,
+  next_focus: { kind: 'Open Question', title: CONVERSATION_OPEN.title, space_id: CONVERSATION_SPACE.id },
+  owed_by_me: [CONVERSATION_COMMITMENT],
+  open_questions: [CONVERSATION_OPEN],
+  recent_change: CONVERSATION_DECISION,
+}
+
+const CONVERSATION_SPACES = {
+  items: [
+    CONVERSATION_SPACE,
+    {
+      ...CONVERSATION_SPACE,
+      id: 'cs-ui-2',
+      profile: 'ONE_ON_ONE',
+      title: '与产品负责人的 1:1',
+      default_goal: '明确下一阶段职责与资源边界',
+      default_mode: 'ONE_ON_ONE',
+      updated_at: T - 172800,
+      open_commitments_count: 0,
+      open_questions_count: 2,
+      next_session: null,
+      last_session: { id: 'cv-ui-2-last', title: '1:1 · Oct 18', ended_at: T - 172800 },
+    },
+    {
+      ...CONVERSATION_SPACE,
+      id: 'cs-ui-3',
+      profile: 'CLIENT_CALL',
+      title: 'Pilot 客户技术沟通',
+      default_goal: '确认试点范围与上线前置条件',
+      default_mode: 'BALANCED',
+      updated_at: T - 864000,
+      open_commitments_count: 2,
+      open_questions_count: 0,
+      next_session: null,
+      last_session: { id: 'cv-ui-3-last', title: 'Pilot Call #2', ended_at: T - 864000 },
+    },
+  ],
+}
+
+const CONVERSATION_TEMPLATES = {
+  items: [
+    { key: 'PROJECT_SYNC', label: '项目同步', default_mode: 'BALANCED', launch_wedge: true, playbook: { closing_objective: '明确下一步、owner 和仍未解决的问题。', success_conditions: [], priority_truth_types: [] } },
+    { key: 'DESIGN_REVIEW', label: '设计评审', default_mode: 'BALANCED', launch_wedge: true, playbook: { closing_objective: '形成有来源的 Decision，或明确留下仍未解决的 trade-off。', success_conditions: [], priority_truth_types: [] } },
+    { key: 'ONE_ON_ONE', label: '1:1', default_mode: 'ONE_ON_ONE', launch_wedge: false, playbook: { closing_objective: '把双方明确说过的期望、承诺和下一步留下来。', success_conditions: [], priority_truth_types: [] } },
+    { key: 'CLIENT_CALL', label: '客户会', default_mode: 'BALANCED', launch_wedge: false, playbook: { closing_objective: '明确客户已表达的需求、风险、承诺和待确认事项。', success_conditions: [], priority_truth_types: [] } },
+  ],
+}
+
 const STUDIO_OVERRIDES = (pathname, method) => {
   if (method !== 'GET') return undefined
   if (pathname === '/api/product/home') return HOME
@@ -459,6 +574,9 @@ const STUDIO_OVERRIDES = (pathname, method) => {
   if (pathname === '/api/product/materials') return PROJECT_MATERIALS
   if (pathname === '/api/intelligence/skill-cards') return MY_SKILLS
   if (pathname === '/api/kb/status') return KB_STATUS
+  if (pathname === '/api/product/conversation/home') return CONVERSATION_HOME
+  if (pathname === '/api/product/conversation/spaces') return CONVERSATION_SPACES
+  if (pathname === '/api/product/conversation/templates') return CONVERSATION_TEMPLATES
   if (pathname === '/api/product/question-banks') return QUESTION_BANKS
   if (pathname.startsWith('/api/product/question-banks/') && pathname.endsWith('/items')) {
     const bankId = pathname.split('/')[4]
@@ -678,6 +796,27 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expectInterviewStudioNav(page)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-projects.png', SNAPSHOT)
+  })
+
+
+  test('Conversation Home — continuity first', async ({ page }) => {
+    await page.goto('/#/conversation')
+    await expect(page.getByTestId('conversation-home')).toBeVisible()
+    await expect(page.getByText('下一场', { exact: true })).toBeVisible()
+    await expect(page.getByText('需要你处理')).toBeVisible()
+    await expect(page.getByText('我来补 rollout plan 和回退条件')).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('conversation-home.png', SNAPSHOT)
+  })
+
+  test('Conversation Spaces — ongoing relationships', async ({ page }) => {
+    await page.goto('/#/conversation/spaces')
+    await expect(page.getByTestId('conversation-spaces')).toBeVisible()
+    await expect(page.getByText('查找承诺、决策和开放问题')).toBeVisible()
+    await expect(page.getByText('PDIG · Android Architecture')).toBeVisible()
+    await expect(page.getByText('与产品负责人的 1:1')).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('conversation-spaces.png', SNAPSHOT)
   })
 
   test('Person resume workspace', async ({ page }) => {

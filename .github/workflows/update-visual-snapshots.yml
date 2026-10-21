@@ -1,5 +1,6 @@
 name: update-visual-snapshots
 
+# One-shot r11 snapshot trigger armed.
 # Manually triggered workflow that regenerates Playwright screenshot
 # baselines on the same Linux runner CI uses, then opens a PR with the
 # new images. Use this when intentional UI changes break the

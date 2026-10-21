@@ -110,3 +110,6 @@ CODE_REVIEW.md
 # PI-Desktop host session artifacts
 .pi/
 .tmp/
+
+# Local visual-acceptance evidence (screenshots, metrics, contact sheet)
+.runtime/

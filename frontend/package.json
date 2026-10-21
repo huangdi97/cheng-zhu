@@ -12,6 +12,8 @@
     "test:e2e:ui": "playwright test --config=playwright.config.mjs --ui",
     "test:e2e:install": "playwright install --with-deps chromium",
     "test:e2e:update-snapshots": "playwright test --config=playwright.config.mjs --grep @visual --update-snapshots",
+    "hva": "node ./scripts/ui-v2-hva.mjs",
+    "hva:sheet": "node ./scripts/ui-v2-hva-sheet.mjs",
     "preview": "vite preview",
     "screenshots:readme": "node ./scripts/promote-readme-product-media.mjs",
     "demo:readme": "node ./scripts/promote-readme-product-media.mjs"

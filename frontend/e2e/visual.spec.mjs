@@ -753,12 +753,67 @@ test.describe('@visual v2 setup boundaries', () => {
     await page.goto('/#/home')
     const wizard = page.getByTestId('onboarding')
     await expect(wizard).toBeVisible()
-    await expect(wizard.getByText('第 1 / 11 步')).toBeVisible()
-    await expect(wizard.getByText('准备这台电脑', { exact: true }).first()).toBeVisible()
-    await expect(wizard.getByText('建立求职上下文', { exact: true })).toBeVisible()
-    await expect(wizard.getByText('跑通第一次闭环', { exact: true })).toBeVisible()
+    await expect(wizard.getByText('FIRST RUN · 1 / 3')).toBeVisible()
+    await expect(wizard.getByRole('heading', { name: '成竹围绕一个目标工作' })).toBeVisible()
+    await expect(wizard.getByRole('button', { name: '测试连接' })).toHaveCount(0)
     await page.waitForTimeout(250)
-    await expect(page).toHaveScreenshot('onboarding-welcome.png', SNAPSHOT)
+    await expect(page).toHaveScreenshot('onboarding-understand.png', SNAPSHOT)
+
+    await wizard.getByTestId('onboarding-next').click()
+    await expect(wizard.getByRole('heading', { name: '你下一场在准备什么？' })).toBeVisible()
+    await wizard.getByTestId('onboarding-goal-company').fill('字节跳动')
+    await wizard.getByTestId('onboarding-goal-role').fill('AI 产品经理')
+    await wizard.getByTestId('onboarding-goal-jd').fill('负责 AI 产品规划、Agent 场景设计与评测体系，并把业务问题转化为可验证的产品假设。')
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('onboarding-goal.png', SNAPSHOT)
+  })
+
+  test('Create Goal — one interview, not a database row', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: (pathname, method) => {
+        if (method === 'GET' && pathname === '/api/product/goals') return { items: [GOAL] }
+        return undefined
+      },
+    })
+    await page.goto('/#/goals')
+    await expect(page.getByRole('heading', { name: '求职目标' })).toBeVisible()
+    await page.getByRole('button', { name: '新建目标' }).first().click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('公司')).toBeVisible()
+    await expect(dialog.getByLabel('岗位')).toBeVisible()
+    await expect(dialog.getByLabel('JD（可稍后补充）')).toBeVisible()
+    await expect(dialog.getByText('下一轮（可选）')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '创建目标' })).toBeInViewport()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('create-goal.png', SNAPSHOT)
+  })
+
+  test('Preflight — ready state answers in the first view', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: (pathname, method) => {
+        if (method === 'GET' && pathname === '/api/product/goals') return { items: [GOAL] }
+        if (method === 'GET' && pathname === `/api/product/goals/${GOAL_ID}`) return GOAL_DETAIL
+        if (method === 'POST' && pathname === '/api/product/live/preflight') return PREFLIGHT
+        return undefined
+      },
+    })
+    await page.goto(`/#/goals/${GOAL_ID}`)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
+    await page.getByTestId('goal-go-live').click()
+    const preflight = page.getByTestId('preflight')
+    await expect(preflight).toBeVisible()
+    await expect(preflight.getByText('可以开始', { exact: true })).toBeVisible()
+    await expect(preflight.getByText('开始前需要处理')).toHaveCount(0)
+    await expect(preflight.getByTestId('preflight-start')).toBeEnabled()
+    await expect(preflight.getByTestId('preflight-start')).toBeInViewport()
+    await expect(preflight.getByTestId('preflight-start')).toContainText('开始上场')
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('preflight-ready.png', SNAPSHOT)
   })
 
   test('Preflight — blocker-first session review', async ({ context, page }) => {

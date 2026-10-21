@@ -266,5 +266,4 @@ export default function GoalPrepare({ goal, reload }: { goal: GoalDetail; reload
       </div>
     </div>
   )
-  )
 }

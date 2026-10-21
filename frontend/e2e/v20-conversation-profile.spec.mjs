@@ -758,7 +758,8 @@ test.describe('v2.0 Conversation Profile', () => {
     await expect(page).toHaveURL(/#\/conversation\/spaces\?new=1/)
     await expect(page.getByLabel('空间名称')).toBeVisible()
     await expect(page.getByText('希望持续达成什么（可选）')).toBeVisible()
-    await expect(page.getByText(/成熟度 · BETA_WEDGE/)).toBeVisible()
+    await expect(page.getByText(/默认帮助方式：/)).toBeVisible()
+    await expect(page.getByText(/这个场景通常希望最后留下：/)).toBeVisible()
   })
 
 
@@ -1484,7 +1485,7 @@ test.describe('v2.0 Conversation Profile', () => {
     })
     await page.goto('/#/conversation/spaces?find=Decision')
     await expect(page.getByTestId('conversation-search')).toBeVisible()
-    await expect(page.getByText('查找长期对话事实')).toBeVisible()
+    await expect(page.getByText('查找承诺、决策和开放问题')).toBeVisible()
     await expect(page.getByText('offline migration 采用 v2')).toBeVisible()
     await expect(page.getByText(/PDIG · Android Architecture · Architecture Review/)).toBeVisible()
     await expect(page.getByText(/来源：TRANSCRIPT_SEGMENT/)).toBeVisible()

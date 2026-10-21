@@ -6,9 +6,6 @@ name: update-visual-snapshots
 # visual-regression check on a feature PR.
 
 on:
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       base_branch:
@@ -31,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.base_branch || github.event.pull_request.head.ref }}
+          ref: ${{ github.event.inputs.base_branch }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4

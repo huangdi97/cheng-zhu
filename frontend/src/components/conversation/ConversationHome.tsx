@@ -4,6 +4,14 @@ import { conversationApi } from '@/lib/conversationApi'
 import { navigate, paths } from '@/lib/router'
 import { EmptyState, ErrorState, Loading, Page, PageHeader, PrimaryButton, SecondaryButton, formatWhen, useAsync } from '@/components/os/ui'
 
+const MODE_LABEL: Record<string, string> = {
+  QUIET: '安静',
+  BALANCED: '平衡',
+  ACTIVE: '主动',
+  PRESENTATION: '演示',
+  ONE_ON_ONE: '1:1',
+}
+
 export default function ConversationHome() {
   const { data, error, loading, reload } = useAsync(() => conversationApi.home(), [])
   const [starting, setStarting] = useState(false)
@@ -93,7 +101,7 @@ export default function ConversationHome() {
                     <span className="min-w-0">
                       <span className="block text-lg font-semibold text-text-primary group-hover:underline group-hover:underline-offset-4">{data.next_session.title}</span>
                       <span className="mt-1 block text-xs text-text-secondary">{formatWhen(data.next_session.scheduled_at)} · 进入准备</span>
-                      <span className="mt-1 block text-[11px] text-text-muted">帮助方式：{data.next_session.assistance_mode}</span>
+                      <span className="mt-1 block text-[11px] text-text-muted">帮助方式：{MODE_LABEL[data.next_session.assistance_mode] ?? data.next_session.assistance_mode}</span>
                     </span>
                   </button>
                 ) : (

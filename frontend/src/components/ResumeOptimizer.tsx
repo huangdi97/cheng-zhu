@@ -144,29 +144,30 @@ export default function ResumeOptimizer() {
             </div>
           ) : null}
 
-          <label className="mt-5 block">
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-medium text-text-secondary">目标岗位 JD</span>
-              <span className="text-[10px] tabular-nums text-text-muted">{jdText.trim().length} 字</span>
-            </span>
+          <section className="mt-5" aria-labelledby="target-jd-label">
+            <div className="flex items-center justify-between gap-3">
+              <span id="target-jd-label" className="text-xs font-medium text-text-secondary">目标岗位 JD</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tabular-nums text-text-muted">{jdText.trim().length} 字</span>
+                <button
+                  type="button"
+                  data-testid="resume-analyze"
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || !jdText.trim() || !config?.has_resume}
+                  className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-blue/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isAnalyzing ? '分析中…' : '分析这份简历'}
+                </button>
+              </div>
+            </div>
             <textarea
+              aria-labelledby="target-jd-label"
               value={jdText}
               onChange={(e) => setJdText(e.target.value)}
               placeholder="粘贴这个岗位真正会考察的职责、要求和加分项…"
-              className="mt-1.5 min-h-[220px] w-full resize-y rounded-xl border border-bg-hover bg-bg-primary px-3 py-2.5 text-xs leading-5 text-text-primary focus:border-accent-blue focus:outline-none"
+              className="mt-1.5 min-h-[150px] w-full resize-y rounded-xl border border-bg-hover bg-bg-primary px-3 py-2.5 text-xs leading-5 text-text-primary focus:border-accent-blue focus:outline-none"
             />
-          </label>
-
-          <div className="mt-3 [&>button]:w-full">
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || !jdText.trim() || !config?.has_resume}
-              className="w-full rounded-lg bg-accent-blue px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-blue/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isAnalyzing ? '正在对照简历与岗位…' : '分析这份简历'}
-            </button>
-          </div>
+          </section>
         </aside>
 
         <main aria-labelledby="resume-result-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">

@@ -88,7 +88,7 @@ test.describe('Goal Prepare workspace', () => {
 
     await expect(page.getByText('RAG 评估')).toBeVisible()
     await expect(page.getByText('指标会被追问口径与来源 · 与岗位要求直接相关')).toBeVisible()
-    await expect(page.getByText(/还没有「团队协作」故事/)).toBeVisible()
+    await expect(page.getByText('下一块最值得补：团队协作')).toBeVisible()
     await expect(page.getByRole('tree', { name: '可能追问' })).toBeVisible()
     await expect(page.getByText('如果让你来落地「Kubernetes」，你会怎么做？')).toBeVisible()
   })

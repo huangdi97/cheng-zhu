@@ -90,6 +90,131 @@ export default function QuickNotesPanel({ goalId, readOnly = false, selectedIds,
   if (error && !notes) return <ErrorState message={error} onRetry={load} />
   if (!notes) return <Loading />
 
+  if (context === 'library' && !compact && !readOnly) {
+    const pinnedCount = notes.filter((note) => note.pinned).length
+    const globalCount = notes.filter((note) => note.scope === 'GLOBAL').length
+    const goalCount = notes.filter((note) => note.scope === 'GOAL').length
+
+    return (
+      <div data-testid="quick-notes-panel">
+        <section aria-label="速记边界" className="grid gap-3 border-y border-bg-tertiary/70 py-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
+          <div>
+            <p className="text-sm font-semibold text-text-primary">你写的提醒，保持为“你的笔记”</p>
+            <p className="mt-0.5 max-w-2xl text-xs leading-5 text-text-secondary">
+              速记适合记录想问的问题、数字、提醒和临场关注点。它不是证据，也不会因为被带入某个 Goal 就自动变成已确认事实。
+            </p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-lg font-semibold tabular-nums text-text-primary">{notes.length}</p>
+            <p className="text-[10px] text-text-muted">全部速记</p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-lg font-semibold tabular-nums text-text-primary">{pinnedCount}</p>
+            <p className="text-[10px] text-text-muted">已置顶</p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-lg font-semibold tabular-nums text-text-primary">{goalCount} / {globalCount}</p>
+            <p className="text-[10px] text-text-muted">目标 / 全局</p>
+          </div>
+        </section>
+
+        <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.75fr)]">
+          <section aria-labelledby="quick-note-list-heading" className="min-w-0">
+            <div>
+              <h2 id="quick-note-list-heading" className="text-sm font-semibold text-text-primary">我的速记</h2>
+              <p className="mt-0.5 text-[11px] text-text-muted">置顶只影响你看到的顺序，不改变内容可信度。</p>
+            </div>
+
+            {error ? <p role="alert" className="mt-3 text-xs text-status-risk">{error}</p> : null}
+            {!notes.length ? <div className="mt-3"><EmptyState title="还没有速记" body="先写下一场最怕忘的一件事，而不是整理一份完整知识库。" /></div> : null}
+
+            {notes.length ? (
+              <ul className="mt-3 divide-y divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+                {notes.map((note, i) => (
+                  <li key={note.id} className="py-3">
+                    {editing?.id === note.id ? (
+                      <div className="space-y-2">
+                        <input aria-label="编辑标题" className={inputCls} value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+                        <textarea aria-label="编辑内容" className={`${inputCls} min-h-[72px]`} value={editing.content} onChange={(e) => setEditing({ ...editing, content: e.target.value })} />
+                        {conflict ? (
+                          <div role="alert" className="border-l-2 border-status-inferred/40 pl-3 text-[11px] text-text-secondary">
+                            这条速记已在别处修改：「{conflict.content.slice(0, 80)}」
+                            <div className="mt-1.5 flex gap-2">
+                              <SecondaryButton onClick={() => { setEditing({ id: conflict.id, title: conflict.title, content: conflict.content, revision: conflict.revision }); setConflict(null) }}>使用最新内容</SecondaryButton>
+                              <SecondaryButton onClick={() => { setEditing({ ...editing, revision: conflict.revision }); setConflict(null) }}>保留我的修改</SecondaryButton>
+                            </div>
+                          </div>
+                        ) : null}
+                        <div className="flex gap-2">
+                          <PrimaryButton onClick={() => void saveEdit()}>保存</PrimaryButton>
+                          <SecondaryButton onClick={() => { setEditing(null); setConflict(null) }}>取消</SecondaryButton>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {note.pinned ? <Pin className="h-3 w-3 text-accent-amber" aria-label="已置顶" /> : null}
+                            {note.title ? <span className="text-sm font-semibold text-text-primary">{note.title}</span> : <span className="text-[10px] text-text-muted">无标题</span>}
+                            <span className="text-[10px] text-text-muted">{note.scope === 'GLOBAL' ? '全局' : '目标'}</span>
+                          </div>
+                          <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-text-secondary">{note.content}</p>
+                        </div>
+                        <div className="flex flex-shrink-0 items-center">
+                          <button type="button" aria-label="上移" disabled={i === 0} onClick={() => void move(i, -1)} className="rounded p-1 text-text-muted hover:bg-bg-hover disabled:opacity-25"><ArrowUp className="h-3.5 w-3.5" aria-hidden /></button>
+                          <button type="button" aria-label="下移" disabled={i === notes.length - 1} onClick={() => void move(i, 1)} className="rounded p-1 text-text-muted hover:bg-bg-hover disabled:opacity-25"><ArrowDown className="h-3.5 w-3.5" aria-hidden /></button>
+                          <ActionMenu label="速记操作" actions={[
+                            { key: 'edit', label: '编辑', onSelect: () => setEditing({ id: note.id, title: note.title, content: note.content, revision: note.revision }) },
+                            { key: 'pin', label: note.pinned ? '取消置顶' : '置顶', onSelect: () => void productApi.patchQuickNote(note.id, { pinned: !note.pinned, base_revision: note.revision }).then(load) },
+                            { key: 'delete', label: '删除', danger: true, onSelect: () => void productApi.deleteQuickNote(note.id).then(load) },
+                          ]} />
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <aside aria-labelledby="quick-note-compose-heading" className="min-w-0 lg:border-l lg:border-bg-tertiary/70 lg:pl-7">
+            <h2 id="quick-note-compose-heading" className="text-sm font-semibold text-text-primary">记下一件别忘的事</h2>
+            <p className="mt-0.5 text-[11px] leading-5 text-text-muted">先写你自己的判断。成竹不会在这里自动补全或把笔记包装成证据。</p>
+
+            <form className="mt-4 space-y-3" onSubmit={(e) => { e.preventDefault(); void create() }}>
+              <label className="block">
+                <span className="text-[11px] font-medium text-text-secondary">标题（可选）</span>
+                <input aria-label="速记标题" className={`${inputCls} mt-1`} placeholder="例如：反问面试官" value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-medium text-text-secondary">内容</span>
+                <textarea aria-label="速记内容" className={`${inputCls} mt-1 min-h-[120px]`} placeholder="例如：问清楚团队当前 Agent 评测是离线还是线上闭环。"
+                  value={draft} onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); void create() } }} />
+              </label>
+              {goalId ? (
+                <fieldset>
+                  <legend className="text-[11px] font-medium text-text-secondary">保存范围</legend>
+                  <div role="radiogroup" aria-label="速记范围" className="mt-1.5 grid grid-cols-2 divide-x divide-bg-tertiary/70 border-y border-bg-tertiary/70">
+                    {(['GOAL', 'GLOBAL'] as const).map((s) => (
+                      <button key={s} type="button" role="radio" aria-checked={scope === s} onClick={() => setScope(s)}
+                        className={`px-3 py-2.5 text-xs ${scope === s ? 'font-semibold text-text-primary' : 'text-text-muted'}`}>
+                        {s === 'GOAL' ? '仅这个目标' : '全局'}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+              <div className="[&>button]:w-full">
+                <PrimaryButton type="submit" disabled={!draft.trim() && !draftTitle.trim()}>保存速记</PrimaryButton>
+              </div>
+            </form>
+          </aside>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-2" data-testid="quick-notes-panel">
       {!compact ? <p className="text-[11px] text-text-muted">速记只是你的提醒，不是证据，也不会自动变成已确认的事实。</p> : null}

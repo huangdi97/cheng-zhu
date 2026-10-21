@@ -285,11 +285,33 @@ const MY_FACTS = {
   facts: [
     { id: 'fact-1', text: '主导 AI 产品从需求到灰度上线', type: 'PROJECT', source: 'WenNian', provenance_status: 'DIRECT_EVIDENCE', provenance_label: '有直接证据', user_assertion_status: 'USER_CONFIRMED', user_assertion_label: '用户已确认', source_ids: ['src-1'] },
     { id: 'fact-2', text: '负责 Agent 评测体系设计', type: 'PROJECT', source: 'Chengzhu', provenance_status: 'DIRECT_EVIDENCE', provenance_label: '有直接证据', user_assertion_status: 'USER_CONFIRMED', user_assertion_label: '用户已确认', source_ids: ['src-2'] },
-    { id: 'fact-3', text: '有企业客户实际交付经验', type: 'CLAIM', source: 'resume', provenance_status: 'NO_EVIDENCE', provenance_label: '暂无证据', user_assertion_status: 'UNREVIEWED', user_assertion_label: '待确认', source_ids: [] },
+    { id: 'fact-3', text: '独立完成 Android 端关键体验验收', type: 'PROJECT', source: 'PDIG / DepMap', provenance_status: 'SUPPORTING_EVIDENCE', provenance_label: '有支持材料', user_assertion_status: 'UNREVIEWED', user_assertion_label: '待确认', source_ids: ['src-3'] },
+    { id: 'fact-4', text: '有企业客户实际交付经验', type: 'CLAIM', source: 'resume', provenance_status: 'NO_EVIDENCE', provenance_label: '暂无证据', user_assertion_status: 'UNREVIEWED', user_assertion_label: '待确认', source_ids: [] },
+    { id: 'fact-5', text: '曾主导一个 8 人跨职能团队', type: 'CLAIM', source: 'session', provenance_status: 'CONFLICTING_EVIDENCE', provenance_label: '来源冲突', user_assertion_status: 'USER_CONFIRMED', user_assertion_label: '用户已确认', source_ids: ['src-4', 'src-5'] },
   ],
   evidence: [
     { id: 'src-1', source: '项目文档', text: 'WenNian 产品设计与上线记录' },
     { id: 'src-2', source: '项目文档', text: 'Chengzhu 评测与发布记录' },
+    { id: 'src-3', source: '测试记录', text: 'Android 端验收与回归记录' },
+    { id: 'src-4', source: '面试口述', text: '本场回答中提到 8 人团队' },
+    { id: 'src-5', source: '简历', text: '简历仅写“跨团队协作”，未记录人数' },
+  ],
+}
+
+const MY_VOICE = {
+  conclusion_first: true,
+  target_seconds: 60,
+  language: 'zh-CN',
+  term_style: 'keep_english_terms',
+  shape: 'bullet',
+  banned_phrases: ['赋能', '抓手', '闭环'],
+}
+
+const QUICK_NOTES = {
+  items: [
+    { id: 'note-1', scope: 'GLOBAL', goal_id: null, title: '反问面试官', content: '问清楚团队当前 Agent 评测是离线指标还是线上用户任务闭环。', pinned: true, sort_order: 0, tags: [], revision: 2, created_at: T - 86400, updated_at: T - 3600 },
+    { id: 'note-2', scope: 'GOAL', goal_id: GOAL_ID, title: '别忘了这个数字', content: 'WenNian 第一版只验证核心链路，不要把尚未上线的指标说成线上结果。', pinned: false, sort_order: 1, tags: [], revision: 1, created_at: T - 72000, updated_at: T - 5400 },
+    { id: 'note-3', scope: 'GLOBAL', goal_id: null, title: '', content: '如果被问为什么不用规则系统，先回答任务边界，再讲模型能力。', pinned: false, sort_order: 2, tags: [], revision: 1, created_at: T - 54000, updated_at: T - 7200 },
   ],
 }
 
@@ -430,6 +452,8 @@ const STUDIO_OVERRIDES = (pathname, method) => {
   if (pathname === '/api/product/practice/options') return PRACTICE_OPTIONS
   if (pathname === '/api/product/history') return HISTORY_ITEMS
   if (pathname === '/api/intelligence/facts') return MY_FACTS
+  if (pathname === '/api/intelligence/voice-preferences') return MY_VOICE
+  if (pathname === '/api/product/quick-notes') return QUICK_NOTES
   if (pathname === '/api/intelligence/stories') return MY_STORIES
   if (pathname === '/api/product/stories/coverage') return STORY_COVERAGE
   if (pathname === '/api/product/materials') return PROJECT_MATERIALS
@@ -606,6 +630,42 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(page.getByText('你会怎么判断一个 AI 功能是否真的值得上线？')).toBeVisible()
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('library-banks.png', SNAPSHOT)
+  })
+
+
+  test('My Chengzhu — facts boundary queue', async ({ page }) => {
+    await page.goto('/#/me/inbox')
+    await expect(page.getByTestId('fact-inbox')).toBeVisible()
+    await page.getByRole('button', { name: '全部事实与来源' }).click()
+    await expect(page.getByTestId('facts-sources')).toBeVisible()
+    await expect(page.getByText('先处理会影响上场表述的事实边界')).toBeVisible()
+    await expect(page.getByText('曾主导一个 8 人跨职能团队')).toBeVisible()
+    const conflictFact = page.getByTestId('fact-row').filter({ hasText: '曾主导一个 8 人跨职能团队' })
+    await expect(conflictFact.getByText('来源冲突', { exact: true })).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-facts.png', SNAPSHOT)
+  })
+
+  test('My Chengzhu — delivery protocol', async ({ page }) => {
+    await page.goto('/#/me/voice')
+    await expect(page.getByTestId('voice-preferences')).toBeVisible()
+    await expect(page.getByText('我的默认表达协议')).toBeVisible()
+    await expect(page.getByText('约 60 秒')).toBeVisible()
+    await expect(page.getByText('赋能、抓手、闭环')).toBeVisible()
+    await expectInterviewStudioNav(page)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('me-voice.png', SNAPSHOT)
+  })
+
+  test('Library — human-authored quick notes', async ({ page }) => {
+    await page.goto('/#/library/notes')
+    await expect(page.getByTestId('library-page')).toBeVisible()
+    await expect(page.getByTestId('quick-notes-panel')).toBeVisible()
+    await expect(page.getByText('你写的提醒，保持为“你的笔记”')).toBeVisible()
+    await expect(page.getByText('问清楚团队当前 Agent 评测是离线指标还是线上用户任务闭环。')).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('library-notes.png', SNAPSHOT)
   })
 
   test('Person resume workspace', async ({ page }) => {

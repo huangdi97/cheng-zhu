@@ -95,6 +95,76 @@ const GOAL_DETAIL = {
   sessions: [RECENT_SESSION],
 }
 
+const GOAL_PREPARE = {
+  goal_id: GOAL_ID,
+  next_focus: GOAL_DETAIL.next_focus,
+  gap_map: [
+    {
+      topic: 'AI 产品判断与验证',
+      status: 'REVIEW_WEAKNESS',
+      source: 'review',
+      priority: 'high',
+      reason: '上一轮两次先讲实现，再补为什么值得做；二面需要先给判断和验证标准。',
+    },
+    {
+      topic: '失败后的回退与止损',
+      status: 'GAP',
+      source: 'story',
+      priority: 'high',
+      reason: '现有材料能说明成功路径，但缺一个主动停止、回退或改方案的完整真实案例。',
+    },
+    {
+      topic: 'Agent 评测方法',
+      status: 'KNOWLEDGE_MATCH',
+      source: 'job_alignment',
+      priority: 'medium',
+      reason: '技术知识足够，但还需要明确哪些评测指标是你实际定义、验证或推动落地的。',
+    },
+  ],
+  attack_surface: [
+    {
+      claim_id: 'claim-prepare-1',
+      text: '我设计了 Chengzhu 的评测闭环，并推动从离线指标收敛到可验证的用户任务。',
+      risks: ['“设计”会被追问你本人具体负责的边界', '评测闭环需要给出指标、样本和失败回退'],
+      probes: ['你本人定义了哪些指标？', '为什么这些指标能代表真实用户价值？', '如果线上结果和离线评测冲突，你怎么处理？'],
+    },
+    {
+      claim_id: 'claim-prepare-2',
+      text: 'WenNian 第一版主动缩小范围，只验证核心 Healthspan 链路。',
+      risks: ['会被追问为什么砍掉原方案', '需要说明判断依据而不是事后合理化'],
+      probes: ['你砍掉了什么？', '当时有哪些数据支持这个取舍？'],
+    },
+  ],
+  question_graph: [
+    { id: 'prep-q1', text: '你怎么判断一个 AI 功能真的值得上线？', kind: 'PRODUCT_JUDGMENT', source: 'review', parent_id: '' },
+    { id: 'prep-q2', text: '具体用哪些用户信号和业务指标验证？', kind: 'EVIDENCE', source: 'review', parent_id: 'prep-q1' },
+    { id: 'prep-q3', text: '如果离线指标很好但用户还是回退呢？', kind: 'PRESSURE', source: 'review', parent_id: 'prep-q2' },
+    { id: 'prep-q4', text: '讲一次你主动停止一个方向并承担取舍的经历。', kind: 'STORY', source: 'story_gap', parent_id: '' },
+  ],
+  stories: {
+    items: MY_STORIES.map((item) => ({ id: item.id, title: item.title, tags: item.tags })),
+    prompts: [{ competency: '失败与反思', hint: '从真实经历整理，不补造结果' }],
+    coverage: STORY_COVERAGE,
+  },
+  has_jd: true,
+  materials: {
+    included: [
+      { material_id: 'mat-ui-1', version_id: 'mv-1', version: 3, title: 'WenNian 产品设计与上线记录', kind: 'PROJECT', usage: 'FACTS', is_personal_evidence: true },
+      { material_id: 'mat-ui-3', version_id: 'mv-3', version: 2, title: 'Chengzhu 设计复盘与评测记录', kind: 'PROJECT', usage: 'BOTH', is_personal_evidence: true },
+    ],
+    skipped: [{ material_id: 'mat-ui-2', title: 'Agent 评测方法与指标参考', reason: '只作为技术参考，不进入个人事实包' }],
+    selected_ids: ['mat-ui-1', 'mat-ui-2', 'mat-ui-3'],
+  },
+  pack_preview: {
+    quick_notes: [QUICK_NOTES.items[0], QUICK_NOTES.items[1]],
+    materials: [
+      { material_id: 'mat-ui-1', version_id: 'mv-1', version: 3, title: 'WenNian 产品设计与上线记录', kind: 'PROJECT', usage: 'FACTS', is_personal_evidence: true },
+      { material_id: 'mat-ui-3', version_id: 'mv-3', version: 2, title: 'Chengzhu 设计复盘与评测记录', kind: 'PROJECT', usage: 'BOTH', is_personal_evidence: true },
+    ],
+    legacy_prep_space_id: null,
+  },
+}
+
 const HOME = {
   state: 'ACTIVE',
   primary_action: { key: 'continue_prepare', label: '继续准备', goal_id: GOAL_ID },
@@ -563,6 +633,7 @@ const STUDIO_OVERRIDES = (pathname, method) => {
   if (pathname === '/api/product/home') return HOME
   if (pathname === '/api/product/goals') return { items: [GOAL] }
   if (pathname === `/api/product/goals/${GOAL_ID}`) return GOAL_DETAIL
+  if (pathname === `/api/product/goals/${GOAL_ID}/prepare`) return GOAL_PREPARE
   if (pathname === '/api/product/reflection/review/902') return REFLECTION
   if (pathname === '/api/product/practice/options') return PRACTICE_OPTIONS
   if (pathname === '/api/product/history') return HISTORY_ITEMS
@@ -640,6 +711,18 @@ test.describe('@visual v2 Studio surfaces', () => {
     await expect(tabs.getByRole('tab', { name: '录用' })).toHaveCount(0)
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('goal-room-overview.png', SNAPSHOT)
+  })
+
+  test('Goal Room — next interview preparation', async ({ page }) => {
+    await page.goto(`/#/goals/${GOAL_ID}/prepare`)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
+    await expect(page.getByTestId('goal-prepare-workspace')).toBeVisible()
+    await expect(page.getByText('下一场，先把这些讲清楚')).toBeVisible()
+    await expect(page.getByText('AI 产品判断与验证')).toBeVisible()
+    await expect(page.getByText('我设计了 Chengzhu 的评测闭环，并推动从离线指标收敛到可验证的用户任务。')).toBeVisible()
+    await expect(page.getByRole('tree', { name: '可能追问' })).toBeVisible()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('goal-room-prepare.png', SNAPSHOT)
   })
 
   test('Reflection — evidence first', async ({ page }) => {

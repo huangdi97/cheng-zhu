@@ -193,6 +193,14 @@ export function Projects() {
   )
 }
 
+
+// v1.3 Stories 3.0 capability categories (canonical §6)
+const STORY_CATEGORIES: Array<[string, string]> = [
+  ['Ownership', 'Ownership 担当'], ['Conflict', '冲突处理'], ['Failure', '失败与反思'], ['Leadership', '领导力'],
+  ['Ambiguity', '模糊情境决策'], ['Collaboration', '协作'], ['Difficult Problem', '解决困难问题'],
+  ['Influence', '影响他人'], ['Trade-off', '取舍'], ['Learning', '学习成长'],
+]
+
 const EMPTY_STORY: Omit<StoryItem, 'id' | 'updated_at' | 'tags'> = { title: '', situation: '', challenge: '', action: '', result: '', reflection: '' }
 const STORY_FIELDS: Array<[keyof typeof EMPTY_STORY, string]> = [
   ['title', '标题'],

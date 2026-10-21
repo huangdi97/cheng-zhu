@@ -261,7 +261,7 @@ function GoLiveInner({ initialGoal, close }: { initialGoal: string | null; close
         ) : null}
 
         <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-0 flex flex-wrap justify-between gap-2 border-t border-bg-tertiary/70 bg-bg-primary/95 px-4 pb-4 pt-3 backdrop-blur">
-          <SecondaryButton onClick={withoutGoal}>不选目标，直接进入</SecondaryButton>
+          <SecondaryButton onClick={withoutGoal} disabled={busy || hasBlockers}>不选目标，直接进入</SecondaryButton>
           <div className="flex gap-2">
             <SecondaryButton onClick={close}>取消</SecondaryButton>
             <PrimaryButton testId="preflight-start" disabled={!goalId || !pre || busy || hasBlockers} onClick={() => void start()}>

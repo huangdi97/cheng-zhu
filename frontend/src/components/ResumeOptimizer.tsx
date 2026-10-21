@@ -120,6 +120,7 @@ export default function ResumeOptimizer() {
               title="当前简历"
               description="选一份你当前愿意用于求职和面试的履历。"
               sharedNote="切换简历后，新的 Interview Pack 才会使用新的内容；不会改写已经冻结的历史场次。"
+              historyMode="popover"
               variant="light"
               className="!rounded-none !border-x-0 !border-b-0 !border-t !border-bg-tertiary/70 !bg-transparent !px-0"
             />

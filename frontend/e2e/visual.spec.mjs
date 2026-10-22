@@ -1111,6 +1111,50 @@ test.describe('@visual v2 Studio surfaces', () => {
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-resume.png', SNAPSHOT)
   })
+
+test.describe('@visual v2 responsive', () => {
+  // The enclosing Studio describe already installs STUDIO_OVERRIDES for every
+  // test, so this block only varies the viewport and the surfaces worth freezing
+  // at narrow widths.
+  for (const [label, width, height] of [['390', 390, 844], ['768', 768, 1024]]) {
+    test.describe(`${label}px`, () => {
+      test.use({ viewport: { width, height } })
+
+      test(`Home — ${label}`, async ({ page }) => {
+        await page.goto('/#/home')
+        await expect(page.getByText('字节跳动 · AI 产品经理').first()).toBeVisible()
+        await expect(page.getByRole('button', { name: '继续准备' }).first()).toBeVisible()
+        await page.waitForTimeout(250)
+        await expect(page).toHaveScreenshot(`responsive-home-${label}.png`, SNAPSHOT)
+      })
+
+      test(`Goal Prepare — ${label}`, async ({ page }) => {
+        await page.goto(`/#/goals/${GOAL_ID}/prepare`)
+        await expect(page.getByTestId('goal-prepare-workspace')).toBeVisible()
+        await expect(page.getByText('下一场，先把这些讲清楚')).toBeVisible()
+        await page.waitForTimeout(250)
+        await expect(page).toHaveScreenshot(`responsive-goal-prepare-${label}.png`, SNAPSHOT)
+      })
+
+      test(`Preflight blocked — ${label}`, async ({ context, page }) => {
+        await installMocks(context, {
+          messages: COMMON_WS_BOOTSTRAP,
+          localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+          apiOverrides: (pathname, method) => {
+            if (method === 'POST' && pathname === '/api/product/live/preflight') return PREFLIGHT_BLOCKED
+            return STUDIO_OVERRIDES(pathname, method)
+          },
+        })
+        await page.goto(`/#/goals/${GOAL_ID}`)
+        await page.getByTestId('goal-go-live').click()
+        await expect(page.getByTestId('preflight')).toBeVisible()
+        await expect(page.getByText('开始前需要处理')).toBeVisible()
+        await page.waitForTimeout(250)
+        await expect(page).toHaveScreenshot(`responsive-preflight-blocked-${label}.png`, SNAPSHOT)
+      })
+    })
+  }
+})
 })
 
 test.describe('@visual v2 Live Cockpit', () => {

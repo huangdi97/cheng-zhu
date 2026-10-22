@@ -125,7 +125,12 @@ The Live surface is a graphite instrument, not a Studio dark theme.
 
 - artifact means a second work surface for the *task* (coding, system design,
   product case, written problem, calculation, structured whiteboard);
-- it is not a code editor by definition, and no surface may assume code.
+- it is not a code editor by definition, and no surface may assume code;
+- status of this round: **NOT_APPLICABLE**. No artifact surface exists yet —
+  `git grep -i artifact -- frontend/src` returns nothing at this commit — so there
+  is no code-editor-bound UI to generalise. The contract above is the gate any
+  future artifact surface must pass before it ships: a non-code artifact must
+  render without code chrome.
 
 ### Transcript
 
@@ -152,7 +157,11 @@ Rules it asserts on every reviewed surface, at 390×844 / 768×1024 / 1280×720 
 -heading order, accessible names on every interactive control, reduced-motion respected;
 -product invariants: primary nav is 首页/求职目标/练习/历史/我的成竹, Goal Prepare keeps
 its next-interview-first order, cue ≤ 3 bullets, transcript collapsed, no
-offer-probability / readiness-percentage / stealth copy anywhere.
+offer-probability / readiness-percentage / stealth copy anywhere;
+-truth boundaries stay individually readable: My Chengzhu must still render
+`有直接证据` / `你已确认` / `暂无证据` separately, and Library must still separate
+`项目资料` / `知识库` / `速记` / `题库`, so no surface can collapse them into one
+generic "verified" label.
 
 Latest run: 18 states × 5 viewports = 90 renders, 0 measured failures.
 Evidence, the measured JSON and a contact sheet are written under

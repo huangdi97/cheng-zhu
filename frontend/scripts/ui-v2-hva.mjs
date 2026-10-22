@@ -682,6 +682,7 @@ const STATES = [
       await waitForStudio(page, viewport)
     },
     nav: true,
+    expectText: ['有直接证据', '你已确认', '暂无证据'],
   },
   {
     id: 'library',
@@ -694,6 +695,7 @@ const STATES = [
       await waitForStudio(page, viewport)
     },
     nav: true,
+    expectText: ['项目资料', '知识库', '速记', '题库'],
   },
   {
     id: 'settings',
@@ -1133,6 +1135,13 @@ function ruleFailures(state, viewport, metrics, png, opts) {
       if (metrics.live.statusLine && metrics.live.statusLine.h > 56) {
         push('live-compact-status', `状态行高度 ${metrics.live.statusLine.h}px > 56px`)
       }
+    }
+    if (state.expectText) {
+      // Truth boundaries must stay individually readable: a surface may not
+      // collapse "direct evidence / user confirmed / no evidence / generic
+      // knowledge / quick note" into one generic "verified" label.
+      const missing = state.expectText.filter((token) => !metrics.bodyTextSample.includes(token))
+      if (missing.length) push('evidence-boundaries', `缺少语义标签: ${missing.join(', ')}`)
     }
     if (state.prepareOrder) {
       const text = metrics.bodyTextSample

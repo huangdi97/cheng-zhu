@@ -1158,9 +1158,18 @@ function createWindow() {
     }
   });
 
-  // 关闭按钮 = 真正退出
+  // 关闭按钮 = 真正退出。主窗口关掉时 overlay 窗口还在，Electron 就不会触发
+  // window-all-closed，进程会带着隐藏的 overlay 一直驻留（实测确实如此）。所以
+  // 用户点关闭时必须显式收尾；已经在退出流程里（isQuitting 由托盘/快捷键置位）
+  // 就直接放行，避免和 before-quit 互相递归。
   mainWindow.on('close', () => {
-    isQuitting = true;
+    const alreadyQuitting = isQuitting
+    isQuitting = true
+    if (alreadyQuitting) return
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      try { overlayWindow.destroy() } catch { /* 退出路径上尽力而为 */ }
+    }
+    app.quit()
   });
 }
 

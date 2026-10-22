@@ -81,6 +81,24 @@ async function request(base, method, pathname, body) {
   return payload
 }
 
+// POST /api/resume wants a multipart file, and /api/config silently drops
+// resume_text (ConfigUpdate has no such field, and core.config pops it on save),
+// so seeding a resume has to go through the real upload + apply path.
+async function uploadResume(base, text) {
+  const form = new FormData()
+  form.append('file', new Blob([text], { type: 'text/plain' }), 'evidence-resume.txt')
+  const res = await fetch(base + '/api/resume', { method: 'POST', body: form })
+  const body = await res.text()
+  if (!res.ok) throw new Error('POST /api/resume -> ' + res.status + ': ' + body.slice(0, 300))
+  return body ? JSON.parse(body) : {}
+}
+
+async function activateResume(base) {
+  const history = await request(base, 'GET', '/api/resume/history')
+  const entryId = history.items?.[0]?.id
+  if (entryId == null) throw new Error('resume upload did not create a history entry')
+  return request(base, 'POST', '/api/resume/history/' + entryId + '/apply', undefined)
+}
 async function formRequest(base, pathname, fields) {
   const form = new FormData()
   for (const [key, value] of Object.entries(fields)) form.append(key, String(value))
@@ -291,6 +309,8 @@ try {
   const resume = 'WenNian：我负责 RAG 检索链路，用 Redis 管理 session state。'
   await request(backendBase, 'POST', '/api/intelligence/candidate/rebuild', { resume_text: resume, interview_notes: '' })
   await request(backendBase, 'POST', '/api/config', { resume_text: resume })
+  await uploadResume(backendBase, resume)
+  await activateResume(backendBase)
 
   const goal = await request(backendBase, 'POST', '/api/product/goals', {
     company: 'MindRank',

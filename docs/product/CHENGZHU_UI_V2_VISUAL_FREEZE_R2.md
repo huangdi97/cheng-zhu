@@ -173,6 +173,9 @@ Rules it asserts on every reviewed surface, at 390×844 / 768×1024 / 1280×720 
 -visible text keeps `≥ 4.5:1` contrast (`≥ 3:1` for large text);
 -no blank or error-only render (ink coverage), brand-green pixel budget `< 6%`;
 -heading order, accessible names on every interactive control, reduced-motion respected;
+-`axe` reports no serious or critical `wcag2a`/`wcag2aa` violation;
+-every keyboard stop shows a focus indicator, and a modal moves focus inside, keeps
+  Tab inside and closes on Escape;
 -neutral warmth: every neutral token with chroma above `0.006` must sit in the warm
 band (`hue 45–125°`), and the accent must stay bamboo (`hue 125–160°`) — this is the
 check that a green-pixel budget cannot make;
@@ -188,6 +191,10 @@ Latest run: 18 states × 5 viewports = 90 renders, 0 measured failures.
 Evidence, the measured JSON and a contact sheet are written under
 `.runtime/ui-v2-hva/` (never committed).
 
+
+This is a required CI job (`hva`, wired into `ci-gate`), not a local script: the
+contact sheet and the JSON are uploaded as artifacts for human sign-off. Adding a
+surface to `STATES` therefore adds it to the gate in the same commit.
 ## 7. Strict baseline set
 
 `frontend/e2e/visual.spec.mjs` freezes these surfaces with `toHaveScreenshot`

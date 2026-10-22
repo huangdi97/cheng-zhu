@@ -111,6 +111,54 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+
+  # ── UI v2 measured acceptance (HVA) ─────────────────────────
+  # The executable form of docs/product/CHENGZHU_UI_V2_VISUAL_FREEZE_R2.md.
+  # Renders 18 surfaces at five viewports and fails on: overflow, CTA outside the
+  # 720p first view, clipped dialogs, more than six type sizes, stray elevation or
+  # radii, decorative card nesting, low contrast, cold/teal neutrals, a non-bamboo
+  # accent, unnamed controls, broken heading order, serious axe violations,
+  # missing focus rings, a modal whose focus escapes or ignores Escape, cue over
+  # three bullets, an expanded transcript, or forbidden copy.
+  hva:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Measured acceptance (18 surfaces x 5 viewports)
+        run: npm run hva
+
+      - name: Contact sheet for human sign-off
+        if: always()
+        run: npm run hva:sheet
+
+      - name: Upload HVA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-v2-hva
+          path: .runtime/ui-v2-hva
+          retention-days: 7
+          if-no-files-found: warn
   # ── Desktop pure-JavaScript tests ───────────────────────────
   # Keep the Electron main-process helpers covered even though the desktop
   # package does not participate in the frontend build.
@@ -384,7 +432,7 @@ jobs:
   # When this gate fails on visual diff, regenerate baselines on the
   # branch via the `update-visual-snapshots` workflow.
   ci-gate:
-    needs: [backend, frontend, desktop, dependency-security, e2e-playwright, e2e-smoke, e2e-visual, packaged-smoke]
+    needs: [backend, frontend, hva, desktop, dependency-security, e2e-playwright, e2e-smoke, e2e-visual, packaged-smoke]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -398,7 +446,8 @@ jobs:
                    "${{ needs.e2e-playwright.result }}" \
                    "${{ needs.e2e-smoke.result }}" \
                    "${{ needs.e2e-visual.result }}" \
-                   "${{ needs.packaged-smoke.result }}"; do
+                   "${{ needs.packaged-smoke.result }}" \
+                   "${{ needs.hva.result }}"; do
             case "$r" in
               success) ;;
               *) echo "Job result: $r"; ok=false ;;

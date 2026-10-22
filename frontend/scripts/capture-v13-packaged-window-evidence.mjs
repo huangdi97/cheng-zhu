@@ -240,20 +240,7 @@ try {
       { kind: 'capture', name: '01-onboarding', note: 'real packaged fresh-install onboarding' },
 
       // Welcome → local data → model → STT → mic → system audio → privacy → resume → first Goal.
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
+      // 第一步是那一场在准备什么，第二步是 Goal 表单，第三步是 ready（可选带练）。
       { kind: 'click', selector: '[data-testid="onboarding-next"]' },
       { kind: 'sleep', ms: 250 },
       { kind: 'wait', selector: '[data-testid="onboarding-goal-role"]', timeout_ms: 10000 },
@@ -262,6 +249,8 @@ try {
       { kind: 'fill', selector: '[data-testid="onboarding-goal-jd"]', value: '负责 Agent、RAG、评估与系统设计。' },
       { kind: 'capture', name: '01b-first-goal', note: 'first packaged Goal during onboarding' },
       { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'wait', selector: '[data-testid="onboarding-complete-step"]', timeout_ms: 10000 },
+      { kind: 'click', selector: '[data-testid="onboarding-guided-start"]' },
 
       { kind: 'wait', selector: '[data-testid="guided-first-practice"]', timeout_ms: 10000 },
       { kind: 'click', selector: '[data-testid="guided-start"]' },
@@ -289,7 +278,7 @@ try {
       { kind: 'wait', selector: '[data-testid="guided-practice-complete"]', timeout_ms: 20000 },
       { kind: 'capture', name: '01g-guided-reflection', note: 'Content/Delivery feedback plus Demo Reflection closes the first-use loop' },
 
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-finish"]' },
       { kind: 'wait', selector: '[data-testid="onboarding-complete-step"]', timeout_ms: 5000 },
       { kind: 'capture', name: '01h-onboarding-complete', note: 'canonical Goal-centered completion message' },
       { kind: 'click', selector: '[data-testid="onboarding-finish"]' },

@@ -313,6 +313,7 @@ export default function OnboardingWizard() {
                 ) : (
                   <button
                     type="button"
+                    data-testid="onboarding-guided-start"
                     onClick={() => setShowGuided(true)}
                     className="text-xs text-text-secondary underline decoration-bg-hover underline-offset-2 hover:text-text-primary"
                   >

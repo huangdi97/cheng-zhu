@@ -59,13 +59,13 @@ code, pre, .font-mono {
 [data-theme='vscode-light-plus'] {
   /* v1.3-R2 Professional Workbench — canonical §41.
    * Internal "vscode-*" IDs are retained only for preference migration. */
-  --c-bg-primary: 247 246 243;     /* Canvas #F6F7F6 */
+  --c-bg-primary: 248 246 240;     /* Canvas #F6F7F6 */
   --c-bg-secondary: 255 255 255;   /* Surface #FFFFFF */
-  --c-bg-tertiary: 241 238 233;    /* Surface Alt #F0F3F1 */
-  --c-bg-hover: 231 227 219;
-  --c-text-primary: 31 29 25;      /* #1B2420 */
-  --c-text-secondary: 91 87 80;    /* #58625D */
-  --c-text-muted: 108 104 96;
+  --c-bg-tertiary: 242 238 229;    /* Surface Alt #F0F3F1 */
+  --c-bg-hover: 231 224 211;
+  --c-text-primary: 34 30 22;      /* #1B2420 */
+  --c-text-secondary: 95 89 76;    /* #58625D */
+  --c-text-muted: 112 106 92;
   --c-accent-blue: 63 106 66;      /* Bamboo #2F6B57; token name retained */
   --c-accent-green: 56 95 60;
   --c-accent-red: 173 69 69;
@@ -73,15 +73,15 @@ code, pre, .font-mono {
   --c-accent-amber: 134 85 31;
   --c-grad-from: 63 106 66;
   --c-grad-to: 86 96 70;         /* Ink Blue #3F6475 */
-  --c-primary-container: 227 233 220;
-  --c-on-primary-container: 47 74 50;
-  --c-secondary-container: 234 229 220;
-  --c-on-secondary-container: 76 70 60;
-  --c-tertiary-container: 243 232 213;
-  --c-on-tertiary-container: 107 83 43;
-  --c-surface-variant: 245 242 237;
-  --c-on-surface-variant: 91 87 80;
-  --c-outline-variant: 219 215 207;
+  --c-primary-container: 228 233 217;
+  --c-on-primary-container: 47 74 47;
+  --c-secondary-container: 236 229 216;
+  --c-on-secondary-container: 78 70 56;
+  --c-tertiary-container: 244 232 209;
+  --c-on-tertiary-container: 107 81 39;
+  --c-surface-variant: 246 243 236;
+  --c-on-surface-variant: 95 89 76;
+  --c-outline-variant: 222 215 202;
   --c-scrollbar-thumb: 177 173 165;
   --c-scrollbar-thumb-hover: 144 140 132;
   --c-selection-bg: 63 106 66;
@@ -89,8 +89,8 @@ code, pre, .font-mono {
   --c-md-code-bg: 233 230 222;
   --c-md-pre-bg: 248 247 244;
   --c-md-pre-border: 215 211 203;
-  --c-md-strong: 31 29 25;
-  --c-md-blockquote: 91 87 80;
+  --c-md-strong: 34 30 22;
+  --c-md-blockquote: 95 89 76;
   --c-code-shell-bg: 249 248 245;
   --c-code-header-bg: 237 234 226;
   --c-code-inline-bg: 233 230 222;
@@ -98,7 +98,7 @@ code, pre, .font-mono {
   --c-surface-panel: 249 248 245;
   --c-surface-elevated: 255 255 255;
   --c-surface-glass: 255 255 255;
-  --c-border-subtle: 220 216 208;
+  --c-border-subtle: 224 217 204;
   --c-border-strong: 151 147 139;
   --c-console-shell-bg: 249 248 245;
   --c-console-header-bg: 236 233 225;

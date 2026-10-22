@@ -41,6 +41,10 @@ import { PNG } from 'pngjs'
 import { resolveApiPayload } from '../e2e/fixtures/sample-data.mjs'
 import { mockWsInitScript } from '../e2e/fixtures/mock-ws.mjs'
 
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+const AXE_PATH = require.resolve('axe-core/axe.min.js')
+
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const FRONTEND = path.resolve(HERE, '..')
 const REPO = path.resolve(FRONTEND, '..')
@@ -409,7 +413,8 @@ const STATES = [
       if (pathname === '/api/config' && method === 'GET') return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
       if (pathname === '/api/intelligence/diagnostics') return DIAGNOSTICS
       if (pathname === '/api/product/goals' && method === 'POST') return GOAL
-      return undefined
+      if (method === 'GET' && pathname.startsWith('/api/product/goals/')) return goalMocks(pathname, method)
+      return goalMocks(pathname, method)
     },
     ready: async (page) => {
       const wizard = page.getByTestId('onboarding')
@@ -437,7 +442,8 @@ const STATES = [
       if (pathname === '/api/config' && method === 'GET') return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
       if (pathname === '/api/intelligence/diagnostics') return DIAGNOSTICS
       if (pathname === '/api/product/goals' && method === 'POST') return GOAL
-      return undefined
+      if (method === 'GET' && pathname.startsWith('/api/product/goals/')) return goalMocks(pathname, method)
+      return goalMocks(pathname, method)
     },
     ready: async (page) => {
       const wizard = page.getByTestId('onboarding')
@@ -886,6 +892,7 @@ async function measure(page) {
     for (const el of all) {
       const cs = getComputedStyle(el)
       const rect = el.getBoundingClientRect()
+
       const inShell = Boolean(el.closest('header, nav'))
       const negligible = el.getBoundingClientRect().width <= 1 || el.getBoundingClientRect().height <= 1
       if (directText(el) && !inShell && !negligible) {
@@ -1182,6 +1189,19 @@ function ruleFailures(state, viewport, metrics, png, opts) {
         push('accent-bamboo', `品牌色相 ${accent.hue}° 不在竹绿区间 125–160`)
       }
     }
+    if (opts.a11y) {
+      const a11y = opts.a11y
+      const serious = (a11y.violations ?? []).filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')
+      if (serious.length) {
+        push('axe-serious', serious.map((violation) => `${violation.id}(${violation.impact}): ${violation.nodes[0] ?? ''}`).join(' | '))
+      }
+      if (a11y.focusRingMissing?.length) {
+        push('focus-visible', `${a11y.focusRingMissing.length} 个焦点停靠点没有焦点环: ${a11y.focusRingMissing.slice(0, 3).join(', ')}`)
+      }
+      if (a11y.focusInsideDialog === false) push('dialog-focus', '打开时焦点不在 dialog 内')
+      if (a11y.trapEscaped) push('dialog-focus-trap', 'Tab 把焦点移出了 modal')
+      if (a11y.escapeCloses === false) push('dialog-escape', 'Escape 没有关闭 dialog')
+    }
     if (state.expectText) {
       // Truth boundaries must stay individually readable: a surface may not
       // collapse "direct evidence / user confirmed / no evidence / generic
@@ -1286,7 +1306,6 @@ async function main() {
         await mkdir(path.join(OUT, dir), { recursive: true })
         const shot = path.join(OUT, dir, `${state.id}-${viewport.id}.png`)
         await page.screenshot({ path: shot, fullPage: false })
-
         const metrics = await measure(page)
         let ctaRect = null
         if (state.primaryCta) {
@@ -1325,8 +1344,12 @@ async function main() {
           }
         }
 
+
+        const a11y = viewport.id === PRIMARY_VIEWPORT
+          ? await auditAccessibility(page, { dialog: Boolean(state.dialog) })
+          : null
         const png = await analysePng(shot)
-        const failures = ruleFailures(state, viewport, metrics, png, { ctaRect, dialogRect, blockingCtaRect })
+        const failures = ruleFailures(state, viewport, metrics, png, { ctaRect, dialogRect, blockingCtaRect, a11y })
         report.states.push({
           id: state.id,
           dir,
@@ -1339,6 +1362,7 @@ async function main() {
           dialogRect,
           consoleErrors,
           readyWarnings,
+          a11y,
           pageErrors,
           failures,
         })
@@ -1389,3 +1413,58 @@ main().catch((error) => {
   console.error(error)
   process.exit(2)
 })
+
+async function auditAccessibility(page, { dialog }) {
+  await page.addScriptTag({ path: AXE_PATH })
+  const violations = await page.evaluate(async () => {
+    const results = await window.axe.run(document, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
+      resultTypes: ['violations'],
+    })
+    return results.violations.map((violation) => ({
+      id: violation.id,
+      impact: violation.impact,
+      nodes: violation.nodes.slice(0, 3).map((node) => node.target.join(' ')),
+    }))
+  })
+
+  const focusInsideDialog = dialog
+    ? await page.evaluate(() => {
+      const dialogEl = document.querySelector('[role="dialog"]')
+      return Boolean(dialogEl && document.activeElement && dialogEl.contains(document.activeElement))
+    })
+    : null
+
+  // Keyboard walk: every stop must show a focus indicator, and a modal must keep
+  // focus inside itself for the whole walk.
+  const focusRingMissing = []
+  let trapEscaped = false
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press('Tab')
+    const stop = await page.evaluate(() => {
+      const el = document.activeElement
+      if (!el || el === document.body) return null
+      const cs = getComputedStyle(el)
+      const outline = cs.outlineStyle !== 'none' && Number.parseFloat(cs.outlineWidth) > 0
+      const ring = cs.boxShadow !== 'none'
+      const dialogEl = document.querySelector('[role="dialog"]')
+      return {
+        label: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 24) || el.tagName,
+        ring: outline || ring,
+        inDialog: dialogEl ? dialogEl.contains(el) : null,
+      }
+    })
+    if (!stop) continue
+    if (!stop.ring) focusRingMissing.push(stop.label)
+    if (dialog && stop.inDialog === false) trapEscaped = true
+  }
+
+  let escapeCloses = null
+  if (dialog) {
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    escapeCloses = (await page.locator('[role="dialog"]').count()) === 0
+  }
+
+  return { violations, focusRingMissing, focusInsideDialog, trapEscaped, escapeCloses }
+}

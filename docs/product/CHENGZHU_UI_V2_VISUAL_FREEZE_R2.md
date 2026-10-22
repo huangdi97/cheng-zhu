@@ -40,6 +40,23 @@ Refinements made in R2 because the measurements exposed them:
 | Motion | not specified | `prefers-reduced-motion: reduce` stops all animation and transition | motion was decoration-only and ignored the OS setting |
 | Palette warmth | "warm neutral canvas", "green only as brand/state" | neutral tokens keep `hue 45–125°` whenever chroma `> 0.006`; accent stays `hue 125–160°` (bamboo) | the neutrals themselves were teal-tinted (text `H166`, borders `H161`, accent `H169`), so the product read green-cyan even with 1% accent coverage |
 
+R2 palette (workbench light; the named third-party themes are untouched):
+
+| role | token | value | hue / chroma |
+| --- | --- | --- | --- |
+| canvas | `--c-bg-primary` | `#F8F6F0` | 91° / 0.008 |
+| raised | `--c-bg-secondary` | `#FFFFFF` | — |
+| sunken | `--c-bg-tertiary` | `#F2EEE5` | 87° / 0.013 |
+| hover | `--c-bg-hover` | `#E7E0D3` | 83° / 0.019 |
+| ink | `--c-text-primary` | `#221E16` | 84° / 0.016 |
+| secondary ink | `--c-text-secondary` | `#5F594C` | 86° / 0.022 |
+| muted ink | `--c-text-muted` | `#706A5C` | 88° / 0.023 |
+| hairline | `--c-outline-variant` | `#DED7CA` | 83° / 0.019 |
+| brand | `--c-accent-blue` | `#3F6A42` | 146° / 0.080 |
+
+Contrast after the change: body 15.4:1, secondary 6.4:1, muted 5.0:1, brand text
+on its container 7.9:1, white on brand 6.3:1.
+
 ## 2. First-run contract
 
 First run answers three questions and nothing else.
@@ -183,8 +200,12 @@ Conversation home · Conversation spaces · Live cockpit · **First run understa
 **First run create goal** · **Create Goal dialog** · **Preflight ready** ·
 **Preflight blocked**.
 
-`playwright.config.mjs` now sets `maxDiffPixelRatio: 0`: a changed pixel is a
-reviewed design change or a defect, never noise.
+`playwright.config.mjs` sets `maxDiffPixelRatio: 0` **and** `threshold: 0.05`.
+Both matter: with the ratio at 0 but the colour threshold left at Playwright's
+default 0.2, a whole-palette re-tint (a few RGB units on every text node and
+hairline) counted as "no change", so the CI baseline generator rewrote nothing and
+the committed baselines silently stayed on the old palette. 0.05 still absorbs
+sub-pixel antialiasing but registers a real colour shift.
 
 ## 8. Known intentional exceptions
 

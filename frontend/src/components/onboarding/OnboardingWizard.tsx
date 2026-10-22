@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, CircleAlert, Loader2 } from 'lucide-react'
 import { api, getErrorMessage } from '@/lib/api'
 import { updateConfigAndRefresh } from '@/lib/configSync'
@@ -110,10 +110,9 @@ export default function OnboardingWizard() {
     if (!open) return
     api.intelDiagnostics().then((d) => setDiag(d as unknown as Diagnostics)).catch(() => setDiag(null))
   }, [open])
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
-  if (!open) return null
-
-  const finish = async () => {
+  const finish = useCallback(async () => {
     try {
       await updateConfigAndRefresh({ onboarding_completed: true })
       track('onboarding_completed', { guided, steps: STEPS.length })
@@ -122,7 +121,44 @@ export default function OnboardingWizard() {
     }
     setDismissed(true)
     if (createdGoalId) navigate(paths.goal(createdGoalId))
-  }
+  }, [createdGoalId, guided, pushToast])
+
+  // Modal contract, same as the shared Dialog: focus moves to the primary action
+  // of the step, Tab stays inside the panel, Escape leaves first run.
+  useEffect(() => {
+    if (!open) return
+    const panel = panelRef.current
+    if (!panel) return
+    const target = panel.querySelector<HTMLElement>('[data-testid="onboarding-next"], [data-testid="onboarding-finish"], [data-testid="onboarding-skip"]')
+    ;(target ?? panel).focus()
+  }, [open, step])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      const panel = panelRef.current
+      if (!panel) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        void finish()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusables = Array.from(panel.querySelectorAll<HTMLElement>('button, input, textarea, select, summary, [tabindex="0"]'))
+        .filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null)
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (!event.shiftKey && active === last) { event.preventDefault(); first.focus() }
+      else if (event.shiftKey && active === first) { event.preventDefault(); last.focus() }
+      else if (active && !panel.contains(active)) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, finish])
+
+  if (!open) return null
 
   const createGoal = async () => {
     if (!role.trim()) {
@@ -157,7 +193,7 @@ export default function OnboardingWizard() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" data-testid="onboarding">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-bg-hover/70 bg-bg-secondary">
+      <div ref={panelRef} tabIndex={-1} className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-bg-hover/70 bg-bg-secondary outline-none">
         <header className="border-b border-bg-tertiary/70 px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <p className="text-[11px] font-medium tracking-[0.14em] text-text-muted">

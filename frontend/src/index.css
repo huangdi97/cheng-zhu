@@ -47,10 +47,15 @@ code, pre, .font-mono {
   -webkit-app-region: no-drag;
 }
 
-/* 统一键盘焦点环：所有 :focus-visible 元素获得一致的可见焦点（可访问性） */
+/* Unified keyboard focus ring. The colour has a literal fallback because this
+   rule sits above the theme blocks: a var() with no fallback would make the whole
+   declaration invalid-at-computed-value-time on any element outside the themed
+   subtree, which is how some controls ended up with no visible focus at all. */
 :focus-visible {
-  outline: 2px solid rgb(var(--c-accent-blue) / 0.55);
+  outline: 2px solid rgb(var(--c-accent-blue, 63 106 66) / 0.55);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(var(--c-accent-blue, 63 106 66) / 0.12);
+  border-radius: 6px;
 }
 
 /* ========== 主题变量（与 tailwind.config 中 rgb(var(--c-*) / <alpha>) 对应）========== */

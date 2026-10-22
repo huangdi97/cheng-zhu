@@ -706,7 +706,7 @@ export default function ControlBar() {
         </div>
       )}
       {isRecording && !isExamMode && (
-        <div className="flex items-center gap-3 rounded-lg border border-bg-hover/40 bg-bg-tertiary/40 px-3 py-1.5" role="meter" aria-label="实时输入电平">
+        <div className="flex items-center gap-3 rounded-lg border border-bg-hover/40 bg-bg-tertiary/40 px-3 py-1.5" role="group" aria-label="实时输入电平">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <span className="w-9 shrink-0 text-[10px] text-text-muted">面试官</span>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-hover">

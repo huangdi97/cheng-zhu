@@ -38,6 +38,7 @@ Refinements made in R2 because the measurements exposed them:
 | Typography | "5–6 stable levels" | measured: ≤ 6 distinct text sizes per Studio surface (shell excluded) | several surfaces carried 7–8 sizes, mostly 10/11px duplicates |
 | Corner radius | "8–12px, dialogs may be larger" | Studio panels `≤ 12px`; dialogs and Live chrome may use `16px` | `rounded-2xl` had spread into Studio panels |
 | Motion | not specified | `prefers-reduced-motion: reduce` stops all animation and transition | motion was decoration-only and ignored the OS setting |
+| Palette warmth | "warm neutral canvas", "green only as brand/state" | neutral tokens keep `hue 45–125°` whenever chroma `> 0.006`; accent stays `hue 125–160°` (bamboo) | the neutrals themselves were teal-tinted (text `H166`, borders `H161`, accent `H169`), so the product read green-cyan even with 1% accent coverage |
 
 ## 2. First-run contract
 
@@ -155,6 +156,9 @@ Rules it asserts on every reviewed surface, at 390×844 / 768×1024 / 1280×720 
 -visible text keeps `≥ 4.5:1` contrast (`≥ 3:1` for large text);
 -no blank or error-only render (ink coverage), brand-green pixel budget `< 6%`;
 -heading order, accessible names on every interactive control, reduced-motion respected;
+-neutral warmth: every neutral token with chroma above `0.006` must sit in the warm
+band (`hue 45–125°`), and the accent must stay bamboo (`hue 125–160°`) — this is the
+check that a green-pixel budget cannot make;
 -product invariants: primary nav is 首页/求职目标/练习/历史/我的成竹, Goal Prepare keeps
 its next-interview-first order, cue ≤ 3 bullets, transcript collapsed, no
 offer-probability / readiness-percentage / stealth copy anywhere;

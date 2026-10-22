@@ -988,6 +988,36 @@ async function measure(page) {
       return cs.animationName && cs.animationName !== 'none' && Number.parseFloat(cs.animationDuration) > 0.05
     }).length
 
+    // Neutral ramp audit: "warm neutral" is a measured property, not an opinion.
+    // A green/teal cast usually hides in the *neutrals* (text, borders, hovers)
+    // while the saturated accent stays inside its budget, so read the tokens.
+    const oklchOf = (triple) => {
+      const parts = String(triple ?? '').trim().split(/\s+/).map((value) => Number.parseFloat(value))
+      if (parts.length < 3 || parts.some((value) => !Number.isFinite(value))) return null
+      const lin = parts.slice(0, 3).map((channel) => {
+        const s = channel / 255
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+      })
+      const l = 0.4122214708 * lin[0] + 0.5363325363 * lin[1] + 0.0514459929 * lin[2]
+      const m = 0.2119034982 * lin[0] + 0.6806995451 * lin[1] + 0.1073969566 * lin[2]
+      const s = 0.0883024619 * lin[0] + 0.2817188376 * lin[1] + 0.6299787005 * lin[2]
+      const l_ = Math.cbrt(l); const m_ = Math.cbrt(m); const s_ = Math.cbrt(s)
+      const A = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_
+      const B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
+      let hue = (Math.atan2(B, A) * 180) / Math.PI
+      if (hue < 0) hue += 360
+      return { chroma: Number(Math.hypot(A, B).toFixed(4)), hue: Math.round(hue) }
+    }
+    const rootStyle = getComputedStyle(document.documentElement)
+    const neutralTokens = ['--c-bg-primary', '--c-bg-tertiary', '--c-bg-hover', '--c-text-primary', '--c-text-secondary', '--c-text-muted', '--c-outline-variant', '--c-border-subtle']
+    const neutralTint = {}
+    for (const token of neutralTokens) {
+      const value = rootStyle.getPropertyValue(token)
+      if (!value.trim()) continue
+      const measured = oklchOf(value)
+      if (measured) neutralTint[token.replace('--c-', '')] = measured
+    }
+    const accentTint = oklchOf(rootStyle.getPropertyValue('--c-accent-blue'))
     const doc = document.documentElement
     const bodyText = document.body.innerText
     const cue = document.querySelector('[data-testid="fast-cue"]')
@@ -1033,6 +1063,8 @@ async function measure(page) {
       cueBullets,
       transcriptCollapsed,
       navLabels,
+      neutralTint,
+      accentTint,
       bodyTextLength: bodyText.length,
       bodyTextSample: bodyText.slice(0, 1200),
       live: {
@@ -1134,6 +1166,20 @@ function ruleFailures(state, viewport, metrics, png, opts) {
       }
       if (metrics.live.statusLine && metrics.live.statusLine.h > 56) {
         push('live-compact-status', `状态行高度 ${metrics.live.statusLine.h}px > 56px`)
+      }
+    }
+    if (state.kind === 'studio' || state.kind === 'setup') {
+      // "Warm neutral canvas" is contractual (R1/R2). This catches the failure
+      // mode a green-pixel budget cannot see: neutrals quietly tinted teal, which
+      // makes the whole product read green even with 1% accent coverage.
+      const coldNeutrals = Object.entries(metrics.neutralTint ?? {})
+        .filter(([, value]) => value.chroma > 0.006 && (value.hue < 45 || value.hue > 125))
+      if (coldNeutrals.length) {
+        push('neutral-tint', `中性色偏冷/偏青: ${coldNeutrals.map(([name, value]) => `${name}(H${value.hue} C${value.chroma})`).join(', ')}`)
+      }
+      const accent = metrics.accentTint
+      if (accent && (accent.hue < 125 || accent.hue > 160)) {
+        push('accent-bamboo', `品牌色相 ${accent.hue}° 不在竹绿区间 125–160`)
       }
     }
     if (state.expectText) {

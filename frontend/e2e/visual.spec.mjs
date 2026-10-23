@@ -283,6 +283,34 @@ const PREFLIGHT = {
   share_privacy_note: '共享隐私默认关闭；本场设置只影响当前会话。',
 }
 
+const PREFLIGHT_BLOCKED = {
+  goal: { id: GOAL_ID, title: GOAL.title },
+  items: [
+    { key: 'goal', label: '目标', value: GOAL.title, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'resume', label: '简历', value: '郝磊-简历.pdf', origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'skill_cards', label: '技能卡', value: 4, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'stories', label: 'Stories', value: 3, origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'knowledge', label: '知识参考', value: '已启用', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'materials', label: '项目资料', value: 2, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'quick_notes', label: '速记', value: 1, origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '速记只是提醒，不是个人经历证据。' },
+    { key: 'answer_language', label: '回答语言', value: 'FOLLOW_INTERVIEW', origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'whisper_language', label: '识别语言', value: 'auto', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'language', label: '界面语言', value: '中文', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'technical_term_policy', label: '技术术语', value: '保留英文', origin: 'PERSON', origin_label: '我的成竹', ok: true, hint: '' },
+    { key: 'active_model', label: '模型', value: 'GPT-4.1 Mini', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'audio', label: '会议音频', value: '未就绪', origin: 'SYSTEM', origin_label: '系统检查', ok: false, hint: '没有检测到可用的系统音频输入；请在设置里完成测试后重试。' },
+    { key: 'stt', label: '语音识别', value: 'Whisper · 就绪', origin: 'SYSTEM', origin_label: '系统检查', ok: true, hint: '' },
+    { key: 'screen_context', label: '屏幕上下文', value: '关闭', origin: 'SYSTEM', origin_label: '系统检查', ok: true, hint: '' },
+    { key: 'ai_policy_mode', label: 'AI 辅助', value: 'AI_ALLOWED', origin: 'GOAL', origin_label: 'Goal 默认', ok: true, hint: '' },
+    { key: 'human_assistance_policy', label: '真人辅助', value: 'HUMAN_PRACTICE_ONLY', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+    { key: 'share_privacy_mode', label: '共享隐私', value: 'OFF', origin: 'GLOBAL', origin_label: '系统默认', ok: true, hint: '' },
+  ],
+  blockers: [
+    { key: 'audio', label: '会议音频', value: '未就绪', origin: 'SYSTEM', origin_label: '系统检查', ok: false, hint: '没有检测到可用的系统音频输入；请在设置里完成测试后重试。' },
+  ],
+  share_privacy_note: '共享隐私默认关闭；它不是安全或“不可检测”保证。',
+}
+
 const FROZEN_PACK = {
   id: 'pack-ui-1',
   session_id: 'live-ui-1',
@@ -694,6 +722,149 @@ async function expectInterviewStudioNav(page) {
   await expect(nav.getByRole('button', { name: '资料库' })).toHaveCount(0)
 }
 
+test.describe('@visual v2 setup boundaries', () => {
+  test('First run — three-phase orientation', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: async (pathname, method) => {
+        if (pathname === '/api/config' && method === 'GET') {
+          const { resolveApiPayload } = await import('./fixtures/sample-data.mjs')
+          return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
+        }
+        if (pathname === '/api/intelligence/diagnostics' && method === 'GET') {
+          return {
+            packaged: true,
+            data_home: 'C:/Users/u/AppData/Roaming/Chengzhu',
+            data_dir: 'C:/Users/u/AppData/Roaming/Chengzhu/data',
+            logs_dir: 'C:/Users/u/AppData/Roaming/Chengzhu/logs',
+            data_writable: true,
+            models: [{ index: 0, name: 'Primary', model: 'gpt-4.1-mini', has_key: true, enabled: true }],
+            has_usable_model: true,
+            stt_provider: 'whisper',
+            audio: { devices: [{ id: 1, name: 'Pixel Buds Microphone', is_loopback: false }, { id: 20000, name: 'Speakers (loopback)', is_loopback: true }] },
+            has_microphone: true,
+            has_system_audio: true,
+          }
+        }
+        return undefined
+      },
+    })
+    await page.goto('/#/home')
+    const wizard = page.getByTestId('onboarding')
+    await expect(wizard).toBeVisible()
+    await expect(wizard.getByText('FIRST RUN · 1 / 3')).toBeVisible()
+    await expect(wizard.getByRole('heading', { name: '成竹围绕一个目标工作' })).toBeVisible()
+    await expect(wizard.getByRole('button', { name: '测试连接' })).toHaveCount(0)
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('onboarding-understand.png', SNAPSHOT)
+
+    await wizard.getByTestId('onboarding-next').click()
+    await expect(wizard.getByRole('heading', { name: '你下一场在准备什么？' })).toBeVisible()
+    await wizard.getByTestId('onboarding-goal-company').fill('字节跳动')
+    await wizard.getByTestId('onboarding-goal-role').fill('AI 产品经理')
+    await wizard.getByTestId('onboarding-goal-jd').fill('负责 AI 产品规划、Agent 场景设计与评测体系，并把业务问题转化为可验证的产品假设。')
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('onboarding-goal.png', SNAPSHOT)
+  })
+
+  test('Create Goal — one interview, not a database row', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: (pathname, method) => {
+        if (method === 'GET' && pathname === '/api/product/goals') return { items: [GOAL] }
+        return undefined
+      },
+    })
+    await page.goto('/#/goals')
+    await expect(page.getByRole('heading', { name: '求职目标' })).toBeVisible()
+    await page.getByRole('button', { name: '新建目标' }).first().click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('公司')).toBeVisible()
+    await expect(dialog.getByLabel('岗位')).toBeVisible()
+    await expect(dialog.getByLabel('JD（可稍后补充）')).toBeVisible()
+    await expect(dialog.getByText('下一轮（可选）')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '创建目标' })).toBeInViewport()
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('create-goal.png', SNAPSHOT)
+  })
+
+  test('Preflight — ready state answers in the first view', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: (pathname, method) => {
+        if (method === 'GET' && pathname === '/api/product/goals') return { items: [GOAL] }
+        if (method === 'GET' && pathname === `/api/product/goals/${GOAL_ID}`) return GOAL_DETAIL
+        if (method === 'POST' && pathname === '/api/product/live/preflight') return PREFLIGHT
+        return undefined
+      },
+    })
+    await page.goto(`/#/goals/${GOAL_ID}`)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
+    await page.getByTestId('goal-go-live').click()
+    const preflight = page.getByTestId('preflight')
+    await expect(preflight).toBeVisible()
+    await expect(preflight.getByText('可以开始', { exact: true })).toBeVisible()
+    await expect(preflight.getByText('开始前需要处理')).toHaveCount(0)
+    await expect(preflight.getByTestId('preflight-start')).toBeEnabled()
+    await expect(preflight.getByTestId('preflight-start')).toBeInViewport()
+    await expect(preflight.getByTestId('preflight-start')).toContainText('开始上场')
+    await page.waitForTimeout(250)
+    await expect(page).toHaveScreenshot('preflight-ready.png', SNAPSHOT)
+  })
+
+  test('Preflight — blocker-first session review', async ({ context, page }) => {
+    await installMocks(context, {
+      messages: COMMON_WS_BOOTSTRAP,
+      localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+      apiOverrides: (pathname, method) => {
+        if (pathname === '/api/product/goals' && method === 'GET') return { items: [GOAL] }
+        if (pathname === `/api/product/goals/${GOAL_ID}` && method === 'GET') return GOAL_DETAIL
+        if (pathname === '/api/product/live/preflight' && method === 'POST') return PREFLIGHT_BLOCKED
+        return undefined
+      },
+    })
+    await page.goto(`/#/goals/${GOAL_ID}`)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
+    await page.getByTestId('goal-go-live').click()
+    const preflight = page.getByTestId('preflight')
+    await expect(preflight).toBeVisible()
+    await expect(preflight.getByText('开始前需要处理')).toBeVisible()
+    await expect(preflight.getByText('没有检测到可用的系统音频输入；请在设置里完成测试后重试。')).toBeVisible()
+    await expect(preflight.getByText('1 项待处理', { exact: true })).toBeVisible()
+    await expect(preflight.getByText('未修改本场默认值', { exact: true })).toBeVisible()
+    const startButton = page.getByTestId('preflight-start')
+    const goalLessButton = preflight.getByRole('button', { name: '不选目标，直接进入' })
+    await expect(startButton).toBeDisabled()
+    await expect(goalLessButton).toBeDisabled()
+    await expect(startButton).toBeInViewport()
+    await expect(goalLessButton).toBeInViewport()
+    await expect(preflight.getByRole('button', { name: '打开语音与音频设置' })).toBeInViewport()
+    await expect(preflight.getByText('本场带入内容', { exact: true })).toBeVisible()
+    await expect(preflight.getByText('本场覆盖', { exact: true })).toBeVisible()
+    await expect(preflight.getByText('这台电脑', { exact: true })).toHaveCount(0)
+    await expect(preflight.getByText('已就绪', { exact: true })).toHaveCount(0)
+
+    const blockerBox = await preflight.getByText('开始前需要处理', { exact: true }).boundingBox()
+    const contentBox = await preflight.getByText('本场带入内容', { exact: true }).boundingBox()
+    const startBox = await startButton.boundingBox()
+    const dialogBox = await page.getByRole('dialog', { name: '上场前检查（Preflight）' }).boundingBox()
+    const viewport = page.viewportSize()
+    expect(blockerBox).not.toBeNull()
+    expect(contentBox).not.toBeNull()
+    expect(startBox).not.toBeNull()
+    expect(dialogBox).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    expect(blockerBox.y).toBeLessThan(contentBox.y)
+    expect(startBox.y + startBox.height).toBeLessThanOrEqual(viewport.height)
+    expect(dialogBox.y).toBeGreaterThanOrEqual(0)
+    expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(viewport.height)
+  })
+})
+
 test.describe('@visual v2 Studio surfaces', () => {
   test.beforeEach(async ({ context }) => {
     await installMocks(context, {
@@ -940,6 +1111,50 @@ test.describe('@visual v2 Studio surfaces', () => {
     await page.waitForTimeout(250)
     await expect(page).toHaveScreenshot('me-resume.png', SNAPSHOT)
   })
+
+test.describe('@visual v2 responsive', () => {
+  // The enclosing Studio describe already installs STUDIO_OVERRIDES for every
+  // test, so this block only varies the viewport and the surfaces worth freezing
+  // at narrow widths.
+  for (const [label, width, height] of [['390', 390, 844], ['768', 768, 1024]]) {
+    test.describe(`${label}px`, () => {
+      test.use({ viewport: { width, height } })
+
+      test(`Home — ${label}`, async ({ page }) => {
+        await page.goto('/#/home')
+        await expect(page.getByText('字节跳动 · AI 产品经理').first()).toBeVisible()
+        await expect(page.getByRole('button', { name: '继续准备' }).first()).toBeVisible()
+        await page.waitForTimeout(250)
+        await expect(page).toHaveScreenshot(`responsive-home-${label}.png`, SNAPSHOT)
+      })
+
+      test(`Goal Prepare — ${label}`, async ({ page }) => {
+        await page.goto(`/#/goals/${GOAL_ID}/prepare`)
+        await expect(page.getByTestId('goal-prepare-workspace')).toBeVisible()
+        await expect(page.getByText('下一场，先把这些讲清楚')).toBeVisible()
+        await page.waitForTimeout(250)
+        await expect(page).toHaveScreenshot(`responsive-goal-prepare-${label}.png`, SNAPSHOT)
+      })
+
+      test(`Preflight blocked — ${label}`, async ({ context, page }) => {
+        await installMocks(context, {
+          messages: COMMON_WS_BOOTSTRAP,
+          localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
+          apiOverrides: (pathname, method) => {
+            if (method === 'POST' && pathname === '/api/product/live/preflight') return PREFLIGHT_BLOCKED
+            return STUDIO_OVERRIDES(pathname, method)
+          },
+        })
+        await page.goto(`/#/goals/${GOAL_ID}`)
+        await page.getByTestId('goal-go-live').click()
+        await expect(page.getByTestId('preflight')).toBeVisible()
+        await expect(page.getByText('开始前需要处理')).toBeVisible()
+        await page.waitForTimeout(250)
+        await expect(page).toHaveScreenshot(`responsive-preflight-blocked-${label}.png`, SNAPSHOT)
+      })
+    })
+  }
+})
 })
 
 test.describe('@visual v2 Live Cockpit', () => {

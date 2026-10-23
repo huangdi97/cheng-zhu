@@ -1,325 +1,354 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, CircleAlert, Loader2 } from 'lucide-react'
 import { api, getErrorMessage } from '@/lib/api'
 import { updateConfigAndRefresh } from '@/lib/configSync'
+import { navigate, paths } from '@/lib/router'
 import { useInterviewStore } from '@/stores/configStore'
-import { SHARE_PRIVACY_COPY } from '@/components/settings/PolicyPrivacySection'
 import { productApi, track } from '@/lib/productApi'
 import GuidedFirstPractice from './GuidedFirstPractice'
 
-// v1.3 首次运行引导。前十步配置真实环境，第十一步只有在跑通一次
-// Guided First Practice 后才允许正常完成；用户仍可显式「跳过引导」。
-// 1 欢迎 2 本地数据 3 模型 4 语音识别 5 麦克风 6 系统音频
-// 7 共享隐私 8 简历 9 第一个目标 10 第一次演练 11 完成
+/**
+ * First run answers three questions and nothing else:
+ *
+ *   01 理解      — what Chengzhu is, and why everything hangs off one Goal;
+ *   02 创建目标  — the few facts needed to say "this is the interview I am
+ *                  getting ready for";
+ *   03 就绪      — what happens next, plus an honest one-line machine status.
+ *
+ * Environment work that used to live here (model keys, STT, microphone,
+ * loopback capture, resume import, privacy defaults) belongs to Settings and to
+ * the blocker-first Preflight, where it is checked at the moment it matters.
+ * This surface must never turn into a setup wizard.
+ */
 
 interface Diagnostics {
-  packaged: boolean
-  data_home: string
-  data_dir: string
-  logs_dir: string
   data_writable: boolean
-  models: Array<{ index: number; name: string; model: string; has_key: boolean; enabled: boolean }>
   has_usable_model: boolean
   stt_provider: string
-  audio: { devices: Array<{ id: number; name: string; is_loopback: boolean }>; error?: string; explain?: Explained; platform?: { instructions?: string } }
   has_microphone: boolean
   has_system_audio: boolean
 }
 
-interface Explained {
-  kind: string
-  cause: string
-  action: string
-}
+const STEPS = [
+  { key: 'understand', label: '理解', title: '成竹围绕一个目标工作' },
+  { key: 'goal', label: '创建目标', title: '你下一场在准备什么？' },
+  { key: 'ready', label: '就绪', title: '接下来从这里开始' },
+] as const
 
-const STEPS = ['欢迎', '本地数据', '模型', '语音识别', '麦克风', '系统音频', '共享隐私', '简历', '第一个目标', '第一次演练', '完成'] as const
+const FLOW = [
+  { step: '准备', detail: '把简历、事实和资料收进这一个目标。' },
+  { step: '练习', detail: '针对下一场的重点先练一轮，拿到可验证的反馈。' },
+  { step: '上场', detail: '上场前检查一次；面试中只出现当前需要的一条提示。' },
+  { step: '复盘', detail: '把这一场真实说过的话写回下一步。' },
+]
 
-function Status({ ok, label, explain }: { ok: boolean | null; label: string; explain?: Explained | null }) {
+function Row({ step, detail }: { step: string; detail: string }) {
   return (
-    <div className="rounded-xl border border-bg-hover/60 bg-bg-tertiary/20 p-3 text-sm">
-      <div className="flex items-center gap-2">
-        {ok === null ? <Loader2 className="w-4 h-4 animate-spin text-text-muted" aria-hidden />
-          : ok ? <CheckCircle2 className="w-4 h-4 text-status-direct" aria-hidden />
-            : <CircleAlert className="w-4 h-4 text-status-risk" aria-hidden />}
-        <span className={ok === false ? 'text-status-risk font-medium' : 'text-text-primary'}>{label}</span>
-      </div>
-      {explain && (
-        <p className="mt-1 pl-6 text-xs text-text-secondary">原因：{explain.cause}。下一步：{explain.action}</p>
-      )}
-    </div>
+    <li className="grid gap-1 border-t border-bg-tertiary/70 py-2.5 sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-4">
+      <span className="text-sm font-medium text-text-primary">{step}</span>
+      <span className="text-xs leading-5 text-text-secondary">{detail}</span>
+    </li>
   )
 }
 
-async function explain(detail: string): Promise<Explained | null> {
-  try {
-    return await api.intelExplainError(detail)
-  } catch {
-    return null
+function MachineStatus({ diag }: { diag: Diagnostics | null }) {
+  if (!diag) {
+    return (
+      <p className="flex items-center gap-2 text-xs text-text-muted">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+        正在读取这台电脑的状态…
+      </p>
+    )
   }
-}
-
-function DeviceTest({ devices, kind }: { devices: Diagnostics['audio']['devices']; kind: 'mic' | 'loopback' }) {
-  const [deviceId, setDeviceId] = useState<number | null>(devices[0]?.id ?? null)
-  const [result, setResult] = useState<{ ok: boolean; text: string; explain?: Explained | null } | null>(null)
-  const [busy, setBusy] = useState(false)
-  if (!devices.length) {
-    return <Status ok={false} label={kind === 'mic' ? '没有检测到麦克风' : '没有检测到系统音频（回环）设备'} explain={{ kind: 'no_device', cause: '没有可用的音频设备', action: kind === 'mic' ? '连接麦克风或耳机后重新打开引导' : '在 Windows 上确认有正在使用的扬声器/耳机输出' }} />
-  }
-  const run = async () => {
-    if (deviceId == null) return
-    setBusy(true)
-    try {
-      const r = await api.audioInputTest(deviceId, 1.5)
-      setResult({ ok: r.has_signal, text: r.has_signal ? `检测到信号（峰值 ${r.peak.toFixed(3)}）` : kind === 'mic' ? '没有检测到声音：请对着麦克风说话后重试' : '没有检测到声音：请播放一段音频后重试' })
-    } catch (error) {
-      const msg = getErrorMessage(error, '测试失败')
-      setResult({ ok: false, text: msg, explain: await explain(msg) })
-    } finally {
-      setBusy(false)
-    }
-  }
+  const checks = [
+    { label: '模型', ok: diag.has_usable_model },
+    { label: '麦克风', ok: diag.has_microphone },
+    { label: '系统音频', ok: diag.has_system_audio },
+    { label: '数据目录', ok: diag.data_writable },
+  ]
   return (
-    <div className="space-y-2">
-      <select aria-label={kind === 'mic' ? '选择麦克风' : '选择系统音频设备'} value={deviceId ?? ''} onChange={(e) => setDeviceId(Number(e.target.value))}
-        className="w-full rounded-lg border border-bg-hover bg-bg-secondary px-2 py-1.5 text-sm text-text-primary">
-        {devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-      </select>
-      <button type="button" onClick={() => void run()} disabled={busy}
-        className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover/60 disabled:opacity-50">
-        {busy ? '测试中…' : kind === 'mic' ? '测试麦克风（说一句话）' : '测试系统音频（播放声音）'}
-      </button>
-      {result && <Status ok={result.ok} label={result.text} explain={result.explain} />}
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-medium tracking-[0.12em] text-text-muted">这台电脑</p>
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {checks.map((check) => (
+          <li key={check.label} className="flex items-center gap-1.5 text-xs">
+            {check.ok
+              ? <CheckCircle2 className="h-3.5 w-3.5 text-status-direct" aria-hidden />
+              : <CircleAlert className="h-3.5 w-3.5 text-status-risk" aria-hidden />}
+            <span className="text-text-secondary">{check.label}</span>
+            <span className={check.ok ? 'text-text-muted' : 'font-medium text-status-risk'}>{check.ok ? '就绪' : '未就绪'}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] leading-5 text-text-muted">
+        没就绪的项不会挡在这里：上场前还会再检查一次，缺什么就在那一步修。
+      </p>
     </div>
   )
 }
 
 export default function OnboardingWizard() {
   const config = useInterviewStore((s) => s.config)
-  const openModelsDrawer = useInterviewStore((s) => s.openModelsDrawer)
-  const toggleSettings = useInterviewStore((s) => s.toggleSettings)
-  const setSettingsDrawerTab = useInterviewStore((s) => s.setSettingsDrawerTab)
   const pushToast = useInterviewStore((s) => s.pushToast)
   const [step, setStep] = useState(0)
   const [diag, setDiag] = useState<Diagnostics | null>(null)
-  const [modelCheck, setModelCheck] = useState<{ ok: boolean | null; label: string; explain?: Explained | null } | null>(null)
-  const [sttCheck, setSttCheck] = useState<{ ok: boolean | null; label: string; explain?: Explained | null } | null>(null)
-  const [share, setShare] = useState('OFF')
-  const [goalCompany, setGoalCompany] = useState('')
-  const [goalRole, setGoalRole] = useState('')
+  const [company, setCompany] = useState('')
+  const [role, setRole] = useState('')
   const [jd, setJd] = useState('')
+  const [round, setRound] = useState('')
+  const [when, setWhen] = useState('')
   const [createdGoalId, setCreatedGoalId] = useState<string | null>(null)
-  const [guidedComplete, setGuidedComplete] = useState(false)
-  const [resumeName, setResumeName] = useState('')
+  const [guided, setGuided] = useState(false)
+  const [showGuided, setShowGuided] = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const markGuidedComplete = useCallback(() => setGuidedComplete(true), [])
+  const [busy, setBusy] = useState(false)
 
   const open = config?.onboarding_completed === false && !dismissed
+  const markGuidedComplete = useCallback(() => setGuided(true), [])
 
-  const loadDiag = useCallback(() => {
+  useEffect(() => {
+    if (!open) return
     api.intelDiagnostics().then((d) => setDiag(d as unknown as Diagnostics)).catch(() => setDiag(null))
-  }, [])
-  useEffect(() => { if (open) loadDiag() }, [open, loadDiag])
+  }, [open])
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
-  if (!open) return null
-
-  const finish = async () => {
+  const finish = useCallback(async () => {
     try {
       await updateConfigAndRefresh({ onboarding_completed: true })
-      track('onboarding_completed', { guided: guidedComplete })
+      track('onboarding_completed', { guided, steps: STEPS.length })
     } catch (error) {
       pushToast(getErrorMessage(error, '保存失败'), 'error')
     }
     setDismissed(true)
-  }
+    if (createdGoalId) navigate(paths.goal(createdGoalId))
+  }, [createdGoalId, guided, pushToast])
 
-  const testModel = async () => {
-    const target = diag?.models.find((m) => m.has_key && m.enabled)
-    if (!target) {
-      setModelCheck({ ok: false, label: '还没有填写可用的 API Key', explain: { kind: 'auth', cause: '未配置模型', action: '点击「打开模型设置」填写服务商、模型名和 API Key。' } })
-      return
-    }
-    setModelCheck({ ok: null, label: '正在连接…' })
-    try {
-      await api.checkSingleModelHealth(target.index)
-      const h = await api.getModelsHealth()
-      const key = String(target.index)
-      const status = h.health?.[key] ?? ''
-      const detail = h.detail?.[key] ?? ''
-      const ok = /ok|available|可用|healthy/i.test(status) && !/不可用|unavailable|error/i.test(status)
-      setModelCheck({ ok, label: ok ? `${target.name} 连接正常${h.latency?.[key] != null ? ` · ${h.latency[key]}ms` : ''}` : `${target.name} 不可用`, explain: ok ? null : await explain(`${status} ${detail}`) })
-    } catch (error) {
-      const msg = getErrorMessage(error, '连接失败')
-      setModelCheck({ ok: false, label: msg, explain: await explain(msg) })
-    }
-  }
+  // Modal contract, same as the shared Dialog: focus moves to the primary action
+  // of the step, Tab stays inside the panel, Escape leaves first run.
+  useEffect(() => {
+    if (!open) return
+    const panel = panelRef.current
+    if (!panel) return
+    const target = panel.querySelector<HTMLElement>('[data-testid="onboarding-next"], [data-testid="onboarding-finish"], [data-testid="onboarding-skip"]')
+    ;(target ?? panel).focus()
+  }, [open, step])
 
-  const testStt = async () => {
-    setSttCheck({ ok: null, label: '正在测试识别…' })
-    try {
-      const r = await api.sttTest()
-      setSttCheck({ ok: r.ok, label: r.ok ? `识别可用${r.text ? `：「${r.text}」` : ''}` : r.detail || '识别失败', explain: r.ok ? null : await explain(r.detail || '') })
-    } catch (error) {
-      const msg = getErrorMessage(error, '识别失败')
-      setSttCheck({ ok: false, label: msg, explain: await explain(msg) })
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      const panel = panelRef.current
+      if (!panel) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        void finish()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusables = Array.from(panel.querySelectorAll<HTMLElement>('button, input, textarea, select, summary, [tabindex="0"]'))
+        .filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null)
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (!event.shiftKey && active === last) { event.preventDefault(); first.focus() }
+      else if (event.shiftKey && active === first) { event.preventDefault(); last.focus() }
+      else if (active && !panel.contains(active)) { event.preventDefault(); first.focus() }
     }
-  }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, finish])
 
-  const onResume = async (file: File | undefined) => {
-    if (!file) return
-    try {
-      await api.uploadResume(file)
-      setResumeName(file.name)
-    } catch (error) {
-      pushToast(getErrorMessage(error, '上传失败'), 'error')
-    }
-  }
+  if (!open) return null
 
   const createGoal = async () => {
-    if (!goalCompany.trim() && !goalRole.trim()) return true
-    if (!goalRole.trim()) {
+    if (!role.trim()) {
       pushToast('请填写目标岗位；公司可以暂时留空', 'warn')
       return false
     }
+    setBusy(true)
     try {
       const goal = await productApi.createGoal({
-        company: goalCompany.trim(),
-        role: goalRole.trim(),
+        company: company.trim(),
+        role: role.trim(),
         jd,
-        stage: '准备中',
-        interview_round: '',
+        interview_round: round.trim(),
+        next_interview_at: when ? Math.round(new Date(when).getTime() / 1000) : null,
       })
       setCreatedGoalId(goal.id)
       return true
     } catch (error) {
       pushToast(getErrorMessage(error, '创建求职目标失败'), 'error')
       return false
+    } finally {
+      setBusy(false)
     }
   }
 
   const next = async () => {
-    if (STEPS[step] === '共享隐私') await updateConfigAndRefresh({ share_privacy_mode: share })
-    if (STEPS[step] === '第一个目标' && !(await createGoal())) return
-    if (STEPS[step] === '第一次演练' && !guidedComplete) return
+    if (STEPS[step].key === 'goal' && !createdGoalId && !(await createGoal())) return
     setStep((s) => Math.min(STEPS.length - 1, s + 1))
   }
 
-  const mics = (diag?.audio.devices ?? []).filter((d) => !d.is_loopback)
-  const loops = (diag?.audio.devices ?? []).filter((d) => d.is_loopback)
+  const current = STEPS[step]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" data-testid="onboarding">
-      <div className="w-full max-w-xl rounded-2xl bg-bg-secondary shadow-xl">
-        <div className="border-b border-bg-hover/60 px-5 py-4">
-          <p className="text-[11px] text-text-muted">第 {step + 1} / {STEPS.length} 步</p>
-          <h2 id="onboarding-title" className="text-lg font-semibold text-text-primary">{STEPS[step]}</h2>
-          <ol className="mt-2 flex gap-1" aria-hidden>
-            {STEPS.map((s, i) => <li key={s} className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-accent-blue' : 'bg-bg-hover'}`} />)}
-          </ol>
-        </div>
-        <div className="max-h-[60vh] overflow-y-auto px-5 py-4 space-y-3 text-sm text-text-secondary">
-          {step === 0 && (
-            <>
-              <p>成竹是一个本机运行的面试准备与实时提示工具：先把你的真实经历整理成有来源的事实，按岗位准备和演练，上场时先给简短 Cue，再按需展开完整回答。</p>
-              <p className="text-xs text-text-muted">开源（MIT License）。请只在允许使用辅助工具的场合使用实时提示；演练和复盘不受限制。</p>
-            </>
-          )}
-          {step === 1 && (
-            <>
-              <p>你的简历、事实、面试记录和配置只保存在这台电脑上，不会上传到成竹的服务器（成竹没有服务器）。调用模型时，问题和必要上下文会发给你自己配置的服务商。</p>
-              <Status ok={diag ? diag.data_writable : null} label={diag ? `数据目录：${diag.data_home}` : '检查中…'} />
-              {diag && <p className="text-xs text-text-muted">日志：{diag.logs_dir}</p>}
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <p>成竹使用你自己的模型服务（BYOK）。填写服务商地址、模型名和 API Key 后测试连接。</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => openModelsDrawer()} className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover/60">打开模型设置</button>
-                <button type="button" onClick={() => { loadDiag(); void testModel() }} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">测试连接</button>
-              </div>
-              {modelCheck && <Status ok={modelCheck.ok} label={modelCheck.label} explain={modelCheck.explain} />}
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <p>语音识别把面试官的话转成文字。当前引擎：<strong>{diag?.stt_provider || '未知'}</strong>。本地 Whisper 首次使用需要下载模型。</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { setSettingsDrawerTab('config'); toggleSettings() }} className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover/60">打开语音设置</button>
-                <button type="button" onClick={() => void testStt()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">测试识别</button>
-              </div>
-              {sttCheck && <Status ok={sttCheck.ok} label={sttCheck.label} explain={sttCheck.explain} />}
-            </>
-          )}
-          {step === 4 && (
-            <>
-              <p>麦克风用来记录你自己的回答（用于复盘和演练）。</p>
-              {diag ? <DeviceTest devices={mics} kind="mic" /> : <Status ok={null} label="检测设备中…" />}
-              {diag?.audio.error && <Status ok={false} label={diag.audio.error} explain={diag.audio.explain} />}
-            </>
-          )}
-          {step === 5 && (
-            <>
-              <p>系统音频用来听会议软件里面试官的声音（Windows 通过扬声器回环采集，不需要额外驱动）。</p>
-              {diag ? <DeviceTest devices={loops} kind="loopback" /> : <Status ok={null} label="检测设备中…" />}
-              {diag?.audio.platform?.instructions && <p className="text-xs text-text-muted whitespace-pre-line">{diag.audio.platform.instructions}</p>}
-            </>
-          )}
-          {step === 6 && (
-            <fieldset className="space-y-2">
-              <legend className="text-text-primary">共享隐私默认值</legend>
-              {[['OFF', '关闭（推荐默认）'], ['PRIVATE_OVERLAY', '私有悬浮窗']].map(([v, l]) => (
-                <label key={v} className="flex items-center gap-2 text-text-primary">
-                  <input type="radio" name="share" value={v} checked={share === v} onChange={() => setShare(v)} />{l}
-                </label>
+      <div ref={panelRef} tabIndex={-1} className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-bg-hover/70 bg-bg-secondary outline-none">
+        <header className="border-b border-bg-tertiary/70 px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-[11px] font-medium tracking-[0.14em] text-text-muted">
+              FIRST RUN · {step + 1} / {STEPS.length}
+            </p>
+            <ol aria-label="首次引导阶段" className="flex items-center gap-3">
+              {STEPS.map((item, index) => (
+                <li
+                  key={item.key}
+                  aria-current={index === step ? 'step' : undefined}
+                  className={`text-[11px] ${index === step ? 'font-semibold text-text-primary' : index < step ? 'text-text-secondary' : 'text-text-muted'}`}
+                >
+                  {String(index + 1).padStart(2, '0')} {item.label}
+                </li>
               ))}
-              <p className="text-xs text-text-muted">{SHARE_PRIVACY_COPY}</p>
-            </fieldset>
+            </ol>
+          </div>
+          <h2 id="onboarding-title" className="mt-2 text-xl font-semibold tracking-tight text-text-primary">{current.title}</h2>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm text-text-secondary">
+          {current.key === 'understand' && (
+            <div className="space-y-4">
+              <p className="max-w-xl text-sm leading-6 text-text-primary">
+                成竹不给你一堆 AI 功能。它只围绕一个具体的求职目标，把准备、练习、上场和复盘连成一条线。
+              </p>
+              <ul className="border-b border-bg-tertiary/70">
+                {FLOW.map((item) => <Row key={item.step} {...item} />)}
+              </ul>
+              <p className="text-xs leading-5 text-text-muted">
+                之所以先建目标：准备内容和复盘结论都要落回同一场面试，否则它们只是互不相干的笔记。
+              </p>
+              <p className="text-xs leading-5 text-text-muted">
+                数据默认留在这台电脑上；调用模型时才会把必要上下文发给你自己配置的服务商。成竹开源（MIT License）。
+              </p>
+            </div>
           )}
-          {step === 7 && (
-            <>
-              <p>导入简历后，成竹会抽取事实并标注来源。你可以在「我的成竹 → 待确认」里确认、否认或补来源。</p>
-              <input type="file" accept=".pdf,.docx,.txt,.md" aria-label="选择简历文件" onChange={(e) => void onResume(e.target.files?.[0])}
-                className="block w-full text-xs text-text-secondary" />
-              {resumeName && <Status ok label={`已导入：${resumeName}`} />}
-            </>
-          )}
-          {step === 8 && (
-            <>
-              <p>建第一个求职目标。之后的准备、练习、上场和复盘都会围绕这个求职目标连起来。</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <input data-testid="onboarding-goal-company" aria-label="目标公司" value={goalCompany} onChange={(e) => setGoalCompany(e.target.value)} placeholder="例如：MindRank"
-                  className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
-                <input data-testid="onboarding-goal-role" aria-label="目标岗位" value={goalRole} onChange={(e) => setGoalRole(e.target.value)} placeholder="例如：AIDD Agent Engineer"
-                  className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
+
+          {current.key === 'goal' && (
+            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void next() }}>
+              <p className="max-w-xl text-xs leading-5 text-text-muted">
+                先写最必要的三项。JD 用来生成准备缺口和可能追问；时间和轮次可以稍后补。
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs">
+                  <span className="font-medium text-text-secondary">公司</span>
+                  <input
+                    data-testid="onboarding-goal-company"
+                    value={company}
+                    onChange={(event) => setCompany(event.target.value)}
+                    placeholder="例如 字节跳动"
+                    className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue/60 outline-none"
+                  />
+                </label>
+                <label className="block text-xs">
+                  <span className="font-medium text-text-secondary">岗位</span>
+                  <input
+                    data-testid="onboarding-goal-role"
+                    value={role}
+                    onChange={(event) => setRole(event.target.value)}
+                    placeholder="例如 AI 产品经理"
+                    className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue/60 outline-none"
+                  />
+                </label>
               </div>
-              <textarea data-testid="onboarding-goal-jd" aria-label="岗位 JD" rows={4} value={jd} onChange={(e) => setJd(e.target.value)} placeholder="粘贴 JD（可选）"
-                className="w-full rounded-lg border border-bg-hover bg-bg-primary px-2 py-1.5 text-sm text-text-primary" />
-              {createdGoalId ? <Status ok label="第一个求职目标已创建" /> : null}
-            </>
+              <label className="block text-xs">
+                <span className="font-medium text-text-secondary">JD / 岗位描述</span>
+                <textarea
+                  data-testid="onboarding-goal-jd"
+                  rows={5}
+                  value={jd}
+                  onChange={(event) => setJd(event.target.value)}
+                  placeholder="粘贴岗位描述，成竹据此判断要补什么"
+                  className="mt-1 min-h-[104px] w-full rounded-lg border border-bg-hover bg-bg-primary px-3 py-2 text-sm leading-6 text-text-primary placeholder:text-text-muted focus:border-accent-blue/60 outline-none"
+                />
+              </label>
+              <details className="border-t border-bg-tertiary/70 pt-3 text-xs">
+                <summary className="cursor-pointer text-text-secondary">下一轮信息（可选）</summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="font-medium text-text-secondary">轮次</span>
+                    <input
+                      value={round}
+                      onChange={(event) => setRound(event.target.value)}
+                      placeholder="例如 产品二面"
+                      className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-blue/60 outline-none"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="font-medium text-text-secondary">时间</span>
+                    <input
+                      type="datetime-local"
+                      value={when}
+                      onChange={(event) => setWhen(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-bg-hover bg-bg-primary px-3 py-2 text-sm text-text-primary focus:border-accent-blue/60 outline-none"
+                    />
+                  </label>
+                </div>
+              </details>
+              {createdGoalId ? <p className="text-xs text-status-direct">这个目标已经建立，可以继续。</p> : null}
+            </form>
           )}
-          {step === 9 && (
-            <GuidedFirstPractice goalId={createdGoalId} onCompleted={markGuidedComplete} />
-          )}
-          {step === 10 && (
-            <div data-testid="onboarding-complete-step">
-              <p>准备好了。之后只记住一条路径：打开求职目标 → 看下一步重点 → 准备或练习 → 上场 → 复盘 → 下一步。</p>
-              <p className="text-xs text-text-muted">系统的复杂度留在后台；你下一步该做什么应该始终很清楚。所有默认值都可以在「设置」里调整。</p>
+
+          {current.key === 'ready' && (
+            <div className="space-y-4" data-testid="onboarding-complete-step">
+              <p className="max-w-xl text-sm leading-6 text-text-primary">
+                {createdGoalId ? '目标已建立。' : '可以先进入成竹，之后再建目标。'}
+                接下来只记住一条路径：打开目标 → 看下一步重点 → 准备或练习 → 上场 → 复盘。
+              </p>
+              <ul className="border-b border-bg-tertiary/70">
+                {FLOW.map((item) => <Row key={item.step} {...item} />)}
+              </ul>
+              <MachineStatus diag={diag} />
+              <div className="border-t border-bg-tertiary/70 pt-3">
+                {showGuided ? (
+                  <GuidedFirstPractice goalId={createdGoalId} onCompleted={() => markGuidedComplete()} />
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="onboarding-guided-start"
+                    onClick={() => setShowGuided(true)}
+                    className="text-xs text-text-secondary underline decoration-bg-hover underline-offset-2 hover:text-text-primary"
+                  >
+                    先用三分钟跑一次演练（可选）
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-bg-hover/60 px-5 py-3">
-          <button type="button" data-testid="onboarding-skip" onClick={() => void finish()} className="text-xs text-text-muted hover:text-text-primary">跳过引导</button>
-          <div className="flex gap-2">
+
+        <div className="flex items-center justify-between border-t border-bg-tertiary/70 bg-bg-primary/35 px-6 py-3">
+          <button type="button" data-testid="onboarding-skip" onClick={() => void finish()} className="text-xs text-text-muted hover:text-text-primary">
+            跳过引导
+          </button>
+          <div className="flex items-center gap-2">
             {step > 0 && (
-              <button type="button" onClick={() => setStep((s) => s - 1)} className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary">上一步</button>
+              <button type="button" onClick={() => setStep((s) => s - 1)} className="rounded-lg border border-bg-hover px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-hover/60">
+                上一步
+              </button>
             )}
             {step < STEPS.length - 1 ? (
-              <button type="button" data-testid="onboarding-next" onClick={() => void next()} disabled={STEPS[step] === '第一次演练' && !guidedComplete}
-                className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">
-                {STEPS[step] === '第一次演练' && !guidedComplete ? '先完成这次演练' : '下一步'}
+              <button
+                type="button"
+                data-testid="onboarding-next"
+                onClick={() => void next()}
+                disabled={busy}
+                className="rounded-lg bg-accent-blue px-3.5 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {busy ? '创建中…' : current.key === 'goal' ? '创建并继续' : '下一步'}
               </button>
             ) : (
-              <button type="button" data-testid="onboarding-finish" onClick={() => void finish()} className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white">进入成竹</button>
+              <button type="button" data-testid="onboarding-finish" onClick={() => void finish()} className="rounded-lg bg-accent-blue px-3.5 py-1.5 text-xs font-semibold text-white">
+                进入成竹
+              </button>
             )}
           </div>
         </div>

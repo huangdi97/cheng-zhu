@@ -292,7 +292,7 @@ function DiagnosticsGroup() {
         <summary className="cursor-pointer text-text-secondary">运行诊断（v1.2 Core）</summary>
         <pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-bg-tertiary/50 p-2 text-[11px]">{JSON.stringify(diag.data, null, 2)}</pre>
       </details>
-      <section aria-label="Conversation Beta 诊断" className="rounded-2xl border border-bg-hover/60 p-3">
+      <section aria-label="Conversation Beta 诊断" className="rounded-xl border border-bg-hover/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-text-primary">Conversation Beta</h3>
@@ -353,7 +353,7 @@ function DiagnosticsGroup() {
         })() : null}
       </section>
 
-      <section aria-label="产品循环验证（v1.4）" className="rounded-2xl border border-bg-hover/60 p-3">
+      <section aria-label="产品循环验证（v1.4）" className="rounded-xl border border-bg-hover/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-text-primary">产品循环验证（v1.4）</h3>

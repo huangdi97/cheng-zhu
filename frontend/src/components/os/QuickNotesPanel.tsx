@@ -219,7 +219,7 @@ export default function QuickNotesPanel({ goalId, readOnly = false, selectedIds,
     <div className="space-y-2" data-testid="quick-notes-panel">
       {!compact ? <p className="text-[11px] text-text-muted">速记只是你的提醒，不是证据，也不会自动变成已确认的事实。</p> : null}
       {!readOnly ? (
-        <form className="rounded-2xl border border-bg-hover/60 p-2 space-y-1.5" onSubmit={(e) => { e.preventDefault(); void create() }}>
+        <form className="rounded-xl border border-bg-hover/60 p-2 space-y-1.5" onSubmit={(e) => { e.preventDefault(); void create() }}>
           <input aria-label="速记标题" className={inputCls} placeholder="标题（可选），例如：想问" value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
           <textarea aria-label="速记内容" className={`${inputCls} min-h-[56px]`} placeholder="写一条速记…" value={draft} onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); void create() } }} />

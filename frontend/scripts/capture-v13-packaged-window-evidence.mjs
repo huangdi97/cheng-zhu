@@ -81,6 +81,24 @@ async function request(base, method, pathname, body) {
   return payload
 }
 
+// POST /api/resume wants a multipart file, and /api/config silently drops
+// resume_text (ConfigUpdate has no such field, and core.config pops it on save),
+// so seeding a resume has to go through the real upload + apply path.
+async function uploadResume(base, text) {
+  const form = new FormData()
+  form.append('file', new Blob([text], { type: 'text/plain' }), 'evidence-resume.txt')
+  const res = await fetch(base + '/api/resume', { method: 'POST', body: form })
+  const body = await res.text()
+  if (!res.ok) throw new Error('POST /api/resume -> ' + res.status + ': ' + body.slice(0, 300))
+  return body ? JSON.parse(body) : {}
+}
+
+async function activateResume(base) {
+  const history = await request(base, 'GET', '/api/resume/history')
+  const entryId = history.items?.[0]?.id
+  if (entryId == null) throw new Error('resume upload did not create a history entry')
+  return request(base, 'POST', '/api/resume/history/' + entryId + '/apply', undefined)
+}
 async function formRequest(base, pathname, fields) {
   const form = new FormData()
   for (const [key, value] of Object.entries(fields)) form.append(key, String(value))
@@ -240,20 +258,7 @@ try {
       { kind: 'capture', name: '01-onboarding', note: 'real packaged fresh-install onboarding' },
 
       // Welcome → local data → model → STT → mic → system audio → privacy → resume → first Goal.
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
-      { kind: 'sleep', ms: 250 },
+      // 第一步是那一场在准备什么，第二步是 Goal 表单，第三步是 ready（可选带练）。
       { kind: 'click', selector: '[data-testid="onboarding-next"]' },
       { kind: 'sleep', ms: 250 },
       { kind: 'wait', selector: '[data-testid="onboarding-goal-role"]', timeout_ms: 10000 },
@@ -262,6 +267,8 @@ try {
       { kind: 'fill', selector: '[data-testid="onboarding-goal-jd"]', value: '负责 Agent、RAG、评估与系统设计。' },
       { kind: 'capture', name: '01b-first-goal', note: 'first packaged Goal during onboarding' },
       { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'wait', selector: '[data-testid="onboarding-complete-step"]', timeout_ms: 10000 },
+      { kind: 'click', selector: '[data-testid="onboarding-guided-start"]' },
 
       { kind: 'wait', selector: '[data-testid="guided-first-practice"]', timeout_ms: 10000 },
       { kind: 'click', selector: '[data-testid="guided-start"]' },
@@ -289,7 +296,7 @@ try {
       { kind: 'wait', selector: '[data-testid="guided-practice-complete"]', timeout_ms: 20000 },
       { kind: 'capture', name: '01g-guided-reflection', note: 'Content/Delivery feedback plus Demo Reflection closes the first-use loop' },
 
-      { kind: 'click', selector: '[data-testid="onboarding-next"]' },
+      { kind: 'click', selector: '[data-testid="onboarding-finish"]' },
       { kind: 'wait', selector: '[data-testid="onboarding-complete-step"]', timeout_ms: 5000 },
       { kind: 'capture', name: '01h-onboarding-complete', note: 'canonical Goal-centered completion message' },
       { kind: 'click', selector: '[data-testid="onboarding-finish"]' },
@@ -302,6 +309,8 @@ try {
   const resume = 'WenNian：我负责 RAG 检索链路，用 Redis 管理 session state。'
   await request(backendBase, 'POST', '/api/intelligence/candidate/rebuild', { resume_text: resume, interview_notes: '' })
   await request(backendBase, 'POST', '/api/config', { resume_text: resume })
+  await uploadResume(backendBase, resume)
+  await activateResume(backendBase)
 
   const goal = await request(backendBase, 'POST', '/api/product/goals', {
     company: 'MindRank',

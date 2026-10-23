@@ -47,10 +47,15 @@ code, pre, .font-mono {
   -webkit-app-region: no-drag;
 }
 
-/* 统一键盘焦点环：所有 :focus-visible 元素获得一致的可见焦点（可访问性） */
+/* Unified keyboard focus ring. The colour has a literal fallback because this
+   rule sits above the theme blocks: a var() with no fallback would make the whole
+   declaration invalid-at-computed-value-time on any element outside the themed
+   subtree, which is how some controls ended up with no visible focus at all. */
 :focus-visible {
-  outline: 2px solid rgb(var(--c-accent-blue) / 0.55);
+  outline: 2px solid rgb(var(--c-accent-blue, 63 106 66) / 0.55);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(var(--c-accent-blue, 63 106 66) / 0.12);
+  border-radius: 6px;
 }
 
 /* ========== 主题变量（与 tailwind.config 中 rgb(var(--c-*) / <alpha>) 对应）========== */
@@ -59,53 +64,54 @@ code, pre, .font-mono {
 [data-theme='vscode-light-plus'] {
   /* v1.3-R2 Professional Workbench — canonical §41.
    * Internal "vscode-*" IDs are retained only for preference migration. */
-  --c-bg-primary: 246 247 246;     /* Canvas #F6F7F6 */
+  --c-bg-primary: 248 246 240;     /* Canvas #F6F7F6 */
   --c-bg-secondary: 255 255 255;   /* Surface #FFFFFF */
-  --c-bg-tertiary: 240 243 241;    /* Surface Alt #F0F3F1 */
-  --c-bg-hover: 228 233 230;
-  --c-text-primary: 27 36 32;      /* #1B2420 */
-  --c-text-secondary: 88 98 93;    /* #58625D */
-  --c-text-muted: 105 116 110;
-  --c-accent-blue: 47 107 87;      /* Bamboo #2F6B57; token name retained */
-  --c-accent-green: 37 106 75;
+  --c-bg-tertiary: 242 238 229;    /* Surface Alt #F0F3F1 */
+  --c-bg-hover: 231 224 211;
+  --c-text-primary: 34 30 22;      /* #1B2420 */
+  --c-text-secondary: 95 89 76;    /* #58625D */
+  --c-text-muted: 112 106 92;
+  --c-accent-blue: 63 106 66;      /* Bamboo #2F6B57; token name retained */
+  --c-accent-green: 56 95 60;
   --c-accent-red: 173 69 69;
+  --c-on-accent: 255 255 255;
   --c-accent-amber: 134 85 31;
-  --c-grad-from: 47 107 87;
-  --c-grad-to: 63 100 117;         /* Ink Blue #3F6475 */
-  --c-primary-container: 221 235 228;
-  --c-on-primary-container: 36 83 66;
-  --c-secondary-container: 224 233 237;
-  --c-on-secondary-container: 50 79 92;
-  --c-tertiary-container: 245 233 215;
-  --c-on-tertiary-container: 112 72 27;
-  --c-surface-variant: 244 246 245;
-  --c-on-surface-variant: 88 98 93;
-  --c-outline-variant: 218 225 221;
-  --c-scrollbar-thumb: 177 187 181;
-  --c-scrollbar-thumb-hover: 144 157 150;
-  --c-selection-bg: 47 107 87;
+  --c-grad-from: 63 106 66;
+  --c-grad-to: 86 96 70;         /* Ink Blue #3F6475 */
+  --c-primary-container: 228 233 217;
+  --c-on-primary-container: 47 74 47;
+  --c-secondary-container: 236 229 216;
+  --c-on-secondary-container: 78 70 56;
+  --c-tertiary-container: 244 232 209;
+  --c-on-tertiary-container: 107 81 39;
+  --c-surface-variant: 246 243 236;
+  --c-on-surface-variant: 95 89 76;
+  --c-outline-variant: 222 215 202;
+  --c-scrollbar-thumb: 177 173 165;
+  --c-scrollbar-thumb-hover: 144 140 132;
+  --c-selection-bg: 63 106 66;
   --c-selection-fg: 255 255 255;
-  --c-md-code-bg: 237 241 239;
-  --c-md-pre-bg: 248 249 248;
-  --c-md-pre-border: 215 223 219;
-  --c-md-strong: 27 36 32;
-  --c-md-blockquote: 88 98 93;
-  --c-code-shell-bg: 248 250 249;
-  --c-code-header-bg: 236 241 238;
-  --c-code-inline-bg: 229 238 233;
-  --c-code-inline-fg: 42 94 77;
-  --c-surface-panel: 249 250 249;
+  --c-md-code-bg: 233 230 222;
+  --c-md-pre-bg: 248 247 244;
+  --c-md-pre-border: 215 211 203;
+  --c-md-strong: 34 30 22;
+  --c-md-blockquote: 95 89 76;
+  --c-code-shell-bg: 249 248 245;
+  --c-code-header-bg: 237 234 226;
+  --c-code-inline-bg: 233 230 222;
+  --c-code-inline-fg: 59 90 59;
+  --c-surface-panel: 249 248 245;
   --c-surface-elevated: 255 255 255;
   --c-surface-glass: 255 255 255;
-  --c-border-subtle: 221 227 223;
-  --c-border-strong: 151 164 157;
-  --c-console-shell-bg: 248 250 249;
-  --c-console-header-bg: 235 240 237;
-  --c-timeline-rail: 182 194 187;
+  --c-border-subtle: 224 217 204;
+  --c-border-strong: 151 147 139;
+  --c-console-shell-bg: 249 248 245;
+  --c-console-header-bg: 236 233 225;
+  --c-timeline-rail: 182 178 170;
   --c-overlay-backdrop: 255 255 255;
-  --c-overlay-border: 47 107 87;
-  --c-lyric-shell-bg: 248 250 249;
-  --c-lyric-shell-border: 63 100 117;
+  --c-overlay-border: 63 106 66;
+  --c-lyric-shell-bg: 249 248 245;
+  --c-lyric-shell-border: 86 96 70;
   /* 悬浮窗(HUD)独立调色板：悬浮于第三方会议软件之上，有意不跟随主界面主题 */
   --c-ov-surface: 255 255 255;
   --c-ov-text: 30 41 59;
@@ -119,53 +125,54 @@ code, pre, .font-mono {
 
 [data-theme='vscode-dark-plus'] {
   /* Chengzhu dark: quiet warm-black surfaces + bamboo primary. */
-  --c-bg-primary: 17 21 19;        /* #111513 */
-  --c-bg-secondary: 23 29 26;      /* #171D1A */
-  --c-bg-tertiary: 30 38 34;       /* #1E2622 */
-  --c-bg-hover: 39 49 44;
-  --c-text-primary: 230 236 232;   /* #E6ECE8 */
-  --c-text-secondary: 181 193 186;
-  --c-text-muted: 145 158 151;
-  --c-accent-blue: 120 182 157;    /* #78B69D */
-  --c-accent-green: 111 207 159;
+  --c-bg-primary: 18 17 15;        /* #111513 */
+  --c-bg-secondary: 25 23 19;      /* #171D1A */
+  --c-bg-tertiary: 34 31 26;       /* #1E2622 */
+  --c-bg-hover: 43 39 33;
+  --c-text-primary: 234 231 224;   /* #E6ECE8 */
+  --c-text-secondary: 182 177 167;
+  --c-text-muted: 154 149 139;
+  --c-accent-blue: 157 194 160;    /* #78B69D */
+  --c-accent-green: 162 196 159;
   --c-accent-red: 242 143 143;
+  --c-on-accent: 15 21 18;
   --c-accent-amber: 224 169 106;
-  --c-grad-from: 120 182 157;
-  --c-grad-to: 113 151 168;
-  --c-primary-container: 42 76 62;
-  --c-on-primary-container: 215 235 226;
-  --c-secondary-container: 45 68 78;
-  --c-on-secondary-container: 218 232 238;
-  --c-tertiary-container: 75 59 35;
-  --c-on-tertiary-container: 241 221 190;
-  --c-surface-variant: 35 43 39;
-  --c-on-surface-variant: 181 193 186;
-  --c-outline-variant: 58 70 64;
-  --c-scrollbar-thumb: 63 78 70;
-  --c-scrollbar-thumb-hover: 84 101 92;
-  --c-selection-bg: 120 182 157;
-  --c-selection-fg: 17 21 19;
-  --c-md-code-bg: 30 38 34;
-  --c-md-pre-bg: 14 18 16;
-  --c-md-pre-border: 46 58 52;
-  --c-md-strong: 230 236 232;
-  --c-md-blockquote: 164 178 170;
-  --c-code-shell-bg: 14 19 17;
-  --c-code-header-bg: 24 31 28;
-  --c-code-inline-bg: 36 48 42;
-  --c-code-inline-fg: 169 218 197;
-  --c-surface-panel: 21 27 24;
-  --c-surface-elevated: 29 37 33;
-  --c-surface-glass: 25 32 29;
-  --c-border-subtle: 47 59 53;
-  --c-border-strong: 88 107 97;
-  --c-console-shell-bg: 14 19 17;
-  --c-console-header-bg: 24 31 28;
-  --c-timeline-rail: 93 115 104;
-  --c-overlay-backdrop: 17 21 19;
-  --c-overlay-border: 120 182 157;
-  --c-lyric-shell-bg: 23 29 26;
-  --c-lyric-shell-border: 120 182 157;
+  --c-grad-from: 157 194 160;
+  --c-grad-to: 140 148 122;
+  --c-primary-container: 40 47 32;
+  --c-on-primary-container: 210 228 206;
+  --c-secondary-container: 58 52 44;
+  --c-on-secondary-container: 236 230 220;
+  --c-tertiary-container: 70 58 40;
+  --c-on-tertiary-container: 240 226 198;
+  --c-surface-variant: 38 35 30;
+  --c-on-surface-variant: 182 177 167;
+  --c-outline-variant: 62 57 50;
+  --c-scrollbar-thumb: 68 63 55;
+  --c-scrollbar-thumb-hover: 90 84 75;
+  --c-selection-bg: 157 194 160;
+  --c-selection-fg: 18 17 15;
+  --c-md-code-bg: 34 31 26;
+  --c-md-pre-bg: 16 14 12;
+  --c-md-pre-border: 50 45 39;
+  --c-md-strong: 234 231 224;
+  --c-md-blockquote: 166 160 149;
+  --c-code-shell-bg: 16 15 12;
+  --c-code-header-bg: 26 24 20;
+  --c-code-inline-bg: 38 36 30;
+  --c-code-inline-fg: 164 202 168;
+  --c-surface-panel: 22 20 17;
+  --c-surface-elevated: 31 28 24;
+  --c-surface-glass: 27 25 21;
+  --c-border-subtle: 50 46 40;
+  --c-border-strong: 94 88 79;
+  --c-console-shell-bg: 16 15 12;
+  --c-console-header-bg: 26 24 20;
+  --c-timeline-rail: 98 92 82;
+  --c-overlay-backdrop: 18 17 15;
+  --c-overlay-border: 157 194 160;
+  --c-lyric-shell-bg: 25 23 19;
+  --c-lyric-shell-border: 157 194 160;
 }
 
 [data-theme='vscode-dark-hc'] {
@@ -179,6 +186,7 @@ code, pre, .font-mono {
   --c-accent-blue: 58 150 221;
   --c-accent-green: 106 185 48;
   --c-accent-red: 255 80 80;
+  --c-on-accent: 0 0 0;
   --c-accent-amber: 255 198 0;
   --c-grad-from: 58 150 221;
   --c-grad-to: 129 140 248;
@@ -232,6 +240,7 @@ code, pre, .font-mono {
   --c-accent-blue: 136 192 208;
   --c-accent-green: 163 190 140;
   --c-accent-red: 191 97 106;
+  --c-on-accent: 15 21 18;
   --c-accent-amber: 235 203 139;
   --c-grad-from: 136 192 208;
   --c-grad-to: 94 129 172;
@@ -282,6 +291,7 @@ code, pre, .font-mono {
   --c-accent-blue: 43 92 169;
   --c-accent-green: 46 105 75;
   --c-accent-red: 158 63 77;
+  --c-on-accent: 255 255 255;
   --c-accent-amber: 140 94 30;
   --c-grad-from: 43 92 169;
   --c-grad-to: 109 78 163;
@@ -335,6 +345,7 @@ code, pre, .font-mono {
   --c-accent-blue: 38 139 210;
   --c-accent-green: 133 153 0;
   --c-accent-red: 220 50 47;
+  --c-on-accent: 15 21 18;
   --c-accent-amber: 181 137 0;
   --c-grad-from: 38 139 210;
   --c-grad-to: 108 113 196;
@@ -538,9 +549,8 @@ code, pre, .font-mono {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: rgb(var(--c-on-accent, 255 255 255));
   background: rgb(var(--c-accent-blue));
-  box-shadow: 0 2px 8px -2px rgb(var(--c-accent-blue) / 0.45);
 }
 
 /* ========== Unified glass floating layer (popover / dropdown) ========== */
@@ -629,7 +639,6 @@ code, pre, .font-mono {
 .header-gradient {
   background: rgb(var(--c-bg-secondary) / 0.94);
   border-bottom: 1px solid rgb(var(--c-border-subtle) / 0.7);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.025);
 }
 
 /* ========== Transcription item entry ========== */
@@ -657,15 +666,13 @@ code, pre, .font-mono {
 /* ========== Improved button styles ========== */
 .btn-primary {
   background: rgb(var(--c-accent-blue));
-  color: white;
+  color: rgb(var(--c-on-accent, 255 255 255));
   border: 1px solid rgb(var(--c-accent-blue) / 0.35);
-  border-radius: 9999px;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
-  transition: filter 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 8px;
+  transition: filter 0.15s ease;
 }
 .btn-primary:hover {
   filter: brightness(1.07);
-  box-shadow: 0 2px 8px -2px rgb(var(--c-accent-blue) / 0.45);
 }
 .btn-primary:active {
   filter: brightness(0.96);
@@ -673,12 +680,10 @@ code, pre, .font-mono {
 
 .btn-danger {
   background: rgb(var(--c-accent-red));
-  color: white;
+  color: rgb(var(--c-on-accent, 255 255 255));
   border: 1px solid rgb(var(--c-accent-red) / 0.3);
+  border-radius: 8px;
   transition: filter 0.15s ease;
-}
-.btn-danger:hover {
-  filter: brightness(1.08);
 }
 
 .btn-subtle {
@@ -1579,6 +1584,15 @@ code, pre, .font-mono {
 
 /* ── reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
+  /* Quiet intelligence: motion is decoration, never information. When the OS
+     asks for reduced motion the whole surface goes still. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .ov-caret {
     animation: none;
   }

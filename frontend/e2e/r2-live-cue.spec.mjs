@@ -138,8 +138,53 @@ test.describe('R2 live cue-first', () => {
   })
 })
 
-test.describe('v1.3 first-run onboarding', () => {
-  test('fresh config shows the 11-step wizard and explains a failing model check', async ({ context, page }) => {
+const ONBOARDING_DIAGNOSTICS = {
+  packaged: true,
+  data_home: 'C:/Users/u/AppData/Roaming/Chengzhu',
+  data_dir: 'x',
+  logs_dir: 'y',
+  data_writable: true,
+  models: [{ index: 0, name: 'M', model: 'm', has_key: true, enabled: true }],
+  has_usable_model: true,
+  stt_provider: 'whisper',
+  audio: { devices: [{ id: 1, name: 'Mic', is_loopback: false }, { id: 20000, name: 'Speakers (loopback)', is_loopback: true }] },
+  has_microphone: true,
+  has_system_audio: false,
+  onboarding_completed: false,
+}
+
+const ONBOARDING_GOAL = {
+  id: 'goal-onboarding',
+  title: 'MindRank · AIDD Agent Engineer',
+  company: 'MindRank',
+  role: 'AIDD Agent Engineer',
+  jd: 'Agent / RAG',
+  status: 'ACTIVE',
+  stage: '准备中',
+  next_interview_at: null,
+  interview_round: '',
+  goal_notes: '',
+  selected_resume_id: null,
+  selected_material_ids: [],
+  selected_kb_ids: [],
+  selected_quick_note_ids: [],
+  active_question_bank_ids: [],
+  next_focus_id: '',
+  offer_state: 'NONE',
+  role_family: 'AI_ML_ENGINEER',
+  legacy_prep_space_id: null,
+  application_id: null,
+  last_opened_at: null,
+  created_at: 1,
+  updated_at: 1,
+  interviews: [],
+  offer: { goal_id: 'goal-onboarding', status: 'NONE', comp: '', deadline: null, notes: '', updated_at: null },
+  next_focus: [],
+  sessions: [],
+}
+
+test.describe('v2 first-run orientation', () => {
+  test('first run asks three questions instead of walking a setup wizard', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus', ia_app_mode: 'home' },
@@ -148,47 +193,42 @@ test.describe('v1.3 first-run onboarding', () => {
           const { resolveApiPayload } = await import('./fixtures/sample-data.mjs')
           return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
         }
-        if (pathname === '/api/intelligence/diagnostics') {
-          return {
-            packaged: true, data_home: 'C:/Users/u/AppData/Roaming/Chengzhu', data_dir: 'x', logs_dir: 'y', data_writable: true,
-            models: [{ index: 0, name: 'M', model: 'm', has_key: true, enabled: true }], has_usable_model: true, stt_provider: 'whisper',
-            audio: { devices: [{ id: 1, name: 'Mic', is_loopback: false }, { id: 20000, name: 'Speakers (loopback)', is_loopback: true }] },
-            has_microphone: true, has_system_audio: true, onboarding_completed: false,
-          }
-        }
-        if (pathname === '/api/models/health/0') return { ok: false }
-        if (pathname === '/api/models/health') return { health: { 0: '不可用' }, detail: { 0: 'Error code: 401 invalid api key' } }
-        if (pathname === '/api/intelligence/diagnostics/explain') return { kind: 'auth', cause: 'API Key 无效或已过期', action: '在「设置 → 模型」里重新填写 API Key。' }
+        if (pathname === '/api/intelligence/diagnostics') return ONBOARDING_DIAGNOSTICS
         return undefined
       },
     })
     await page.goto('/')
     const wizard = page.getByTestId('onboarding')
     await expect(wizard).toBeVisible({ timeout: 8000 })
-    await expect(wizard.getByText('第 1 / 11 步')).toBeVisible()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByText('数据目录：C:/Users/u/AppData/Roaming/Chengzhu')).toBeVisible()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await wizard.getByRole('button', { name: '测试连接' }).click()
-    await expect(wizard.getByText(/原因：API Key 无效或已过期/)).toBeVisible()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByLabel('选择麦克风')).toBeVisible()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByLabel('选择系统音频设备')).toBeVisible()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByRole('radio', { name: '关闭（推荐默认）' })).toBeChecked()
+
+    // 01 理解 — the product explains itself, it does not configure the machine.
+    await expect(wizard.getByText('FIRST RUN · 1 / 3')).toBeVisible()
+    await expect(wizard.getByRole('heading', { name: '成竹围绕一个目标工作' })).toBeVisible()
+    await expect(wizard.getByText('理解', { exact: false }).first()).toBeVisible()
+    await expect(wizard.getByRole('button', { name: '测试连接' })).toHaveCount(0)
+    await expect(wizard.getByLabel('选择麦克风')).toHaveCount(0)
+    await expect(wizard.getByText('打开模型设置')).toHaveCount(0)
+
+    // 02 创建目标 — only what is needed to say which interview this is.
+    await wizard.getByTestId('onboarding-next').click()
+    await expect(wizard.getByRole('heading', { name: '你下一场在准备什么？' })).toBeVisible()
+    await expect(wizard.getByTestId('onboarding-goal-company')).toBeVisible()
+    await expect(wizard.getByTestId('onboarding-goal-role')).toBeVisible()
+    await expect(wizard.getByTestId('onboarding-goal-jd')).toBeVisible()
+    await expect(wizard.getByText('下一轮信息（可选）')).toBeVisible()
+
+    // 03 就绪 — machine status is reported honestly and never gates entry.
+    await expect(wizard.getByTestId('onboarding-finish')).toHaveCount(0)
+    await wizard.getByTestId('onboarding-goal-role').fill('AIDD Agent Engineer')
+    await wizard.getByTestId('onboarding-next').click()
+    await expect(wizard.getByTestId('onboarding-complete-step')).toBeVisible()
+    await expect(wizard.getByText('这台电脑')).toBeVisible()
+    await expect(wizard.getByText('未就绪')).toBeVisible()
+    await expect(wizard.getByText('上场前还会再检查一次，缺什么就在那一步修。')).toBeVisible()
+    await expect(wizard.getByTestId('onboarding-finish')).toBeEnabled()
   })
 
-  test('first Goal flows into Guided First Practice before onboarding completes', async ({ context, page }) => {
-    const GOAL = {
-      id: 'goal-onboarding', title: 'MindRank · AIDD Agent Engineer', company: 'MindRank', role: 'AIDD Agent Engineer',
-      jd: 'Agent / RAG', status: 'ACTIVE', stage: '准备中', next_interview_at: null, interview_round: '',
-      goal_notes: '', selected_resume_id: null, selected_material_ids: [], selected_kb_ids: [],
-      selected_quick_note_ids: [], active_question_bank_ids: [], next_focus_id: '', offer_state: 'NONE',
-      role_family: 'AI_ML_ENGINEER', legacy_prep_space_id: null, application_id: null,
-      last_opened_at: null, created_at: 1, updated_at: 1,
-    }
+  test('the first Goal created here leads into its Goal Room', async ({ context, page }) => {
     await installMocks(context, {
       messages: COMMON_WS_BOOTSTRAP,
       localStorage: { 'ia-color-scheme': 'vscode-light-plus' },
@@ -197,72 +237,28 @@ test.describe('v1.3 first-run onboarding', () => {
           const { resolveApiPayload } = await import('./fixtures/sample-data.mjs')
           return { ...resolveApiPayload('/api/config', 'GET'), onboarding_completed: false }
         }
-        if (pathname === '/api/intelligence/diagnostics') {
-          return {
-            packaged: true, data_home: 'C:/Users/u/AppData/Roaming/Chengzhu', data_dir: 'x', logs_dir: 'y', data_writable: true,
-            models: [{ index: 0, name: 'M', model: 'm', has_key: true, enabled: true }], has_usable_model: true, stt_provider: 'whisper',
-            audio: { devices: [{ id: 1, name: 'Mic', is_loopback: false }, { id: 20000, name: 'Speakers (loopback)', is_loopback: true }] },
-            has_microphone: true, has_system_audio: true, onboarding_completed: false,
-          }
+        if (pathname === '/api/intelligence/diagnostics') return ONBOARDING_DIAGNOSTICS
+        if (pathname === '/api/product/goals' && method === 'POST') return ONBOARDING_GOAL
+        if (pathname === '/api/product/goals/goal-onboarding' && method === 'GET') return ONBOARDING_GOAL
+        if (pathname === '/api/product/goals/goal-onboarding/prepare' && method === 'GET') {
+          return { goal_id: 'goal-onboarding', next_focus: [], gap_map: [], attack_surface: [], question_graph: [], stories: { items: [], prompts: [], coverage: { categories: [], missing: [] } }, has_jd: true, materials: { included: [], skipped: [], selected_ids: [] }, pack_preview: { quick_notes: [], materials: [], legacy_prep_space_id: null } }
         }
-        if (pathname === '/api/product/goals' && method === 'POST') return GOAL
-        if (pathname === '/api/product/practice' && method === 'POST') {
-          return {
-            practice_id: 'guided-1',
-            config: { goal_id: GOAL.id, guided: true },
-            question: { id: 'gq-1', seq: 1, question: '为什么在这个项目里选择 RAG？', move: 'OPEN', source: 'ROLE_BANK', persona_id: 'TECH_LEAD', persona_label: 'Tech Lead' },
-            panel: { personas: [], current_speaker: 'TECH_LEAD', next_speaker: '', shared_topic: 'RAG', is_panel: false },
-            pool_size: 1, total: 1,
-          }
-        }
-        if (pathname === '/api/product/practice/guided-1/answer' && method === 'POST') {
-          return {
-            done: true, answered: 1,
-            feedback: {
-              content: {
-                signals: { did_answer_question: 1 },
-                findings: [{ signal: 'structure', dimension: 'structure', level: 2, finding: '结论可以更早。', evidence_from_actual_speech: '因为知识更新快。', action: '第一句直接给选择 RAG 的结论。' }],
-                strengths: [],
-              },
-              delivery: { metrics: { answer_duration_s: 12, time_to_conclusion_s: 5, fillers: 0 }, advice: ['把结论提前到前 3 秒。'] },
-            },
-            report: { practice_id: 'guided-1', review_session_id: 1, goal_id: GOAL.id, turn_count: 1, went_well: [], to_improve: [], delivery: [] },
-          }
-        }
-        // Exercise the explicitly-labelled fixture fallback. The real
-        // guidance_fast transport is covered by the cue-first test above.
-        if (pathname === '/api/ask' && method === 'POST') return { detail: 'Not found' }
         return undefined
       },
     })
-
     await page.goto('/')
     const wizard = page.getByTestId('onboarding')
     await expect(wizard).toBeVisible({ timeout: 8000 })
-
-    // Advance to 第一个目标 without requiring real credentials/hardware.
-    for (let i = 0; i < 8; i++) await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByText('第一个目标')).toBeVisible()
-    await wizard.getByLabel('目标公司').fill('MindRank')
-    await wizard.getByLabel('目标岗位').fill('AIDD Agent Engineer')
-    await wizard.getByRole('button', { name: '下一步' }).click()
-
-    await expect(wizard.getByRole('heading', { name: '第一次演练' })).toBeVisible()
-    await expect(wizard.getByRole('button', { name: '先完成这次演练' })).toBeDisabled()
-    await wizard.getByRole('button', { name: '开始第一次演练' }).click()
-    await expect(wizard.getByTestId('guided-question')).toContainText('为什么在这个项目里选择 RAG？')
-
-    await wizard.getByRole('button', { name: '生成快速提示' }).click()
-    await expect(wizard.getByRole('alert')).toBeVisible()
-    await wizard.getByRole('button', { name: '使用标记明确的示例 Cue 继续' }).click()
-    await expect(wizard.getByTestId('guided-fast-cue-fallback')).toContainText('不是实时模型证据')
-
-    await wizard.getByLabel('第一次演练回答').fill('因为知识更新快，而且来源需要可追溯，所以我会优先用 RAG。')
-    await wizard.getByRole('button', { name: '提交演练' }).click()
-    await expect(wizard.getByTestId('guided-practice-complete')).toBeVisible()
-    await expect(wizard.getByRole('button', { name: '下一步' })).toBeEnabled()
-    await wizard.getByRole('button', { name: '下一步' }).click()
-    await expect(wizard.getByText('准备好了。之后只记住一条路径')).toBeVisible()
+    await wizard.getByTestId('onboarding-next').click()
+    await wizard.getByTestId('onboarding-goal-company').fill('MindRank')
+    await wizard.getByTestId('onboarding-goal-role').fill('AIDD Agent Engineer')
+    await wizard.getByTestId('onboarding-goal-jd').fill('Agent / RAG')
+    await wizard.getByTestId('onboarding-next').click()
+    await expect(wizard.getByTestId('onboarding-complete-step')).toBeVisible()
+    await expect(wizard.getByText('目标已建立。', { exact: false })).toBeVisible()
+    await wizard.getByTestId('onboarding-finish').click()
+    await expect(page).toHaveURL(/#\/goals\/goal-onboarding/)
+    await expect(page.getByTestId('goal-room')).toBeVisible()
   })
 })
 

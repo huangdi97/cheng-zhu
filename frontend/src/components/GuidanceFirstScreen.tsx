@@ -61,7 +61,7 @@ export default function GuidanceFirstScreen({ cue, qaId }: FastCuePanelProps) {
       )}
       {cue.cues.length > 0 && (
         <ul className="space-y-1.5">
-          {cue.cues.map((item, idx) => (
+          {cue.cues.slice(0, 3).map((item, idx) => (
             <li key={idx} className="flex items-start gap-2 text-[13px] text-text-primary leading-relaxed">
               <span className="mt-[8px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent-blue" aria-hidden />
               <span className="min-w-0 flex-1 break-words">{item.text}</span>

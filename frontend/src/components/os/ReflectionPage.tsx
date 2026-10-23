@@ -210,7 +210,7 @@ export default function ReflectionPage({ kind, sessionRef }: { kind: string; ses
       <Timeline data={data} />
       {data.session_kind === 'REVIEW' ? (
         <Section title="完整复盘（逐题分析、AI 参考答案）" action={<SecondaryButton onClick={() => setDetailOpen((v) => !v)}>{detailOpen ? '收起' : '展开'}</SecondaryButton>}>
-          {detailOpen ? <div className="rounded-2xl border border-bg-hover/50 overflow-hidden"><Suspense fallback={<Loading />}><ReviewSessionDetail sessionId={Number(data.session_ref)} onBack={() => setDetailOpen(false)} /></Suspense></div> : null}
+          {detailOpen ? <div className="rounded-xl border border-bg-hover/50 overflow-hidden"><Suspense fallback={<Loading />}><ReviewSessionDetail sessionId={Number(data.session_ref)} onBack={() => setDetailOpen(false)} /></Suspense></div> : null}
         </Section>
       ) : null}
     </Page>

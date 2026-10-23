@@ -46,9 +46,15 @@ export default defineConfig({
     'e2e/__screenshots__/{testFilePath}/{arg}-{platform}{ext}',
   expect: {
     toHaveScreenshot: {
-      // ~0.5% allowed pixel diff handles font subpixel rendering noise.
-      maxDiffPixelRatio: 0.005,
-      threshold: 0.2,
+      // Pixel-exact regression: UI v2 baselines are frozen artifacts and any
+      // changed pixel is an intentional design change that must be reviewed.
+      // `threshold` is the per-pixel colour tolerance: Playwright's default 0.2
+      // is loose enough that a whole-palette re-tint (a few RGB units on every
+      // text and hairline) registers as "no change", so baselines would silently
+      // go stale. 0.05 still absorbs sub-pixel antialiasing but catches a real
+      // palette or typography shift.
+      maxDiffPixelRatio: 0,
+      threshold: 0.05,
       animations: 'disabled',
       // index.css 拉 Google Fonts，部分环境等待 document.fonts 较慢
       timeout: 30_000,

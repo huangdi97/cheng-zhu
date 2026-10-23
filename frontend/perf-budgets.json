@@ -1,0 +1,6 @@
+{
+  "eagerJsCssGzipKb": 308,
+  "totalGzipKb": 501,
+  "largestChunkGzipKb": 134,
+  "note": "Rewritten with --write: current value +5% headroom. Lower these deliberately, never by regeneration."
+}

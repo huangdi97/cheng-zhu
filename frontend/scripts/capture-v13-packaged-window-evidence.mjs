@@ -296,9 +296,9 @@ try {
       { kind: 'wait', selector: '[data-testid="guided-practice-complete"]', timeout_ms: 20000 },
       { kind: 'capture', name: '01g-guided-reflection', note: 'Content/Delivery feedback plus Demo Reflection closes the first-use loop' },
 
-      { kind: 'click', selector: '[data-testid="onboarding-finish"]' },
       { kind: 'wait', selector: '[data-testid="onboarding-complete-step"]', timeout_ms: 5000 },
       { kind: 'capture', name: '01h-onboarding-complete', note: 'canonical Goal-centered completion message' },
+      { kind: 'wait', selector: '[data-testid="onboarding-finish"]', timeout_ms: 5000 },
       { kind: 'click', selector: '[data-testid="onboarding-finish"]' },
       { kind: 'wait', selector: '[data-testid="action-home"]', timeout_ms: 10000 },
     ],

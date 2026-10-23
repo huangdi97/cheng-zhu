@@ -49,6 +49,29 @@ test('share privacy runtime snapshot verifies actual live window flags', () => {
   const staleOff = sharePrivacy.runtimeSnapshot('OFF', protectedWindow, null, 'win32');
   assert.equal(staleOff.protected, true);
   assert.equal(staleOff.runtime_verified, false);
+test('share privacy verdict ignores windows that are not on screen', () => {
+  const win = (visible, protectedFlag) => ({
+    isDestroyed: () => false,
+    isVisible: () => visible,
+    isContentProtected: () => protectedFlag,
+  });
+  // Live: the main window is hidden on purpose while the private overlay is on
+  // screen. Windows clears a hidden window's display affinity, so judging it
+  // reported "共享隐私：关" at the exact moment the overlay was showing.
+  const live = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', win(false, false), win(true, true), 'win32');
+  assert.equal(live.main_window_visible, false);
+  assert.equal(live.main_window_protected, null);
+  assert.equal(live.overlay_window_protected, true);
+  assert.equal(live.protected, true);
+  assert.equal(live.runtime_verified, true);
+  // A visible, unprotected overlay is still a real leak.
+  const leak = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', win(false, false), win(true, false), 'win32');
+  assert.equal(leak.protected, false);
+  assert.equal(leak.runtime_verified, false);
+  // Nothing visible to judge is not a pass.
+  const blind = sharePrivacy.runtimeSnapshot('PRIVATE_OVERLAY', win(false, false), win(false, false), 'win32');
+  assert.equal(blind.runtime_verified, false);
+});
 });
 
 test('share privacy runtime snapshot surfaces macOS ScreenCaptureKit limitation', () => {

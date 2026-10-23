@@ -58,6 +58,12 @@ function applyToWindow(win, mode) {
 function readWindowProtection(win) {
   if (!win || (typeof win.isDestroyed === 'function' && win.isDestroyed())) return null;
   if (typeof win.isContentProtected !== 'function') return null;
+  // A hidden window is not composited, so it cannot be captured, and Windows clears
+  // the display affinity while it is hidden (measured on the packaged build: the
+  // flag reads false the moment the window hides). Judging it would flip the verdict
+  // to "unprotected" exactly when the private overlay is on screen — the one moment
+  // protection matters. Only visible windows join the verdict.
+  if (typeof win.isVisible === 'function' && !win.isVisible()) return null;
   try {
     return Boolean(win.isContentProtected());
   } catch {
@@ -81,6 +87,8 @@ function runtimeSnapshot(mode, mainWindow, overlayWindow, platform = process.pla
     runtime_verified: runtimeVerified,
     main_window_protected: mainProtected,
     overlay_window_protected: overlayProtected,
+    main_window_visible: typeof mainWindow?.isVisible === 'function' ? mainWindow.isVisible() : null,
+    overlay_window_visible: typeof overlayWindow?.isVisible === 'function' ? overlayWindow.isVisible() : null,
     platform,
     windows_capture_exclusion_may_lag: platform === 'win32' && requested,
     macos_screencapturekit_limitation: platform === 'darwin' && requested,

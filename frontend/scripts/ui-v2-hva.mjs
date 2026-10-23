@@ -61,6 +61,14 @@ const VIEWPORTS = [
   { id: '390x844', width: 390, height: 844 },
 ]
 const PRIMARY_VIEWPORT = '1440x900'
+
+// Measured on the fixture run (18 surfaces): DOM <= 414, LCP <= 280 ms, long-task
+// total <= 53 ms, heap ~10 MB. The ceilings sit well above that — enough headroom
+// for the richer real-data states, tight enough that a runaway list, a rerender
+// loop or a leak trips them. LCP is recorded but not enforced: a shared CI runner
+// changes that number far more than the code does.
+const RUNTIME_BUDGET = { domNodes: 700, longTaskMs: 250, heapMb: 60 }
+
 const RESPONSIVE_VIEWPORTS = ['1280x720', '1920x1080', '768x1024', '390x844']
 
 // ---------------------------------------------------------------- fixtures --
@@ -828,6 +836,42 @@ async function enterLive(page) {
   await page.getByTestId('live-status-line').waitFor({ state: 'visible' })
 }
 
+// Runtime probe: registered before the app boots, because LCP and long tasks are
+// only observable through a PerformanceObserver that exists while they happen.
+function runtimeProbeInit() {
+  window.__perf = { lcp: 0, longTaskMs: 0, longTasks: 0 }
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) window.__perf.lcp = Math.max(window.__perf.lcp, entry.startTime)
+    }).observe({ type: 'largest-contentful-paint', buffered: true })
+  } catch { /* not supported in this engine */ }
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        window.__perf.longTaskMs += entry.duration
+        window.__perf.longTasks += 1
+      }
+    }).observe({ type: 'longtask', buffered: true })
+  } catch { /* not supported in this engine */ }
+}
+
+async function measureRuntime(page) {
+  return page.evaluate(() => {
+    const nav = performance.getEntriesByType('navigation')[0]
+    const fcp = performance.getEntriesByName('first-contentful-paint')[0]
+    const perf = window.__perf || { lcp: 0, longTaskMs: 0, longTasks: 0 }
+    const memory = performance.memory
+    return {
+      domNodes: document.querySelectorAll('*').length,
+      fcpMs: fcp ? Math.round(fcp.startTime) : null,
+      lcpMs: perf.lcp ? Math.round(perf.lcp) : null,
+      dclMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
+      longTasks: perf.longTasks,
+      longTaskMs: Math.round(perf.longTaskMs),
+      heapMb: memory ? Math.round(memory.usedJSHeapSize / 1048576) : null,
+    }
+  })
+}
 async function measure(page) {
   return page.evaluate(() => {
     const round = (n) => Math.round(n * 10) / 10
@@ -1189,6 +1233,12 @@ function ruleFailures(state, viewport, metrics, png, opts) {
         push('accent-bamboo', `品牌色相 ${accent.hue}° 不在竹绿区间 125–160`)
       }
     }
+    if (opts.runtime) {
+      const runtime = opts.runtime
+      if (runtime.domNodes > RUNTIME_BUDGET.domNodes) push('runtime-dom', `DOM 节点 ${runtime.domNodes} > ${RUNTIME_BUDGET.domNodes}`)
+      if (runtime.longTaskMs > RUNTIME_BUDGET.longTaskMs) push('runtime-longtask', `长任务累计 ${runtime.longTaskMs}ms > ${RUNTIME_BUDGET.longTaskMs}ms`)
+      if (runtime.heapMb != null && runtime.heapMb > RUNTIME_BUDGET.heapMb) push('runtime-heap', `JS 堆 ${runtime.heapMb}MB > ${RUNTIME_BUDGET.heapMb}MB`)
+    }
     if (opts.a11y) {
       const a11y = opts.a11y
       const serious = (a11y.violations ?? []).filter((violation) => violation.impact === 'serious' || violation.impact === 'critical')
@@ -1262,6 +1312,7 @@ async function main() {
         colorScheme: 'light',
       })
       await context.addInitScript(mockWsInitScript, { messages: state.messages ?? COMMON_WS_BOOTSTRAP })
+      await context.addInitScript(runtimeProbeInit)
       if (state.localStorage) {
         await context.addInitScript((entries) => {
           for (const [key, value] of Object.entries(entries)) {
@@ -1307,6 +1358,7 @@ async function main() {
         const shot = path.join(OUT, dir, `${state.id}-${viewport.id}.png`)
         await page.screenshot({ path: shot, fullPage: false })
         const metrics = await measure(page)
+        const runtime = viewport.id === PRIMARY_VIEWPORT ? await measureRuntime(page) : null
         let ctaRect = null
         if (state.primaryCta) {
           const locator = page.locator(state.primaryCta).first()
@@ -1349,7 +1401,7 @@ async function main() {
           ? await auditAccessibility(page, { dialog: Boolean(state.dialog) })
           : null
         const png = await analysePng(shot)
-        const failures = ruleFailures(state, viewport, metrics, png, { ctaRect, dialogRect, blockingCtaRect, a11y })
+        const failures = ruleFailures(state, viewport, metrics, png, { ctaRect, dialogRect, blockingCtaRect, a11y, runtime })
         report.states.push({
           id: state.id,
           dir,
@@ -1363,6 +1415,7 @@ async function main() {
           consoleErrors,
           readyWarnings,
           a11y,
+          runtime,
           pageErrors,
           failures,
         })
@@ -1405,6 +1458,12 @@ async function main() {
     for (const s of consoleErr.slice(0, 8)) console.log(`  ${s.id} [${s.viewport}]: ${s.consoleErrors[0]}`)
   }
   console.log(`\nmetrics: ${path.join(OUT, 'hva-metrics.json')}`)
+
+  const runtimeRows = report.states.filter((state) => state.runtime)
+  if (runtimeRows.length) {
+    const worst = (key) => runtimeRows.reduce((max, state) => Math.max(max, state.runtime[key] ?? 0), 0)
+    console.log(`runtime (max over ${runtimeRows.length} surfaces): dom ${worst('domNodes')} nodes · LCP ${worst('lcpMs')}ms · long tasks ${worst('longTaskMs')}ms · heap ${worst('heapMb')}MB`)
+  }
   console.log(`failures: ${report.failures.length}`)
   if (report.failures.length) process.exitCode = 1
 }

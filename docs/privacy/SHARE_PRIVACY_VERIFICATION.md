@@ -59,9 +59,9 @@ phone pointed at the screen. The product copy says this and must keep saying it.
 - **Human Coach is opt-in and token-guarded.** `api/coach/router.py` starts a second
   listener on `0.0.0.0:18180` *only while a coach session is active*, serving only
   the helper page and token-guarded endpoints (`x-coach-token`), and stops it when
-  idle. This is the one interface reachable from the LAN, by design; it is worth
-  writing that down in user-facing copy because "local app" and "port open to the
-  LAN while coaching" are not obviously the same thing.
+  idle. This is the one interface reachable from the LAN, by design, and it is now
+  stated in Settings → 隐私与策略 (`COACH_LAN_COPY`): the port, the token, that it
+  closes with the session, and that everything else stays on loopback.
 
 ## 3. Local data at rest
 
@@ -71,9 +71,11 @@ Verified by reading the packaged profile: `product.db`, `resume_history.db`,
 
 That is a deliberate local-first trade-off, but it means the real protection for
 this data is the OS account boundary plus disk encryption (BitLocker/FileVault).
-Recommendation, not implemented: document "turn on disk encryption" in the privacy
-note, and consider encrypting only `resume_history.db` if a threat model ever needs
-it.
+Settings → 隐私与策略 now says exactly that, next to the 共享隐私 control
+(`LOCAL_DATA_COPY` in `frontend/src/lib/privacyCopy.ts`), and a unit test keeps the
+sentence from being trimmed away.
+
+Still open: encrypting `resume_history.db` itself, if a threat model ever needs it.
 
 ## 4. Policy enforcement
 

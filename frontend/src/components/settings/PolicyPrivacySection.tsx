@@ -3,6 +3,7 @@ import Switch from '@/components/Switch'
 import { useInterviewStore } from '@/stores/configStore'
 import { updateConfigAndRefresh } from '@/lib/configSync'
 import { Field, Section } from './shared'
+import { COACH_LAN_COPY, LOCAL_DATA_COPY, SHARE_PRIVACY_COPY } from '@/lib/privacyCopy'
 
 declare const __APP_VERSION__: string
 
@@ -20,9 +21,6 @@ const HUMAN_OPTIONS: Array<[string, string]> = [
   ['HUMAN_FORBIDDEN', '禁止'],
   ['HUMAN_ALLOWED', '允许（需面试方明确允许外部协助）'],
 ]
-
-export const SHARE_PRIVACY_COPY =
-  '用于减少成竹中的私人资料意外出现在受支持的屏幕共享或录制路径中。不同系统和捕获方式行为不同，这不是安全或“不可检测”保证。'
 
 export default function PolicyPrivacySection({ mode = 'full' }: { mode?: 'full' | 'about' }) {
   const config = useInterviewStore((s) => s.config)
@@ -52,6 +50,15 @@ export default function PolicyPrivacySection({ mode = 'full' }: { mode?: 'full' 
             <option value="PRIVATE_OVERLAY">私有悬浮窗</option>
           </select>
         </Field>
+        <div className="rounded-lg border border-bg-hover/60 bg-bg-primary/40 px-3 py-2">
+          <p className="text-[11px] font-medium text-text-secondary">本机数据</p>
+          <p className="mt-1 text-[10px] leading-4 text-text-muted">
+            {LOCAL_DATA_COPY}
+          </p>
+          <p className="mt-1 text-[10px] leading-4 text-text-muted">
+            {COACH_LAN_COPY}
+          </p>
+        </div>
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-text-secondary">正式场次的语速 / cue 采纳分析</p>

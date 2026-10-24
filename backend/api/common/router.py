@@ -1,3 +1,4 @@
+import asyncio
 import socket
 import threading
 import time
@@ -264,6 +265,13 @@ def _list_remote_models(api_base_url: str, api_key: str) -> dict:
 @router.get("/config")
 async def api_get_config():
     return build_config_payload(get_config())
+
+@router.get("/privacy/exposure")
+async def api_privacy_exposure():
+    """本机到底还有什么能被人直接读走。只做报告，不做承诺。"""
+    from services.privacy import exposure
+
+    return await asyncio.to_thread(exposure.scan)
 
 
 _LEGACY_STT_PROVIDER_MAP = {"iflytek": "generic"}

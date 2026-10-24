@@ -92,14 +92,37 @@ def unprotect(data: bytes, purpose: str = "resume") -> bytes:
     return _call(ctypes.windll.crypt32.CryptUnprotectData, blob, _entropy(purpose))
 
 
+def protect_text(value: str, purpose: str = "resume") -> str:
+    """Protect a SQLite text column. Returns the value unchanged when it cannot."""
+    if not value:
+        return value
+    blob = protect(value.encode("utf-8"), purpose)
+    if blob is None:
+        return value
+    return base64.b64encode(blob).decode("ascii")
+
+
+def unprotect_text(value: str, purpose: str = "resume") -> str:
+    """Inverse of protect_text; tolerates plaintext written by an older build."""
+    if not value:
+        return value
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except Exception:  # noqa: BLE001 - not our envelope, treat as plaintext
+        return value
+    if not is_protected(raw):
+        return value
+    return unprotect(raw, purpose).decode("utf-8")
+
+
 def status() -> dict[str, Any]:
     return {
         "available": available(),
         "scheme": "windows-dpapi" if available() else "none",
         "magic": base64.b64encode(MAGIC).decode("ascii"),
-        "covers": ["resume uploads"],
+        "covers": ["resume uploads", "resume text columns"],
         "does_not_cover": [
-            "sqlite text columns",
+            "knowledge base and other stores",
             "a process already running as this user",
             "a compromised OS account",
         ],

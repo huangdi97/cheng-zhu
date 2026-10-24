@@ -96,14 +96,19 @@ unwrap. Measured on this machine:
 
 What it does not do, and the code says so in `status()`:
 
-- **SQLite text columns stay plaintext.** The parsed resume text, Goal fields and
-  transcripts are readable in the `.db` files; encrypting them needs a key story for
-  search and migrations, so it is a separate change.
+- **The resume text columns are protected too** (`resume_entries.resume_summary`,
+  `preview`), measured by scanning the database and its WAL for a marker string: it
+  does not appear, and the UI still renders the text. The other stores (Goal fields,
+  transcripts, knowledge base) stay plaintext — the knowledge base needs FTS, so
+  encrypting it is a search problem, not a crypto one.
 - **It does not stop a process running as the same user** — that process can call
   `CryptUnprotectData` too. It closes the "profile copied to another machine or into a
   synced folder" case, not a compromised account.
 - **Non-Windows platforms get no protection.** `protect()` returns `None`, writes
   stay plaintext, and `status()` reports `scheme: none` rather than pretending.
+  macOS has the right home for a key (Keychain) but no cipher in the standard
+  library, and this environment cannot reach PyPI to add `cryptography`, so the macOS
+  path stays unimplemented rather than hand-rolled.
 
 Reads stay backward compatible: anything without the marker is returned untouched, so
 an existing plaintext directory keeps working and is protected from the next write.
@@ -120,3 +125,15 @@ by the strict eval that CI runs (`python -m evals.r2_eval --check`, mandatory ca
 - It does not claim the overlay is undetectable, or that a determined interviewer,
   proctoring tool or hardware capture cannot see it.
 - It does not cover macOS (ScreenCaptureKit path) — untested here.
+
+## 3b. 本机暴露自检
+
+`GET /api/privacy/exposure` (Settings → 隐私与策略 → 本机暴露自检) reports the
+filesystem as it is: how many uploaded originals are protected, how many resume rows
+carry the marker, the database files and their sizes, and the disk-encryption state
+(BitLocker on Windows, FileVault on macOS).
+
+It is a report, not a promise. `disk_encryption.protected: null` means "could not
+determine" — it is never counted as a pass, and it is never reported as a gap either.
+`verdict` flips to `exposed` only when something is measurably plaintext or the
+platform has no at-rest implementation at all.

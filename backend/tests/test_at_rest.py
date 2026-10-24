@@ -10,7 +10,8 @@ def test_status_tells_the_truth_about_platform():
     assert status["available"] is (sys.platform == "win32")
     assert status["scheme"] == ("windows-dpapi" if sys.platform == "win32" else "none")
     # The limits are part of the contract, not a footnote someone can drop.
-    assert "sqlite text columns" in status["does_not_cover"]
+    assert "resume text columns" in status["covers"]
+    assert "knowledge base and other stores" in status["does_not_cover"]
     assert "a compromised OS account" in status["does_not_cover"]
 
 
@@ -77,3 +78,26 @@ def test_upload_bytes_are_protected_at_rest(resume_env):
 
     back, _name, _base = rh._read_entry_bytes(entry["history_id"])
     assert back == content
+def test_resume_text_columns_are_not_plaintext_on_disk(resume_env):
+    """The parsed resume text is the other half of the exposure: it must not sit
+    readable in the SQLite file, and it must still render in the UI."""
+    rh, _uploads = resume_env
+    marker = "WenNian-RAG-Redis-session-state"
+    content = f"简历：负责 RAG 检索链路 {marker}，用 Redis 管理 session state。".encode()
+    rh.add_upload(content, "at_rest_columns.txt")
+
+    blob = b""
+    for suffix in ("", "-wal"):
+        path = rh.DB_PATH + suffix
+        try:
+            with open(path, "rb") as handle:
+                blob += handle.read()
+        except OSError:
+            continue
+
+    if at_rest.available():
+        assert marker.encode() not in blob
+    entry = rh.list_entries()[0]
+    assert entry["parsed_ok"] is True
+    detail = rh.get_entry_detail(entry["id"])
+    assert marker in (detail.get("summary") or detail.get("preview") or "")

@@ -141,15 +141,28 @@ def _evict_excess(conn: sqlite3.Connection) -> None:
         _delete_row_and_file(conn, eid)
 
 
-def _row_to_item(row: sqlite3.Row, active_id: Optional[int]) -> dict[str, Any]:
-    return {
+def _seal(value: Optional[str]) -> Optional[str]:
+    """加密入库的简历文本列；平台不支持时原样写入。"""
+    if not value:
+        return value
+    return at_rest.protect_text(value)
+
+
+def _open(value: Optional[str]) -> Optional[str]:
+    """读取时解密；老版本写入的明文按原样返回。"""
+    if not value:
+        return value
+    return at_rest.unprotect_text(value)
+
+
+def _row_to_item(row: sqlite3.Row, active_id: Optional[int]) -> dict[str, Any]:    return {
         "id": row["id"],
         "original_filename": row["original_filename"],
         "file_size": row["file_size"],
         "created_at": row["created_at"],
         "last_used_at": row["last_used_at"],
         "parsed_ok": bool(row["parsed_ok"]),
-        "preview": row["preview"] or "",
+        "preview": _open(row["preview"]) or "",
         "parse_error": row["parse_error"] or None,
         "is_active": active_id is not None and int(row["id"]) == int(active_id),
     }
@@ -232,9 +245,9 @@ def add_upload(content: bytes, original_filename: str) -> dict[str, Any]:
                     now,
                     now,
                     1 if parsed_ok else 0,
-                    preview_text or "",
+                    _seal(preview_text) or "",
                     parse_error,
-                    summary if summary else "",
+                    _seal(summary) or "",
                 ),
             )
             conn.commit()
@@ -302,7 +315,7 @@ def apply_entry(entry_id: int) -> dict[str, Any]:
     if not row:
         raise FileNotFoundError("记录不存在")
 
-    cached = (_row_get(row, "resume_summary", "") or "").strip()
+    cached = (_open(_row_get(row, "resume_summary", "")) or "").strip()
     if cached:
         with _db_lock:
             conn = _conn()
@@ -338,7 +351,7 @@ def apply_entry(entry_id: int) -> dict[str, Any]:
                 resume_summary = ?
             WHERE id = ?
             """,
-            (now, preview_text, summary, entry_id),
+            (now, _seal(preview_text), _seal(summary), entry_id),
         )
         conn.commit()
         conn.close()
@@ -373,8 +386,8 @@ def get_entry_detail(entry_id: int) -> dict[str, Any]:
         conn.close()
     if not row:
         raise FileNotFoundError("记录不存在")
-    rs = (_row_get(row, "resume_summary", "") or "").strip()
-    preview = (_row_get(row, "preview", "") or "").strip()
+    rs = (_open(_row_get(row, "resume_summary", "")) or "").strip()
+    preview = (_open(_row_get(row, "preview", "")) or "").strip()
     # 优先完整摘要；否则仅展示入库时的 preview（通常约 500 字）；选用一次后会写入 resume_summary
     summary_text = rs if rs else preview
     base = _row_to_item(row, active_id)
@@ -400,7 +413,7 @@ def update_entry_summary(entry_id: int, summary: str) -> dict[str, Any]:
             SET resume_summary = ?, preview = ?, parsed_ok = 1, parse_error = NULL
             WHERE id = ?
             """,
-            (summary, preview_text, entry_id),
+            (_seal(summary), _seal(preview_text), entry_id),
         )
         conn.commit()
         conn.close()

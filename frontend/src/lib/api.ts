@@ -428,6 +428,17 @@ export interface SkillBuilderAnswerResult {
 
 export const api = {
   getConfig: () => request('/api/config'),
+  // 本机暴露自检：报告仍是明文的产物，不做承诺。
+  privacyExposure: () => request<{
+    data_dir: string
+    platform: string
+    verdict: 'clean' | 'exposed'
+    gaps: string[]
+    at_rest: { available: boolean; scheme: string }
+    resume_uploads: { total: number; protected: number; plaintext: number }
+    resume_rows: { total: number; protected: number }
+    disk_encryption: { checked: boolean; protected: boolean | null; source: string | null }
+  }>('/api/privacy/exposure'),
   updateConfig: (data: Record<string, any>) =>
     request('/api/config', { method: 'POST', body: JSON.stringify(data) }),
   modelsLayout: (data: {

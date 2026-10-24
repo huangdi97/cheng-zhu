@@ -4,6 +4,7 @@ import { useInterviewStore } from '@/stores/configStore'
 import { updateConfigAndRefresh } from '@/lib/configSync'
 import { Field, Section } from './shared'
 import { COACH_LAN_COPY, LOCAL_DATA_COPY, SHARE_PRIVACY_COPY } from '@/lib/privacyCopy'
+import ExposureCheck from './ExposureCheck'
 
 declare const __APP_VERSION__: string
 
@@ -59,6 +60,7 @@ export default function PolicyPrivacySection({ mode = 'full' }: { mode?: 'full' 
             {COACH_LAN_COPY}
           </p>
         </div>
+        <ExposureCheck />
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-text-secondary">正式场次的语速 / cue 采纳分析</p>

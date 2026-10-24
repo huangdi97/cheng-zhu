@@ -14,6 +14,8 @@ from typing import Any, Optional
 
 from core.config import get_config, update_config
 from services.resume import parse_resume_bytes, summarize_resume
+from services.privacy import at_rest
+from services.privacy.at_rest import AtRestError
 from services.storage.paths import data_dir, sqlite_path
 
 MAX_ENTRIES = 10
@@ -193,8 +195,11 @@ def add_upload(content: bytes, original_filename: str) -> dict[str, Any]:
     stored_basename = f"{uuid.uuid4().hex}{ext}"
     disk_path = os.path.join(_uploads_dir(), stored_basename)
 
+    # 原始上传文件是用户最敏感的产物：能在 Windows 上用 DPAPI 保护就保护，
+    # 保护失败（或非 Windows）则原样落盘，绝不因为加密失败丢掉这次上传。
+    payload = at_rest.protect(content) or content
     with open(disk_path, "wb") as f:
-        f.write(content)
+        f.write(payload)
 
     preview_text: Optional[str] = None
     parse_error: Optional[str] = None
@@ -280,7 +285,11 @@ def _read_entry_bytes(entry_id: int) -> tuple[bytes, str, str]:
     if not os.path.isfile(path):
         raise FileNotFoundError("文件已丢失")
     with open(path, "rb") as f:
-        return f.read(), orig, basename
+        raw = f.read()
+    try:
+        return at_rest.unprotect(raw), orig, basename
+    except at_rest.AtRestError as e:
+        raise AtRestError("文件由其他 Windows 账户加密，无法读取：" + str(e)) from e
 
 
 def apply_entry(entry_id: int) -> dict[str, Any]:

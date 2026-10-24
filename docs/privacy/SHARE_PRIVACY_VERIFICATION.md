@@ -75,7 +75,38 @@ Settings → 隐私与策略 now says exactly that, next to the 共享隐私 con
 (`LOCAL_DATA_COPY` in `frontend/src/lib/privacyCopy.ts`), and a unit test keeps the
 sentence from being trimmed away.
 
-Still open: encrypting `resume_history.db` itself, if a threat model ever needs it.
+## 3a. Resume uploads at rest (Windows)
+
+Inspecting the storage layer changed the recommendation: the parsed text in
+`resume_history.db` is the smaller half. The **uploaded document itself** is written
+verbatim to `resume_uploads/<uuid>.<ext>` — the exact PDF/DOCX the user handed over.
+
+`backend/services/privacy/at_rest.py` now protects those bytes with DPAPI
+(`CryptProtectData`, scoped by a per-purpose entropy), so the file on disk is
+`CZHDPAPI1\n` + a blob that only the same Windows user on the same machine can
+unwrap. Measured on this machine:
+
+| Check | Result |
+| --- | --- |
+| file starts with the marker | yes |
+| plaintext bytes still present in the file | no |
+| `_read_entry_bytes()` returns the original document | yes |
+| tampered blob | `AtRestError`, not silent garbage |
+| wrong purpose | `AtRestError` |
+
+What it does not do, and the code says so in `status()`:
+
+- **SQLite text columns stay plaintext.** The parsed resume text, Goal fields and
+  transcripts are readable in the `.db` files; encrypting them needs a key story for
+  search and migrations, so it is a separate change.
+- **It does not stop a process running as the same user** — that process can call
+  `CryptUnprotectData` too. It closes the "profile copied to another machine or into a
+  synced folder" case, not a compromised account.
+- **Non-Windows platforms get no protection.** `protect()` returns `None`, writes
+  stay plaintext, and `status()` reports `scheme: none` rather than pretending.
+
+Reads stay backward compatible: anything without the marker is returned untouched, so
+an existing plaintext directory keeps working and is protected from the next write.
 
 ## 4. Policy enforcement
 

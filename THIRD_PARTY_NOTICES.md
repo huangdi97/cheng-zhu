@@ -386,7 +386,7 @@ If you are the author of upstream code and believe it is included here under dif
 | `semver` | 6.3.1 | ISC | dev |
 | `set-blocking` | 2.0.0 | ISC | runtime |
 | `siginfo` | 2.0.0 | ISC | dev |
-| `source-map-js` | 1.2.1 | BSD-3-Clause | dev |
+| `source-map-js` | 1.2.2 | BSD-3-Clause | dev |
 | `space-separated-tokens` | 2.0.2 | MIT | runtime |
 | `stackback` | 0.0.2 | MIT | dev |
 | `std-env` | 4.0.0 | MIT | dev |
@@ -542,7 +542,7 @@ If you are the author of upstream code and believe it is included here under dif
 | `dunder-proto` | 1.0.1 | MIT | dev |
 | `duplexer2` | 0.1.4 | BSD-3-Clause | dev |
 | `ejs` | 3.1.10 | Apache-2.0 | dev |
-| `electron` | 41.10.7 | MIT | dev |
+| `electron` | 42.11.18 | MIT | dev |
 | `electron-builder` | 26.17.0 | MIT | dev |
 | `electron-builder-squirrel-windows` | 26.17.0 | MIT | dev |
 | `electron-publish` | 26.16.0 | MIT | dev |
@@ -701,8 +701,8 @@ If you are the author of upstream code and believe it is included here under dif
 | `truncate-utf8-bytes` | 1.0.2 | WTFPL | dev |
 | `tslib` | 2.8.1 | 0BSD | dev |
 | `type-fest` | 0.13.1 | (MIT OR CC0-1.0) | dev |
-| `undici` | 6.29.0 | MIT | dev |
-| `undici` | 7.29.1 | MIT | dev |
+| `undici` | 6.29.1 | MIT | dev |
+| `undici` | 7.30.1 | MIT | dev |
 | `undici-types` | 7.18.2 | MIT | dev |
 | `universalify` | 0.1.2 | MIT | dev |
 | `universalify` | 2.0.1 | MIT | dev |

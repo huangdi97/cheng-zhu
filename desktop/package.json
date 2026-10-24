@@ -13,7 +13,7 @@
     "dist:win": "electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
-    "electron": "^41.10.7",
+    "electron": "^42.11.18",
     "electron-builder": "26.17.0"
   },
   "productName": "Chengzhu",
